@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import atexit
 import fcntl
 import os
-import pty
 import signal
 import subprocess
 from dataclasses import dataclass
@@ -14,13 +14,18 @@ from app.sandbox.manager import sandbox_manager
 from app.sandbox.nsjail import _nsjail_available
 
 
-@dataclass
+@dataclass(eq=False)
 class PtyProcess:
     """Handle to a PTY-backed shell process."""
 
     read_fd: int
     write_fd: int
     pid: int
+    session_id: str = ""
+
+
+# Global registry of active PTY processes so we can clean them all up.
+_active_ptys: set[PtyProcess] = set()
 
 
 def create_pty_process(session_id: str) -> PtyProcess:
@@ -35,9 +40,10 @@ def create_pty_process(session_id: str) -> PtyProcess:
 
     env = os.environ.copy()
     env["TERM"] = "xterm-256color"
-    env["HOME"] = "/home/project"
 
     if _nsjail_available() and sandbox is not None:
+        # Inside nsjail the workspace is mounted at /home/project
+        env["HOME"] = "/home/project"
         from app.sandbox.nsjail import build_nsjail_command
 
         cmd = build_nsjail_command(session_id, workspace_dir, sandbox.port, command=None)
@@ -51,6 +57,8 @@ def create_pty_process(session_id: str) -> PtyProcess:
         )
         pid = proc.pid
     else:
+        # macOS / dev fallback — HOME is the real workspace dir
+        env["HOME"] = workspace_dir
         pid = os.fork()
         if pid == 0:
             # Child process
@@ -71,14 +79,13 @@ def create_pty_process(session_id: str) -> PtyProcess:
     flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
     fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-    return PtyProcess(read_fd=master_fd, write_fd=master_fd, pid=pid)
+    pty_proc = PtyProcess(read_fd=master_fd, write_fd=master_fd, pid=pid, session_id=session_id)
+    _active_ptys.add(pty_proc)
+    return pty_proc
 
 
 def read_pty(pty_proc: PtyProcess) -> bytes:
-    """Non-blocking read from the PTY master fd.
-
-    Returns an empty ``bytes`` object if nothing is available.
-    """
+    """Non-blocking read from the PTY master fd."""
     try:
         return os.read(pty_proc.read_fd, 4096)
     except BlockingIOError:
@@ -93,15 +100,45 @@ def write_pty(pty_proc: PtyProcess, data: bytes) -> None:
 
 
 def close_pty(pty_proc: PtyProcess) -> None:
-    """Close the PTY file descriptors and kill the child process."""
+    """Close the PTY and kill the entire process group (bash + pnpm + node etc.)."""
+    _active_ptys.discard(pty_proc)
+
     try:
         os.close(pty_proc.read_fd)
     except OSError:
         pass
 
-    # write_fd is the same fd as read_fd (master), so no separate close needed
-
+    # Kill the entire process group so child processes (pnpm, node, esbuild)
+    # don't survive as zombies.  os.setsid() in the fork made the PTY shell
+    # the leader of its own process group, so killpg reaches all descendants.
     try:
-        os.kill(pty_proc.pid, signal.SIGTERM)
-    except ProcessLookupError:
+        os.killpg(os.getpgid(pty_proc.pid), signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        # Fallback: kill just the PID
+        try:
+            os.kill(pty_proc.pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+    # Reap the zombie so it doesn't linger in the process table
+    try:
+        os.waitpid(pty_proc.pid, os.WNOHANG)
+    except ChildProcessError:
         pass
+
+
+def cleanup_session_ptys(session_id: str) -> None:
+    """Kill all PTY processes belonging to a specific session."""
+    for pty_proc in list(_active_ptys):
+        if pty_proc.session_id == session_id:
+            close_pty(pty_proc)
+
+
+def cleanup_all_ptys() -> None:
+    """Kill every active PTY process. Called on server shutdown."""
+    for pty_proc in list(_active_ptys):
+        close_pty(pty_proc)
+
+
+# Best-effort cleanup when the Python process exits (Ctrl+C, kill, etc.)
+atexit.register(cleanup_all_ptys)
