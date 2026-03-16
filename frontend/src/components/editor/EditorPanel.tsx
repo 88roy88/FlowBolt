@@ -1,11 +1,15 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import Editor, { type Monaco } from '@monaco-editor/react';
 import { Download, FileCode } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
 import { downloadZip, downloadSingleHtml } from '../../services/api';
+import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
+
+const FILE_TREE_MIN = 120;
+const FILE_TREE_MAX = 400;
 
 let monacoTypesInitialized = false;
 
@@ -13,6 +17,11 @@ export function EditorPanel() {
   const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree } = useFilesStore();
   const sessionId = useSessionStore((s) => s.sessionId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [fileTreeWidth, setFileTreeWidth] = useState(180);
+
+  const handleFileTreeResize = useCallback((delta: number) => {
+    setFileTreeWidth((w) => Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, w + delta)));
+  }, []);
 
   useEffect(() => {
     if (sessionId) {
@@ -136,17 +145,20 @@ declare namespace JSX {
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: '180px 1fr',
+        display: 'flex',
+        flexDirection: 'row',
         height: '100%',
         overflow: 'hidden',
       }}
     >
       <div
         style={{
+          width: fileTreeWidth,
+          minWidth: fileTreeWidth,
           borderRight: '1px solid var(--border)',
           overflow: 'auto',
           background: 'var(--surface)',
+          flexShrink: 0,
         }}
       >
         <div
@@ -209,7 +221,9 @@ declare namespace JSX {
         <FileTree />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Resizer direction="horizontal" onDrag={handleFileTreeResize} />
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <FileTabs />
 
         {activeFilePath && activeContent !== undefined ? (
