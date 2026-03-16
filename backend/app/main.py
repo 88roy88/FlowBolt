@@ -78,3 +78,16 @@ app.include_router(export.router)
 # WebSocket routers
 app.include_router(chat.router)
 app.include_router(terminal.router)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    print(f"Starting backend server...")
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        reload_excludes=["data/**", "*.db"],
+        reload_delay=5.0,  # wait 5s after file change before reloading
+    )
