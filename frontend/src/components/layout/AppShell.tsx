@@ -10,7 +10,7 @@ type BottomTab = 'terminal' | 'server' | 'preview';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [bottomTab, setBottomTab] = useState<BottomTab>('terminal');
+  const [bottomTab, setBottomTab] = useState<BottomTab>('server');
 
   return (
     <div style={{
@@ -80,17 +80,6 @@ export function AppShell() {
               {sidebarOpen ? '\u25C0' : '\u25B6'}
             </button>
             <button
-              onClick={() => setBottomTab('terminal')}
-              style={{
-                padding: '6px 16px',
-                fontSize: '13px',
-                color: bottomTab === 'terminal' ? 'var(--accent)' : 'var(--text-dim)',
-                borderBottom: bottomTab === 'terminal' ? '2px solid var(--accent)' : '2px solid transparent',
-              }}
-            >
-              Terminal
-            </button>
-            <button
               onClick={() => setBottomTab('server')}
               style={{
                 padding: '6px 16px',
@@ -100,6 +89,17 @@ export function AppShell() {
               }}
             >
               Server
+            </button>
+            <button
+              onClick={() => setBottomTab('terminal')}
+              style={{
+                padding: '6px 16px',
+                fontSize: '13px',
+                color: bottomTab === 'terminal' ? 'var(--accent)' : 'var(--text-dim)',
+                borderBottom: bottomTab === 'terminal' ? '2px solid var(--accent)' : '2px solid transparent',
+              }}
+            >
+              Terminal
             </button>
             <button
               onClick={() => setBottomTab('preview')}

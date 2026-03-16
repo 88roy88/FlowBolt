@@ -55,9 +55,14 @@ export function ServerLog() {
     function connect() {
       if (closed) return;
       ws = new WebSocket(`${getWsBase()}/ws/server-log/${sessionId}`);
+      ws.binaryType = 'arraybuffer';
 
       ws.addEventListener('message', (event) => {
-        term.write(event.data as string);
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+        } else {
+          term.write(event.data as string);
+        }
       });
 
       ws.addEventListener('close', () => {
