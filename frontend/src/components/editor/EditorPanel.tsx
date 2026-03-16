@@ -7,6 +7,8 @@ import { downloadZip, downloadSingleHtml } from '../../services/api';
 import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
 
+let monacoTypesInitialized = false;
+
 export function EditorPanel() {
   const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree } = useFilesStore();
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -25,6 +27,7 @@ export function EditorPanel() {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
+
     saveTimerRef.current = setTimeout(() => {
       saveFile(activeFilePath);
     }, 1000);
@@ -34,11 +37,12 @@ export function EditorPanel() {
 
   const getLanguage = (path: string): string => {
     const ext = path.split('.').pop()?.toLowerCase();
+
     const langMap: Record<string, string> = {
       ts: 'typescript',
-      tsx: 'typescriptreact',
+      tsx: 'typescript',
       js: 'javascript',
-      jsx: 'javascriptreact',
+      jsx: 'javascript',
       json: 'json',
       html: 'html',
       css: 'css',
@@ -53,11 +57,14 @@ export function EditorPanel() {
       bash: 'shell',
       svg: 'xml',
     };
+
     return langMap[ext ?? ''] ?? 'plaintext';
   };
 
   const handleEditorMount = useCallback((monaco: Monaco) => {
-    // Configure TypeScript/JavaScript defaults for JSX support
+    if (monacoTypesInitialized) return;
+    monacoTypesInitialized = true;
+
     const tsDefaults = monaco.languages.typescript.typescriptDefaults;
     const jsDefaults = monaco.languages.typescript.javascriptDefaults;
 
@@ -72,22 +79,25 @@ export function EditorPanel() {
       strict: true,
       skipLibCheck: true,
       noEmit: true,
+      baseUrl: 'file:///',
     };
 
     tsDefaults.setCompilerOptions(sharedCompilerOptions);
     jsDefaults.setCompilerOptions(sharedCompilerOptions);
 
-    // Enable validation
     tsDefaults.setDiagnosticsOptions({
       noSemanticValidation: false,
       noSyntaxValidation: false,
     });
+
     jsDefaults.setDiagnosticsOptions({
       noSemanticValidation: false,
       noSyntaxValidation: false,
     });
 
-    // Add React type stub so JSX doesn't show errors
+    tsDefaults.setEagerModelSync(true);
+    jsDefaults.setEagerModelSync(true);
+
     const reactTypes = `
 declare module 'react' {
   export function useState<T>(initial: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void];
@@ -95,65 +105,66 @@ declare module 'react' {
   export function useRef<T>(initial: T): { current: T };
   export function useCallback<T extends (...args: any[]) => any>(fn: T, deps: any[]): T;
   export function useMemo<T>(fn: () => T, deps: any[]): T;
-  export function useContext<T>(context: React.Context<T>): T;
-  export function createContext<T>(defaultValue: T): React.Context<T>;
-  export function memo<T>(component: T): T;
-  export function forwardRef<T, P>(render: (props: P, ref: React.Ref<T>) => React.ReactElement | null): React.ForwardRefExoticComponent<P & React.RefAttributes<T>>;
-  export type FC<P = {}> = (props: P) => React.ReactElement | null;
-  export type ReactNode = React.ReactElement | string | number | boolean | null | undefined | Iterable<ReactNode>;
-  export type ReactElement = any;
-  export type Ref<T> = ((instance: T | null) => void) | { current: T | null } | null;
-  export type RefAttributes<T> = { ref?: Ref<T> };
-  export type ForwardRefExoticComponent<P> = React.FC<P>;
-  export type Context<T> = { Provider: FC<{ value: T; children?: ReactNode }>; Consumer: FC<{ children: (value: T) => ReactNode }> };
-  export type CSSProperties = Record<string, string | number>;
-  export type ChangeEvent<T = Element> = { target: T & { value: string } };
-  export type MouseEvent<T = Element> = { stopPropagation(): void; preventDefault(): void; target: T };
-  export type KeyboardEvent<T = Element> = { key: string; stopPropagation(): void; preventDefault(): void };
-  export type FormEvent<T = Element> = { stopPropagation(): void; preventDefault(): void };
+  export const StrictMode: any;
+  export type FC<P = {}> = (props: P) => any;
+  const React: any;
   export default React;
-  namespace React {}
 }
 
 declare module 'react-dom/client' {
   export function createRoot(container: Element): { render(element: any): void };
 }
 
+declare module 'react/jsx-runtime' {
+  export const Fragment: any;
+  export function jsx(type: any, props: any, key?: any): any;
+  export function jsxs(type: any, props: any, key?: any): any;
+}
+
 declare namespace JSX {
-  interface IntrinsicElements { [tag: string]: any; }
+  interface IntrinsicElements {
+    [tag: string]: any;
+  }
   type Element = any;
 }
 `;
+
     tsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
     jsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
   }, []);
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '180px 1fr',
-      height: '100%',
-      overflow: 'hidden',
-    }}>
-      {/* File tree */}
-      <div style={{
-        borderRight: '1px solid var(--border)',
-        overflow: 'auto',
-        background: 'var(--surface)',
-      }}>
-        <div style={{
-          padding: '6px 12px',
-          fontSize: '12px',
-          fontWeight: 600,
-          color: 'var(--text-dim)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '180px 1fr',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          borderRight: '1px solid var(--border)',
+          overflow: 'auto',
+          background: 'var(--surface)',
+        }}
+      >
+        <div
+          style={{
+            padding: '6px 12px',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'var(--text-dim)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <span>Files</span>
+
           <div style={{ display: 'flex', gap: '4px' }}>
             <button
               title="Export ZIP"
@@ -173,6 +184,7 @@ declare namespace JSX {
             >
               <Download size={13} />
             </button>
+
             <button
               title="Export HTML"
               disabled={!sessionId}
@@ -193,12 +205,13 @@ declare namespace JSX {
             </button>
           </div>
         </div>
+
         <FileTree />
       </div>
 
-      {/* Editor area */}
       <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <FileTabs />
+
         {activeFilePath && activeContent !== undefined ? (
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <Editor
@@ -220,14 +233,16 @@ declare namespace JSX {
             />
           </div>
         ) : (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-dim)',
-            fontSize: '14px',
-          }}>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-dim)',
+              fontSize: '14px',
+            }}
+          >
             {sessionId ? 'Select a file to edit' : 'No project selected'}
           </div>
         )}

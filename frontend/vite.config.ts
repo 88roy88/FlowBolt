@@ -6,11 +6,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://pro-jolly-monster.ngrok-free.app',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'http://pro-jolly-monster.ngrok-free.app',
         ws: true,
       },
     },

@@ -3,6 +3,7 @@ import type { WSMessage } from '../types';
 interface ChatSocket {
   send(message: WSMessage): void;
   onMessage(handler: (msg: WSMessage) => void): void;
+  offMessage(handler: (msg: WSMessage) => void): void;
   close(): void;
 }
 
@@ -107,6 +108,10 @@ export function createChatSocket(sessionId: string): ChatSocket {
     onMessage(handler: (msg: WSMessage) => void) {
       handlers.push(handler);
     },
+    offMessage(handler: (msg: WSMessage) => void) {
+      const idx = handlers.indexOf(handler);
+      if (idx !== -1) handlers.splice(idx, 1);
+    },
     close,
   };
 }
@@ -131,4 +136,14 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
     },
     close,
   };
+}
+
+const chatSockets = new Map<string, ChatSocket>();
+
+export function getChatSocket(sessionId: string): ChatSocket {
+  const existing = chatSockets.get(sessionId);
+  if (existing) return existing;
+  const sock = createChatSocket(sessionId);
+  chatSockets.set(sessionId, sock);
+  return sock;
 }
