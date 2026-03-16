@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { PanelLeftOpen } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -49,20 +50,50 @@ export function AppShell() {
         overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          width: sidebarOpen ? sidebarWidth : 0,
-          minWidth: sidebarOpen ? sidebarWidth : 0,
-          overflow: 'hidden',
-          borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
-          background: 'var(--surface)',
-          transition: sidebarOpen ? 'none' : 'width 0.2s ease, min-width 0.2s ease',
-        }}
-      >
-        {sidebarOpen && <Sidebar />}
-      </div>
-
-      {sidebarOpen && <Resizer direction="horizontal" onDrag={handleSidebarResize} />}
+      {/* When closed: vertical \"Projects\" tab on the left. When open: full projects sidebar with internal close button. */}
+      {sidebarOpen ? (
+        <>
+          <div
+            style={{
+              width: sidebarWidth,
+              minWidth: sidebarWidth,
+              overflow: 'hidden',
+              borderRight: '1px solid var(--border)',
+              background: 'var(--surface)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <Sidebar onCloseSidebar={() => setSidebarOpen(false)} />
+          </div>
+          <Resizer direction="horizontal" onDrag={handleSidebarResize} />
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          title="Show projects panel"
+          style={{
+            width: '48px',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+            background: 'var(--surface)',
+            border: 'none',
+            borderRight: '1px solid var(--border)',
+            color: 'var(--accent)',
+            cursor: 'pointer',
+            fontSize: '10px',
+            fontWeight: 600,
+          }}
+        >
+          <PanelLeftOpen size={22} />
+          <span>Projects</span>
+        </button>
+      )}
 
       <div
         style={{
@@ -124,19 +155,6 @@ export function AppShell() {
               flexShrink: 0,
             }}
           >
-            <button
-              onClick={() => setSidebarOpen((v) => !v)}
-              style={{
-                padding: '6px 10px',
-                fontSize: '12px',
-                color: 'var(--text-dim)',
-                borderRight: '1px solid var(--border)',
-              }}
-              title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            >
-              {sidebarOpen ? '\u25C0' : '\u25B6'}
-            </button>
-
             <button
               onClick={() => setBottomTab('terminal')}
               style={{
