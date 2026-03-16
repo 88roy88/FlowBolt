@@ -13,10 +13,11 @@ import os
 
 import litellm
 
-from app.api import chat, export, files, models, preview, projects, terminal
+from app.api import chat, export, files, models, preview, projects, server_log, terminal
 from app.config import settings
 from app.models.project import init_db
 from app.sandbox.manager import sandbox_manager
+from app.sandbox.pty import cleanup_all_ptys
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Sandbox restoration complete.")
 
     yield
+    logger.info("Shutting down — killing PTY processes...")
+    cleanup_all_ptys()
     logger.info("Shutting down — destroying all sandboxes...")
     await sandbox_manager.destroy_all()
     logger.info("Shutdown complete.")
@@ -77,6 +80,7 @@ app.include_router(export.router)
 # WebSocket routers
 app.include_router(chat.router)
 app.include_router(terminal.router)
+app.include_router(server_log.router)
 
 
 if __name__ == "__main__":

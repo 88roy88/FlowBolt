@@ -3,9 +3,10 @@ import { Sidebar } from './Sidebar';
 import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Terminal } from '../terminal/Terminal';
+import { ServerLog } from '../terminal/ServerLog';
 import { Preview } from '../preview/Preview';
 
-type BottomTab = 'terminal' | 'preview';
+type BottomTab = 'terminal' | 'server' | 'preview';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -90,6 +91,17 @@ export function AppShell() {
               Terminal
             </button>
             <button
+              onClick={() => setBottomTab('server')}
+              style={{
+                padding: '6px 16px',
+                fontSize: '13px',
+                color: bottomTab === 'server' ? 'var(--accent)' : 'var(--text-dim)',
+                borderBottom: bottomTab === 'server' ? '2px solid var(--accent)' : '2px solid transparent',
+              }}
+            >
+              Server
+            </button>
+            <button
               onClick={() => setBottomTab('preview')}
               style={{
                 padding: '6px 16px',
@@ -104,7 +116,9 @@ export function AppShell() {
 
           {/* Tab content */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            {bottomTab === 'terminal' ? <Terminal /> : <Preview />}
+            {bottomTab === 'terminal' && <Terminal />}
+            {bottomTab === 'server' && <ServerLog />}
+            {bottomTab === 'preview' && <Preview />}
           </div>
         </div>
       </div>
