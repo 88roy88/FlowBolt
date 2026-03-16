@@ -140,22 +140,76 @@ export const createChatSocket = getChatSocket;
 
 export function createTerminalSocket(sessionId: string): TerminalSocket {
   const handlers: Array<(data: string) => void> = [];
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
 
-  const { sendOrQueue, close } = createReconnectingSocket(
-    `${getWsBase()}/ws/terminal/${sessionId}`,
-    undefined,
-    (data) => {
-      handlers.forEach((h) => h(data));
-    },
-  );
+  let socket: WebSocket | null = null;
+  let closed = false;
+  let retryDelay = 1000;
+  const pendingQueue: ArrayBuffer[] = [];
+
+  function flushQueue() {
+    while (pendingQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
+      socket.send(pendingQueue.shift()!);
+    }
+  }
+
+  function connect() {
+    if (closed) return;
+    const ws = new WebSocket(`${getWsBase()}/ws/terminal/${sessionId}`);
+    // Receive binary frames as ArrayBuffer (not Blob)
+    ws.binaryType = 'arraybuffer';
+    socket = ws;
+
+    ws.addEventListener('open', () => {
+      retryDelay = 1000;
+      flushQueue();
+    });
+
+    ws.addEventListener('message', (event) => {
+      let text: string;
+      if (event.data instanceof ArrayBuffer) {
+        text = decoder.decode(event.data);
+      } else {
+        text = event.data as string;
+      }
+      handlers.forEach((h) => h(text));
+    });
+
+    ws.addEventListener('close', () => {
+      socket = null;
+      if (!closed) {
+        setTimeout(() => {
+          retryDelay = Math.min(retryDelay * 2, 30000);
+          connect();
+        }, retryDelay);
+      }
+    });
+
+    ws.addEventListener('error', () => {
+      ws.close();
+    });
+  }
+
+  connect();
 
   return {
     send(data: string) {
-      sendOrQueue(data);
+      // Send as binary to match backend's receive_bytes()
+      const buf = encoder.encode(data);
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(buf);
+      } else {
+        pendingQueue.push(buf.buffer);
+      }
     },
     onData(handler: (data: string) => void) {
       handlers.push(handler);
     },
-    close,
+    close() {
+      closed = true;
+      socket?.close();
+      socket = null;
+    },
   };
 }
