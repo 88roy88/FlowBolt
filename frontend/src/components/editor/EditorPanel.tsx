@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import Editor, { type Monaco } from '@monaco-editor/react';
+import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import { Download, FileCode } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
@@ -8,15 +8,33 @@ import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
 
 export function EditorPanel() {
-  const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree } = useFilesStore();
+  const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree, pendingRevealLine, pendingRevealColumn, clearPendingReveal } = useFilesStore();
   const sessionId = useSessionStore((s) => s.sessionId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
   useEffect(() => {
     if (sessionId) {
       loadFileTree();
     }
   }, [sessionId, loadFileTree]);
+
+  // Reveal line/column when navigating from error toast
+  useEffect(() => {
+    if (!pendingRevealLine || !editorRef.current) return;
+    const line = pendingRevealLine;
+    const col = pendingRevealColumn ?? 1;
+    // Small delay to let Monaco finish switching to the new file model
+    const timer = setTimeout(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.revealLineInCenter(line);
+      editor.setPosition({ lineNumber: line, column: col });
+      editor.focus();
+    }, 100);
+    clearPendingReveal();
+    return () => clearTimeout(timer);
+  }, [pendingRevealLine, pendingRevealColumn, activeFilePath, clearPendingReveal]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (!activeFilePath || value === undefined) return;
@@ -208,6 +226,18 @@ declare namespace JSX {
               value={activeContent}
               onChange={handleEditorChange}
               beforeMount={handleEditorMount}
+              onMount={(editor) => {
+                editorRef.current = editor;
+                const { pendingRevealLine: line, pendingRevealColumn: col, clearPendingReveal: clear } = useFilesStore.getState();
+                if (line) {
+                  setTimeout(() => {
+                    editor.revealLineInCenter(line);
+                    editor.setPosition({ lineNumber: line, column: col ?? 1 });
+                    editor.focus();
+                    clear();
+                  }, 50);
+                }
+              }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 13,

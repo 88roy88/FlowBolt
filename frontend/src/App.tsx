@@ -1,16 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSessionStore } from './stores/session';
 import { useChatStore } from './stores/chat';
 import { useFilesStore } from './stores/files';
 import { AppShell } from './components/layout/AppShell';
+import { ErrorToast, useErrorCapture } from './components/errors/ErrorToast';
+
+function getSessionIdFromHash(): string | null {
+  const match = window.location.hash.match(/^#\/project\/(.+)$/);
+  return match ? match[1] : null;
+}
 
 export default function App() {
   const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
   const loadHistory = useChatStore((s) => s.loadHistory);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
+  useErrorCapture();
   const [newProjectName, setNewProjectName] = useState('');
   const [showNewProject, setShowNewProject] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const selectProject = useCallback((project: typeof projects[number]) => {
+    setCurrentProject(project);
+    window.location.hash = `#/project/${project.session_id}`;
+    loadHistory(project.session_id);
+    loadFileTree();
+  }, [setCurrentProject, loadHistory, loadFileTree]);
 
   useEffect(() => {
     loadProjects()
@@ -18,25 +32,66 @@ export default function App() {
       .finally(() => setLoading(false));
   }, [loadProjects]);
 
+  // On load: match URL hash to a project, or auto-select first
   useEffect(() => {
-    if (!loading && projects.length === 0) {
-      setShowNewProject(true);
+    if (loading || projects.length === 0) {
+      if (!loading && projects.length === 0) {
+        setShowNewProject(true);
+      }
+      return;
     }
-    // Auto-select first project and load its data on initial load
-    if (!loading && projects.length > 0 && !currentProject) {
-      const first = projects[0];
-      setCurrentProject(first);
-      loadHistory(first.session_id);
-      loadFileTree();
+    if (currentProject) return;
+
+    const hashSessionId = getSessionIdFromHash();
+    const match = hashSessionId
+      ? projects.find((p) => p.session_id === hashSessionId)
+      : null;
+    const target = match ?? projects[0];
+    selectProject(target);
+  }, [loading, projects, currentProject, selectProject]);
+
+  // Listen for hash changes (back/forward)
+  useEffect(() => {
+    function onHashChange() {
+      const hashSessionId = getSessionIdFromHash();
+      if (!hashSessionId) return;
+      const match = projects.find((p) => p.session_id === hashSessionId);
+      if (match && match.id !== currentProject?.id) {
+        selectProject(match);
+      }
     }
-  }, [loading, projects.length, currentProject, setCurrentProject, loadHistory, loadFileTree, projects]);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [projects, currentProject, selectProject]);
 
   const handleCreate = async () => {
     const name = newProjectName.trim() || 'My Project';
     await createProject(name);
     setNewProjectName('');
     setShowNewProject(false);
+    // After creation, the session store already has the new project selected.
+    // Set the hash URL and start polling for files (scaffold takes a few seconds).
+    const session = useSessionStore.getState();
+    if (session.currentProject) {
+      window.location.hash = `#/project/${session.currentProject.session_id}`;
+      loadHistory(session.currentProject.session_id);
+      // Poll for file tree until scaffold completes
+      pollFileTree();
+    }
   };
+
+  function pollFileTree() {
+    let attempts = 0;
+    const maxAttempts = 15;
+    const interval = setInterval(async () => {
+      attempts++;
+      await loadFileTree();
+      const tree = useFilesStore.getState().fileTree;
+      if (tree.length > 0 || attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 2000);
+  }
 
   if (loading) {
     return (
@@ -90,5 +145,10 @@ export default function App() {
     );
   }
 
-  return <AppShell />;
+  return (
+    <>
+      <AppShell />
+      <ErrorToast />
+    </>
+  );
 }
