@@ -1,0 +1,107 @@
+"""PTY-backed process for interactive terminal sessions."""
+
+from __future__ import annotations
+
+import fcntl
+import os
+import pty
+import signal
+import subprocess
+from dataclasses import dataclass
+
+from app.config import settings
+from app.sandbox.manager import sandbox_manager
+from app.sandbox.nsjail import _nsjail_available
+
+
+@dataclass
+class PtyProcess:
+    """Handle to a PTY-backed shell process."""
+
+    read_fd: int
+    write_fd: int
+    pid: int
+
+
+def create_pty_process(session_id: str) -> PtyProcess:
+    """Fork a PTY-backed bash process inside the sandbox workspace.
+
+    On systems without nsjail the shell runs directly in the workspace dir.
+    """
+    sandbox = sandbox_manager.get_sandbox(session_id)
+    workspace_dir = sandbox.workspace_dir if sandbox else os.path.join(settings.WORKSPACE_BASE_DIR, session_id)
+
+    master_fd, slave_fd = os.openpty()
+
+    env = os.environ.copy()
+    env["TERM"] = "xterm-256color"
+    env["HOME"] = "/home/project"
+
+    if _nsjail_available() and sandbox is not None:
+        from app.sandbox.nsjail import build_nsjail_command
+
+        cmd = build_nsjail_command(session_id, workspace_dir, sandbox.port, command=None)
+        proc = subprocess.Popen(
+            cmd,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            preexec_fn=os.setsid,
+            env=env,
+        )
+        pid = proc.pid
+    else:
+        pid = os.fork()
+        if pid == 0:
+            # Child process
+            os.close(master_fd)
+            os.setsid()
+            fcntl.ioctl(slave_fd, __import__("termios").TIOCSCTTY, 0)
+            os.dup2(slave_fd, 0)
+            os.dup2(slave_fd, 1)
+            os.dup2(slave_fd, 2)
+            if slave_fd > 2:
+                os.close(slave_fd)
+            os.chdir(workspace_dir)
+            os.execvpe("/bin/bash", ["/bin/bash", "--login"], env)
+
+    os.close(slave_fd)
+
+    # Set master_fd to non-blocking for async reads
+    flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+    fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+    return PtyProcess(read_fd=master_fd, write_fd=master_fd, pid=pid)
+
+
+def read_pty(pty_proc: PtyProcess) -> bytes:
+    """Non-blocking read from the PTY master fd.
+
+    Returns an empty ``bytes`` object if nothing is available.
+    """
+    try:
+        return os.read(pty_proc.read_fd, 4096)
+    except BlockingIOError:
+        return b""
+    except OSError:
+        return b""
+
+
+def write_pty(pty_proc: PtyProcess, data: bytes) -> None:
+    """Write raw bytes (keystrokes) to the PTY."""
+    os.write(pty_proc.write_fd, data)
+
+
+def close_pty(pty_proc: PtyProcess) -> None:
+    """Close the PTY file descriptors and kill the child process."""
+    try:
+        os.close(pty_proc.read_fd)
+    except OSError:
+        pass
+
+    # write_fd is the same fd as read_fd (master), so no separate close needed
+
+    try:
+        os.kill(pty_proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass

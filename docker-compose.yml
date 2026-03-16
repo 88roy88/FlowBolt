@@ -1,0 +1,44 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - workspaces:/var/lib/ai-builder/workspaces
+      - db-data:/app/data
+    environment:
+      - WORKSPACE_BASE_DIR=/var/lib/ai-builder/workspaces
+      - DATABASE_URL=sqlite:///app/data/ai_builder.db
+      - AI_MODEL=bedrock/anthropic.claude-sonnet-4-20250514
+      - AWS_REGION=us-east-1
+    # Required for nsjail cgroups
+    privileged: true
+    security_opt:
+      - seccomp:unconfined
+    cgroup: host
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  workspaces:
+  db-data:
