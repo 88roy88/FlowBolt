@@ -22,11 +22,18 @@ function createReconnectingSocket(
   onOpen?: () => void,
   onMessage?: (data: string) => void,
   onClose?: () => void,
-): { getSocket: () => WebSocket | null; close: () => void } {
+): { getSocket: () => WebSocket | null; sendOrQueue: (data: string) => void; close: () => void } {
   let socket: WebSocket | null = null;
   let closed = false;
   let retryDelay = 1000;
   const maxRetryDelay = 30000;
+  const pendingQueue: string[] = [];
+
+  function flushQueue() {
+    while (pendingQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
+      socket.send(pendingQueue.shift()!);
+    }
+  }
 
   function connect() {
     if (closed) return;
@@ -34,6 +41,7 @@ function createReconnectingSocket(
 
     socket.addEventListener('open', () => {
       retryDelay = 1000;
+      flushQueue();
       onOpen?.();
     });
 
@@ -61,6 +69,13 @@ function createReconnectingSocket(
 
   return {
     getSocket: () => socket,
+    sendOrQueue: (data: string) => {
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(data);
+      } else {
+        pendingQueue.push(data);
+      }
+    },
     close: () => {
       closed = true;
       socket?.close();
@@ -72,7 +87,7 @@ function createReconnectingSocket(
 export function createChatSocket(sessionId: string): ChatSocket {
   const handlers: Array<(msg: WSMessage) => void> = [];
 
-  const { getSocket, close } = createReconnectingSocket(
+  const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${sessionId}`,
     undefined,
     (data) => {
@@ -87,10 +102,7 @@ export function createChatSocket(sessionId: string): ChatSocket {
 
   return {
     send(message: WSMessage) {
-      const sock = getSocket();
-      if (sock && sock.readyState === WebSocket.OPEN) {
-        sock.send(JSON.stringify(message));
-      }
+      sendOrQueue(JSON.stringify(message));
     },
     onMessage(handler: (msg: WSMessage) => void) {
       handlers.push(handler);
@@ -102,7 +114,7 @@ export function createChatSocket(sessionId: string): ChatSocket {
 export function createTerminalSocket(sessionId: string): TerminalSocket {
   const handlers: Array<(data: string) => void> = [];
 
-  const { getSocket, close } = createReconnectingSocket(
+  const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/terminal/${sessionId}`,
     undefined,
     (data) => {
@@ -112,10 +124,7 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
 
   return {
     send(data: string) {
-      const sock = getSocket();
-      if (sock && sock.readyState === WebSocket.OPEN) {
-        sock.send(data);
-      }
+      sendOrQueue(data);
     },
     onData(handler: (data: string) => void) {
       handlers.push(handler);

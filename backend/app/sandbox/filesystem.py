@@ -7,7 +7,7 @@ prefix check prevents path-traversal attacks.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from app.config import settings
 from app.sandbox.manager import sandbox_manager
@@ -78,6 +78,8 @@ async def list_files(session_id: str, path: str = "/") -> list[FileEntry]:
     assert sandbox is not None
     workspace = os.path.realpath(sandbox.workspace_dir)
 
+    SKIP_DIRS = {"node_modules", ".git", ".next", "dist", ".cache", "__pycache__", ".vite"}
+
     def _build_tree(dir_path: str) -> list[FileEntry]:
         entries: list[FileEntry] = []
         try:
@@ -86,7 +88,8 @@ async def list_files(session_id: str, path: str = "/") -> list[FileEntry]:
             return entries
 
         for name in items:
-            # Skip hidden / VCS / node_modules noise at top level for cleanliness
+            if name.startswith(".") or name in SKIP_DIRS:
+                continue
             abs_path = os.path.join(dir_path, name)
             rel_path = "/" + os.path.relpath(abs_path, workspace)
             is_dir = os.path.isdir(abs_path)

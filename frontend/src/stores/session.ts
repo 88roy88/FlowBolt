@@ -6,6 +6,7 @@ interface SessionState {
   currentProject: Project | null;
   projects: Project[];
   sessionId: string | null;
+  isCreating: boolean;
   setCurrentProject: (project: Project) => void;
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
@@ -16,6 +17,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   currentProject: null,
   projects: [],
   sessionId: null,
+  isCreating: false,
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, sessionId: project.session_id });
@@ -27,9 +29,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async createProject(name: string) {
-    const project = await api.createProject(name);
-    const projects = [...get().projects, project];
-    set({ projects, currentProject: project, sessionId: project.session_id });
+    set({ isCreating: true });
+    try {
+      const project = await api.createProject(name);
+      const projects = [...get().projects, project];
+      set({ projects, currentProject: project, sessionId: project.session_id });
+    } finally {
+      set({ isCreating: false });
+    }
   },
 
   async deleteProject(id: string) {

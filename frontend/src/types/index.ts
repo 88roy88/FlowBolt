@@ -28,8 +28,14 @@ export interface Project {
   created_at: string;
 }
 
+export interface AIModel {
+  id: string;
+  name: string;
+  provider: string;
+}
+
 export type WSMessage =
-  | { type: 'message'; content: string }
+  | { type: 'message'; content: string; model?: string }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }

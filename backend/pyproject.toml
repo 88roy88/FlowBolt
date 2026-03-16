@@ -12,8 +12,13 @@ dependencies = [
     "websockets>=14.1",
     "python-multipart>=0.0.19",
     "httpx>=0.28.0",
+    "langfuse>=3.14.0",
+    "boto3>=1.42.68",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [build-system]
 requires = ["hatchling"]
-build-backend = "hatchling.backends"
+build-backend = "hatchling.build"

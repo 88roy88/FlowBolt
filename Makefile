@@ -4,7 +4,7 @@
 dev: dev-backend dev-frontend
 
 dev-backend:
-	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	cd backend && uv run python run.py
 
 dev-frontend:
 	cd frontend && pnpm dev

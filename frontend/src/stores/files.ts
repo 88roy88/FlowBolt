@@ -35,12 +35,16 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     }
     const sessionId = useSessionStore.getState().sessionId;
     if (!sessionId) return;
-    const content = await api.fetchFileContent(sessionId, path);
-    set((s) => {
-      const next = new Map(s.openFiles);
-      next.set(path, content);
-      return { openFiles: next, activeFilePath: path };
-    });
+    try {
+      const content = await api.fetchFileContent(sessionId, path);
+      set((s) => {
+        const next = new Map(s.openFiles);
+        next.set(path, content);
+        return { openFiles: next, activeFilePath: path };
+      });
+    } catch (err) {
+      console.error('Failed to open file:', path, err);
+    }
   },
 
   closeFile(path: string) {

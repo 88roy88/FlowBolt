@@ -5,7 +5,7 @@ import { useFilesStore } from '../../stores/files';
 import { Plus, Trash2, FolderKanban } from 'lucide-react';
 
 export function Sidebar() {
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject } = useSessionStore();
+  const { projects, currentProject, setCurrentProject, createProject, deleteProject, isCreating } = useSessionStore();
   const clearMessages = useChatStore((s) => s.clearMessages);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
   const [newName, setNewName] = useState('');
@@ -13,10 +13,10 @@ export function Sidebar() {
 
   const handleCreate = async () => {
     const name = newName.trim() || 'New Project';
-    await createProject(name);
-    clearMessages();
     setNewName('');
     setShowInput(false);
+    await createProject(name);
+    clearMessages();
   };
 
   const handleSelect = (project: typeof projects[number]) => {
@@ -49,7 +49,8 @@ export function Sidebar() {
         </span>
         <button
           onClick={() => setShowInput(true)}
-          style={{ padding: '4px', borderRadius: '4px', color: 'var(--text-dim)' }}
+          disabled={isCreating}
+          style={{ padding: '4px', borderRadius: '4px', color: 'var(--text-dim)', opacity: isCreating ? 0.4 : 1 }}
           title="New Project"
         >
           <Plus size={18} />
@@ -91,6 +92,34 @@ export function Sidebar() {
           >
             Add
           </button>
+        </div>
+      )}
+
+      {/* Creating indicator */}
+      {isCreating && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 8px',
+          marginBottom: '8px',
+          borderRadius: '6px',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          fontSize: '13px',
+          color: 'var(--text-dim)',
+        }}>
+          <span style={{
+            display: 'inline-block',
+            width: '14px',
+            height: '14px',
+            border: '2px solid var(--border)',
+            borderTopColor: 'var(--accent)',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            flexShrink: 0,
+          }} />
+          Scaffolding project...
         </div>
       )}
 

@@ -1,10 +1,15 @@
-import type { FileEntry, Project } from '../types';
+import type { FileEntry, Project, AIModel } from '../types';
 
 const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {};
+  // Only set Content-Type for requests with a body
+  if (options?.body) {
+    headers['Content-Type'] = 'application/json';
+  }
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   });
   if (!res.ok) {
@@ -15,19 +20,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export async function fetchFileTree(sessionId: string): Promise<FileEntry[]> {
-  return request<FileEntry[]>(`/sessions/${sessionId}/files`);
+  return request<FileEntry[]>(`/files/${sessionId}/tree`);
 }
 
 export async function fetchFileContent(sessionId: string, path: string): Promise<string> {
-  const res = await fetch(`${BASE}/sessions/${sessionId}/files/content?path=${encodeURIComponent(path)}`);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch file content: ${res.status}`);
-  }
-  return res.text();
+  const data = await request<{ path: string; content: string }>(
+    `/files/${sessionId}/content?path=${encodeURIComponent(path)}`
+  );
+  return data.content;
 }
 
 export async function saveFileContent(sessionId: string, path: string, content: string): Promise<void> {
-  await request(`/sessions/${sessionId}/files/content`, {
+  await request(`/files/${sessionId}/content`, {
     method: 'PUT',
     body: JSON.stringify({ path, content }),
   });
@@ -46,4 +50,26 @@ export async function createProject(name: string): Promise<Project> {
 
 export async function deleteProject(id: string): Promise<void> {
   await request(`/projects/${id}`, { method: 'DELETE' });
+}
+
+export async function fetchPreviewPort(sessionId: string): Promise<number> {
+  const data = await request<{ session_id: string; port: number }>(`/preview/${sessionId}/port`);
+  return data.port;
+}
+
+export async function fetchModels(): Promise<AIModel[]> {
+  return request<AIModel[]>('/models');
+}
+
+export async function fetchDefaultModel(): Promise<string> {
+  const data = await request<{ model: string }>('/models/default');
+  return data.model;
+}
+
+export function downloadZip(sessionId: string): void {
+  window.open(`${BASE}/export/${sessionId}/zip`, '_blank');
+}
+
+export function downloadSingleHtml(sessionId: string): void {
+  window.open(`${BASE}/export/${sessionId}/html`, '_blank');
 }
