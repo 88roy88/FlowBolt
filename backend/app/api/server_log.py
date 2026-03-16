@@ -19,8 +19,8 @@ router = APIRouter()
 async def server_log_ws(websocket: WebSocket, session_id: str) -> None:
     """Stream ``.dev-server.log`` to the client.
 
-    Sends all existing content on connect, then tails new lines until
-    the WebSocket is closed.  The dev server process is unaffected.
+    Reads the file in binary mode so ANSI color codes are preserved.
+    The xterm frontend renders them natively.
     """
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
@@ -40,12 +40,12 @@ async def server_log_ws(websocket: WebSocket, session_id: str) -> None:
                 return
             await asyncio.sleep(0.5)
 
-        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(log_path, "rb") as f:
             while not stop.is_set():
                 data = f.read(8192)
                 if data:
                     try:
-                        await websocket.send_text(data)
+                        await websocket.send_bytes(data)
                     except Exception:
                         return
                 else:
