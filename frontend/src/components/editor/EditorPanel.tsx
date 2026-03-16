@@ -18,6 +18,7 @@ export function EditorPanel() {
   const sessionId = useSessionStore((s) => s.sessionId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
+   const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
 
   const handleFileTreeResize = useCallback((delta: number) => {
     setFileTreeWidth((w) => Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, w + delta)));
@@ -28,6 +29,18 @@ export function EditorPanel() {
       loadFileTree();
     }
   }, [sessionId, loadFileTree]);
+
+  // Sync Monaco theme with app light/dark theme
+  useEffect(() => {
+    const applyTheme = () => {
+      const mode = document.documentElement.dataset.theme === 'light' ? 'light' : 'vs-dark';
+      setEditorTheme(mode);
+    };
+    applyTheme();
+    const observer = new MutationObserver(() => applyTheme());
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (!activeFilePath || value === undefined) return;
@@ -229,7 +242,7 @@ declare namespace JSX {
         {activeFilePath && activeContent !== undefined ? (
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <Editor
-              theme="vs-dark"
+              theme={editorTheme}
               language={getLanguage(activeFilePath)}
               path={activeFilePath}
               value={activeContent}

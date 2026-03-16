@@ -8,6 +8,21 @@ export default function App() {
   const [showNewProject, setShowNewProject] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Initialize theme (dark/light) once on app load
+  useEffect(() => {
+    const stored = window.localStorage.getItem('theme');
+    let theme: 'light' | 'dark';
+    if (stored === 'light' || stored === 'dark') {
+      theme = stored;
+    } else {
+      theme = window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: light)').matches
+        ? 'light'
+        : 'dark';
+    }
+    document.documentElement.dataset.theme = theme;
+  }, []);
+
   useEffect(() => {
     loadProjects()
       .catch(console.error)

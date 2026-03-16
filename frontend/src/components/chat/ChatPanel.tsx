@@ -4,6 +4,7 @@ import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
 import type { AIModel } from '../../types';
 import { ChevronDown, Check } from 'lucide-react';
+import { ThemeToggle } from '../layout/ThemeToggle';
 
 function ModelSelector() {
   const { models, selectedModel, setSelectedModel, loadModels } = useChatStore();
@@ -173,19 +174,25 @@ export function ChatPanel() {
       overflow: 'hidden',
     }}>
       {/* Header */}
-      <div style={{
-        padding: '10px 16px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--surface)',
-        fontSize: '13px',
-        fontWeight: 600,
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
+      <div
+        style={{
+          padding: '10px 16px',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--surface)',
+          fontSize: '13px',
+          fontWeight: 600,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
         <span>Chat</span>
-        <ModelSelector />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThemeToggle />
+          <ModelSelector />
+        </div>
       </div>
 
       {/* Messages */}

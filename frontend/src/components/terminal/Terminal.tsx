@@ -6,6 +6,26 @@ import { useSessionStore } from '../../stores/session';
 import { createTerminalSocket } from '../../services/websocket';
 import '@xterm/xterm/css/xterm.css';
 
+function getTerminalTheme(): XTerm['options']['theme'] {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  const root = document.documentElement;
+  const styles = getComputedStyle(root);
+  const bg = styles.getPropertyValue('--bg').trim() || '#1e1e2e';
+  const fg = styles.getPropertyValue('--text').trim() || '#cdd6f4';
+  const accent = styles.getPropertyValue('--accent').trim() || '#89b4fa';
+  const border = styles.getPropertyValue('--border').trim() || '#45475a';
+
+  return {
+    background: bg,
+    foreground: fg,
+    cursor: accent,
+    cursorAccent: bg,
+    selectionBackground: border,
+  };
+}
+
 export function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
@@ -16,21 +36,7 @@ export function Terminal() {
     if (!containerRef.current || !sessionId) return;
 
     const term = new XTerm({
-      theme: {
-        background: '#1e1e2e',
-        foreground: '#cdd6f4',
-        cursor: '#89b4fa',
-        cursorAccent: '#1e1e2e',
-        selectionBackground: '#45475a',
-        black: '#45475a',
-        red: '#f38ba8',
-        green: '#a6e3a1',
-        yellow: '#f9e2af',
-        blue: '#89b4fa',
-        magenta: '#cba6f7',
-        cyan: '#94e2d5',
-        white: '#cdd6f4',
-      },
+      theme: getTerminalTheme(),
       fontSize: 13,
       fontFamily: 'var(--font-mono)',
       cursorBlink: true,
@@ -66,8 +72,21 @@ export function Terminal() {
     });
     resizeObserver.observe(containerRef.current);
 
+    // React to theme changes (light/dark)
+    const mutationObserver = new MutationObserver(() => {
+      const theme = getTerminalTheme();
+      if (theme) {
+        term.options.theme = theme;
+      }
+    });
+    mutationObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
     return () => {
       resizeObserver.disconnect();
+      mutationObserver.disconnect();
       socket.close();
       term.dispose();
       termRef.current = null;

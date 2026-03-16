@@ -1,4 +1,10 @@
 :root {
+  color-scheme: dark;
+}
+
+/* Dark theme (default) */
+:root,
+:root[data-theme='dark'] {
   --bg: #1e1e2e;
   --surface: #2a2a3e;
   --text: #cdd6f4;
@@ -11,6 +17,22 @@
   --user-bubble: #313244;
   --assistant-bubble: #2a2a3e;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* Light theme */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --text: #111827;
+  --text-dim: #6b7280;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --border: #d1d5db;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --user-bubble: #e5f0ff;
+  --assistant-bubble: #f3f4f6;
 }
 
 *,
