@@ -230,27 +230,46 @@ class SandboxManager:
             await _kill_process_tree(info.dev_process)
 
         log_path = os.path.join(info.workspace_dir, ".dev-server.log")
-        log_file = open(log_path, "wb")  # noqa: SIM115 — binary for raw ANSI
 
-        cmd = build_nsjail_command(
-            session_id,
-            info.workspace_dir,
-            info.port,
-            command=f"pnpm dev --port {info.port} --host 0.0.0.0",
-        )
+        from app.sandbox.nsjail import _nsjail_available
 
-        # Force color output so the Server Log tab renders ANSI colors
-        env = os.environ.copy()
-        env["FORCE_COLOR"] = "1"
+        if not _nsjail_available():
+            # macOS dev: use `script -q` to run in a PTY so node/pnpm use
+            # line buffering and output ANSI colors.  `script` writes the
+            # transcript directly to log_path with immediate flushing.
+            dev_cmd = f"pnpm dev --port {info.port} --host 0.0.0.0"
+            cmd = [
+                "script", "-q", log_path,
+                "/bin/bash", "-c", f"cd {info.workspace_dir} && {dev_cmd}",
+            ]
+            info.dev_process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            info._dev_log_file = None
+        else:
+            log_file = open(log_path, "wb")  # noqa: SIM115
 
-        info.dev_process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=log_file,
-            stderr=asyncio.subprocess.STDOUT,
-            env=env,
-            start_new_session=True,  # own process group so killpg works
-        )
-        info._dev_log_file = log_file  # keep a ref so we can close it on teardown
+            cmd = build_nsjail_command(
+                session_id,
+                info.workspace_dir,
+                info.port,
+                command=f"pnpm dev --port {info.port} --host 0.0.0.0",
+            )
+
+            env = os.environ.copy()
+            env["FORCE_COLOR"] = "1"
+
+            info.dev_process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=log_file,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                start_new_session=True,
+            )
+            info._dev_log_file = log_file
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
             session_id, info.port, info.dev_process.pid,
