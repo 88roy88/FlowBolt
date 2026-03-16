@@ -12,11 +12,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers,
     ...options,
   });
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
-  return res.json() as Promise<T>;
+  if (!text) return undefined as T; // 204 No Content or empty body
+  return JSON.parse(text) as T;
 }
 
 export async function fetchFileTree(sessionId: string): Promise<FileEntry[]> {
