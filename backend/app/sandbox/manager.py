@@ -14,6 +14,32 @@ from app.sandbox.nsjail import build_nsjail_command
 logger = logging.getLogger(__name__)
 
 
+def write_vite_config(session_id: str, workspace_dir: str | None = None) -> None:
+    """Write a vite.config.ts with the correct ``base`` for the preview proxy.
+
+    If *workspace_dir* is not given, it is looked up from the sandbox registry.
+    """
+    if workspace_dir is None:
+        info = sandbox_manager.get_sandbox(session_id)
+        if info is None:
+            return
+        workspace_dir = info.workspace_dir
+
+    config = (
+        "import { defineConfig } from 'vite'\n"
+        "import react from '@vitejs/plugin-react'\n"
+        "\n"
+        "// https://vitejs.dev/config/\n"
+        "export default defineConfig({\n"
+        "  plugins: [react()],\n"
+        f"  base: '/api/preview/{session_id}/proxy/',\n"
+        "})\n"
+    )
+    path = os.path.join(workspace_dir, "vite.config.ts")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(config)
+
+
 @dataclass
 class SandboxInfo:
     """Runtime information for a single sandbox."""
@@ -23,6 +49,7 @@ class SandboxInfo:
     port: int
     process: asyncio.subprocess.Process | None = None
     dev_process: asyncio.subprocess.Process | None = None
+    _dev_log_file: object | None = None  # file handle for .dev-server.log
 
 
 class SandboxManager:
@@ -93,12 +120,17 @@ class SandboxManager:
         if info is None:
             return
 
-        # Terminate the dev server
+        # Terminate the dev server and close its log file
         if info.dev_process is not None and info.dev_process.returncode is None:
             try:
                 info.dev_process.kill()
                 await info.dev_process.wait()
             except ProcessLookupError:
+                pass
+        if info._dev_log_file is not None:
+            try:
+                info._dev_log_file.close()
+            except Exception:
                 pass
 
         # Terminate the long-lived shell process
@@ -118,7 +150,12 @@ class SandboxManager:
             shutil.rmtree(info.workspace_dir, ignore_errors=True)
 
     async def start_dev_server(self, session_id: str) -> None:
-        """Start `pnpm dev` on the sandbox's allocated port as a background process."""
+        """Start `pnpm dev` on the sandbox's allocated port as a background process.
+
+        Stdout/stderr are redirected to ``.dev-server.log`` inside the workspace
+        so the dev server never blocks on a full pipe buffer.  Users can view
+        the log via ``tail -f .dev-server.log`` in the terminal.
+        """
         info = self._sandboxes.get(session_id)
         if info is None:
             logger.warning("Cannot start dev server: no sandbox for %s", session_id)
@@ -132,6 +169,9 @@ class SandboxManager:
             except ProcessLookupError:
                 pass
 
+        log_path = os.path.join(info.workspace_dir, ".dev-server.log")
+        log_file = open(log_path, "w", encoding="utf-8")  # noqa: SIM115
+
         cmd = build_nsjail_command(
             session_id,
             info.workspace_dir,
@@ -141,9 +181,10 @@ class SandboxManager:
 
         info.dev_process = await asyncio.create_subprocess_exec(
             *cmd,
-            stdout=asyncio.subprocess.PIPE,
+            stdout=log_file,
             stderr=asyncio.subprocess.STDOUT,
         )
+        info._dev_log_file = log_file  # keep a ref so we can close it on teardown
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
             session_id, info.port, info.dev_process.pid,
@@ -154,20 +195,34 @@ class SandboxManager:
         return self._sandboxes.get(session_id)
 
     async def restore_existing_workspaces(self) -> None:
-        """Re-register sandboxes for workspace directories that already exist on disk.
+        """Re-register sandboxes for workspace directories that still have a
+        matching project in the database.
 
         Called on startup so that after a uvicorn reload the file APIs still work
-        for sessions whose workspace was preserved.
+        for sessions whose workspace was preserved.  Orphan directories (project
+        deleted but workspace left on disk) are cleaned up automatically.
         """
         base = settings.WORKSPACE_BASE_DIR
         if not os.path.isdir(base):
             return
+
+        # Query the DB for all live session IDs
+        from app.models.project import list_projects
+
+        live_projects = await list_projects()
+        live_session_ids = {p.session_id for p in live_projects}
 
         for name in os.listdir(base):
             workspace_dir = os.path.join(base, name)
             if not os.path.isdir(workspace_dir):
                 continue
             if name in self._sandboxes:
+                continue
+
+            # Remove orphan workspaces that have no matching project in the DB
+            if name not in live_session_ids:
+                logger.info("Removing orphan workspace %s (no matching project in DB)", name)
+                shutil.rmtree(workspace_dir, ignore_errors=True)
                 continue
 
             async with self._lock:
@@ -185,9 +240,10 @@ class SandboxManager:
             self._sandboxes[name] = info
             logger.info("Restored sandbox for session %s (port %d)", name, port)
 
-        # Restart dev servers in the background (don't block startup)
+        # Patch vite configs and restart dev servers in the background
         for name, info in self._sandboxes.items():
             if os.path.isfile(os.path.join(info.workspace_dir, "package.json")):
+                write_vite_config(name, info.workspace_dir)
                 asyncio.create_task(self.start_dev_server(name))
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:
