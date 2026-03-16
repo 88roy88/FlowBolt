@@ -1,8 +1,11 @@
 import { useEffect, useRef, useMemo } from 'react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
-import type { AIModel } from '../../types';
+import { WorkPlanView } from './WorkPlanView';
+import { TaskProgress } from './TaskProgress';
+import type { AIModel, AgentPhase } from '../../types';
 
 function ModelSelector() {
   const { models, selectedModel, setSelectedModel, loadModels } = useChatStore();
@@ -51,13 +54,98 @@ function ModelSelector() {
   );
 }
 
+const PHASE_LABELS: Record<AgentPhase, string> = {
+  idle: '',
+  classifying: 'Analyzing your request...',
+  designing: 'Designing the application...',
+  planning: 'Building work plan...',
+  awaiting_approval: 'Review the plan below',
+  executing: 'Building...',
+  complete: 'Done!',
+};
+
+function DesignProgress({ designProgress }: { designProgress: { architecture: string | null; ux: string | null } }) {
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '12px',
+      padding: '14px 16px',
+    }}>
+      <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '10px' }}>
+        Designing...
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+          {designProgress.architecture ? (
+            <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+          ) : (
+            <Loader2 size={14} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+          )}
+          <span>Architecture</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+          {designProgress.ux ? (
+            <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+          ) : (
+            <Loader2 size={14} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+          )}
+          <span>UI/UX</span>
+        </div>
+      </div>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function PhaseIndicator({ phase }: { phase: AgentPhase }) {
+  const label = PHASE_LABELS[phase];
+  if (!label) return null;
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 14px',
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      fontSize: '13px',
+      color: 'var(--text-dim)',
+    }}>
+      {phase !== 'complete' && phase !== 'awaiting_approval' && (
+        <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+      )}
+      {phase === 'complete' && (
+        <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+      )}
+      {label}
+    </div>
+  );
+}
+
 export function ChatPanel() {
-  const { messages, isStreaming, currentAssistantMessage, actions, error, clearError } = useChatStore();
+  const {
+    messages, isStreaming, currentAssistantMessage, actions, error, clearError,
+    agentPhase, planOverview, executionTasks, designProgress,
+  } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentAssistantMessage]);
+  }, [messages, currentAssistantMessage, agentPhase, executionTasks]);
+
+  const showDesignProgress = agentPhase === 'designing';
+  const showOverview = agentPhase === 'awaiting_approval' && planOverview;
+  const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
+  const showStreamingMessage = isStreaming && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress;
+  const showPhaseIndicator = agentPhase === 'classifying' || agentPhase === 'planning';
 
   return (
     <div style={{
@@ -95,8 +183,20 @@ export function ChatPanel() {
           <ChatMessage key={msg.id} message={msg} />
         ))}
 
-        {/* Streaming message */}
-        {isStreaming && (
+        {/* Phase indicator for classifying/planning */}
+        {showPhaseIndicator && <PhaseIndicator phase={agentPhase} />}
+
+        {/* Design progress */}
+        {showDesignProgress && <DesignProgress designProgress={designProgress} />}
+
+        {/* Plan overview for approval */}
+        {showOverview && <WorkPlanView overview={planOverview} />}
+
+        {/* Task execution progress */}
+        {showTaskProgress && <TaskProgress tasks={executionTasks} />}
+
+        {/* Streaming message (follow-up flow) */}
+        {showStreamingMessage && (
           <ChatMessage
             message={{
               id: '__streaming__',

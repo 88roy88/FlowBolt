@@ -8,6 +8,7 @@ export function PromptInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const isStreaming = useChatStore((s) => s.isStreaming);
+  const agentPhase = useChatStore((s) => s.agentPhase);
   const sessionId = useSessionStore((s) => s.sessionId);
 
   const adjustHeight = useCallback(() => {
@@ -35,7 +36,16 @@ export function PromptInput() {
     }
   };
 
-  const disabled = isStreaming || !sessionId;
+  const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'awaiting_approval' && agentPhase !== 'complete');
+  const disabled = isBusy || !sessionId;
+
+  const placeholder = !sessionId
+    ? 'Select a project first'
+    : agentPhase === 'awaiting_approval'
+      ? 'Review the plan above, then accept, modify, or reject'
+      : isBusy
+        ? 'AI is working...'
+        : 'Describe what you want to build...';
 
   return (
     <div style={{
@@ -61,7 +71,7 @@ export function PromptInput() {
             adjustHeight();
           }}
           onKeyDown={handleKeyDown}
-          placeholder={sessionId ? 'Describe what you want to build...' : 'Select a project first'}
+          placeholder={placeholder}
           disabled={disabled}
           rows={1}
           style={{
@@ -88,9 +98,13 @@ export function PromptInput() {
           <Send size={18} />
         </button>
       </div>
-      {isStreaming && (
+      {isBusy && (
         <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '6px', textAlign: 'center' }}>
-          AI is responding...
+          {agentPhase === 'classifying' ? 'Analyzing...' :
+           agentPhase === 'designing' ? 'Designing...' :
+           agentPhase === 'planning' ? 'Planning...' :
+           agentPhase === 'executing' ? 'Building...' :
+           'AI is responding...'}
         </p>
       )}
     </div>
