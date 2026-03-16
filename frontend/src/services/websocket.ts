@@ -3,6 +3,7 @@ import type { WSMessage } from '../types';
 interface ChatSocket {
   send(message: WSMessage): void;
   onMessage(handler: (msg: WSMessage) => void): void;
+  offMessage(handler: (msg: WSMessage) => void): void;
   close(): void;
 }
 
@@ -22,7 +23,7 @@ function createReconnectingSocket(
   onOpen?: () => void,
   onMessage?: (data: string) => void,
   onClose?: () => void,
-): { getSocket: () => WebSocket | null; sendOrQueue: (data: string) => void; close: () => void } {
+): { sendOrQueue: (data: string) => void; close: () => void } {
   let socket: WebSocket | null = null;
   let closed = false;
   let retryDelay = 1000;
@@ -68,7 +69,6 @@ function createReconnectingSocket(
   connect();
 
   return {
-    getSocket: () => socket,
     sendOrQueue: (data: string) => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(data);
@@ -84,8 +84,14 @@ function createReconnectingSocket(
   };
 }
 
-export function createChatSocket(sessionId: string): ChatSocket {
-  const handlers: Array<(msg: WSMessage) => void> = [];
+// Singleton chat sockets — one per session, reused across messages
+const chatSockets = new Map<string, ChatSocket>();
+
+export function getChatSocket(sessionId: string): ChatSocket {
+  const existing = chatSockets.get(sessionId);
+  if (existing) return existing;
+
+  const handlers = new Set<(msg: WSMessage) => void>();
 
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${sessionId}`,
@@ -98,18 +104,39 @@ export function createChatSocket(sessionId: string): ChatSocket {
         // ignore malformed messages
       }
     },
+    () => {
+      // on close — don't remove from map, reconnect will handle it
+    },
   );
 
-  return {
+  const socket: ChatSocket = {
     send(message: WSMessage) {
       sendOrQueue(JSON.stringify(message));
     },
     onMessage(handler: (msg: WSMessage) => void) {
-      handlers.push(handler);
+      handlers.add(handler);
     },
-    close,
+    offMessage(handler: (msg: WSMessage) => void) {
+      handlers.delete(handler);
+    },
+    close() {
+      chatSockets.delete(sessionId);
+      close();
+    },
   };
+
+  chatSockets.set(sessionId, socket);
+  return socket;
 }
+
+/** Close and remove the chat socket for a session (e.g. on project delete). */
+export function closeChatSocket(sessionId: string): void {
+  const socket = chatSockets.get(sessionId);
+  if (socket) socket.close();
+}
+
+// Keep createChatSocket as alias for backwards compat during transition
+export const createChatSocket = getChatSocket;
 
 export function createTerminalSocket(sessionId: string): TerminalSocket {
   const handlers: Array<(data: string) => void> = [];
