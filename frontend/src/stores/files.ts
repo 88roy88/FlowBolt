@@ -13,6 +13,7 @@ interface FilesState {
   setActiveFile: (path: string) => void;
   updateFileContent: (path: string, content: string) => void;
   saveFile: (path: string) => Promise<void>;
+  reset: () => void;
 }
 
 export const useFilesStore = create<FilesState>((set, get) => ({
@@ -79,5 +80,9 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     if (content !== undefined) {
       await api.saveFileContent(sessionId, path, content);
     }
+  },
+
+  reset() {
+    set({ fileTree: [], openFiles: new Map(), activeFilePath: null });
   },
 }));

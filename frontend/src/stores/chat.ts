@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { Message, Action, WSMessage, AIModel } from '../types';
-import { createChatSocket } from '../services/websocket';
+import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
+import { useFilesStore } from './files';
 import { fetchModels, fetchDefaultModel } from '../services/api';
 
 interface ChatState {
@@ -9,11 +10,13 @@ interface ChatState {
   isStreaming: boolean;
   currentAssistantMessage: string;
   actions: Action[];
+  error: string | null;
   models: AIModel[];
   selectedModel: string | null;
   sendMessage: (content: string) => void;
   addMessage: (message: Message) => void;
   clearMessages: () => void;
+  clearError: () => void;
   setStreaming: (streaming: boolean) => void;
   setSelectedModel: (model: string) => void;
   loadModels: () => Promise<void>;
@@ -28,6 +31,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isStreaming: false,
   currentAssistantMessage: '',
   actions: [],
+  error: null,
   models: [],
   selectedModel: null,
 
@@ -47,12 +51,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isStreaming: true,
       currentAssistantMessage: '',
       actions: [],
+      error: null,
     }));
 
-    const socket = createChatSocket(sessionId);
+    const socket = getChatSocket(sessionId);
     const assistantId = generateId();
 
-    socket.onMessage((msg: WSMessage) => {
+    const handler = (msg: WSMessage) => {
       switch (msg.type) {
         case 'text': {
           set((state) => ({
@@ -67,6 +72,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
               { type: 'file', path: msg.path, content: msg.content },
             ],
           }));
+          // Update the file in editor if it's open, and refresh tree
+          const filesStore = useFilesStore.getState();
+          if (filesStore.openFiles.has(msg.path)) {
+            filesStore.updateFileContent(msg.path, msg.content);
+          }
+          filesStore.loadFileTree();
           break;
         }
         case 'shell_output': {
@@ -76,6 +87,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
               { type: 'shell', command: msg.command, output: msg.output },
             ],
           }));
+          break;
+        }
+        case 'error': {
+          set({ error: msg.message, isStreaming: false });
+          socket.offMessage(handler);
           break;
         }
         case 'action_complete': {
@@ -93,11 +109,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
             currentAssistantMessage: '',
             actions: [],
           }));
-          socket.close();
+          socket.offMessage(handler);
+          // Refresh file tree after all actions are done
+          useFilesStore.getState().loadFileTree();
           break;
         }
       }
-    });
+    };
+
+    socket.onMessage(handler);
 
     const { selectedModel } = get();
     const msg: WSMessage = selectedModel
@@ -111,7 +131,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearMessages() {
-    set({ messages: [], currentAssistantMessage: '', actions: [] });
+    set({ messages: [], currentAssistantMessage: '', actions: [], error: null });
+  },
+
+  clearError() {
+    set({ error: null });
   },
 
   setStreaming(streaming: boolean) {
@@ -128,6 +152,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         fetchModels(),
         fetchDefaultModel(),
       ]);
+      // Ensure the default model is in the list even if the provider didn't return it
+      const modelIds = new Set(models.map((m) => m.id));
+      if (defaultModel && !modelIds.has(defaultModel)) {
+        models.unshift({ id: defaultModel, name: defaultModel, provider: 'default' });
+      }
       set((state) => ({
         models,
         selectedModel: state.selectedModel ?? defaultModel,

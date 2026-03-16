@@ -7,7 +7,7 @@ import { Plus, Trash2, FolderKanban } from 'lucide-react';
 export function Sidebar() {
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, isCreating } = useSessionStore();
   const clearMessages = useChatStore((s) => s.clearMessages);
-  const loadFileTree = useFilesStore((s) => s.loadFileTree);
+  const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
 
@@ -22,6 +22,7 @@ export function Sidebar() {
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
     clearMessages();
+    resetFiles();
     loadFileTree();
   };
 
