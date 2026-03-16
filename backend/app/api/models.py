@@ -74,7 +74,7 @@ def _fetch_bedrock_models() -> list[dict[str, str]]:
             models.append(
                 {
                     "id": f"bedrock/{model_id}",
-                    "name": _friendly_name(model_id),
+                    "name": f"{_friendly_name(model_id)} ({model_id})",
                     "provider": "bedrock",
                 }
             )
@@ -104,7 +104,7 @@ def _fetch_ollama_models() -> list[dict[str, str]]:
             models.append(
                 {
                     "id": f"ollama/{name}",
-                    "name": name,
+                    "name": f"ollama/{name}",
                     "provider": "ollama",
                 }
             )

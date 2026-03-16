@@ -185,9 +185,10 @@ class SandboxManager:
             self._sandboxes[name] = info
             logger.info("Restored sandbox for session %s (port %d)", name, port)
 
-            # Restart dev server if the workspace has a package.json
-            if os.path.isfile(os.path.join(workspace_dir, "package.json")):
-                await self.start_dev_server(name)
+        # Restart dev servers in the background (don't block startup)
+        for name, info in self._sandboxes.items():
+            if os.path.isfile(os.path.join(info.workspace_dir, "package.json")):
+                asyncio.create_task(self.start_dev_server(name))
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:
         """Tear down every active sandbox.  Used during application shutdown.

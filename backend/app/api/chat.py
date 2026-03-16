@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from dataclasses import asdict
+
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.ai.parser import ActionParser
 from app.ai.prompts import get_system_prompt
@@ -19,6 +21,16 @@ from app.sandbox.nsjail import exec_in_sandbox
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/api/chat/{session_id}/history")
+async def chat_history(session_id: str):
+    """Return saved chat messages for a session."""
+    project = await get_project_by_session(session_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Unknown session")
+    messages = await get_messages(project.id)
+    return [asdict(m) for m in messages]
 
 
 @router.websocket("/ws/chat/{session_id}")
