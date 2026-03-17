@@ -12,6 +12,9 @@ import logging
 import uuid
 from collections.abc import Callable, Awaitable
 
+from langfuse import Langfuse
+from langfuse.decorators import observe, langfuse_context
+
 from app.ai.parser import ActionParser
 from app.ai.provider import complete_chat, stream_chat
 from app.sandbox.nsjail import exec_in_sandbox
@@ -58,7 +61,22 @@ class AgentOrchestrator:
         self._completed_files: dict[str, str] = {}
         # Track which files belong to which task for dependency context
         self._task_files: dict[str, list[str]] = {}  # task_id -> [file_paths]
+        # Store trace_id and observation_id to maintain single trace across multiple method calls
+        self._trace_id: str | None = None
+        self._observation_id: str | None = None
 
+    def _llm_metadata(self, generation_name: str) -> dict:
+        """Build metadata for LiteLLM calls with trace context."""
+        trace_id = self._trace_id or langfuse_context.get_current_trace_id()
+        observation_id = self._observation_id or langfuse_context.get_current_observation_id()
+
+        return {
+            "existing_trace_id": trace_id,
+            "parent_observation_id": observation_id,
+            "generation_name": generation_name,
+        }
+
+    @observe(name="agent-handle-message", as_type="span")
     async def handle_message(
         self,
         content: str,
@@ -67,6 +85,20 @@ class AgentOrchestrator:
         """Process a new user message through the agent pipeline."""
         self.model = model
         self._user_content = content
+
+        # Capture trace_id to maintain single trace across method calls
+        self._trace_id = langfuse_context.get_current_trace_id()
+
+        # Add trace-level metadata
+        langfuse_context.update_current_trace(
+            session_id=self.session_id,
+            user_id=self.project_id,
+            metadata={
+                "model": model or "default",
+                "project_id": self.project_id,
+            },
+            tags=["agent-flow", "new-message"],
+        )
 
         # 1. Classify
         await self.ws_send({"type": "phase", "phase": "classifying"})
@@ -115,18 +147,59 @@ class AgentOrchestrator:
                 "overview": self._user_overview,
                 "accepted": True,
             }))
-            # Build the technical plan internally, then execute
-            await self.ws_send({"type": "phase", "phase": "planning"})
-            self._work_plan = await self._build_technical_plan()
-            # Send task list for progress UI (titles only, no file paths)
-            await self.ws_send({
-                "type": "task_list",
-                "tasks": [
-                    {"id": t.id, "title": t.title, "status": t.status}
-                    for t in self._work_plan.tasks
-                ],
-            })
-            await self._execute()
+
+            # Use stored trace_id to continue the same trace
+            if self._trace_id:
+                langfuse_client = Langfuse()
+
+                # Build the technical plan internally
+                await self.ws_send({"type": "phase", "phase": "planning"})
+                span_plan = langfuse_client.span(
+                    trace_id=self._trace_id,
+                    name="build-technical-plan",
+                )
+                # Store observation ID for LLM calls within this span
+                self._observation_id = span_plan.id
+                self._work_plan = await self._build_technical_plan()
+                span_plan.end()
+
+                # Send task list for progress UI (titles only, no file paths)
+                await self.ws_send({
+                    "type": "task_list",
+                    "tasks": [
+                        {"id": t.id, "title": t.title, "status": t.status}
+                        for t in self._work_plan.tasks
+                    ],
+                })
+
+                # Execute
+                span_execute = langfuse_client.span(
+                    trace_id=self._trace_id,
+                    name="execute-plan",
+                    metadata={
+                        "total_tasks": len(self._work_plan.tasks),
+                        "execution_layers": len(self._work_plan.execution_layers()),
+                    }
+                )
+                # Store observation ID for LLM calls within this span
+                self._observation_id = span_execute.id
+                await self._execute()
+                span_execute.end()
+
+                # Reset observation_id after execution
+                self._observation_id = None
+            else:
+                # Fallback if no trace_id (shouldn't happen)
+                await self.ws_send({"type": "phase", "phase": "planning"})
+                self._work_plan = await self._build_technical_plan()
+                await self.ws_send({
+                    "type": "task_list",
+                    "tasks": [
+                        {"id": t.id, "title": t.title, "status": t.status}
+                        for t in self._work_plan.tasks
+                    ],
+                })
+                await self._execute()
 
         elif action == "modify":
             if feedback:
@@ -151,6 +224,7 @@ class AgentOrchestrator:
     # Classification
     # ------------------------------------------------------------------
 
+    @observe(name="classify-request", as_type="span")
     async def _classify(self, content: str) -> bool:
         """Return True if this is a new project request, False for follow-up."""
         history = await get_messages(self.project_id)
@@ -161,12 +235,15 @@ class AgentOrchestrator:
         ]
         if len(assistant_msgs) == 0:
             logger.info("[agent] First message — classifying as new_project")
+            langfuse_context.update_current_observation(
+                metadata={"classification": "new_project", "reason": "first_message"}
+            )
             return True
 
         # Include project summary for classifier context
         classify_content = content
         project = await get_project_by_session(self.session_id)
-        if project and project.summary:
+        if project and project.summwary:
             try:
                 summary_data = json.loads(project.summary)
                 classify_content = (
@@ -178,45 +255,84 @@ class AgentOrchestrator:
 
         messages = [{"role": "user", "content": classify_content}]
         try:
-            raw = await complete_chat(messages, CLASSIFY_PROMPT, model=self.model)
+            raw = await complete_chat(
+                messages,
+                CLASSIFY_PROMPT,
+                model=self.model,
+                metadata=self._llm_metadata("classify")
+            )
             data = json.loads(raw.strip())
             classification = data.get("classification", "follow_up")
             logger.info("[agent] Classification: %s", classification)
-            return classification == "new_project"
+            is_new = classification == "new_project"
+            langfuse_context.update_current_observation(
+                metadata={"classification": classification, "is_new_project": is_new}
+            )
+            return is_new
         except Exception:
             logger.exception("[agent] Classification failed, defaulting to follow_up")
+            langfuse_context.update_current_observation(
+                metadata={"classification": "follow_up", "reason": "error_fallback"}
+            )
             return False
 
     # ------------------------------------------------------------------
     # Design phase (internal)
     # ------------------------------------------------------------------
 
+    @observe(name="design-architecture", as_type="span")
     async def _design_architecture(self, content: str) -> dict:
         messages = [{"role": "user", "content": content}]
         try:
-            raw = await complete_chat(messages, ARCHITECTURE_PROMPT, model=self.model)
+            raw = await complete_chat(
+                messages,
+                ARCHITECTURE_PROMPT,
+                model=self.model,
+                metadata=self._llm_metadata("design_architecture")
+            )
             await self.ws_send({"type": "design_progress", "stream": "architecture", "content": "complete"})
-            return _parse_json_response(raw)
+            result = _parse_json_response(raw)
+            langfuse_context.update_current_observation(
+                metadata={"success": True, "components_count": len(result.get("components", []))}
+            )
+            return result
         except Exception:
             logger.exception("[agent] Architecture design failed")
             await self.ws_send({"type": "design_progress", "stream": "architecture", "content": "failed"})
+            langfuse_context.update_current_observation(
+                metadata={"success": False}
+            )
             return {}
 
+    @observe(name="design-ux", as_type="span")
     async def _design_ux(self, content: str) -> dict:
         messages = [{"role": "user", "content": content}]
         try:
-            raw = await complete_chat(messages, UX_DESIGN_PROMPT, model=self.model)
+            raw = await complete_chat(
+                messages,
+                UX_DESIGN_PROMPT,
+                model=self.model,
+                metadata=self._llm_metadata("design_ux")
+            )
             await self.ws_send({"type": "design_progress", "stream": "ux", "content": "complete"})
-            return _parse_json_response(raw)
+            result = _parse_json_response(raw)
+            langfuse_context.update_current_observation(
+                metadata={"success": True, "screens_count": len(result.get("screens", []))}
+            )
+            return result
         except Exception:
             logger.exception("[agent] UX design failed")
             await self.ws_send({"type": "design_progress", "stream": "ux", "content": "failed"})
+            langfuse_context.update_current_observation(
+                metadata={"success": False}
+            )
             return {}
 
     # ------------------------------------------------------------------
     # User-facing overview
     # ------------------------------------------------------------------
 
+    @observe(name="build-user-overview", as_type="span")
     async def _build_user_overview(self, content: str) -> dict:
         """Build a friendly, non-technical overview for the user."""
         plan_input = json.dumps({
@@ -225,8 +341,17 @@ class AgentOrchestrator:
             "ux_design": self._ux_design,
         }, indent=2)
         messages = [{"role": "user", "content": plan_input}]
-        raw = await complete_chat(messages, USER_PLAN_PROMPT, model=self.model)
-        return _parse_json_response(raw)
+        raw = await complete_chat(
+            messages,
+            USER_PLAN_PROMPT,
+            model=self.model,
+            metadata=self._llm_metadata("build_user_overview")
+        )
+        result = _parse_json_response(raw)
+        langfuse_context.update_current_observation(
+            metadata={"decisions_count": len(result.get("decisions", []))}
+        )
+        return result
 
     async def _rebuild_overview_with_feedback(self, feedback: str) -> dict:
         """Re-generate the user overview incorporating user feedback.
@@ -248,6 +373,7 @@ class AgentOrchestrator:
             "Update the overview to reflect their preferences. If they chose an alternative "
             "for a decision, switch the 'chosen' field accordingly.",
             model=self.model,
+            metadata=self._llm_metadata("rebuild_overview_with_feedback")
         )
         return _parse_json_response(raw)
 
@@ -264,9 +390,18 @@ class AgentOrchestrator:
             "user_preferences": self._user_overview.get("decisions", []),
         }, indent=2)
         messages = [{"role": "user", "content": merge_input}]
-        raw = await complete_chat(messages, MERGE_PROMPT, model=self.model)
+        raw = await complete_chat(
+            messages,
+            MERGE_PROMPT,
+            model=self.model,
+            metadata=self._llm_metadata("build_technical_plan")
+        )
         plan_data = _parse_json_response(raw)
-        return _dict_to_work_plan(plan_data, self._architecture, self._ux_design)
+        work_plan = _dict_to_work_plan(plan_data, self._architecture, self._ux_design)
+        langfuse_context.update_current_observation(
+            metadata={"tasks_count": len(work_plan.tasks)}
+        )
+        return work_plan
 
     # ------------------------------------------------------------------
     # Execution
@@ -296,10 +431,22 @@ class AgentOrchestrator:
             ],
         }))
 
-        # Run typecheck to catch errors
-        errors = await self._typecheck()
-        if errors:
-            await self._fix_errors(errors)
+        # Run both typecheck and build to catch errors
+        typecheck_errors, build_errors = await asyncio.gather(
+            self._typecheck(),
+            self._build(),
+        )
+
+        # Combine all errors
+        all_errors = []
+        if typecheck_errors:
+            all_errors.append("## TypeScript Errors\n" + typecheck_errors)
+        if build_errors:
+            all_errors.append("## Build Errors\n" + build_errors)
+
+        if all_errors:
+            combined_errors = "\n\n".join(all_errors)
+            await self._fix_errors(combined_errors)
 
         # Generate and persist project summary
         await self._generate_summary()
@@ -309,6 +456,7 @@ class AgentOrchestrator:
         await self.ws_send({"type": "phase", "phase": "complete"})
         await self.ws_send({"type": "action_complete"})
 
+    @observe(name="execute-task", as_type="span")
     async def _execute_task(self, task: Task) -> None:
         """Execute a single task: call AI for code, parse XML, write files."""
         task.status = "running"
@@ -317,6 +465,16 @@ class AgentOrchestrator:
             "taskId": task.id,
             "status": "running",
         })
+
+        # Add task-specific metadata
+        langfuse_context.update_current_observation(
+            metadata={
+                "task_id": task.id,
+                "task_title": task.title,
+                "dependencies": task.depends_on,
+                "expected_files": len(task.files),
+            }
+        )
 
         assert self._work_plan is not None
 
@@ -354,6 +512,7 @@ class AgentOrchestrator:
                 [{"role": "user", "content": "Generate the code."}],
                 prompt,
                 model=self.model,
+                metadata=self._llm_metadata(f"execute_task_{task.id}")
             ):
                 full_text.append(chunk)
                 parser.feed(chunk)
@@ -392,7 +551,7 @@ class AgentOrchestrator:
             })
 
     # ------------------------------------------------------------------
-    # Typecheck
+    # Typecheck and Build
     # ------------------------------------------------------------------
 
     async def _typecheck(self) -> str:
@@ -414,6 +573,26 @@ class AgentOrchestrator:
             logger.exception("[agent] Typecheck execution failed")
             return ""
 
+    async def _build(self) -> str:
+        """Run pnpm build and return error output (empty string if clean)."""
+        try:
+            lines: list[str] = []
+            async for line in exec_in_sandbox(
+                self.session_id,
+                "pnpm build 2>&1",
+            ):
+                lines.append(line.rstrip())
+            output = "\n".join(lines).strip()
+            if output and ("error" in output.lower() or "failed" in output.lower()):
+                logger.info("[agent] Build found errors:\n%s", output)
+                return output
+            else:
+                logger.info("[agent] Build passed")
+                return ""
+        except Exception:
+            logger.exception("[agent] Build execution failed")
+            return ""
+
     async def _fix_errors(self, errors: str) -> None:
         """Ask the LLM to fix typecheck errors, then write the corrected files."""
         assert self._work_plan is not None
@@ -421,9 +600,9 @@ class AgentOrchestrator:
 
         prompt = f"""\
 You are an expert React/TypeScript developer. The project was just built but has
-TypeScript errors. Fix ALL errors below by outputting corrected files.
+errors. Fix ALL errors below by outputting corrected files.
 
-## TypeScript Errors
+## Errors
 ```
 {errors}
 ```
@@ -462,6 +641,7 @@ Rules:
                 [{"role": "user", "content": "Fix the TypeScript errors."}],
                 prompt,
                 model=self.model,
+                metadata=self._llm_metadata("fix_errors")
             ):
                 full_text.append(chunk)
                 parser.feed(chunk)
@@ -490,8 +670,18 @@ Rules:
                 "architecture": self._architecture,
                 "files_created": list(self._completed_files.keys()),
             }, indent=2)
+
+            langfuse_context.update_current_observation(
+                metadata={"files_count": len(self._completed_files)}
+            )
+
             messages = [{"role": "user", "content": summary_input}]
-            raw = await complete_chat(messages, SUMMARY_PROMPT, model=self.model)
+            raw = await complete_chat(
+                messages,
+                SUMMARY_PROMPT,
+                model=self.model,
+                metadata=self._llm_metadata("generate_summary")
+            )
             summary_data = _parse_json_response(raw)
 
             if summary_data:
@@ -506,9 +696,15 @@ Rules:
     # Simple follow-up flow (existing behavior)
     # ------------------------------------------------------------------
 
+    @observe(name="simple-follow-up", as_type="span")
     async def _simple_flow(self, content: str) -> None:
         """Single-turn AI flow for follow-up edits."""
         await self.ws_send({"type": "phase", "phase": "executing"})
+
+        # Add follow-up metadata
+        langfuse_context.update_current_observation(
+            tags=["follow-up-edit"]
+        )
 
         # Load project summary for context
         project = await get_project_by_session(self.session_id)
@@ -544,7 +740,12 @@ Rules:
 
         try:
             system_prompt = get_system_prompt() + summary_context
-            async for chunk in stream_chat(messages, system_prompt, model=self.model):
+            async for chunk in stream_chat(
+                messages,
+                system_prompt,
+                model=self.model,
+                metadata=self._llm_metadata("simple_follow_up")
+            ):
                 full_response.append(chunk)
                 parser.feed(chunk)
                 await self.ws_send({"type": "text", "content": chunk})
@@ -587,8 +788,12 @@ def encode_card(card_data: dict) -> str:
     return f"{CARD_PREFIX}{json.dumps(card_data, separators=(',', ':'))}{CARD_SUFFIX}"
 
 
-def _parse_json_response(raw: str) -> dict:
+def _parse_json_response(raw: str | None) -> dict:
     """Extract JSON from an AI response that may contain markdown fences."""
+    if raw is None:
+        logger.error("[agent] Received None response from LLM")
+        return {}
+
     text = raw.strip()
     if text.startswith("```"):
         lines = text.split("\n")
