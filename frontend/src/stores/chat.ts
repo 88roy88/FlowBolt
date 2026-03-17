@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask } from '../types';
+import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
@@ -33,6 +33,7 @@ interface ChatState {
   planOverview: PlanOverview | null;
   executionTasks: ExecutionTask[];
   designProgress: { architecture: string | null; ux: string | null };
+  projectSummary: ProjectSummary | null;
   // Actions
   sendMessage: (content: string) => void;
   respondToPlan: (action: 'accept' | 'reject' | 'modify', feedback?: string) => void;
@@ -64,6 +65,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   planOverview: null,
   executionTasks: [],
   designProgress: { architecture: null, ux: null },
+  projectSummary: null,
 
   sendMessage(content: string) {
     const sessionId = useSessionStore.getState().sessionId;
@@ -154,6 +156,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (msg.file) {
             useFilesStore.getState().loadFileTree();
           }
+          break;
+        }
+        case 'project_summary': {
+          set({ projectSummary: msg.summary });
+          // Bake the summary into chat as a card
+          const summaryMsg: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            agentCard: { type: 'project_summary', summary: msg.summary },
+          };
+          set((s) => ({ messages: [...s.messages, summaryMsg] }));
           break;
         }
         case 'text': {
