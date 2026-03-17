@@ -22,11 +22,12 @@ class Settings(BaseSettings):
     SANDBOX_PID_LIMIT: int = 256
 
     # Langfuse (optional — set public/secret key to enable)
-    LANGFUSE_PUBLIC_KEY: str = "sk-lf-4ebc8ff8-da65-484b-8747-6af8ab49b600"
-    LANGFUSE_SECRET_KEY: str = "pk-lf-5b72f594-fa75-4a2d-847f-d037a6cf34f8"
+    LANGFUSE_PUBLIC_KEY: str = ""
+    LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
 
     model_config = {"env_prefix": "AIB_", "env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()
+
