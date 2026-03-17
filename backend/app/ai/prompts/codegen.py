@@ -111,8 +111,9 @@ Rules:
 3. Tailwind CSS is pre-configured - use utility classes extensively for styling.
 4. Write clean, production-quality code with modern, polished UI/UX.
 5. Only output the files listed above — do not create extra files.
-6. Import from already-completed files using their exact export names.
-7. Do NOT include shell actions — only file actions.
+6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
+7. Import from already-completed files using their exact export names.
+8. Do NOT include shell actions — only file actions.
 """
 
 

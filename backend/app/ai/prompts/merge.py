@@ -40,6 +40,6 @@ Rules:
 - Component tasks depend on their type definitions
 - The final App.tsx integration task depends on all component tasks
 - Keep the total number of tasks reasonable (3-10 for most projects)
-- Include a task for package.json if new dependencies are needed
+- Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS)
 - Do NOT include tasks for installing dependencies or running the dev server
 """
