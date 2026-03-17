@@ -10,6 +10,39 @@ function getWsBase(): string {
   return `${protocol}//${window.location.host}`;
 }
 
+function getServerLogTheme(): XTerm['options']['theme'] {
+  if (typeof window === 'undefined') return undefined;
+  const isLight = document.documentElement.dataset.theme === 'light';
+  const styles = getComputedStyle(document.documentElement);
+  const bg = styles.getPropertyValue('--bg').trim() || '#1e1e2e';
+  const fg = styles.getPropertyValue('--text').trim() || '#cdd6f4';
+
+  return {
+    background: bg,
+    foreground: fg,
+    cursor: bg,
+    cursorAccent: bg,
+    selectionBackground: isLight ? 'rgba(37, 99, 235, 0.2)' : 'rgba(137, 180, 250, 0.25)',
+    selectionForeground: fg,
+    black:   isLight ? '#6b7280' : '#45475a',
+    brightBlack: isLight ? '#9ca3af' : '#585b70',
+    red:     isLight ? '#dc2626' : '#f38ba8',
+    brightRed: isLight ? '#ef4444' : '#f38ba8',
+    green:   isLight ? '#16a34a' : '#a6e3a1',
+    brightGreen: isLight ? '#22c55e' : '#a6e3a1',
+    yellow:  isLight ? '#ca8a04' : '#f9e2af',
+    brightYellow: isLight ? '#eab308' : '#f9e2af',
+    blue:    isLight ? '#2563eb' : '#89b4fa',
+    brightBlue: isLight ? '#3b82f6' : '#89b4fa',
+    magenta: isLight ? '#9333ea' : '#cba6f7',
+    brightMagenta: isLight ? '#a855f7' : '#cba6f7',
+    cyan:    isLight ? '#0891b2' : '#94e2d5',
+    brightCyan: isLight ? '#06b6d4' : '#94e2d5',
+    white:   isLight ? '#374151' : '#bac2de',
+    brightWhite: isLight ? '#111827' : '#cdd6f4',
+  };
+}
+
 export function ServerLog() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -18,30 +51,7 @@ export function ServerLog() {
     if (!containerRef.current || !sessionId) return;
 
     const term = new XTerm({
-      theme: {
-        background: '#1e1e2e',
-        foreground: '#cdd6f4',
-        cursor: '#1e1e2e',
-        cursorAccent: '#1e1e2e',
-        selectionBackground: 'rgba(137, 180, 250, 0.25)',
-        selectionForeground: '#cdd6f4',
-        black: '#45475a',
-        brightBlack: '#585b70',
-        red: '#f38ba8',
-        brightRed: '#f38ba8',
-        green: '#a6e3a1',
-        brightGreen: '#a6e3a1',
-        yellow: '#f9e2af',
-        brightYellow: '#f9e2af',
-        blue: '#89b4fa',
-        brightBlue: '#89b4fa',
-        magenta: '#cba6f7',
-        brightMagenta: '#cba6f7',
-        cyan: '#94e2d5',
-        brightCyan: '#94e2d5',
-        white: '#bac2de',
-        brightWhite: '#cdd6f4',
-      },
+      theme: getServerLogTheme(),
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Menlo, monospace",
       cursorBlink: false,
@@ -105,9 +115,19 @@ export function ServerLog() {
     });
     resizeObserver.observe(containerRef.current);
 
+    const mutationObserver = new MutationObserver(() => {
+      const theme = getServerLogTheme();
+      if (theme) term.options.theme = theme;
+    });
+    mutationObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
     return () => {
       closed = true;
       resizeObserver.disconnect();
+      mutationObserver.disconnect();
       ws?.close();
       ws = null;
       term.dispose();
