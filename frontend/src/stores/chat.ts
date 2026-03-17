@@ -367,6 +367,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSelectedModel(model: string) {
     set({ selectedModel: model });
+    // Save the selected model to the project
+    const currentProject = useSessionStore.getState().currentProject;
+    if (currentProject) {
+      updateProjectModel(currentProject.id, model).catch((err) => {
+        console.error('Failed to save selected model:', err);
+      });
+    }
   },
 
   async loadModels() {
