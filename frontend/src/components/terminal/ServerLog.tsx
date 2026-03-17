@@ -3,21 +3,24 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useSessionStore } from '../../stores/session';
-import { createTerminalSocket } from '../../services/websocket';
 import '@xterm/xterm/css/xterm.css';
 
-function getTerminalTheme(): XTerm['options']['theme'] {
+function getWsBase(): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}`;
+}
+
+function getServerLogTheme(): XTerm['options']['theme'] {
   if (typeof window === 'undefined') return undefined;
   const isLight = document.documentElement.dataset.theme === 'light';
   const styles = getComputedStyle(document.documentElement);
   const bg = styles.getPropertyValue('--bg').trim() || '#1e1e2e';
   const fg = styles.getPropertyValue('--text').trim() || '#cdd6f4';
-  const accent = styles.getPropertyValue('--accent').trim() || '#89b4fa';
 
   return {
     background: bg,
     foreground: fg,
-    cursor: accent,
+    cursor: bg,
     cursorAccent: bg,
     selectionBackground: isLight ? 'rgba(37, 99, 235, 0.2)' : 'rgba(137, 180, 250, 0.25)',
     selectionForeground: fg,
@@ -40,21 +43,19 @@ function getTerminalTheme(): XTerm['options']['theme'] {
   };
 }
 
-export function Terminal() {
+export function ServerLog() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<XTerm | null>(null);
-  const socketRef = useRef<ReturnType<typeof createTerminalSocket> | null>(null);
   const sessionId = useSessionStore((s) => s.sessionId);
 
   useEffect(() => {
     if (!containerRef.current || !sessionId) return;
 
     const term = new XTerm({
-      theme: getTerminalTheme(),
+      theme: getServerLogTheme(),
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Menlo, monospace",
-      cursorBlink: true,
-      cursorStyle: 'bar',
+      cursorBlink: false,
+      disableStdin: true,
       convertEol: true,
       lineHeight: 1.2,
     });
@@ -67,17 +68,43 @@ export function Terminal() {
     term.open(containerRef.current);
     fitAddon.fit();
 
-    const socket = createTerminalSocket(sessionId);
-    socketRef.current = socket;
-    termRef.current = term;
+    let ws: WebSocket | null = null;
+    let closed = false;
+    let retryDelay = 1000;
 
-    term.onData((data) => {
-      socket.send(data);
-    });
+    function connect() {
+      if (closed) return;
+      ws = new WebSocket(`${getWsBase()}/ws/server-log/${sessionId}`);
+      ws.binaryType = 'arraybuffer';
 
-    socket.onData((data) => {
-      term.write(data);
-    });
+      ws.addEventListener('message', (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+        } else {
+          term.write(event.data as string);
+        }
+      });
+
+      ws.addEventListener('close', () => {
+        ws = null;
+        if (!closed) {
+          setTimeout(() => {
+            retryDelay = Math.min(retryDelay * 2, 30000);
+            connect();
+          }, retryDelay);
+        }
+      });
+
+      ws.addEventListener('open', () => {
+        retryDelay = 1000;
+      });
+
+      ws.addEventListener('error', () => {
+        ws?.close();
+      });
+    }
+
+    connect();
 
     const resizeObserver = new ResizeObserver(() => {
       try {
@@ -88,12 +115,9 @@ export function Terminal() {
     });
     resizeObserver.observe(containerRef.current);
 
-    // React to theme changes (light/dark)
     const mutationObserver = new MutationObserver(() => {
-      const theme = getTerminalTheme();
-      if (theme) {
-        term.options.theme = theme;
-      }
+      const theme = getServerLogTheme();
+      if (theme) term.options.theme = theme;
     });
     mutationObserver.observe(document.documentElement, {
       attributes: true,
@@ -101,12 +125,12 @@ export function Terminal() {
     });
 
     return () => {
+      closed = true;
       resizeObserver.disconnect();
       mutationObserver.disconnect();
-      socket.close();
+      ws?.close();
+      ws = null;
       term.dispose();
-      termRef.current = null;
-      socketRef.current = null;
     };
   }, [sessionId]);
 

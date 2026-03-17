@@ -4,7 +4,14 @@ export interface Message {
   content: string;
   actions?: Action[];
   timestamp: number;
+  // Agent card data (persisted in chat history)
+  agentCard?: AgentCard;
 }
+
+export type AgentCard =
+  | { type: 'design_complete'; architecture: boolean; ux: boolean }
+  | { type: 'plan_overview'; overview: PlanOverview; accepted: boolean }
+  | { type: 'task_progress'; tasks: ExecutionTask[] };
 
 export interface Action {
   type: 'file' | 'shell';
@@ -34,10 +41,52 @@ export interface AIModel {
   provider: string;
 }
 
+// Agent types
+export type AgentPhase =
+  | 'idle'
+  | 'classifying'
+  | 'designing'
+  | 'planning'
+  | 'awaiting_approval'
+  | 'executing'
+  | 'complete';
+
+// User-facing plan overview (shown during approval)
+export interface PlanFeature {
+  title: string;
+  description: string;
+}
+
+export interface PlanDecision {
+  id: string;
+  title: string;
+  chosen: string;
+  alternatives: string[];
+}
+
+export interface PlanOverview {
+  summary: string;
+  features: PlanFeature[];
+  decisions: PlanDecision[];
+}
+
+// Execution tasks (shown during build progress, title-only)
+export interface ExecutionTask {
+  id: string;
+  title: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+}
+
 export type WSMessage =
   | { type: 'message'; content: string; model?: string }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }
   | { type: 'action_complete' }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'phase'; phase: AgentPhase }
+  | { type: 'design_progress'; stream: 'architecture' | 'ux'; content: string }
+  | { type: 'plan_overview'; overview: PlanOverview }
+  | { type: 'task_list'; tasks: ExecutionTask[] }
+  | { type: 'task_update'; taskId: string; status: 'running' | 'completed' | 'failed'; file?: string }
+  | { type: 'plan_response'; action: 'accept' | 'reject' | 'modify'; feedback?: string };

@@ -7,12 +7,15 @@ interface FilesState {
   fileTree: FileEntry[];
   openFiles: Map<string, string>;
   activeFilePath: string | null;
+  pendingRevealLine: number | null;
+  pendingRevealColumn: number | null;
   loadFileTree: () => Promise<void>;
-  openFile: (path: string) => Promise<void>;
+  openFile: (path: string, line?: number, column?: number) => Promise<void>;
   closeFile: (path: string) => void;
   setActiveFile: (path: string) => void;
   updateFileContent: (path: string, content: string) => void;
   saveFile: (path: string) => Promise<void>;
+  clearPendingReveal: () => void;
   reset: () => void;
 }
 
@@ -20,6 +23,8 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   fileTree: [],
   openFiles: new Map(),
   activeFilePath: null,
+  pendingRevealLine: null,
+  pendingRevealColumn: null,
 
   async loadFileTree() {
     const sessionId = useSessionStore.getState().sessionId;
@@ -28,10 +33,10 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     set({ fileTree: tree });
   },
 
-  async openFile(path: string) {
+  async openFile(path: string, line?: number, column?: number) {
     const state = get();
     if (state.openFiles.has(path)) {
-      set({ activeFilePath: path });
+      set({ activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null });
       return;
     }
     const sessionId = useSessionStore.getState().sessionId;
@@ -41,7 +46,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       set((s) => {
         const next = new Map(s.openFiles);
         next.set(path, content);
-        return { openFiles: next, activeFilePath: path };
+        return { openFiles: next, activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null };
       });
     } catch (err) {
       console.error('Failed to open file:', path, err);
@@ -82,7 +87,11 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     }
   },
 
+  clearPendingReveal() {
+    set({ pendingRevealLine: null, pendingRevealColumn: null });
+  },
+
   reset() {
-    set({ fileTree: [], openFiles: new Map(), activeFilePath: null });
+    set({ fileTree: [], openFiles: new Map(), activeFilePath: null, pendingRevealLine: null, pendingRevealColumn: null });
   },
 }));

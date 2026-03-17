@@ -7,6 +7,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.sandbox.manager import sandbox_manager
 from app.sandbox.pty import PtyProcess, close_pty, create_pty_process, read_pty, write_pty
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
     """Bidirectional PTY WebSocket.
 
     Client sends raw bytes (keystrokes); server sends terminal output bytes.
+    The dev server is managed by sandbox_manager as a background process.
     """
     await websocket.accept()
 

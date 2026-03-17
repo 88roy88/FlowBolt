@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Project } from '../types';
 import * as api from '../services/api';
+import { closeChatSocket } from '../services/websocket';
 
 interface SessionState {
   currentProject: Project | null;
@@ -40,6 +41,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async deleteProject(id: string) {
+    const projectToDelete = get().projects.find((p) => p.id === id);
+    if (projectToDelete?.session_id) {
+      closeChatSocket(projectToDelete.session_id);
+    }
     await api.deleteProject(id);
     const projects = get().projects.filter((p) => p.id !== id);
     const current = get().currentProject;

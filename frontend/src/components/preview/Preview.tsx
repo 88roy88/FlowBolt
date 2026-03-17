@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
-import { fetchPreviewPort } from '../../services/api';
 import { RefreshCw, ExternalLink } from 'lucide-react';
 
 export function Preview() {
@@ -8,22 +7,20 @@ export function Preview() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
       setPreviewUrl(null);
       return;
     }
-    setError(null);
-    fetchPreviewPort(sessionId)
-      .then((port) => {
-        // In dev, connect directly to the sandbox dev server port
-        setPreviewUrl(`http://localhost:${port}/`);
-      })
-      .catch(() => {
-        setError('Could not load preview port');
-      });
+    setLoading(true);
+
+    // Use the reverse proxy — it rewrites Vite's absolute paths so assets
+    // like /@vite/client and /src/main.tsx route back through the proxy.
+    const url = `/api/preview/${sessionId}/proxy/`;
+    setPreviewUrl(url);
+    setLoading(false);
   }, [sessionId, refreshKey]);
 
   const handleRefresh = () => {
@@ -105,18 +102,7 @@ export function Preview() {
       </div>
 
       {/* iframe */}
-      {error ? (
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--text-dim)',
-          fontSize: '14px',
-        }}>
-          {error}
-        </div>
-      ) : previewUrl ? (
+      {previewUrl ? (
         <iframe
           ref={iframeRef}
           key={refreshKey}
@@ -138,7 +124,7 @@ export function Preview() {
           color: 'var(--text-dim)',
           fontSize: '14px',
         }}>
-          Loading preview...
+          {loading ? 'Loading preview...' : 'No preview available'}
         </div>
       )}
     </div>

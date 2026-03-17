@@ -9,14 +9,9 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from app.ai.parser import ActionParser
-from app.ai.prompts import get_system_prompt
-from app.ai.provider import stream_chat
-from app.config import settings
+from app.ai.agent import AgentOrchestrator
 from app.models.chat import get_messages, save_message
 from app.models.project import get_project_by_session
-from app.sandbox.filesystem import write_file
-from app.sandbox.nsjail import exec_in_sandbox
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +35,14 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
     Client sends::
 
         {"type": "message", "content": "user prompt text"}
+        {"type": "plan_response", "action": "accept" | "reject" | "modify", "feedback": "..."}
 
     Server sends a stream of::
 
+        {"type": "phase", "phase": "classifying" | "designing" | "planning" | "awaiting_approval" | "executing" | "complete"}
+        {"type": "design_progress", "stream": "architecture" | "ux", "content": "..."}
+        {"type": "work_plan", "plan": {...}}
+        {"type": "task_update", "taskId": "...", "status": "running" | "completed" | "failed", "file": "..."}
         {"type": "text", "content": "..."}
         {"type": "file", "path": "...", "content": "..."}
         {"type": "shell_output", "command": "...", "output": "..."}
@@ -60,95 +60,47 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
 
     logger.info("[chat] Project %s found for session %s", project.id, session_id)
 
+    async def ws_send(msg: dict) -> None:
+        await websocket.send_json(msg)
+
+    orchestrator = AgentOrchestrator(
+        session_id=session_id,
+        project_id=project.id,
+        ws_send=ws_send,
+    )
+
     try:
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
-            logger.info("[chat] Received message type=%s session=%s", data.get("type"), session_id)
+            msg_type = data.get("type")
+            logger.info("[chat] Received message type=%s session=%s", msg_type, session_id)
 
-            if data.get("type") != "message":
-                continue
+            if msg_type == "message":
+                user_content: str = data["content"]
+                selected_model: str | None = data.get("model")
+                logger.info("[chat] User message (%d chars): %.100s...", len(user_content), user_content)
 
-            user_content: str = data["content"]
-            logger.info("[chat] User message (%d chars): %.100s...", len(user_content), user_content)
+                # Save user message
+                await save_message(project.id, "user", user_content)
 
-            # 1. Save user message
-            await save_message(project.id, "user", user_content)
+                # Delegate to orchestrator
+                try:
+                    await orchestrator.handle_message(user_content, model=selected_model)
+                except Exception:
+                    logger.exception("[chat] Orchestrator error for session %s", session_id)
+                    await websocket.send_json({"type": "error", "message": "AI processing failed"})
 
-            # 2. Build conversation context
-            history = await get_messages(project.id)
-            messages = [{"role": m.role, "content": m.content} for m in history]
-            logger.info("[chat] Conversation context: %d messages", len(messages))
+            elif msg_type == "plan_response":
+                action = data.get("action", "reject")
+                feedback = data.get("feedback")
+                logger.info("[chat] Plan response: action=%s session=%s", action, session_id)
 
-            # 3. Stream AI response & parse actions
-            full_response: list[str] = []
-            pending_files: list[tuple[str, str]] = []
-            pending_shells: list[str] = []
-
-            parser = ActionParser(
-                on_text=lambda t: None,  # text tracked via full_response
-                on_file_action=lambda p, c: pending_files.append((p, c)),
-                on_shell_action=lambda c: pending_shells.append(c),
-            )
-
-            selected_model: str | None = data.get("model")
-            logger.info("[chat] Starting AI stream (model=%s)", selected_model or settings.AI_MODEL)
-            chunk_count = 0
-
-            try:
-                async for chunk in stream_chat(messages, get_system_prompt(), model=selected_model):
-                    chunk_count += 1
-                    full_response.append(chunk)
-                    parser.feed(chunk)
-
-                    # Send text chunk to client
-                    await websocket.send_json({"type": "text", "content": chunk})
-
-                    # Process completed file actions
-                    for path, content in pending_files:
-                        logger.info("[chat] File action: %s (%d bytes)", path, len(content))
-                        await write_file(session_id, path, content)
-                        await websocket.send_json({"type": "file", "path": path, "content": content})
-                    pending_files.clear()
-
-                    # Process completed shell actions
-                    for command in pending_shells:
-                        logger.info("[chat] Shell action: %s", command)
-                        async for line in exec_in_sandbox(session_id, command):
-                            await websocket.send_json(
-                                {"type": "shell_output", "command": command, "output": line}
-                            )
-                    pending_shells.clear()
-
-            except Exception:
-                logger.exception("[chat] Error during AI streaming after %d chunks", chunk_count)
-                await websocket.send_json({"type": "error", "message": "AI streaming failed"})
-                continue
-
-            logger.info("[chat] AI stream complete: %d chunks received", chunk_count)
-
-            parser.flush()
-
-            # Process any remaining actions after flush
-            for path, content in pending_files:
-                logger.info("[chat] File action (flush): %s", path)
-                await write_file(session_id, path, content)
-                await websocket.send_json({"type": "file", "path": path, "content": content})
-            for command in pending_shells:
-                logger.info("[chat] Shell action (flush): %s", command)
-                async for line in exec_in_sandbox(session_id, command):
-                    await websocket.send_json(
-                        {"type": "shell_output", "command": command, "output": line}
-                    )
-
-            # 4. Save assistant message
-            assistant_content = "".join(full_response)
-            await save_message(project.id, "assistant", assistant_content)
-            logger.info("[chat] Saved assistant message (%d chars)", len(assistant_content))
-
-            # 5. Signal completion
-            await websocket.send_json({"type": "action_complete"})
-            logger.info("[chat] action_complete sent for session %s", session_id)
+                try:
+                    await orchestrator.handle_plan_response(action, feedback)
+                except Exception:
+                    logger.exception("[chat] Plan response error for session %s", session_id)
+                    await websocket.send_json({"type": "error", "message": "Plan handling failed"})
 
     except WebSocketDisconnect:
         logger.info("[chat] WebSocket disconnected for session %s", session_id)

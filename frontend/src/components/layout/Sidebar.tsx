@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Trash2, FolderKanban } from 'lucide-react';
+import { Plus, Trash2, FolderKanban, PanelLeftClose } from 'lucide-react';
 
-export function Sidebar() {
+type SidebarProps = {
+  onCloseSidebar?: () => void;
+};
+
+export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, isCreating } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
@@ -17,10 +21,27 @@ export function Sidebar() {
     setShowInput(false);
     await createProject(name);
     clearMessages();
+    // Update URL hash and load data for the new project
+    const session = useSessionStore.getState();
+    if (session.currentProject) {
+      window.location.hash = `#/project/${session.currentProject.session_id}`;
+      loadHistory(session.currentProject.session_id);
+      // Poll for scaffold to finish
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        await loadFileTree();
+        const tree = useFilesStore.getState().fileTree;
+        if (tree.length > 0 || attempts >= 15) {
+          clearInterval(interval);
+        }
+      }, 2000);
+    }
   };
 
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
+    window.location.hash = `#/project/${project.session_id}`;
     resetFiles();
     loadFileTree();
     loadHistory(project.session_id);
@@ -39,23 +60,52 @@ export function Sidebar() {
       padding: '12px',
     }}>
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '12px',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '12px',
+        }}
+      >
         <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--accent)' }}>
           AI Builder
         </span>
-        <button
-          onClick={() => setShowInput(true)}
-          disabled={isCreating}
-          style={{ padding: '4px', borderRadius: '4px', color: 'var(--text-dim)', opacity: isCreating ? 0.4 : 1 }}
-          title="New Project"
-        >
-          <Plus size={18} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {onCloseSidebar && (
+            <button
+              type="button"
+              onClick={onCloseSidebar}
+              title="Hide projects panel"
+              style={{
+                padding: '4px',
+                borderRadius: '4px',
+                color: 'var(--text-dim)',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <PanelLeftClose size={16} />
+            </button>
+          )}
+          <button
+            onClick={() => setShowInput(true)}
+            disabled={isCreating}
+            style={{
+              padding: '4px',
+              borderRadius: '4px',
+              color: 'var(--text-dim)',
+              opacity: isCreating ? 0.4 : 1,
+              background: 'transparent',
+              border: 'none',
+              cursor: isCreating ? 'default' : 'pointer',
+            }}
+            title="New Project"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
       </div>
 
       {/* New project input */}
