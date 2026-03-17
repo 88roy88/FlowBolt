@@ -188,6 +188,19 @@ class AgentOrchestrator:
 
                 # Reset observation_id after execution
                 self._observation_id = None
+
+                # Generate summary as a sibling span (top-level under trace)
+                span_summary = langfuse_client.span(
+                    trace_id=self._trace_id,
+                    name="generate-summary",
+                )
+                # Store observation ID for LLM calls within this span
+                self._observation_id = span_summary.id
+                await self._generate_summary()
+                span_summary.end()
+
+                # Reset observation_id after summary
+                self._observation_id = None
             else:
                 # Fallback if no trace_id (shouldn't happen)
                 await self.ws_send({"type": "phase", "phase": "planning"})
@@ -417,9 +430,10 @@ class AgentOrchestrator:
         self._task_files = {}
         layers = self._work_plan.execution_layers()
 
+        langfuse_client = Langfuse()
         for layer in layers:
             await asyncio.gather(
-                *[self._execute_task(task) for task in layer]
+                *[self._execute_task_with_span(task, langfuse_client) for task in layer]
             )
 
         # Save task progress card
@@ -448,15 +462,38 @@ class AgentOrchestrator:
             combined_errors = "\n\n".join(all_errors)
             await self._fix_errors(combined_errors)
 
-        # Generate and persist project summary
-        await self._generate_summary()
-
         self.state = "idle"
         self._work_plan = None
         await self.ws_send({"type": "phase", "phase": "complete"})
         await self.ws_send({"type": "action_complete"})
 
-    @observe(name="execute-task", as_type="span")
+    async def _execute_task_with_span(self, task: Task, langfuse_client: Langfuse) -> None:
+        """Wrapper to execute a task with its own span nested under execute-plan."""
+        # Create a child span under the execute-plan span (self._observation_id)
+        task_span = langfuse_client.span(
+            trace_id=self._trace_id,
+            parent_observation_id=self._observation_id,
+            name=f"execute-task-{task.id}",
+            metadata={
+                "task_id": task.id,
+                "task_title": task.title,
+                "task_description": task.description,
+                "dependencies": task.depends_on,
+                "expected_files": len(task.files),
+            },
+        )
+
+        # Temporarily save current observation_id and replace with task span
+        parent_observation_id = self._observation_id
+        self._observation_id = task_span.id
+
+        try:
+            await self._execute_task(task)
+        finally:
+            # Restore parent observation_id and end task span
+            self._observation_id = parent_observation_id
+            task_span.end()
+
     async def _execute_task(self, task: Task) -> None:
         """Execute a single task: call AI for code, parse XML, write files."""
         task.status = "running"
@@ -465,16 +502,6 @@ class AgentOrchestrator:
             "taskId": task.id,
             "status": "running",
         })
-
-        # Add task-specific metadata
-        langfuse_context.update_current_observation(
-            metadata={
-                "task_id": task.id,
-                "task_title": task.title,
-                "dependencies": task.depends_on,
-                "expected_files": len(task.files),
-            }
-        )
 
         assert self._work_plan is not None
 
@@ -573,8 +600,66 @@ class AgentOrchestrator:
             logger.exception("[agent] Typecheck execution failed")
             return ""
 
+    @observe(name="build-validation", as_type="span")
     async def _build(self) -> str:
         """Run pnpm build and return error output (empty string if clean)."""
+        langfuse_client = Langfuse()
+        trace_id = self._trace_id or langfuse_context.get_current_trace_id()
+        parent_id = langfuse_context.get_current_observation_id()
+
+        # Span for typecheck
+        span_typecheck = langfuse_client.span(
+            trace_id=trace_id,
+            parent_observation_id=parent_id,
+            name="typecheck",
+            metadata={"command": "npx tsc --noEmit"}
+        )
+
+        typecheck_output = ""
+        typecheck_success = False
+        try:
+            lines: list[str] = []
+            async for line in exec_in_sandbox(
+                self.session_id,
+                "npx tsc --noEmit 2>&1",
+            ):
+                lines.append(line.rstrip())
+            typecheck_output = "\n".join(lines).strip()
+            typecheck_success = not bool(typecheck_output)
+
+            span_typecheck.end(
+                metadata={
+                    "command": "npx tsc --noEmit",
+                    "success": typecheck_success,
+                    "has_errors": bool(typecheck_output),
+                    "error_output": typecheck_output if typecheck_output else None,
+                }
+            )
+
+            if typecheck_output:
+                logger.info("[agent] Typecheck found errors:\n%s", typecheck_output)
+            else:
+                logger.info("[agent] Typecheck passed")
+        except Exception as exc:
+            logger.exception("[agent] Typecheck execution failed")
+            span_typecheck.end(
+                metadata={
+                    "command": "npx tsc --noEmit",
+                    "success": False,
+                    "exception": str(exc),
+                }
+            )
+
+        # Span for build
+        span_build = langfuse_client.span(
+            trace_id=trace_id,
+            parent_observation_id=parent_id,
+            name="build",
+            metadata={"command": "pnpm build"}
+        )
+
+        build_output = ""
+        build_success = False
         try:
             lines: list[str] = []
             async for line in exec_in_sandbox(
@@ -582,15 +667,34 @@ class AgentOrchestrator:
                 "pnpm build 2>&1",
             ):
                 lines.append(line.rstrip())
-            output = "\n".join(lines).strip()
-            if output and ("error" in output.lower() or "failed" in output.lower()):
-                logger.info("[agent] Build found errors:\n%s", output)
-                return output
+            build_output = "\n".join(lines).strip()
+            has_errors = build_output and ("error" in build_output.lower() or "failed" in build_output.lower())
+            build_success = not has_errors
+
+            span_build.end(
+                metadata={
+                    "command": "pnpm build",
+                    "success": build_success,
+                    "has_errors": has_errors,
+                    "error_output": build_output if has_errors else None,
+                }
+            )
+
+            if has_errors:
+                logger.info("[agent] Build found errors:\n%s", build_output)
+                return build_output
             else:
                 logger.info("[agent] Build passed")
                 return ""
-        except Exception:
+        except Exception as exc:
             logger.exception("[agent] Build execution failed")
+            span_build.end(
+                metadata={
+                    "command": "pnpm build",
+                    "success": False,
+                    "exception": str(exc),
+                }
+            )
             return ""
 
     async def _fix_errors(self, errors: str) -> None:
