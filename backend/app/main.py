@@ -13,7 +13,7 @@ import os
 
 import litellm
 
-from app.api import chat, errors, export, files, models, preview, projects, server_log, terminal
+from app.api import chat, errors, export, files, models, package_api, preview, projects, server_log, terminal
 from app.config import settings
 from app.models.project import init_db
 from app.sandbox.manager import sandbox_manager
@@ -76,6 +76,7 @@ app.include_router(files.router)
 app.include_router(preview.router)
 app.include_router(models.router)
 app.include_router(export.router)
+app.include_router(package_api.router)
 
 # WebSocket routers
 app.include_router(chat.router)
