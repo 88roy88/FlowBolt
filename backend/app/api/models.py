@@ -136,8 +136,8 @@ def _get_openrouter_models() -> list[dict[str, str]]:
             "provider": "openrouter",
         },
         {
-            "id": "openrouter/z-ai/glm-5",
-            "name": "GLM-5 (OpenRouter)",
+            "id": "openrouter/z-ai/glm-4.7",
+            "name": "GLM-4.7 (OpenRouter)",
             "provider": "openrouter",
         },
     ]
