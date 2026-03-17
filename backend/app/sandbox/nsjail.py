@@ -115,6 +115,8 @@ async def exec_in_sandbox(session_id: str, command: str) -> AsyncIterator[str]:
 
             while True:
                 line = await asyncio.wait_for(stdout.readline(), timeout=settings.MAX_COMMAND_TIMEOUT)
+                if not line:  # EOF — process exited before sentinel
+                    break
                 decoded = line.decode(errors="replace")
                 if sentinel in decoded:
                     break

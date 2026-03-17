@@ -51,7 +51,22 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    const wasSelected = currentProject?.id === id;
     await deleteProject(id);
+    if (wasSelected) {
+      const next = useSessionStore.getState().currentProject;
+      if (next) {
+        window.location.hash = `#/project/${next.session_id}`;
+        resetFiles();
+        loadFileTree();
+        clearMessages();
+        loadHistory(next.session_id);
+      } else {
+        window.location.hash = '';
+        resetFiles();
+        clearMessages();
+      }
+    }
   };
 
   const handleShowSummary = (e: React.MouseEvent, project: typeof projects[number]) => {
