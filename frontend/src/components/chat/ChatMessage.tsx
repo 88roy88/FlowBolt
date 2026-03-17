@@ -171,6 +171,24 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         fontSize: '14px',
         lineHeight: '1.6',
       }}>
+        {isUser && message.package && (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '3px 8px',
+            borderRadius: 999,
+            background: 'rgba(76, 167, 255, 0.14)',
+            border: '1px solid rgba(76, 167, 255, 0.25)',
+            color: 'var(--text)',
+            fontSize: 12,
+            marginBottom: 6,
+          }}>
+            <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Package</span>
+            <span style={{ fontWeight: 600 }}>{message.package.name}</span>
+            <span style={{ color: 'var(--text-dim)' }}>#{message.package.id}</span>
+          </div>
+        )}
         {isUser ? (
           <p style={{ whiteSpace: 'pre-wrap' }}>{message.content}</p>
         ) : (

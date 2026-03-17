@@ -7,6 +7,7 @@ def get_codegen_prompt(
     task_files: list[str],
     architecture: dict,
     ux_design: dict,
+    package_data: dict | None = None,
     completed_files: dict[str, str] | None = None,
 ) -> str:
     """Build a focused code-generation prompt for a single task.
@@ -42,6 +43,16 @@ def get_codegen_prompt(
             + "\n\n".join(file_summaries)
         )
 
+    package_section = ""
+    if package_data is not None:
+        package_section = (
+            "\n\n## Package data (from running the selected package)\n"
+            "Use this as the primary dataset to display in the generated UI.\n\n"
+            "```json\n"
+            f"{_compact_json(package_data)}\n"
+            "```"
+        )
+
     return f"""\
 You are an expert React/TypeScript developer. You are implementing a specific task
 as part of a larger project.
@@ -62,6 +73,7 @@ as part of a larger project.
 ```json
 {_compact_json(ux_design)}
 ```
+{package_section}
 {completed_section}
 
 ## Output Format

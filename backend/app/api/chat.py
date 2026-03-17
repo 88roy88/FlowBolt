@@ -79,6 +79,9 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
             if msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
+                package_id: str | None = None
+                if "packageId" in data and data["packageId"] is not None:
+                    package_id = str(data["packageId"])
                 logger.info("[chat] User message (%d chars): %.100s...", len(user_content), user_content)
 
                 # Save user message
@@ -86,7 +89,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
 
                 # Delegate to orchestrator
                 try:
-                    await orchestrator.handle_message(user_content, model=selected_model)
+                    await orchestrator.handle_message(user_content, model=selected_model, package_id=package_id)
                 except Exception:
                     logger.exception("[chat] Orchestrator error for session %s", session_id)
                     await websocket.send_json({"type": "error", "message": "AI processing failed"})

@@ -12,6 +12,8 @@ import logging
 import uuid
 from collections.abc import Callable, Awaitable
 
+from app.config import settings
+from app.integrations.package_api import PackageApiClient, PackageApiUpstreamError
 from app.ai.parser import ActionParser
 from app.ai.provider import complete_chat, stream_chat
 from app.ai.task_tree import Task, WorkPlan
@@ -45,6 +47,8 @@ class AgentOrchestrator:
         self.state = "idle"
         self.model: str | None = None
         self._user_content: str = ""
+        self._package_id: str | None = None
+        self._package_results: dict | None = None
         # Internal design artifacts (never shown raw to the user)
         self._architecture: dict = {}
         self._ux_design: dict = {}
@@ -58,10 +62,22 @@ class AgentOrchestrator:
         self,
         content: str,
         model: str | None = None,
+        package_id: str | None = None,
     ) -> None:
         """Process a new user message through the agent pipeline."""
         self.model = model
         self._user_content = content
+        self._package_id = package_id
+        self._package_results = None
+
+        # 0. If user selected a package, run it first and store the results.
+        if package_id:
+            try:
+                self._package_results = await self._run_selected_package(package_id)
+            except Exception as exc:
+                logger.exception("[agent] Package run failed (package_id=%s)", package_id)
+                await self.ws_send({"type": "error", "message": f"Package run failed for id={package_id}"})
+                raise exc
 
         # 1. Classify
         await self.ws_send({"type": "phase", "phase": "classifying"})
@@ -203,6 +219,8 @@ class AgentOrchestrator:
         """Build a friendly, non-technical overview for the user."""
         plan_input = json.dumps({
             "user_request": content,
+            "package_id": self._package_id,
+            "package_results": self._package_results,
             "architecture": self._architecture,
             "ux_design": self._ux_design,
         }, indent=2)
@@ -218,6 +236,8 @@ class AgentOrchestrator:
         """
         plan_input = json.dumps({
             "user_request": self._user_content,
+            "package_id": self._package_id,
+            "package_results": self._package_results,
             "architecture": self._architecture,
             "ux_design": self._ux_design,
             "previous_overview": self._user_overview,
@@ -241,6 +261,8 @@ class AgentOrchestrator:
         """Build the detailed technical task plan from designs + user decisions."""
         merge_input = json.dumps({
             "user_request": self._user_content,
+            "package_id": self._package_id,
+            "package_results": self._package_results,
             "architecture": self._architecture,
             "ux_design": self._ux_design,
             "user_preferences": self._user_overview.get("decisions", []),
@@ -298,6 +320,7 @@ class AgentOrchestrator:
             task_files=task.files,
             architecture=self._work_plan.architecture,
             ux_design=self._work_plan.ux_design,
+            package_data=self._package_results,
             completed_files=self._completed_files if self._completed_files else None,
         )
 
@@ -372,6 +395,22 @@ class AgentOrchestrator:
         )
 
         try:
+            # Include package context (if any) as a leading user message.
+            if self._package_id and self._package_results is not None:
+                messages = [
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "package_id": self._package_id,
+                                "package_results": self._package_results,
+                            },
+                            ensure_ascii=False,
+                            indent=2,
+                        ),
+                    },
+                    *messages,
+                ]
             async for chunk in stream_chat(messages, get_system_prompt(), model=self.model):
                 full_response.append(chunk)
                 parser.feed(chunk)
@@ -400,6 +439,15 @@ class AgentOrchestrator:
         await save_message(self.project_id, "assistant", assistant_content)
         await self.ws_send({"type": "phase", "phase": "complete"})
         await self.ws_send({"type": "action_complete"})
+
+    async def _run_selected_package(self, package_id: str) -> dict:
+        """Run a selected package via the Package API, returning results as JSON."""
+        client = PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
+        try:
+            # Use allQueries=true to match typical real runs.
+            return await client.run_package(package_id, all_queries=True, body={})
+        except PackageApiUpstreamError as e:
+            raise RuntimeError(str(e)) from e
 
 
 # ------------------------------------------------------------------

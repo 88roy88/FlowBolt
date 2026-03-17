@@ -4,6 +4,7 @@ export interface Message {
   content: string;
   actions?: Action[];
   timestamp: number;
+  package?: { id: number; name: string } | null;
   // Agent card data (persisted in chat history)
   agentCard?: AgentCard;
 }
@@ -90,7 +91,7 @@ export interface ExecutionTask {
 }
 
 export type WSMessage =
-  | { type: 'message'; content: string; model?: string }
+  | { type: 'message'; content: string; model?: string; packageId?: number }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }

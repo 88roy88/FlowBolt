@@ -72,12 +72,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage(content: string) {
     const sessionId = useSessionStore.getState().sessionId;
     if (!sessionId) return;
+    const pkg = get().selectedPackage;
 
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
       content,
       timestamp: Date.now(),
+      package: pkg ? { id: pkg.Id, name: pkg.Name } : null,
     };
 
     set((state) => ({
@@ -245,10 +247,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     activeSessionId = sessionId;
     socket.onMessage(handler);
 
-    const { selectedModel } = get();
-    const msg: WSMessage = selectedModel
-      ? { type: 'message', content, model: selectedModel }
-      : { type: 'message', content };
+    const { selectedModel, selectedPackage } = get();
+    const baseMsg: WSMessage = { type: 'message', content };
+    if (selectedModel) baseMsg.model = selectedModel;
+    if (selectedPackage?.Id != null) baseMsg.packageId = selectedPackage.Id;
+    const msg: WSMessage = baseMsg;
     socket.send(msg);
   },
 
