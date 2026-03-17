@@ -94,24 +94,13 @@ export function useErrorCapture() {
 
 function SingleErrorToast({ error }: { error: AppError }) {
   const dismissError = useErrorStore((s) => s.dismissError);
-  const sendMessage = useChatStore((s) => s.sendMessage);
+  const sendFixError = useChatStore((s) => s.sendFixError);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const openFile = useFilesStore((s) => s.openFile);
   const loadProjects = useSessionStore((s) => s.loadProjects);
 
   const handleFix = () => {
-    const parts: string[] = [
-      `Fix this ${error.source} error:`,
-      '',
-      `**Error:** ${error.message}`,
-    ];
-    if (error.file) {
-      parts.push(`**File:** ${error.file}${error.line ? `:${error.line}` : ''}`);
-    }
-    if (error.stack) {
-      parts.push('', '```', error.stack.slice(0, 500), '```');
-    }
-    sendMessage(parts.join('\n'));
+    sendFixError(error.message, error.file, error.line, error.stack);
     dismissError(error.id);
   };
 

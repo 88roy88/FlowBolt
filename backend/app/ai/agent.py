@@ -31,7 +31,7 @@ from app.ai.prompts import (
 from app.ai.prompts_legacy import get_system_prompt
 from app.models.chat import get_messages, save_message
 from app.models.project import get_project_by_session, update_project_summary
-from app.sandbox.filesystem import write_file
+from app.sandbox.filesystem import write_file, read_file, list_files
 
 logger = logging.getLogger(__name__)
 
@@ -697,10 +697,21 @@ class AgentOrchestrator:
             )
             return ""
 
+    @observe(name="fix-errors-auto", as_type="span")
     async def _fix_errors(self, errors: str) -> None:
         """Ask the LLM to fix typecheck errors, then write the corrected files."""
         assert self._work_plan is not None
         await self.ws_send({"type": "phase", "phase": "fixing"})
+
+        # Add metadata about the errors being fixed
+        error_lines = errors.strip().split("\n")
+        langfuse_context.update_current_observation(
+            metadata={
+                "error_count": len(error_lines),
+                "error_preview": errors[:500],  # First 500 chars
+                "files_in_context": len(self._completed_files),
+            }
+        )
 
         prompt = f"""\
 You are an expert React/TypeScript developer. The project was just built but has
@@ -752,6 +763,7 @@ Rules:
 
             parser.flush()
 
+            # Write fixed files
             for path, content in generated_files:
                 await write_file(self.session_id, path, content)
                 self._completed_files[path] = content
@@ -759,8 +771,474 @@ Rules:
 
             if generated_files:
                 logger.info("[agent] Fixed %d files after typecheck", len(generated_files))
-        except Exception:
+                # Update observation with results
+                langfuse_context.update_current_observation(
+                    metadata={
+                        "files_fixed": len(generated_files),
+                        "fixed_file_paths": [p for p, _ in generated_files],
+                        "success": True,
+                    }
+                )
+        except Exception as exc:
             logger.exception("[agent] Error fix pass failed")
+            langfuse_context.update_current_observation(
+                metadata={
+                    "success": False,
+                    "exception": str(exc),
+                }
+            )
+
+    # ------------------------------------------------------------------
+    # Direct error fixing (for "Fix with AI" button)
+    # ------------------------------------------------------------------
+
+    @observe(name="fix-error-direct", as_type="span")
+    async def handle_fix_error(
+        self,
+        error_message: str,
+        error_file: str | None = None,
+        error_line: int | None = None,
+        error_stack: str | None = None,
+        model: str | None = None,
+    ) -> None:
+        """Fix a build/runtime error directly without full agent flow.
+
+        This is used by the "Fix with AI" button in the error toast.
+        """
+        self.model = model
+        self._trace_id = langfuse_context.get_current_trace_id()
+
+        # Add metadata about the error to the parent span
+        langfuse_context.update_current_observation(
+            metadata={
+                "error_message": error_message[:200],  # Truncate for readability
+                "error_file": error_file,
+                "error_line": error_line,
+                "has_stack": bool(error_stack),
+                "model": self.model,
+            }
+        )
+
+        await self.ws_send({"type": "phase", "phase": "fixing"})
+
+        # Track steps for persisting to chat history
+        fix_steps: list[dict] = []
+        explanation_text = ""
+
+        # Send initial step
+        await self.ws_send({
+            "type": "fix_step",
+            "step": "discover",
+            "status": "running",
+            "message": "Discovering files to fix..."
+        })
+        fix_steps.append({
+            "id": str(uuid.uuid4()),
+            "step": "discover",
+            "status": "running",
+            "message": "Discovering files to fix..."
+        })
+
+        # Determine which file(s) to fix - wrap in a span
+        langfuse_client = Langfuse()
+        span_discovery = langfuse_client.span(
+            trace_id=self._trace_id,
+            parent_observation_id=langfuse_context.get_current_observation_id(),
+            name="discover-files-to-fix",
+            metadata={
+                "error_file": error_file,
+                "error_line": error_line,
+            },
+        )
+
+        files_to_read: list[str] = []
+        if error_file:
+            # Normalize the file path to be relative to workspace (e.g., /src/App.tsx)
+            file_path = error_file
+
+            # If it's an absolute path with workspace directory, extract the relative part
+            if f"/{self.session_id}/" in file_path:
+                # Extract everything after the session_id
+                idx = file_path.find(f"/{self.session_id}/")
+                if idx != -1:
+                    file_path = file_path[idx + len(self.session_id) + 2:]  # +2 for the two slashes
+                    if not file_path.startswith("/"):
+                        file_path = "/" + file_path
+            # If it already starts with /src/, it's correct
+            elif not file_path.startswith("/src/"):
+                # Try to extract just the /src/... part
+                # Look for /src/ but make sure it's the actual src directory
+                if "/src/" in file_path:
+                    # Find the last occurrence of /src/ (most likely to be the project src)
+                    src_idx = file_path.rfind("/src/")
+                    file_path = file_path[src_idx:]
+                elif not file_path.startswith("/"):
+                    file_path = "/src/" + file_path
+                else:
+                    file_path = "/src" + file_path
+
+            files_to_read.append(file_path)
+        else:
+            # No specific file, try to read all source files
+            try:
+                tree = await list_files(self.session_id)
+                for entry in tree:
+                    if entry.name == "src" and entry.children:
+                        for child in entry.children:
+                            if child.path.endswith((".tsx", ".ts", ".jsx", ".js")):
+                                files_to_read.append(child.path)
+            except Exception:
+                logger.warning("[agent] Could not read file tree for error fix")
+
+        # Read the files
+        file_contents: dict[str, str] = {}
+        files_read_successfully: list[str] = []
+        files_read_failed: list[str] = []
+
+        for path in files_to_read[:10]:  # Limit to 10 files to avoid token overflow
+            try:
+                content = await read_file(self.session_id, path)
+                file_contents[path] = content
+                files_read_successfully.append(path)
+            except Exception as e:
+                logger.warning("[agent] Could not read file %s for error fix: %s", path, str(e))
+                files_read_failed.append(path)
+
+                # If specific file doesn't exist, try to find relevant files
+                if not file_contents and error_file:
+                    # File might not exist yet or path is wrong, read all src files instead
+                    logger.info("[agent] Attempting to read all source files as fallback")
+                    try:
+                        tree = await list_files(self.session_id)
+                        for entry in tree:
+                            if entry.name == "src" and entry.children:
+                                for child in entry.children:
+                                    if child.path.endswith((".tsx", ".ts", ".jsx", ".js", ".css")):
+                                        try:
+                                            content = await read_file(self.session_id, child.path)
+                                            file_contents[child.path] = content
+                                            files_read_successfully.append(child.path)
+                                        except Exception:
+                                            pass
+                                break
+                    except Exception as fallback_err:
+                        logger.warning("[agent] Fallback file reading failed: %s", str(fallback_err))
+
+        # End discovery span with output metadata
+        span_discovery.update(
+            output={
+                "files_discovered": len(files_to_read),
+                "files_read_successfully": len(files_read_successfully),
+                "files_read_failed": len(files_read_failed),
+                "file_list": files_read_successfully,
+            }
+        )
+        span_discovery.end()
+
+        # Send discovery completion
+        await self.ws_send({
+            "type": "fix_step",
+            "step": "discover",
+            "status": "completed",
+            "message": f"Found {len(files_read_successfully)} file(s) to analyze"
+        })
+        fix_steps[-1]["status"] = "completed"
+        fix_steps[-1]["message"] = f"Found {len(files_read_successfully)} file(s) to analyze"
+
+        if not file_contents:
+            await self.ws_send({
+                "type": "error",
+                "message": "Could not read source files to fix error"
+            })
+            return
+
+        # Build the prompt
+        prompt = f"""\
+You are an expert React/TypeScript developer. Fix the following error:
+
+## Error
+{error_message}
+"""
+
+        if error_file:
+            prompt += f"\n**File:** {error_file}"
+            if error_line:
+                prompt += f":{error_line}"
+
+        if error_stack:
+            prompt += f"\n\n**Stack trace:**\n```\n{error_stack[:500]}\n```"
+
+        prompt += "\n\n## Current Files\n"
+        for path, content in file_contents.items():
+            prompt += f"\n### {path}\n```\n{content}\n```\n"
+
+        prompt += """
+## Instructions
+
+First, provide a brief explanation (2-3 sentences) of what's causing the error and how you'll fix it.
+
+Then, provide the fix using the boltArtifact XML format. Only output files that need changes.
+
+Example:
+The error is caused by [reason]. I'll fix this by [solution].
+
+<boltArtifact id="fix-error" title="Fix error">
+  <boltAction type="file" filePath="path/to/file.tsx">
+    Full corrected file content
+  </boltAction>
+</boltArtifact>
+
+Rules:
+1. Start with a brief explanation of the error and fix
+2. Fix the reported error with minimal changes
+3. Do NOT refactor unrelated code
+4. Output complete file contents, not patches
+5. Do NOT include shell actions
+6. **CRITICAL**: Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS). Do NOT import other npm packages.
+"""
+
+        # Send generate step
+        await self.ws_send({
+            "type": "fix_step",
+            "step": "generate",
+            "status": "running",
+            "message": "Generating fix with AI..."
+        })
+        fix_steps.append({
+            "id": str(uuid.uuid4()),
+            "step": "generate",
+            "status": "running",
+            "message": "Generating fix with AI..."
+        })
+
+        # Generate fix with LLM
+        span_generate = langfuse_client.span(
+            trace_id=self._trace_id,
+            parent_observation_id=langfuse_context.get_current_observation_id(),
+            name="generate-fix",
+            metadata={
+                "files_count": len(file_contents),
+                "prompt_length": len(prompt),
+            }
+        )
+        self._observation_id = span_generate.id
+
+        try:
+            generated_files: list[tuple[str, str]] = []
+            parser = ActionParser(
+                on_file_action=lambda p, c: generated_files.append((p, c)),
+            )
+
+            full_text: list[str] = []
+
+            # Collect all LLM output first
+            async for chunk in stream_chat(
+                [{"role": "user", "content": "Fix the error."}],
+                prompt,
+                model=self.model,
+                metadata=self._llm_metadata("fix_error_direct")
+            ):
+                full_text.append(chunk)
+                parser.feed(chunk)
+
+            parser.flush()
+
+            # Extract and send only the explanation (before the artifact)
+            full_response = "".join(full_text)
+
+            # Find where the artifact/xml starts
+            artifact_start = full_response.find("<boltArtifact")
+            xml_block_start = full_response.find("```xml")
+
+            # Use whichever comes first (or neither)
+            cut_point = len(full_response)
+            if artifact_start != -1:
+                cut_point = min(cut_point, artifact_start)
+            if xml_block_start != -1:
+                cut_point = min(cut_point, xml_block_start)
+
+            # Send only the explanation part
+            explanation = full_response[:cut_point].strip()
+            if explanation:
+                await self.ws_send({"type": "text", "content": explanation + "\n\n"})
+                explanation_text = explanation
+
+            # Update generate span with output
+            span_generate.update(
+                output={
+                    "files_generated": len(generated_files),
+                    "generated_file_paths": [p for p, _ in generated_files],
+                    "response_length": sum(len(t) for t in full_text),
+                }
+            )
+            span_generate.end()
+
+            # Send generate completion
+            await self.ws_send({
+                "type": "fix_step",
+                "step": "generate",
+                "status": "completed",
+                "message": f"Generated fix for {len(generated_files)} file(s)"
+            })
+            fix_steps[-1]["status"] = "completed"
+            fix_steps[-1]["message"] = f"Generated fix for {len(generated_files)} file(s)"
+
+            # Write files with a span
+            if generated_files:
+                # Send write step
+                await self.ws_send({
+                    "type": "fix_step",
+                    "step": "write",
+                    "status": "running",
+                    "message": "Writing fixed files..."
+                })
+                fix_steps.append({
+                    "id": str(uuid.uuid4()),
+                    "step": "write",
+                    "status": "running",
+                    "message": "Writing fixed files..."
+                })
+                span_write = langfuse_client.span(
+                    trace_id=self._trace_id,
+                    parent_observation_id=langfuse_context.get_current_observation_id(),
+                    name="write-fixed-files",
+                    input={
+                        "files_to_write": len(generated_files),
+                        "file_paths": [p for p, _ in generated_files],
+                    },
+                )
+                self._observation_id = span_write.id
+
+                for path, content in generated_files:
+                    await write_file(self.session_id, path, content)
+                    await self.ws_send({"type": "file", "path": path, "content": content})
+
+                span_write.update(
+                    output={"success": True, "files_written": len(generated_files)}
+                )
+                span_write.end()
+
+                # Send write completion
+                await self.ws_send({
+                    "type": "fix_step",
+                    "step": "write",
+                    "status": "completed",
+                    "message": f"Wrote {len(generated_files)} file(s)"
+                })
+                fix_steps[-1]["status"] = "completed"
+                fix_steps[-1]["message"] = f"Wrote {len(generated_files)} file(s)"
+
+                logger.info("[agent] Fixed %d file(s) via direct error fix", len(generated_files))
+
+                # Send validate step
+                await self.ws_send({
+                    "type": "fix_step",
+                    "step": "validate",
+                    "status": "running",
+                    "message": "Validating fix..."
+                })
+                fix_steps.append({
+                    "id": str(uuid.uuid4()),
+                    "step": "validate",
+                    "status": "running",
+                    "message": "Validating fix..."
+                })
+
+                # Validate the fix by running build (already has @observe via _build)
+                self._observation_id = langfuse_context.get_current_observation_id()
+                errors = await self._build()
+
+                if errors:
+                    # Send validate failed
+                    await self.ws_send({
+                        "type": "fix_step",
+                        "step": "validate",
+                        "status": "failed",
+                        "message": "Validation found issues"
+                    })
+                    fix_steps[-1]["status"] = "failed"
+                    fix_steps[-1]["message"] = "Validation found issues"
+
+                    # Send retry step
+                    await self.ws_send({
+                        "type": "fix_step",
+                        "step": "retry",
+                        "status": "running",
+                        "message": "Attempting auto-fix..."
+                    })
+                    fix_steps.append({
+                        "id": str(uuid.uuid4()),
+                        "step": "retry",
+                        "status": "running",
+                        "message": "Attempting auto-fix..."
+                    })
+
+                    # Try one more fix iteration with a span
+                    span_retry = langfuse_client.span(
+                        trace_id=self._trace_id,
+                        parent_observation_id=langfuse_context.get_current_observation_id(),
+                        name="retry-fix-after-validation",
+                        input={
+                            "error_count": len(errors.split("\n")),
+                            "error_preview": errors[:300],
+                        },
+                    )
+                    self._observation_id = span_retry.id
+                    self._completed_files = {p: c for p, c in generated_files}
+                    await self._fix_errors(errors)
+                    span_retry.update(output={"retry_completed": True})
+                    span_retry.end()
+
+                    # Send retry completion
+                    await self.ws_send({
+                        "type": "fix_step",
+                        "step": "retry",
+                        "status": "completed",
+                        "message": "Auto-fix applied"
+                    })
+                    fix_steps[-1]["status"] = "completed"
+                    fix_steps[-1]["message"] = "Auto-fix applied"
+                else:
+                    # Send validate success
+                    await self.ws_send({
+                        "type": "fix_step",
+                        "step": "validate",
+                        "status": "completed",
+                        "message": "Fix validated successfully!"
+                    })
+                    fix_steps[-1]["status"] = "completed"
+                    fix_steps[-1]["message"] = "Fix validated successfully!"
+
+            # Save fix progress card to chat history
+            if fix_steps:
+                card_data = {
+                    "type": "fix_progress",
+                    "steps": fix_steps,
+                }
+                # Save the card with explanation as content (so it's searchable)
+                await save_message(
+                    self.project_id,
+                    "assistant",
+                    f"{explanation_text}\n\n{encode_card(card_data)}" if explanation_text else encode_card(card_data)
+                )
+
+            await self.ws_send({"type": "action_complete"})
+            await self.ws_send({"type": "phase", "phase": "idle"})
+
+        except Exception as exc:
+            logger.exception("[agent] Direct error fix failed")
+            span_generate.update(
+                output={
+                    "success": False,
+                    "exception": str(exc),
+                }
+            )
+            span_generate.end()
+            await self.ws_send({
+                "type": "error",
+                "message": "Failed to fix error"
+            })
+            await self.ws_send({"type": "phase", "phase": "idle"})
 
     # ------------------------------------------------------------------
     # Summary generation

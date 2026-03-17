@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { FileText, TerminalSquare, Sparkles, CheckCircle2, XCircle, ArrowRight, Check, X, Package } from 'lucide-react';
-import type { Message, PlanOverview, ExecutionTask, ProjectSummary } from '../../types';
+import { FileText, TerminalSquare, Sparkles, CheckCircle2, XCircle, ArrowRight, Check, X, Package, AlertTriangle, ChevronDown, ChevronRight, Loader2, Search, Wrench, Save, TestTube, RefreshCw } from 'lucide-react';
+import type { Message, PlanOverview, ExecutionTask, ProjectSummary, FixStep } from '../../types';
 
 interface ChatMessageProps {
   message: Message;
@@ -222,6 +223,179 @@ function ProjectSummaryCard({ summary }: { summary: ProjectSummary }) {
   );
 }
 
+function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorStack }: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '10px',
+      padding: '12px 14px',
+      fontSize: '13px',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '8px',
+        fontSize: '12px',
+        color: '#f38ba8',
+      }}>
+        <AlertTriangle size={14} />
+        Fix error request
+      </div>
+
+      {errorFile && (
+        <div style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
+          <FileText size={12} style={{ display: 'inline', marginRight: '4px' }} />
+          <strong>{errorFile}</strong>
+          {errorLine && <span>:{errorLine}</span>}
+        </div>
+      )}
+
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          cursor: 'pointer',
+          padding: '6px',
+          marginBottom: isExpanded ? '8px' : '0',
+          borderRadius: '6px',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <span style={{ fontSize: '12px', fontWeight: 600 }}>Error details</span>
+      </div>
+
+      {isExpanded && (
+        <div style={{
+          padding: '8px',
+          background: 'var(--bg)',
+          borderRadius: '6px',
+          fontSize: '12px',
+          lineHeight: '1.5',
+        }}>
+          <div style={{ marginBottom: errorStack ? '8px' : '0' }}>
+            <strong style={{ color: '#f38ba8' }}>Message:</strong>
+            <div style={{ marginTop: '4px', color: 'var(--text)' }}>{errorMessage}</div>
+          </div>
+
+          {errorStack && (
+            <div>
+              <strong style={{ color: 'var(--text-dim)' }}>Stack trace:</strong>
+              <pre style={{
+                marginTop: '4px',
+                padding: '8px',
+                background: 'var(--surface)',
+                borderRadius: '4px',
+                fontSize: '11px',
+                overflow: 'auto',
+                maxHeight: '200px',
+                fontFamily: 'monospace',
+              }}>
+                {errorStack}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getStepIcon(step: FixStep['step']) {
+  switch (step) {
+    case 'discover':
+      return Search;
+    case 'generate':
+      return Wrench;
+    case 'write':
+      return Save;
+    case 'validate':
+      return TestTube;
+    case 'retry':
+      return RefreshCw;
+  }
+}
+
+function FixProgressCard({ steps, content }: { steps: FixStep[]; content?: string }) {
+  const completed = steps.filter((s) => s.status === 'completed').length;
+  const failed = steps.filter((s) => s.status === 'failed').length;
+  const total = steps.length;
+
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '10px',
+      padding: '12px 14px',
+      fontSize: '13px',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '8px',
+        fontSize: '12px',
+        color: failed > 0 ? 'var(--danger)' : 'var(--success)',
+      }}>
+        {failed > 0 ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
+        {failed > 0
+          ? `Fixed error with ${failed} validation failure${failed > 1 ? 's' : ''}`
+          : `Fixed error (${completed}/${total} steps)`}
+      </div>
+
+      {/* Explanation text */}
+      {content && (
+        <div style={{
+          marginBottom: '8px',
+          padding: '8px',
+          background: 'var(--bg)',
+          borderRadius: '6px',
+          fontSize: '12px',
+          lineHeight: '1.5',
+          color: 'var(--text)',
+        }}>
+          {content}
+        </div>
+      )}
+
+      {/* Steps */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        {steps.map((step) => {
+          const StepIcon = getStepIcon(step.step);
+          return (
+            <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+              {step.status === 'running' ? (
+                <Loader2 size={11} style={{ color: 'var(--accent)', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
+              ) : step.status === 'completed' ? (
+                <StepIcon size={11} style={{ color: 'var(--success)', flexShrink: 0 }} />
+              ) : (
+                <XCircle size={11} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+              )}
+              <span style={{ color: step.status === 'failed' ? 'var(--danger)' : 'var(--text)' }}>
+                {step.message}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   const isUser = message.role === 'user';
 
@@ -233,19 +407,32 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   // Agent card messages (no bubble wrapper — the card IS the message)
   if (message.agentCard) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-start', maxWidth: '85%' }}>
-        {message.agentCard.type === 'design_complete' && (
-          <DesignCompleteCard architecture={message.agentCard.architecture} ux={message.agentCard.ux} />
-        )}
-        {message.agentCard.type === 'plan_overview' && (
-          <PlanOverviewCard overview={message.agentCard.overview} accepted={message.agentCard.accepted} />
-        )}
-        {message.agentCard.type === 'task_progress' && (
-          <TaskProgressCard tasks={message.agentCard.tasks} />
-        )}
-        {message.agentCard.type === 'project_summary' && (
-          <ProjectSummaryCard summary={message.agentCard.summary} />
-        )}
+      <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+        <div style={{ maxWidth: '85%' }}>
+          {message.agentCard.type === 'design_complete' && (
+            <DesignCompleteCard architecture={message.agentCard.architecture} ux={message.agentCard.ux} />
+          )}
+          {message.agentCard.type === 'plan_overview' && (
+            <PlanOverviewCard overview={message.agentCard.overview} accepted={message.agentCard.accepted} />
+          )}
+          {message.agentCard.type === 'task_progress' && (
+            <TaskProgressCard tasks={message.agentCard.tasks} />
+          )}
+          {message.agentCard.type === 'project_summary' && (
+            <ProjectSummaryCard summary={message.agentCard.summary} />
+          )}
+          {message.agentCard.type === 'error_fix_request' && (
+            <ErrorFixRequestCard
+              errorMessage={message.agentCard.errorMessage}
+              errorFile={message.agentCard.errorFile}
+              errorLine={message.agentCard.errorLine}
+              errorStack={message.agentCard.errorStack}
+            />
+          )}
+          {message.agentCard.type === 'fix_progress' && (
+            <FixProgressCard steps={message.agentCard.steps} content={message.content} />
+          )}
+        </div>
       </div>
     );
   }
