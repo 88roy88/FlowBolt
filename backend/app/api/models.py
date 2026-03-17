@@ -123,6 +123,27 @@ def _fetch_ollama_models() -> list[dict[str, str]]:
 
 
 # ---------------------------------------------------------------------------
+# OpenRouter static models
+# ---------------------------------------------------------------------------
+
+
+def _get_openrouter_models() -> list[dict[str, str]]:
+    """Return a static list of OpenRouter models."""
+    return [
+        {
+            "id": "openrouter/minimax/minimax-m2.5",
+            "name": "Minimax M2.5 (OpenRouter)",
+            "provider": "openrouter",
+        },
+        {
+            "id": "openrouter/z-ai/glm-5",
+            "name": "GLM-5 (OpenRouter)",
+            "provider": "openrouter",
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Aggregation with caching
 # ---------------------------------------------------------------------------
 
@@ -132,6 +153,7 @@ def _refresh_models() -> list[dict[str, str]]:
     all_models: list[dict[str, str]] = []
     all_models.extend(_fetch_bedrock_models())
     all_models.extend(_fetch_ollama_models())
+    all_models.extend(_get_openrouter_models())
     _cache["models"] = all_models
     _cache["ts"] = time.monotonic()
     return all_models
