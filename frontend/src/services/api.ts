@@ -78,3 +78,13 @@ export function downloadZip(sessionId: string): void {
 export function downloadSingleHtml(sessionId: string): void {
   window.open(`${BASE}/export/${sessionId}/html`, '_blank');
 }
+
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    await request<Project[]>('/projects');
+    return true;
+  } catch (error) {
+    console.error('Backend health check failed:', error);
+    return false;
+  }
+}

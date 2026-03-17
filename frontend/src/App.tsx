@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useSessionStore } from './stores/session';
 import { useChatStore } from './stores/chat';
 import { useFilesStore } from './stores/files';
+import { useErrorStore } from './stores/errors';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorToast, useErrorCapture } from './components/errors/ErrorToast';
+import * as api from './services/api';
 
 function getSessionIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
@@ -18,6 +20,8 @@ export default function App() {
   const [newProjectName, setNewProjectName] = useState('');
   const [showNewProject, setShowNewProject] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [backendAvailable, setBackendAvailable] = useState(true);
+  const [checkingBackend, setCheckingBackend] = useState(true);
 
   const selectProject = useCallback((project: typeof projects[number]) => {
     setCurrentProject(project);
@@ -41,9 +45,34 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
   }, []);
 
+  // Check backend availability on mount
+  useEffect(() => {
+    async function checkBackend() {
+      setCheckingBackend(true);
+      const isAvailable = await api.checkBackendHealth();
+      setBackendAvailable(isAvailable);
+      setCheckingBackend(false);
+
+      if (!isAvailable) {
+        useErrorStore.getState().pushError({
+          source: 'connection',
+          message: 'Cannot connect to backend server. Please ensure the server is running.',
+        });
+      }
+    }
+    checkBackend();
+  }, []);
+
   useEffect(() => {
     loadProjects()
-      .catch(console.error)
+      .catch((error) => {
+        console.error('Failed to load projects:', error);
+        // Show connection error to user
+        useErrorStore.getState().pushError({
+          source: 'connection',
+          message: 'Failed to connect to backend server. Please ensure the server is running.',
+        });
+      })
       .finally(() => setLoading(false));
   }, [loadProjects]);
 
@@ -108,7 +137,7 @@ export default function App() {
     }, 2000);
   }
 
-  if (loading) {
+  if (loading || checkingBackend) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
         <p style={{ color: 'var(--text-dim)' }}>Loading...</p>
@@ -127,35 +156,69 @@ export default function App() {
         gap: '16px',
       }}>
         <h1 style={{ color: 'var(--accent)', fontSize: '24px' }}>AI Builder</h1>
-        <p style={{ color: 'var(--text-dim)' }}>Create your first project to get started</p>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
-            placeholder="Project name"
-            value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-            style={{
-              padding: '8px 12px',
+        {!backendAvailable ? (
+          <>
+            <div style={{
+              padding: '16px 24px',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              width: '250px',
-            }}
-          />
-          <button
-            onClick={handleCreate}
-            style={{
-              padding: '8px 16px',
-              background: 'var(--accent)',
-              color: 'var(--bg)',
-              borderRadius: '6px',
-              fontWeight: 600,
-            }}
-          >
-            Create
-          </button>
-        </div>
+              border: '2px solid var(--danger)',
+              borderRadius: '8px',
+              maxWidth: '500px',
+              textAlign: 'center',
+            }}>
+              <p style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' }}>
+                Backend Server Unavailable
+              </p>
+              <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>
+                Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.
+              </p>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '8px 16px',
+                background: 'var(--accent)',
+                color: 'var(--bg)',
+                borderRadius: '6px',
+                fontWeight: 600,
+              }}
+            >
+              Retry Connection
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ color: 'var(--text-dim)' }}>Create your first project to get started</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="Project name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+                style={{
+                  padding: '8px 12px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  width: '250px',
+                }}
+              />
+              <button
+                onClick={handleCreate}
+                style={{
+                  padding: '8px 16px',
+                  background: 'var(--accent)',
+                  color: 'var(--bg)',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </>
+        )}
       </div>
     );
   }
