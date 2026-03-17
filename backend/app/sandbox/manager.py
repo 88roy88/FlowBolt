@@ -390,21 +390,22 @@ class SandboxManager:
         from app.sandbox.nsjail import _nsjail_available
 
         if not _nsjail_available():
-            # macOS dev: use `script -q` to run in a PTY so node/pnpm use
-            # line buffering and output ANSI colors.  `script` writes the
-            # transcript directly to log_path with immediate flushing.
+            # macOS dev: run pnpm directly with FORCE_COLOR for ANSI output.
             dev_cmd = f"pnpm dev --port {info.port} --host 0.0.0.0"
-            cmd = [
-                "script", "-q", log_path,
-                "/bin/bash", "-c", f"cd {info.workspace_dir} && {dev_cmd}",
-            ]
+            log_file = open(log_path, "wb")  # noqa: SIM115
+
+            env = os.environ.copy()
+            env["FORCE_COLOR"] = "1"
+
             info.dev_process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                "/bin/bash", "-c", f"cd {info.workspace_dir} && {dev_cmd}",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
                 start_new_session=True,
             )
-            info._dev_log_file = None
+            info._dev_log_file = log_file
         else:
             log_file = open(log_path, "wb")  # noqa: SIM115
 

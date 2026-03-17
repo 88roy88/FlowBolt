@@ -1,6 +1,5 @@
 """Entry point for running the server."""
 
-import sys
 import uvicorn
 
 def main_dev():
@@ -10,7 +9,7 @@ def main_dev():
         host="0.0.0.0",
         port=8000,
         reload=True,
-        reload_excludes=["data/**", "*.db"],
+        reload_dirs=["app"],
         log_level="info",
     )
 
