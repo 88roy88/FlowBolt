@@ -36,12 +36,15 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      padding: '12px',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        padding: '12px',
+        background: 'var(--surface)',
+      }}
+    >
       {/* Header */}
       <div
         style={{
@@ -170,7 +173,10 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
               padding: '8px',
               borderRadius: '6px',
               cursor: 'pointer',
-              background: currentProject?.id === project.id ? 'var(--bg)' : 'transparent',
+              background:
+                currentProject?.id === project.id ? 'rgba(var(--accent-rgb), 0.14)' : 'transparent',
+              borderLeft:
+                currentProject?.id === project.id ? '2px solid var(--accent)' : '2px solid transparent',
               marginBottom: '2px',
             }}
           >

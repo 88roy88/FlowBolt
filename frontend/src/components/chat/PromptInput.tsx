@@ -38,21 +38,25 @@ export function PromptInput() {
   const disabled = isStreaming || !sessionId;
 
   return (
-    <div style={{
-      padding: '12px 16px',
-      borderTop: '1px solid var(--border)',
-      background: 'var(--surface)',
-      flexShrink: 0,
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: '8px',
-        background: 'var(--bg)',
-        border: '1px solid var(--border)',
-        borderRadius: '10px',
-        padding: '8px 12px',
-      }}>
+    <div
+      style={{
+        padding: 'var(--space-lg)',
+        background: 'var(--surface)',
+        boxShadow: 'var(--shadow-subtle-top)',
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 'var(--space-md)',
+          background: 'var(--surface-elevated)',
+          borderRadius: 'var(--radius-lg)',
+          padding: 'var(--space-md) var(--space-lg)',
+          boxShadow: 'var(--shadow-soft)',
+        }}
+      >
         <textarea
           ref={textareaRef}
           value={value}
@@ -67,7 +71,7 @@ export function PromptInput() {
           style={{
             flex: 1,
             resize: 'none',
-            fontSize: '14px',
+            fontSize: 14,
             lineHeight: '1.5',
             maxHeight: '150px',
             opacity: disabled ? 0.5 : 1,
@@ -77,10 +81,11 @@ export function PromptInput() {
           onClick={handleSubmit}
           disabled={disabled || !value.trim()}
           style={{
-            padding: '6px',
-            borderRadius: '6px',
-            color: value.trim() && !disabled ? 'var(--accent)' : 'var(--text-dim)',
-            opacity: value.trim() && !disabled ? 1 : 0.4,
+            padding: 'var(--space-md) var(--space-lg)',
+            borderRadius: 'var(--radius-lg)',
+            background: value.trim() && !disabled ? 'var(--accent)' : 'transparent',
+            color: value.trim() && !disabled ? '#fff' : 'var(--text-dim)',
+            opacity: value.trim() && !disabled ? 1 : 0.5,
             flexShrink: 0,
           }}
           title="Send message"
@@ -89,7 +94,7 @@ export function PromptInput() {
         </button>
       </div>
       {isStreaming && (
-        <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '6px', textAlign: 'center' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: 'var(--space-sm)', textAlign: 'center' }}>
           AI is responding...
         </p>
       )}

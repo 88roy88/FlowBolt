@@ -13,12 +13,48 @@ const FILE_TREE_MAX = 400;
 
 let monacoTypesInitialized = false;
 
+function defineMonacoThemes(monaco: Monaco) {
+  monaco.editor.defineTheme('ai-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#111827',
+      'editor.foreground': '#e5e7eb',
+      'editorLineNumber.foreground': '#6b7280',
+      'editorLineNumber.activeForeground': '#60a5fa',
+      'editor.selectionBackground': '#60a5fa33',
+      'editor.inactiveSelectionBackground': '#60a5fa22',
+      'editor.lineHighlightBackground': '#1f293766',
+      'editorIndentGuide.background': '#1f293780',
+      'editorIndentGuide.activeBackground': '#60a5fa',
+    },
+  });
+
+  monaco.editor.defineTheme('ai-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#ffffff',
+      'editor.foreground': '#111827',
+      'editorLineNumber.foreground': '#9ca3af',
+      'editorLineNumber.activeForeground': '#2563eb',
+      'editor.selectionBackground': '#2563eb26',
+      'editor.inactiveSelectionBackground': '#2563eb1a',
+      'editor.lineHighlightBackground': '#e5e7eb66',
+      'editorIndentGuide.background': '#e5e7eb80',
+      'editorIndentGuide.activeBackground': '#2563eb',
+    },
+  });
+}
+
 export function EditorPanel() {
   const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree } = useFilesStore();
   const sessionId = useSessionStore((s) => s.sessionId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
-   const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
+  const [editorTheme, setEditorTheme] = useState<'ai-dark' | 'ai-light'>('ai-dark');
 
   const handleFileTreeResize = useCallback((delta: number) => {
     setFileTreeWidth((w) => Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, w + delta)));
@@ -33,7 +69,7 @@ export function EditorPanel() {
   // Sync Monaco theme with app light/dark theme
   useEffect(() => {
     const applyTheme = () => {
-      const mode = document.documentElement.dataset.theme === 'light' ? 'light' : 'vs-dark';
+      const mode = document.documentElement.dataset.theme === 'light' ? 'ai-light' : 'ai-dark';
       setEditorTheme(mode);
     };
     applyTheme();
@@ -84,8 +120,12 @@ export function EditorPanel() {
   };
 
   const handleEditorMount = useCallback((monaco: Monaco) => {
-    if (monacoTypesInitialized) return;
-    monacoTypesInitialized = true;
+    if (!monacoTypesInitialized) {
+      monacoTypesInitialized = true;
+
+      // Align Monaco themes with app surfaces
+      defineMonacoThemes(monaco);
+    }
 
     const tsDefaults = monaco.languages.typescript.typescriptDefaults;
     const jsDefaults = monaco.languages.typescript.javascriptDefaults;
@@ -176,7 +216,7 @@ declare namespace JSX {
       >
         <div
           style={{
-            padding: '6px 12px',
+            padding: 'var(--space-md) var(--space-lg)',
             fontSize: '12px',
             fontWeight: 600,
             color: 'var(--text-dim)',
@@ -190,7 +230,7 @@ declare namespace JSX {
         >
           <span>Files</span>
 
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
             <button
               title="Export ZIP"
               disabled={!sessionId}
@@ -198,8 +238,8 @@ declare namespace JSX {
               style={{
                 background: 'none',
                 border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
+                borderRadius: 'var(--radius-sm)',
+                padding: 'var(--space-sm) var(--space-md)',
                 cursor: sessionId ? 'pointer' : 'not-allowed',
                 color: sessionId ? 'var(--text)' : 'var(--text-dim)',
                 display: 'flex',
@@ -217,8 +257,8 @@ declare namespace JSX {
               style={{
                 background: 'none',
                 border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
+                borderRadius: 'var(--radius-sm)',
+                padding: 'var(--space-sm) var(--space-md)',
                 cursor: sessionId ? 'pointer' : 'not-allowed',
                 color: sessionId ? 'var(--text)' : 'var(--text-dim)',
                 display: 'flex',
@@ -236,7 +276,16 @@ declare namespace JSX {
 
       <Resizer direction="horizontal" onDrag={handleFileTreeResize} />
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          background: 'var(--surface)',
+        }}
+      >
         <FileTabs />
 
         {activeFilePath && activeContent !== undefined ? (

@@ -22,9 +22,9 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
-            padding: '3px 8px',
-            paddingLeft: `${8 + depth * 14}px`,
+            gap: 'var(--space-sm)',
+            padding: 'var(--space-sm) var(--space-md)',
+            paddingLeft: `${12 + depth * 16}px`,
             cursor: 'pointer',
             fontSize: '13px',
             color: 'var(--text)',
@@ -49,13 +49,14 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '4px',
-        padding: '3px 8px',
-        paddingLeft: `${8 + depth * 14}px`,
+        gap: 'var(--space-sm)',
+        padding: 'var(--space-sm) var(--space-md)',
+        paddingLeft: `${12 + depth * 16}px`,
         cursor: 'pointer',
         fontSize: '13px',
         color: isActive ? 'var(--accent)' : 'var(--text)',
-        background: isActive ? 'var(--bg)' : 'transparent',
+        background: isActive ? 'rgba(var(--accent-rgb), 0.12)' : 'transparent',
+        borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
       }}
     >
       <File size={14} style={{ flexShrink: 0, color: 'var(--text-dim)' }} />
@@ -70,7 +71,7 @@ export function FileTree() {
   if (fileTree.length === 0) {
     return (
       <div style={{
-        padding: '12px',
+        padding: 'var(--space-lg)',
         fontSize: '12px',
         color: 'var(--text-dim)',
         textAlign: 'center',
@@ -81,7 +82,7 @@ export function FileTree() {
   }
 
   return (
-    <div style={{ padding: '4px 0' }}>
+    <div style={{ padding: 'var(--space-sm) 0' }}>
       {fileTree.map((entry) => (
         <TreeNode key={entry.path} entry={entry} depth={0} />
       ))}

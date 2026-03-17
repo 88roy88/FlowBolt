@@ -45,8 +45,8 @@ function ModelSelector() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
-          padding: '4px 10px',
+          gap: 'var(--space-sm)',
+          padding: 'var(--space-sm) var(--space-md)',
           background: 'var(--bg)',
           border: '1px solid var(--border)',
           borderRadius: '999px',
@@ -93,7 +93,7 @@ function ModelSelector() {
             <div key={provider}>
               <div
                 style={{
-                  padding: '6px 10px',
+                  padding: 'var(--space-sm) var(--space-md)',
                   fontSize: '11px',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
@@ -116,10 +116,10 @@ function ModelSelector() {
                     }}
                     style={{
                       width: '100%',
-                      padding: '6px 10px',
+                      padding: 'var(--space-md) var(--space-lg)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: 'var(--space-md)',
                       background: isActive ? 'rgba(76, 167, 255, 0.15)' : 'transparent',
                       border: 'none',
                       borderBottom: '1px solid rgba(255,255,255,0.03)',
@@ -176,20 +176,31 @@ export function ChatPanel() {
       {/* Header */}
       <div
         style={{
-          padding: '10px 16px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
+          padding: 'var(--space-lg) var(--space-lg)',
+          background: 'var(--surface-elevated)',
+          boxShadow: 'var(--shadow-subtle)',
           fontSize: '13px',
           fontWeight: 600,
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 8,
+          gap: 'var(--space-lg)',
         }}
       >
-        <span>Chat</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-sm)',
+          }}
+        >
+          <span>Chat</span>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Describe what you want to build
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
           <ThemeToggle />
           <ModelSelector />
         </div>
@@ -199,10 +210,10 @@ export function ChatPanel() {
       <div style={{
         flex: 1,
         overflow: 'auto',
-        padding: '16px',
+        padding: 'var(--space-lg)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: 'var(--space-lg)',
       }}>
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />

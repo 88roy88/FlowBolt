@@ -118,7 +118,6 @@ export function AppShell() {
             style={{
               flex: mainSplit,
               minWidth: 0,
-              borderRight: '1px solid var(--border)',
               overflow: 'hidden',
             }}
           >
@@ -138,18 +137,19 @@ export function AppShell() {
           style={{
             height: bottomHeight,
             minHeight: BOTTOM_MIN,
-            borderTop: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             flexShrink: 0,
+            background: 'var(--surface)',
+            boxShadow: 'var(--shadow-subtle-top)',
           }}
         >
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0',
+              gap: 0,
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface)',
               flexShrink: 0,
@@ -158,10 +158,11 @@ export function AppShell() {
             <button
               onClick={() => setBottomTab('terminal')}
               style={{
-                padding: '6px 16px',
+                padding: 'var(--space-md) var(--space-lg)',
                 fontSize: '13px',
                 color: bottomTab === 'terminal' ? 'var(--accent)' : 'var(--text-dim)',
                 borderBottom: bottomTab === 'terminal' ? '2px solid var(--accent)' : '2px solid transparent',
+                background: bottomTab === 'terminal' ? 'rgba(var(--accent-rgb), 0.14)' : 'transparent',
               }}
             >
               Terminal
@@ -170,10 +171,11 @@ export function AppShell() {
             <button
               onClick={() => setBottomTab('preview')}
               style={{
-                padding: '6px 16px',
+                padding: 'var(--space-md) var(--space-lg)',
                 fontSize: '13px',
                 color: bottomTab === 'preview' ? 'var(--accent)' : 'var(--text-dim)',
                 borderBottom: bottomTab === 'preview' ? '2px solid var(--accent)' : '2px solid transparent',
+                background: bottomTab === 'preview' ? 'rgba(var(--accent-rgb), 0.14)' : 'transparent',
               }}
             >
               Preview
