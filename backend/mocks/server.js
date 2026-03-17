@@ -7,7 +7,8 @@ import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResult
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// Allow any valid JSON (including primitives), because Swagger/UI often defaults to `"string"`.
+app.use(express.json({ limit: '10mb', strict: false }));
 
 const PORT = Number(process.env.MOCK_PORT) || 4000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -189,12 +190,8 @@ function buildPackageSearchRecordById(id) {
   if (!trimmed) return null;
 
   // Real FLAPI returns 200 with [] when not found.
-  // We only stub a couple of known IDs for now.
-  if (trimmed !== '572903') return null;
-
-  return {
-    Id: 572903,
-    Name: 'כרטסת - base',
+  // We stub a small set of known package IDs that are useful in development.
+  const base = {
     Purpose: '',
     Description: '',
     UserName: '',
@@ -202,6 +199,18 @@ function buildPackageSearchRecordById(id) {
     Tags: JSON.stringify([{ value: 'אפיון', label: 'אפיון' }]),
     Subjects: JSON.stringify([]),
   };
+
+  const known = {
+    1: { Id: 1, Name: 'Sample Sales Package', ...base },
+    2: { Id: 2, Name: 'User Analytics Package', ...base },
+    3: { Id: 3, Name: 'Intelligence Briefing', ...base, Tags: JSON.stringify([{ value: 'מודיעין', label: 'מודיעין' }]) },
+    4: { Id: 4, Name: 'People & Photos', ...base, Tags: JSON.stringify([{ value: 'אנשים', label: 'אנשים' }]) },
+    572903: { Id: 572903, Name: 'כרטסת - base', ...base },
+  };
+
+  const numeric = Number(trimmed);
+  if (!Number.isFinite(numeric)) return null;
+  return known[numeric] ?? null;
 }
 
 function handlePackageSearchByPartialOrId(partialOrId) {
