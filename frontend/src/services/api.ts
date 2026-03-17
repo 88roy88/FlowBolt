@@ -53,6 +53,13 @@ export async function deleteProject(id: string): Promise<void> {
   await request(`/projects/${id}`, { method: 'DELETE' });
 }
 
+export async function updateProjectModel(projectId: string, model: string): Promise<void> {
+  await request(`/projects/${projectId}/model`, {
+    method: 'PATCH',
+    body: JSON.stringify({ model }),
+  });
+}
+
 export async function fetchPreviewPort(sessionId: string): Promise<number> {
   const data = await request<{ session_id: string; port: number }>(`/preview/${sessionId}/port`);
   return data.port;

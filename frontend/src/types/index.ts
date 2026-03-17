@@ -42,6 +42,7 @@ export interface Project {
   session_id: string;
   created_at: string;
   summary?: string;
+  selected_model?: string;
 }
 
 export interface AIModel {

@@ -30,6 +30,7 @@ class Project:
     created_at: str
     updated_at: str
     summary: str = ""
+    selected_model: str = ""
 
 
 async def init_db() -> None:
@@ -64,6 +65,14 @@ async def init_db() -> None:
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
             await db.execute("ALTER TABLE projects ADD COLUMN summary TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass  # Column already exists
+
+    # Migration-safe: add selected_model column if it doesn't exist
+    async with aiosqlite.connect(_get_db_path()) as db:
+        try:
+            await db.execute("ALTER TABLE projects ADD COLUMN selected_model TEXT DEFAULT ''")
             await db.commit()
         except Exception:
             pass  # Column already exists
@@ -124,6 +133,16 @@ async def update_project_summary(project_id: str, summary: str) -> None:
         await db.execute(
             "UPDATE projects SET summary = ?, updated_at = ? WHERE id = ?",
             (summary, datetime.now(timezone.utc).isoformat(), project_id),
+        )
+        await db.commit()
+
+
+async def update_project_model(project_id: str, model: str) -> None:
+    """Update the selected_model field for a project."""
+    async with aiosqlite.connect(_get_db_path()) as db:
+        await db.execute(
+            "UPDATE projects SET selected_model = ?, updated_at = ? WHERE id = ?",
+            (model, datetime.now(timezone.utc).isoformat(), project_id),
         )
         await db.commit()
 

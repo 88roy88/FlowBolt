@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Project } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
+import { useChatStore } from './chat';
 
 interface SessionState {
   currentProject: Project | null;
@@ -22,6 +23,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, sessionId: project.session_id });
+    // Restore the selected model for this project
+    if (project.selected_model) {
+      useChatStore.setState({ selectedModel: project.selected_model });
+    }
   },
 
   async loadProjects() {

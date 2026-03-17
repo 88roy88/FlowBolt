@@ -9,7 +9,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.models.project import create_project, delete_project, get_project, list_projects
+from app.models.project import create_project, delete_project, get_project, list_projects, update_project_model
 from app.models.session import session_registry
 from app.sandbox.manager import (
     inject_error_reporter,
@@ -30,6 +30,10 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 class CreateProjectRequest(BaseModel):
     name: str
+
+
+class UpdateProjectModelRequest(BaseModel):
+    model: str
 
 
 @router.get("")
@@ -95,6 +99,17 @@ async def create_new_project(body: CreateProjectRequest):
     asyncio.create_task(_scaffold_and_start())
 
     return asdict(project)
+
+
+@router.patch("/{project_id}/model", status_code=200)
+async def update_project_selected_model(project_id: str, body: UpdateProjectModelRequest):
+    """Update the selected model for a project."""
+    project = await get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    await update_project_model(project_id, body.model)
+    return {"success": True}
 
 
 @router.delete("/{project_id}", status_code=204)

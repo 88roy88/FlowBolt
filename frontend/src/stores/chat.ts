@@ -3,7 +3,7 @@ import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOv
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
-import { fetchModels, fetchDefaultModel, fetchChatHistory } from '../services/api';
+import { fetchModels, fetchDefaultModel, fetchChatHistory, updateProjectModel } from '../services/api';
 
 const CARD_PREFIX = '<!--agent-card:';
 const CARD_SUFFIX = '-->';
@@ -169,6 +169,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
             agentCard: { type: 'project_summary', summary: msg.summary },
           };
           set((s) => ({ messages: [...s.messages, summaryMsg] }));
+          // Update projects store so Info icon appears without refresh
+          const currentProject = useSessionStore.getState().currentProject;
+          if (currentProject) {
+            useSessionStore.getState().updateProjectSummary(
+              currentProject.id,
+              JSON.stringify(msg.summary)
+            );
+          }
           break;
         }
         case 'text': {
