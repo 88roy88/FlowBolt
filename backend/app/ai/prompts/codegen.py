@@ -1,5 +1,7 @@
 """Prompt for generating code for a specific task."""
 
+import re
+
 
 def get_codegen_prompt(
     task_title: str,
@@ -7,7 +9,8 @@ def get_codegen_prompt(
     task_files: list[str],
     architecture: dict,
     ux_design: dict,
-    completed_files: dict[str, str] | None = None,
+    dependency_files: dict[str, str] | None = None,
+    other_completed_files: dict[str, str] | None = None,
 ) -> str:
     """Build a focused code-generation prompt for a single task.
 
@@ -23,24 +26,49 @@ def get_codegen_prompt(
         The full architecture design dict (for context).
     ux_design:
         The full UX design dict (for context).
-    completed_files:
-        Dict of {path: content} for files already written by prior tasks,
-        so the model can import from them correctly.
+    dependency_files:
+        Dict of {path: content} for files produced by direct dependency tasks.
+        These are included in full so the model can import from them correctly.
+    other_completed_files:
+        Dict of {path: content} for files from non-dependency tasks.
+        Only export summaries are shown to save tokens.
     """
     completed_section = ""
-    if completed_files:
-        file_summaries = []
-        for path, content in completed_files.items():
-            # Include a truncated view so the model knows what's available
-            lines = content.split("\n")
-            preview = "\n".join(lines[:50])
-            if len(lines) > 50:
-                preview += f"\n... ({len(lines) - 50} more lines)"
-            file_summaries.append(f"### {path}\n```\n{preview}\n```")
-        completed_section = (
-            "\n\n## Already-completed files (for reference — do NOT rewrite these)\n\n"
-            + "\n\n".join(file_summaries)
-        )
+    parts: list[str] = []
+
+    # Full content for direct dependency files
+    if dependency_files:
+        dep_parts = []
+        for path, content in dependency_files.items():
+            dep_parts.append(f"### {path} (full — direct dependency)\n```\n{content}\n```")
+        if dep_parts:
+            parts.append(
+                "## Direct dependency files (full content — import from these)\n\n"
+                + "\n\n".join(dep_parts)
+            )
+
+    # Export summaries for other completed files
+    if other_completed_files:
+        other_parts = []
+        for path, content in other_completed_files.items():
+            exports = _extract_exports(content)
+            if exports:
+                other_parts.append(f"### {path} (exports)\n```\n{exports}\n```")
+            else:
+                # Fallback: truncated preview for non-parseable files (CSS, JSON, etc.)
+                lines = content.split("\n")
+                preview = "\n".join(lines[:50])
+                if len(lines) > 50:
+                    preview += f"\n... ({len(lines) - 50} more lines)"
+                other_parts.append(f"### {path}\n```\n{preview}\n```")
+        if other_parts:
+            parts.append(
+                "## Other completed files (exports only — do NOT rewrite these)\n\n"
+                + "\n\n".join(other_parts)
+            )
+
+    if parts:
+        completed_section = "\n\n" + "\n\n".join(parts)
 
     return f"""\
 You are an expert React/TypeScript developer. You are implementing a specific task
@@ -79,12 +107,58 @@ placeholders or ellipses.
 
 Rules:
 1. All file paths are relative to the project root (e.g. src/App.tsx).
-2. Use TypeScript, React 18+, and Tailwind CSS.
-3. Write clean, production-quality code.
-4. Only output the files listed above — do not create extra files.
-5. Import from already-completed files using their exact export names.
-6. Do NOT include shell actions — only file actions.
+2. Use TypeScript, React 18+, and Tailwind CSS v3.
+3. Tailwind CSS is pre-configured - use utility classes extensively for styling.
+4. Write clean, production-quality code with modern, polished UI/UX.
+5. Only output the files listed above — do not create extra files.
+6. Import from already-completed files using their exact export names.
+7. Do NOT include shell actions — only file actions.
 """
+
+
+def _extract_exports(content: str) -> str:
+    """Extract export statements from TypeScript/TSX content.
+
+    Returns a compact string of all exports: function signatures, type/interface
+    definitions, and const declarations.  For function/component exports only
+    the signature line is kept (not the body).  For interface/type exports the
+    full block is included (they're usually short).
+    """
+    lines = content.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        # Match lines starting with 'export'
+        if re.match(r"^export\s", stripped):
+            # Interface or type block — capture until closing brace
+            if re.match(r"^export\s+(interface|type)\s+\w+", stripped):
+                block = [line]
+                # If it's a single-line type alias (no opening brace or has closing on same line)
+                if "{" not in stripped or ("}" in stripped):
+                    result.append(line)
+                    i += 1
+                    continue
+                # Multi-line: capture until balanced braces
+                depth = stripped.count("{") - stripped.count("}")
+                i += 1
+                while i < len(lines) and depth > 0:
+                    block.append(lines[i])
+                    depth += lines[i].count("{") - lines[i].count("}")
+                    i += 1
+                result.extend(block)
+                continue
+
+            # Function or const — just the signature line
+            result.append(line)
+            i += 1
+            continue
+
+        i += 1
+
+    return "\n".join(result)
 
 
 def _compact_json(data: dict) -> str:

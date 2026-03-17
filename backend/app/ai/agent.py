@@ -14,6 +14,7 @@ from collections.abc import Callable, Awaitable
 
 from app.ai.parser import ActionParser
 from app.ai.provider import complete_chat, stream_chat
+from app.sandbox.nsjail import exec_in_sandbox
 from app.ai.task_tree import Task, WorkPlan
 from app.ai.prompts import (
     CLASSIFY_PROMPT,
@@ -21,10 +22,12 @@ from app.ai.prompts import (
     UX_DESIGN_PROMPT,
     USER_PLAN_PROMPT,
     MERGE_PROMPT,
+    SUMMARY_PROMPT,
     get_codegen_prompt,
 )
 from app.ai.prompts_legacy import get_system_prompt
 from app.models.chat import get_messages, save_message
+from app.models.project import get_project_by_session, update_project_summary
 from app.sandbox.filesystem import write_file
 
 logger = logging.getLogger(__name__)
@@ -53,6 +56,8 @@ class AgentOrchestrator:
         # Technical plan (built after approval, used for execution)
         self._work_plan: WorkPlan | None = None
         self._completed_files: dict[str, str] = {}
+        # Track which files belong to which task for dependency context
+        self._task_files: dict[str, list[str]] = {}  # task_id -> [file_paths]
 
     async def handle_message(
         self,
@@ -158,7 +163,20 @@ class AgentOrchestrator:
             logger.info("[agent] First message — classifying as new_project")
             return True
 
-        messages = [{"role": "user", "content": content}]
+        # Include project summary for classifier context
+        classify_content = content
+        project = await get_project_by_session(self.session_id)
+        if project and project.summary:
+            try:
+                summary_data = json.loads(project.summary)
+                classify_content = (
+                    f"[Existing project: {summary_data.get('summary', '')}]\n\n"
+                    f"User message: {content}"
+                )
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+        messages = [{"role": "user", "content": classify_content}]
         try:
             raw = await complete_chat(messages, CLASSIFY_PROMPT, model=self.model)
             data = json.loads(raw.strip())
@@ -261,6 +279,7 @@ class AgentOrchestrator:
         await self.ws_send({"type": "phase", "phase": "executing"})
 
         self._completed_files = {}
+        self._task_files = {}
         layers = self._work_plan.execution_layers()
 
         for layer in layers:
@@ -277,6 +296,14 @@ class AgentOrchestrator:
             ],
         }))
 
+        # Run typecheck to catch errors
+        errors = await self._typecheck()
+        if errors:
+            await self._fix_errors(errors)
+
+        # Generate and persist project summary
+        await self._generate_summary()
+
         self.state = "idle"
         self._work_plan = None
         await self.ws_send({"type": "phase", "phase": "complete"})
@@ -292,13 +319,28 @@ class AgentOrchestrator:
         })
 
         assert self._work_plan is not None
+
+        # Split completed files into dependency (full) vs other (exports only)
+        dep_file_paths: set[str] = set()
+        for dep_id in task.depends_on:
+            dep_file_paths.update(self._task_files.get(dep_id, []))
+
+        dependency_files: dict[str, str] = {}
+        other_completed_files: dict[str, str] = {}
+        for path, content in self._completed_files.items():
+            if path in dep_file_paths:
+                dependency_files[path] = content
+            else:
+                other_completed_files[path] = content
+
         prompt = get_codegen_prompt(
             task_title=task.title,
             task_description=task.description,
             task_files=task.files,
             architecture=self._work_plan.architecture,
             ux_design=self._work_plan.ux_design,
-            completed_files=self._completed_files if self._completed_files else None,
+            dependency_files=dependency_files or None,
+            other_completed_files=other_completed_files or None,
         )
 
         try:
@@ -318,9 +360,11 @@ class AgentOrchestrator:
 
             parser.flush()
 
+            task_file_paths: list[str] = []
             for path, content in generated_files:
                 await write_file(self.session_id, path, content)
                 self._completed_files[path] = content
+                task_file_paths.append(path)
                 await self.ws_send({
                     "type": "task_update",
                     "taskId": task.id,
@@ -329,6 +373,7 @@ class AgentOrchestrator:
                 })
                 await self.ws_send({"type": "file", "path": path, "content": content})
 
+            self._task_files[task.id] = task_file_paths
             task.status = "completed"
             await self.ws_send({
                 "type": "task_update",
@@ -347,12 +392,138 @@ class AgentOrchestrator:
             })
 
     # ------------------------------------------------------------------
+    # Typecheck
+    # ------------------------------------------------------------------
+
+    async def _typecheck(self) -> str:
+        """Run tsc --noEmit and return error output (empty string if clean)."""
+        try:
+            lines: list[str] = []
+            async for line in exec_in_sandbox(
+                self.session_id,
+                "npx tsc --noEmit 2>&1",
+            ):
+                lines.append(line.rstrip())
+            output = "\n".join(lines).strip()
+            if output:
+                logger.info("[agent] Typecheck found errors:\n%s", output)
+            else:
+                logger.info("[agent] Typecheck passed")
+            return output
+        except Exception:
+            logger.exception("[agent] Typecheck execution failed")
+            return ""
+
+    async def _fix_errors(self, errors: str) -> None:
+        """Ask the LLM to fix typecheck errors, then write the corrected files."""
+        assert self._work_plan is not None
+        await self.ws_send({"type": "phase", "phase": "fixing"})
+
+        prompt = f"""\
+You are an expert React/TypeScript developer. The project was just built but has
+TypeScript errors. Fix ALL errors below by outputting corrected files.
+
+## TypeScript Errors
+```
+{errors}
+```
+
+## Current Files
+"""
+        for path, content in self._completed_files.items():
+            prompt += f"\n### {path}\n```\n{content}\n```\n"
+
+        prompt += """
+## Output Format
+Respond using the boltArtifact XML format. Only output files that need changes.
+
+```xml
+<boltArtifact id="fix-errors" title="Fix TypeScript errors">
+  <boltAction type="file" filePath="path/to/file.tsx">
+    Full corrected file content
+  </boltAction>
+</boltArtifact>
+```
+
+Rules:
+1. Fix ALL reported errors.
+2. Do NOT change functionality — only fix type errors.
+3. Output complete file contents, not patches.
+4. Do NOT include shell actions.
+"""
+        try:
+            generated_files: list[tuple[str, str]] = []
+            parser = ActionParser(
+                on_file_action=lambda p, c: generated_files.append((p, c)),
+            )
+
+            full_text: list[str] = []
+            async for chunk in stream_chat(
+                [{"role": "user", "content": "Fix the TypeScript errors."}],
+                prompt,
+                model=self.model,
+            ):
+                full_text.append(chunk)
+                parser.feed(chunk)
+
+            parser.flush()
+
+            for path, content in generated_files:
+                await write_file(self.session_id, path, content)
+                self._completed_files[path] = content
+                await self.ws_send({"type": "file", "path": path, "content": content})
+
+            if generated_files:
+                logger.info("[agent] Fixed %d files after typecheck", len(generated_files))
+        except Exception:
+            logger.exception("[agent] Error fix pass failed")
+
+    # ------------------------------------------------------------------
+    # Summary generation
+    # ------------------------------------------------------------------
+
+    async def _generate_summary(self) -> None:
+        """Generate and persist a project summary after all tasks complete."""
+        try:
+            summary_input = json.dumps({
+                "user_request": self._user_content,
+                "architecture": self._architecture,
+                "files_created": list(self._completed_files.keys()),
+            }, indent=2)
+            messages = [{"role": "user", "content": summary_input}]
+            raw = await complete_chat(messages, SUMMARY_PROMPT, model=self.model)
+            summary_data = _parse_json_response(raw)
+
+            if summary_data:
+                summary_json = json.dumps(summary_data, ensure_ascii=False)
+                await update_project_summary(self.project_id, summary_json)
+                await self.ws_send({"type": "project_summary", "summary": summary_data})
+                logger.info("[agent] Project summary saved for %s", self.project_id)
+        except Exception:
+            logger.exception("[agent] Summary generation failed")
+
+    # ------------------------------------------------------------------
     # Simple follow-up flow (existing behavior)
     # ------------------------------------------------------------------
 
     async def _simple_flow(self, content: str) -> None:
         """Single-turn AI flow for follow-up edits."""
         await self.ws_send({"type": "phase", "phase": "executing"})
+
+        # Load project summary for context
+        project = await get_project_by_session(self.session_id)
+        summary_context = ""
+        if project and project.summary:
+            try:
+                summary_data = json.loads(project.summary)
+                summary_context = (
+                    f"\n\n## Existing Project Summary\n"
+                    f"{summary_data.get('summary', '')}\n"
+                    f"Tech stack: {', '.join(summary_data.get('tech_stack', []))}\n"
+                    f"Features: {', '.join(summary_data.get('features', []))}\n"
+                )
+            except (json.JSONDecodeError, AttributeError):
+                pass
 
         history = await get_messages(self.project_id)
         # Filter out card messages from conversation context
@@ -372,7 +543,8 @@ class AgentOrchestrator:
         )
 
         try:
-            async for chunk in stream_chat(messages, get_system_prompt(), model=self.model):
+            system_prompt = get_system_prompt() + summary_context
+            async for chunk in stream_chat(messages, system_prompt, model=self.model):
                 full_response.append(chunk)
                 parser.feed(chunk)
                 await self.ws_send({"type": "text", "content": chunk})
