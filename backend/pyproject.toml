@@ -16,6 +16,13 @@ dependencies = [
     "boto3>=1.42.68",
 ]
 
+[tool.uv]
+dev-dependencies = []
+
+[tool.uv.scripts]
+dev = "uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+start = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
 

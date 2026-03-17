@@ -4,7 +4,7 @@
 dev: dev-backend dev-frontend
 
 dev-backend:
-	cd backend && uv run python run.py
+	cd backend && uv run dev
 
 dev-frontend:
 	cd frontend && pnpm dev

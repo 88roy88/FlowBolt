@@ -17,15 +17,16 @@ services:
       - workspaces:/var/lib/ai-builder/workspaces
       - db-data:/app/data
     environment:
-      - WORKSPACE_BASE_DIR=/var/lib/ai-builder/workspaces
-      - DATABASE_URL=sqlite:///app/data/ai_builder.db
-      - AI_MODEL=bedrock/anthropic.claude-sonnet-4-20250514
+      - AIB_WORKSPACE_BASE_DIR=/var/lib/ai-builder/workspaces
+      - AIB_DATABASE_URL=sqlite:///app/data/ai_builder.db
+      - AIB_AI_MODEL=bedrock/anthropic.claude-sonnet-4-20250514
       - AWS_REGION=us-east-1
-    # Required for nsjail cgroups
-    privileged: true
-    security_opt:
-      - seccomp:unconfined
-    cgroup: host
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
     restart: unless-stopped
 
   nginx:

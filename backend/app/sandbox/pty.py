@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import atexit
-import fcntl
 import os
 import signal
 import subprocess
@@ -12,6 +11,14 @@ from dataclasses import dataclass
 from app.config import settings
 from app.sandbox.manager import sandbox_manager
 from app.sandbox.nsjail import _nsjail_available
+
+# Windows doesn't support PTY/fcntl - conditionally import
+try:
+    import fcntl  # type: ignore[import-not-found]
+    _PTY_SUPPORTED = True
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
+    _PTY_SUPPORTED = False
 
 
 @dataclass(eq=False)
@@ -33,6 +40,14 @@ def create_pty_process(session_id: str) -> PtyProcess:
 
     On systems without nsjail the shell runs directly in the workspace dir.
     """
+    if not _PTY_SUPPORTED:
+        raise NotImplementedError(
+            "PTY terminals are not supported on Windows. "
+            "Interactive terminal features require Unix-like systems (Linux/macOS)."
+        )
+
+    assert fcntl is not None, "fcntl must be available on PTY-supported systems"
+
     sandbox = sandbox_manager.get_sandbox(session_id)
     workspace_dir = sandbox.workspace_dir if sandbox else os.path.join(settings.WORKSPACE_BASE_DIR, session_id)
 
