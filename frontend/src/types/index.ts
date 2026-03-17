@@ -39,4 +39,5 @@ export type WSMessage =
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }
-  | { type: 'action_complete' };
+  | { type: 'action_complete' }
+  | { type: 'error'; message: string };

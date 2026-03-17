@@ -12,7 +12,7 @@ dependencies = [
     "websockets>=14.1",
     "python-multipart>=0.0.19",
     "httpx>=0.28.0",
-    "langfuse>=3.14.0",
+    "langfuse==2.59.7",
     "boto3>=1.42.68",
 ]
 

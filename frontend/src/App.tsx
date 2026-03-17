@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSessionStore } from './stores/session';
+import { useChatStore } from './stores/chat';
+import { useFilesStore } from './stores/files';
 import { AppShell } from './components/layout/AppShell';
 
 export default function App() {
-  const { projects, loadProjects, createProject } = useSessionStore();
+  const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
+  const loadHistory = useChatStore((s) => s.loadHistory);
+  const loadFileTree = useFilesStore((s) => s.loadFileTree);
   const [newProjectName, setNewProjectName] = useState('');
   const [showNewProject, setShowNewProject] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -33,7 +37,14 @@ export default function App() {
     if (!loading && projects.length === 0) {
       setShowNewProject(true);
     }
-  }, [loading, projects.length]);
+    // Auto-select first project and load its data on initial load
+    if (!loading && projects.length > 0 && !currentProject) {
+      const first = projects[0];
+      setCurrentProject(first);
+      loadHistory(first.session_id);
+      loadFileTree();
+    }
+  }, [loading, projects.length, currentProject, setCurrentProject, loadHistory, loadFileTree, projects]);
 
   const handleCreate = async () => {
     const name = newProjectName.trim() || 'My Project';

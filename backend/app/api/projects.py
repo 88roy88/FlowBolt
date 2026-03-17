@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import asdict
 
@@ -40,22 +41,22 @@ async def create_new_project(body: CreateProjectRequest):
     # Register session
     session_registry.register(project.session_id, project.id, sandbox_info)
 
-    # Scaffold a React + Vite + TypeScript project
-    logger.info("[projects] Scaffolding React project for session %s", project.session_id)
-    scaffold_output: list[str] = []
-    try:
-        async for line in exec_in_sandbox(
-            project.session_id,
-            "pnpm create vite . --template react-ts -- --yes 2>&1 && pnpm install 2>&1",
-        ):
-            scaffold_output.append(line)
-            logger.info("[scaffold] %s", line.rstrip())
-    except Exception:
-        logger.exception("[projects] Scaffold failed for session %s", project.session_id)
+    # Scaffold + start dev server in the background (don't block response)
+    async def _scaffold_and_start():
+        logger.info("[projects] Scaffolding React project for session %s", project.session_id)
+        try:
+            async for line in exec_in_sandbox(
+                project.session_id,
+                "pnpm create vite . --template react-ts -- --yes 2>&1 && pnpm install 2>&1",
+            ):
+                logger.info("[scaffold] %s", line.rstrip())
+        except Exception:
+            logger.exception("[projects] Scaffold failed for session %s", project.session_id)
+            return
+        logger.info("[projects] Starting dev server for session %s", project.session_id)
+        await sandbox_manager.start_dev_server(project.session_id)
 
-    # Start the dev server in the background
-    logger.info("[projects] Starting dev server for session %s", project.session_id)
-    await sandbox_manager.start_dev_server(project.session_id)
+    asyncio.create_task(_scaffold_and_start())
 
     return asdict(project)
 

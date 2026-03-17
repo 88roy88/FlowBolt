@@ -159,7 +159,7 @@ function ModelSelector() {
 }
 
 export function ChatPanel() {
-  const { messages, isStreaming, currentAssistantMessage, actions } = useChatStore();
+  const { messages, isStreaming, currentAssistantMessage, actions, error, clearError } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -235,6 +235,29 @@ export function ChatPanel() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div style={{
+          padding: '8px 16px',
+          background: 'rgba(243, 139, 168, 0.15)',
+          borderTop: '1px solid var(--danger)',
+          color: 'var(--danger)',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <span>{error}</span>
+          <button
+            onClick={clearError}
+            style={{ color: 'var(--danger)', padding: '2px 6px', fontSize: '12px' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Input */}
       <PromptInput />

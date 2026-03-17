@@ -58,6 +58,10 @@ export async function fetchPreviewPort(sessionId: string): Promise<number> {
   return data.port;
 }
 
+export async function fetchChatHistory(sessionId: string): Promise<{ id: string; role: string; content: string; created_at: string }[]> {
+  return request(`/chat/${sessionId}/history`);
+}
+
 export async function fetchModels(): Promise<AIModel[]> {
   return request<AIModel[]>('/models');
 }

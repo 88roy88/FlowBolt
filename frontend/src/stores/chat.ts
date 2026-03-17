@@ -3,7 +3,7 @@ import type { Message, Action, WSMessage, AIModel } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
-import { fetchModels, fetchDefaultModel } from '../services/api';
+import { fetchModels, fetchDefaultModel, fetchChatHistory } from '../services/api';
 
 interface ChatState {
   messages: Message[];
@@ -15,6 +15,7 @@ interface ChatState {
   selectedModel: string | null;
   sendMessage: (content: string) => void;
   addMessage: (message: Message) => void;
+  loadHistory: (sessionId: string) => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
@@ -128,6 +129,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   addMessage(message: Message) {
     set((state) => ({ messages: [...state.messages, message] }));
+  },
+
+  async loadHistory(sessionId: string) {
+    try {
+      const history = await fetchChatHistory(sessionId);
+      const messages: Message[] = history.map((m) => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: new Date(m.created_at).getTime(),
+      }));
+      set({ messages, currentAssistantMessage: '', actions: [], error: null });
+    } catch (err) {
+      console.error('Failed to load chat history:', err);
+    }
   },
 
   clearMessages() {

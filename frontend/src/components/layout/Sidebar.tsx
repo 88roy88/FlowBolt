@@ -10,7 +10,7 @@ type SidebarProps = {
 
 export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, isCreating } = useSessionStore();
-  const clearMessages = useChatStore((s) => s.clearMessages);
+  const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
@@ -25,9 +25,9 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
 
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
-    clearMessages();
     resetFiles();
     loadFileTree();
+    loadHistory(project.session_id);
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
