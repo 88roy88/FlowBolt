@@ -4,6 +4,7 @@ import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
 import { fetchModels, fetchDefaultModel, fetchChatHistory } from '../services/api';
+import type { PackageSearchRecord } from '../types';
 
 const CARD_PREFIX = '<!--agent-card:';
 const CARD_SUFFIX = '-->';
@@ -28,6 +29,7 @@ interface ChatState {
   error: string | null;
   models: AIModel[];
   selectedModel: string | null;
+  selectedPackage: Pick<PackageSearchRecord, 'Id' | 'Name'> | null;
   // Agent state
   agentPhase: AgentPhase;
   planOverview: PlanOverview | null;
@@ -42,6 +44,7 @@ interface ChatState {
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
   setSelectedModel: (model: string) => void;
+  setSelectedPackage: (pkg: Pick<PackageSearchRecord, 'Id' | 'Name'> | null) => void;
   loadModels: () => Promise<void>;
 }
 
@@ -60,6 +63,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   models: [],
   selectedModel: null,
+  selectedPackage: null,
   agentPhase: 'idle',
   planOverview: null,
   executionTasks: [],
@@ -89,7 +93,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     const socket = getChatSocket(sessionId);
-    const assistantId = generateId();
 
     if (activeHandler && activeSessionId === sessionId) {
       socket.offMessage(activeHandler);
@@ -344,6 +347,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSelectedModel(model: string) {
     set({ selectedModel: model });
+  },
+
+  setSelectedPackage(pkg) {
+    set({ selectedPackage: pkg });
   },
 
   async loadModels() {
