@@ -11,7 +11,15 @@ from pydantic import BaseModel
 
 from app.models.project import create_project, delete_project, get_project, list_projects
 from app.models.session import session_registry
-from app.sandbox.manager import inject_error_reporter, sandbox_manager, write_vite_config
+from app.sandbox.manager import (
+    inject_error_reporter,
+    inject_tailwind_directives,
+    patch_tsconfig,
+    sandbox_manager,
+    write_postcss_config,
+    write_tailwind_config,
+    write_vite_config,
+)
 from app.sandbox.nsjail import exec_in_sandbox
 from app.sandbox.pty import cleanup_session_ptys
 
@@ -44,21 +52,43 @@ async def create_new_project(body: CreateProjectRequest):
 
     # Scaffold + start dev server in the background (don't block response)
     async def _scaffold_and_start():
-        logger.info("[projects] Scaffolding React project for session %s", project.session_id)
+        logger.info("[projects] Scaffolding React project with Tailwind CSS for session %s", project.session_id)
+
+        # Step 1: Create Vite project and install base dependencies
         try:
             async for line in exec_in_sandbox(
                 project.session_id,
-                "pnpm create vite . --template react-ts -- --yes 2>&1 && pnpm install 2>&1",
+                "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm create vite . --template react-ts -- --yes 2>&1 && "
+                "pnpm install 2>&1",
             ):
                 logger.info("[scaffold] %s", line.rstrip())
         except Exception:
             logger.exception("[projects] Scaffold failed for session %s", project.session_id)
             return
-        # Write session-specific vite.config.ts and inject error reporter
+
+        # Step 2: Install Tailwind CSS
+        logger.info("[projects] Installing Tailwind CSS for session %s", project.session_id)
+        try:
+            async for line in exec_in_sandbox(
+                project.session_id,
+                "pnpm add -D tailwindcss@^3 postcss autoprefixer 2>&1",
+            ):
+                logger.info("[tailwind] %s", line.rstrip())
+        except Exception:
+            logger.exception("[projects] Tailwind install failed for session %s", project.session_id)
+            return
+
+        # Step 3: Write all config files (AFTER Tailwind is installed)
         sandbox = sandbox_manager.get_sandbox(project.session_id)
-        write_vite_config(project.session_id)
         if sandbox:
+            write_vite_config(project.session_id)
+            patch_tsconfig(sandbox.workspace_dir)
             inject_error_reporter(sandbox.workspace_dir)
+            write_tailwind_config(sandbox.workspace_dir)
+            write_postcss_config(sandbox.workspace_dir)
+            inject_tailwind_directives(sandbox.workspace_dir)
+
+        # Step 4: Start dev server (AFTER everything is configured)
         logger.info("[projects] Starting dev server for session %s", project.session_id)
         await sandbox_manager.start_dev_server(project.session_id)
 
