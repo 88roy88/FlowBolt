@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 import litellm
+from langfuse import Langfuse
 
 from app.api import chat, errors, export, files, models, preview, projects, server_log, terminal
 from app.config import settings
@@ -31,7 +32,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         os.environ["LANGFUSE_PUBLIC_KEY"] = settings.LANGFUSE_PUBLIC_KEY
         os.environ["LANGFUSE_SECRET_KEY"] = settings.LANGFUSE_SECRET_KEY
         os.environ["LANGFUSE_HOST"] = settings.LANGFUSE_HOST
-        # set langfuse as a callback, litellm will send the data to langfuse
+
+        # Initialize Langfuse client for decorator usage
+        Langfuse()
+
+        # Set langfuse as a callback, litellm will send the data to langfuse
         litellm.success_callback = ["langfuse"]
         litellm.failure_callback = ["langfuse"]
         logger.info("Langfuse tracing enabled (host=%s)", settings.LANGFUSE_HOST)
