@@ -21,10 +21,27 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
     setShowInput(false);
     await createProject(name);
     clearMessages();
+    // Update URL hash and load data for the new project
+    const session = useSessionStore.getState();
+    if (session.currentProject) {
+      window.location.hash = `#/project/${session.currentProject.session_id}`;
+      loadHistory(session.currentProject.session_id);
+      // Poll for scaffold to finish
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        await loadFileTree();
+        const tree = useFilesStore.getState().fileTree;
+        if (tree.length > 0 || attempts >= 15) {
+          clearInterval(interval);
+        }
+      }, 2000);
+    }
   };
 
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
+    window.location.hash = `#/project/${project.session_id}`;
     resetFiles();
     loadFileTree();
     loadHistory(project.session_id);

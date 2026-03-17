@@ -5,6 +5,7 @@ import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Terminal } from '../terminal/Terminal';
+import { ServerLog } from '../terminal/ServerLog';
 import { Preview } from '../preview/Preview';
 
 const SIDEBAR_MIN = 180;
@@ -14,14 +15,14 @@ const BOTTOM_MAX = 600;
 const MAIN_SPLIT_MIN = 0.2;
 const MAIN_SPLIT_MAX = 0.8;
 
-type BottomTab = 'terminal' | 'preview';
+type BottomTab = 'terminal' | 'server' | 'preview';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [bottomTab, setBottomTab] = useState<BottomTab>('server');
   const [sidebarWidth, setSidebarWidth] = useState(250);
   const [bottomHeight, setBottomHeight] = useState(300);
   const [mainSplit, setMainSplit] = useState(0.5);
-  const [bottomTab, setBottomTab] = useState<BottomTab>('terminal');
   const mainTopRef = useRef<HTMLDivElement>(null);
 
   const handleSidebarResize = useCallback((delta: number) => {
@@ -156,6 +157,17 @@ export function AppShell() {
             }}
           >
             <button
+              onClick={() => setBottomTab('server')}
+              style={{
+                padding: '6px 16px',
+                fontSize: '13px',
+                color: bottomTab === 'server' ? 'var(--accent)' : 'var(--text-dim)',
+                borderBottom: bottomTab === 'server' ? '2px solid var(--accent)' : '2px solid transparent',
+              }}
+            >
+              Server
+            </button>
+            <button
               onClick={() => setBottomTab('terminal')}
               style={{
                 padding: 'var(--space-md) var(--space-lg)',
@@ -167,7 +179,6 @@ export function AppShell() {
             >
               Terminal
             </button>
-
             <button
               onClick={() => setBottomTab('preview')}
               style={{
@@ -183,7 +194,9 @@ export function AppShell() {
           </div>
 
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            {bottomTab === 'terminal' ? <Terminal /> : <Preview />}
+            {bottomTab === 'terminal' && <Terminal />}
+            {bottomTab === 'server' && <ServerLog />}
+            {bottomTab === 'preview' && <Preview />}
           </div>
         </div>
       </div>

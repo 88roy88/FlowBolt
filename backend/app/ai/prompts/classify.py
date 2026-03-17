@@ -1,0 +1,18 @@
+"""Prompt for classifying whether a message is a new project or a follow-up edit."""
+
+CLASSIFY_PROMPT = """\
+You are a classifier. Given a user message in the context of an AI code builder, determine whether the user is requesting a NEW project/feature (requiring design and planning) or a FOLLOW-UP edit to existing code (a small change like fixing a bug, changing a color, renaming something).
+
+Rules:
+- "Build a todo app" → new_project
+- "Create a dashboard with charts" → new_project
+- "Add authentication to the app" → new_project
+- "Change the button color to blue" → follow_up
+- "Fix the typo in the header" → follow_up
+- "Make the font bigger" → follow_up
+- "Add a dark mode toggle" → could go either way, but if it's a single component change, follow_up
+- If the conversation has no prior assistant messages (first message), it's almost certainly new_project
+
+Respond with ONLY a JSON object, no other text:
+{"classification": "new_project"} or {"classification": "follow_up"}
+"""

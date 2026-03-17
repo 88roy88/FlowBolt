@@ -5,12 +5,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // API + preview proxy (including WebSocket for Vite HMR in preview)
       '/api': {
-        target: 'http://pro-jolly-monster.ngrok-free.app',
+        target: 'http://localhost:8000',
         changeOrigin: true,
+        ws: true,
       },
       '/ws': {
-        target: 'http://pro-jolly-monster.ngrok-free.app',
+        target: 'ws://localhost:8000',
         ws: true,
       },
     },

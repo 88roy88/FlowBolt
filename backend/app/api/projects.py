@@ -11,8 +11,9 @@ from pydantic import BaseModel
 
 from app.models.project import create_project, delete_project, get_project, list_projects
 from app.models.session import session_registry
-from app.sandbox.manager import sandbox_manager
+from app.sandbox.manager import inject_error_reporter, sandbox_manager, write_vite_config
 from app.sandbox.nsjail import exec_in_sandbox
+from app.sandbox.pty import cleanup_session_ptys
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,11 @@ async def create_new_project(body: CreateProjectRequest):
         except Exception:
             logger.exception("[projects] Scaffold failed for session %s", project.session_id)
             return
+        # Write session-specific vite.config.ts and inject error reporter
+        sandbox = sandbox_manager.get_sandbox(project.session_id)
+        write_vite_config(project.session_id)
+        if sandbox:
+            inject_error_reporter(sandbox.workspace_dir)
         logger.info("[projects] Starting dev server for session %s", project.session_id)
         await sandbox_manager.start_dev_server(project.session_id)
 
@@ -67,6 +73,9 @@ async def delete_existing_project(project_id: str):
     project = await get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # Kill any active PTY processes for this session before destroying the sandbox
+    cleanup_session_ptys(project.session_id)
 
     # Destroy sandbox and delete workspace files
     await sandbox_manager.destroy_sandbox(project.session_id, delete_workspace=True)

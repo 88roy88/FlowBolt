@@ -8,6 +8,7 @@ export function PromptInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const isStreaming = useChatStore((s) => s.isStreaming);
+  const agentPhase = useChatStore((s) => s.agentPhase);
   const sessionId = useSessionStore((s) => s.sessionId);
 
   const adjustHeight = useCallback(() => {
@@ -35,28 +36,33 @@ export function PromptInput() {
     }
   };
 
-  const disabled = isStreaming || !sessionId;
+  const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'awaiting_approval' && agentPhase !== 'complete');
+  const disabled = isBusy || !sessionId;
+
+  const placeholder = !sessionId
+    ? 'Select a project first'
+    : agentPhase === 'awaiting_approval'
+      ? 'Review the plan above, then accept, modify, or reject'
+      : isBusy
+        ? 'AI is working...'
+        : 'Describe what you want to build...';
 
   return (
-    <div
-      style={{
-        padding: 'var(--space-lg)',
-        background: 'var(--surface)',
-        boxShadow: 'var(--shadow-subtle-top)',
-        flexShrink: 0,
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 'var(--space-md)',
-          background: 'var(--surface-elevated)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-md) var(--space-lg)',
-          boxShadow: 'var(--shadow-soft)',
-        }}
-      >
+    <div style={{
+      padding: '12px 16px',
+      borderTop: '1px solid var(--border)',
+      background: 'var(--surface)',
+      flexShrink: 0,
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        gap: '8px',
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        borderRadius: '10px',
+        padding: '8px 12px',
+      }}>
         <textarea
           ref={textareaRef}
           value={value}
@@ -65,13 +71,13 @@ export function PromptInput() {
             adjustHeight();
           }}
           onKeyDown={handleKeyDown}
-          placeholder={sessionId ? 'Describe what you want to build...' : 'Select a project first'}
+          placeholder={placeholder}
           disabled={disabled}
           rows={1}
           style={{
             flex: 1,
             resize: 'none',
-            fontSize: 14,
+            fontSize: '14px',
             lineHeight: '1.5',
             maxHeight: '150px',
             opacity: disabled ? 0.5 : 1,
@@ -81,11 +87,10 @@ export function PromptInput() {
           onClick={handleSubmit}
           disabled={disabled || !value.trim()}
           style={{
-            padding: 'var(--space-md) var(--space-lg)',
-            borderRadius: 'var(--radius-lg)',
-            background: value.trim() && !disabled ? 'var(--accent)' : 'transparent',
-            color: value.trim() && !disabled ? '#fff' : 'var(--text-dim)',
-            opacity: value.trim() && !disabled ? 1 : 0.5,
+            padding: '6px',
+            borderRadius: '6px',
+            color: value.trim() && !disabled ? 'var(--accent)' : 'var(--text-dim)',
+            opacity: value.trim() && !disabled ? 1 : 0.4,
             flexShrink: 0,
           }}
           title="Send message"
@@ -93,9 +98,13 @@ export function PromptInput() {
           <Send size={18} />
         </button>
       </div>
-      {isStreaming && (
-        <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: 'var(--space-sm)', textAlign: 'center' }}>
-          AI is responding...
+      {isBusy && (
+        <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '6px', textAlign: 'center' }}>
+          {agentPhase === 'classifying' ? 'Analyzing...' :
+           agentPhase === 'designing' ? 'Designing...' :
+           agentPhase === 'planning' ? 'Planning...' :
+           agentPhase === 'executing' ? 'Building...' :
+           'AI is responding...'}
         </p>
       )}
     </div>

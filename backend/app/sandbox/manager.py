@@ -6,12 +6,109 @@ import asyncio
 import logging
 import os
 import shutil
+import signal
 from dataclasses import dataclass
 
 from app.config import settings
 from app.sandbox.nsjail import build_nsjail_command
 
 logger = logging.getLogger(__name__)
+
+
+async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
+    """Kill a subprocess and its entire process group.
+
+    On macOS (no nsjail) subprocesses spawned with ``start_new_session=True``
+    get their own process group.  ``os.killpg`` sends SIGTERM to the whole
+    group so child processes (pnpm, node, vite, esbuild) don't survive as
+    orphans.
+    """
+    if proc.returncode is not None:
+        return
+    try:
+        pgid = os.getpgid(proc.pid)
+        os.killpg(pgid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+    try:
+        await proc.wait()
+    except ProcessLookupError:
+        pass
+
+
+def write_vite_config(session_id: str, workspace_dir: str | None = None) -> None:
+    """Write a vite.config.ts with the correct ``base`` for the preview proxy.
+
+    If *workspace_dir* is not given, it is looked up from the sandbox registry.
+    """
+    if workspace_dir is None:
+        info = sandbox_manager.get_sandbox(session_id)
+        if info is None:
+            return
+        workspace_dir = info.workspace_dir
+
+    config = (
+        "import { defineConfig } from 'vite'\n"
+        "import react from '@vitejs/plugin-react'\n"
+        "\n"
+        "// https://vitejs.dev/config/\n"
+        "export default defineConfig({\n"
+        "  plugins: [react()],\n"
+        f"  base: '/api/preview/{session_id}/proxy/',\n"
+        "})\n"
+    )
+    path = os.path.join(workspace_dir, "vite.config.ts")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(config)
+
+
+def inject_error_reporter(workspace_dir: str) -> None:
+    """Inject a runtime error reporter script into index.html.
+
+    The script catches uncaught errors and unhandled rejections, then posts
+    them to the parent window via postMessage so the builder UI can display
+    them.
+    """
+    index_path = os.path.join(workspace_dir, "index.html")
+    if not os.path.isfile(index_path):
+        return
+
+    with open(index_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    # Don't inject twice
+    if "__ERROR_REPORTER__" in html:
+        return
+
+    script = (
+        '<script id="__ERROR_REPORTER__">\n'
+        "(function(){\n"
+        "  function report(err){\n"
+        "    if(!window.parent||window.parent===window)return;\n"
+        "    window.parent.postMessage({\n"
+        "      type:'runtime-error',\n"
+        "      message:String(err.message||err),\n"
+        "      file:err.filename||err.fileName||'',\n"
+        "      line:err.lineno||err.lineNumber||0,\n"
+        "      column:err.colno||err.columnNumber||0,\n"
+        "      stack:err.error?err.error.stack||'':''\n"
+        "    },'*');\n"
+        "  }\n"
+        "  window.addEventListener('error',function(e){report(e)});\n"
+        "  window.addEventListener('unhandledrejection',function(e){\n"
+        "    var r=e.reason||{};\n"
+        "    report({message:r.message||String(r),stack:r.stack||''});\n"
+        "  });\n"
+        "})()\n"
+        "</script>\n"
+    )
+
+    html = html.replace("</head>", script + "</head>", 1)
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write(html)
 
 
 @dataclass
@@ -23,6 +120,7 @@ class SandboxInfo:
     port: int
     process: asyncio.subprocess.Process | None = None
     dev_process: asyncio.subprocess.Process | None = None
+    _dev_log_file: object | None = None  # file handle for .dev-server.log
 
 
 class SandboxManager:
@@ -66,6 +164,7 @@ class SandboxManager:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
+            start_new_session=True,  # own process group so killpg works
         )
 
         info = SandboxInfo(
@@ -93,21 +192,18 @@ class SandboxManager:
         if info is None:
             return
 
-        # Terminate the dev server
-        if info.dev_process is not None and info.dev_process.returncode is None:
+        # Terminate the dev server and close its log file
+        if info.dev_process is not None:
+            await _kill_process_tree(info.dev_process)
+        if info._dev_log_file is not None:
             try:
-                info.dev_process.kill()
-                await info.dev_process.wait()
-            except ProcessLookupError:
+                info._dev_log_file.close()
+            except Exception:
                 pass
 
         # Terminate the long-lived shell process
-        if info.process is not None and info.process.returncode is None:
-            try:
-                info.process.kill()
-                await info.process.wait()
-            except ProcessLookupError:
-                pass
+        if info.process is not None:
+            await _kill_process_tree(info.process)
 
         # Return port to pool
         async with self._lock:
@@ -118,32 +214,62 @@ class SandboxManager:
             shutil.rmtree(info.workspace_dir, ignore_errors=True)
 
     async def start_dev_server(self, session_id: str) -> None:
-        """Start `pnpm dev` on the sandbox's allocated port as a background process."""
+        """Start `pnpm dev` on the sandbox's allocated port as a background process.
+
+        Stdout/stderr are redirected to ``.dev-server.log`` inside the workspace
+        so the dev server never blocks on a full pipe buffer.  Users can view
+        the log via ``tail -f .dev-server.log`` in the terminal.
+        """
         info = self._sandboxes.get(session_id)
         if info is None:
             logger.warning("Cannot start dev server: no sandbox for %s", session_id)
             return
 
         # Kill existing dev server if running
-        if info.dev_process is not None and info.dev_process.returncode is None:
-            try:
-                info.dev_process.kill()
-                await info.dev_process.wait()
-            except ProcessLookupError:
-                pass
+        if info.dev_process is not None:
+            await _kill_process_tree(info.dev_process)
 
-        cmd = build_nsjail_command(
-            session_id,
-            info.workspace_dir,
-            info.port,
-            command=f"pnpm dev --port {info.port} --host 0.0.0.0",
-        )
+        log_path = os.path.join(info.workspace_dir, ".dev-server.log")
 
-        info.dev_process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
+        from app.sandbox.nsjail import _nsjail_available
+
+        if not _nsjail_available():
+            # macOS dev: use `script -q` to run in a PTY so node/pnpm use
+            # line buffering and output ANSI colors.  `script` writes the
+            # transcript directly to log_path with immediate flushing.
+            dev_cmd = f"pnpm dev --port {info.port} --host 0.0.0.0"
+            cmd = [
+                "script", "-q", log_path,
+                "/bin/bash", "-c", f"cd {info.workspace_dir} && {dev_cmd}",
+            ]
+            info.dev_process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            info._dev_log_file = None
+        else:
+            log_file = open(log_path, "wb")  # noqa: SIM115
+
+            cmd = build_nsjail_command(
+                session_id,
+                info.workspace_dir,
+                info.port,
+                command=f"pnpm dev --port {info.port} --host 0.0.0.0",
+            )
+
+            env = os.environ.copy()
+            env["FORCE_COLOR"] = "1"
+
+            info.dev_process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=log_file,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                start_new_session=True,
+            )
+            info._dev_log_file = log_file
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
             session_id, info.port, info.dev_process.pid,
@@ -153,21 +279,87 @@ class SandboxManager:
         """Look up sandbox info by session id (non-blocking)."""
         return self._sandboxes.get(session_id)
 
+    @staticmethod
+    def _kill_stale_dev_servers() -> None:
+        """Kill any leftover pnpm/vite processes from previous runs.
+
+        This handles the case where uvicorn --reload killed the Python
+        process but the child node processes survived as orphans.
+        """
+        import subprocess as _sp
+
+        port_start = settings.SANDBOX_PORT_RANGE_START
+        port_end = settings.SANDBOX_PORT_RANGE_END
+        try:
+            result = _sp.run(
+                ["pgrep", "-f", "pnpm dev --port"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode != 0:
+                return
+            for pid_str in result.stdout.strip().splitlines():
+                pid = int(pid_str.strip())
+                # Read cmdline to check if port is in our range
+                try:
+                    cmdline = _sp.run(
+                        ["ps", "-p", str(pid), "-o", "args="],
+                        capture_output=True, text=True, timeout=5,
+                    ).stdout.strip()
+                except Exception:
+                    continue
+                # Extract port from "pnpm dev --port NNNN"
+                for part in cmdline.split():
+                    try:
+                        port = int(part)
+                        if port_start <= port <= port_end:
+                            try:
+                                os.killpg(os.getpgid(pid), signal.SIGTERM)
+                            except (ProcessLookupError, PermissionError, OSError):
+                                try:
+                                    os.kill(pid, signal.SIGTERM)
+                                except (ProcessLookupError, PermissionError):
+                                    pass
+                            logger.info("Killed stale dev server pid %d (port %d)", pid, port)
+                            break
+                    except ValueError:
+                        continue
+        except FileNotFoundError:
+            pass  # pgrep not available
+        except Exception:
+            logger.debug("Failed to clean stale dev servers", exc_info=True)
+
     async def restore_existing_workspaces(self) -> None:
-        """Re-register sandboxes for workspace directories that already exist on disk.
+        """Re-register sandboxes for workspace directories that still have a
+        matching project in the database.
 
         Called on startup so that after a uvicorn reload the file APIs still work
-        for sessions whose workspace was preserved.
+        for sessions whose workspace was preserved.  Orphan directories (project
+        deleted but workspace left on disk) are cleaned up automatically.
         """
+        # Kill any orphan dev servers left from previous runs
+        self._kill_stale_dev_servers()
+
         base = settings.WORKSPACE_BASE_DIR
         if not os.path.isdir(base):
             return
+
+        # Query the DB for all live session IDs
+        from app.models.project import list_projects
+
+        live_projects = await list_projects()
+        live_session_ids = {p.session_id for p in live_projects}
 
         for name in os.listdir(base):
             workspace_dir = os.path.join(base, name)
             if not os.path.isdir(workspace_dir):
                 continue
             if name in self._sandboxes:
+                continue
+
+            # Remove orphan workspaces that have no matching project in the DB
+            if name not in live_session_ids:
+                logger.info("Removing orphan workspace %s (no matching project in DB)", name)
+                shutil.rmtree(workspace_dir, ignore_errors=True)
                 continue
 
             async with self._lock:
@@ -185,9 +377,11 @@ class SandboxManager:
             self._sandboxes[name] = info
             logger.info("Restored sandbox for session %s (port %d)", name, port)
 
-        # Restart dev servers in the background (don't block startup)
+        # Patch vite configs, inject error reporter, and restart dev servers
         for name, info in self._sandboxes.items():
             if os.path.isfile(os.path.join(info.workspace_dir, "package.json")):
+                write_vite_config(name, info.workspace_dir)
+                inject_error_reporter(info.workspace_dir)
                 asyncio.create_task(self.start_dev_server(name))
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:

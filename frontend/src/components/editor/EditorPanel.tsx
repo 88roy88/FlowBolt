@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import Editor, { type Monaco } from '@monaco-editor/react';
+import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import { Download, FileCode } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
@@ -50,9 +50,10 @@ function defineMonacoThemes(monaco: Monaco) {
 }
 
 export function EditorPanel() {
-  const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree } = useFilesStore();
+  const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree, pendingRevealLine, pendingRevealColumn, clearPendingReveal } = useFilesStore();
   const sessionId = useSessionStore((s) => s.sessionId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
   const [editorTheme, setEditorTheme] = useState<'ai-dark' | 'ai-light'>('ai-dark');
 
@@ -77,6 +78,23 @@ export function EditorPanel() {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => observer.disconnect();
   }, []);
+
+  // Reveal line/column when navigating from error toast
+  useEffect(() => {
+    if (!pendingRevealLine || !editorRef.current) return;
+    const line = pendingRevealLine;
+    const col = pendingRevealColumn ?? 1;
+    // Small delay to let Monaco finish switching to the new file model
+    const timer = setTimeout(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      editor.revealLineInCenter(line);
+      editor.setPosition({ lineNumber: line, column: col });
+      editor.focus();
+    }, 100);
+    clearPendingReveal();
+    return () => clearTimeout(timer);
+  }, [pendingRevealLine, pendingRevealColumn, activeFilePath, clearPendingReveal]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (!activeFilePath || value === undefined) return;
@@ -141,7 +159,6 @@ export function EditorPanel() {
       strict: true,
       skipLibCheck: true,
       noEmit: true,
-      baseUrl: 'file:///',
     };
 
     tsDefaults.setCompilerOptions(sharedCompilerOptions);
@@ -168,9 +185,25 @@ declare module 'react' {
   export function useCallback<T extends (...args: any[]) => any>(fn: T, deps: any[]): T;
   export function useMemo<T>(fn: () => T, deps: any[]): T;
   export const StrictMode: any;
-  export type FC<P = {}> = (props: P) => any;
   const React: any;
+  export function useContext<T>(context: React.Context<T>): T;
+  export function createContext<T>(defaultValue: T): React.Context<T>;
+  export function memo<T>(component: T): T;
+  export function forwardRef<T, P>(render: (props: P, ref: React.Ref<T>) => React.ReactElement | null): React.ForwardRefExoticComponent<P & React.RefAttributes<T>>;
+  export type FC<P = {}> = (props: P) => React.ReactElement | null;
+  export type ReactNode = React.ReactElement | string | number | boolean | null | undefined | Iterable<ReactNode>;
+  export type ReactElement = any;
+  export type Ref<T> = ((instance: T | null) => void) | { current: T | null } | null;
+  export type RefAttributes<T> = { ref?: Ref<T> };
+  export type ForwardRefExoticComponent<P> = React.FC<P>;
+  export type Context<T> = { Provider: FC<{ value: T; children?: ReactNode }>; Consumer: FC<{ children: (value: T) => ReactNode }> };
+  export type CSSProperties = Record<string, string | number>;
+  export type ChangeEvent<T = Element> = { target: T & { value: string } };
+  export type MouseEvent<T = Element> = { stopPropagation(): void; preventDefault(): void; target: T };
+  export type KeyboardEvent<T = Element> = { key: string; stopPropagation(): void; preventDefault(): void };
+  export type FormEvent<T = Element> = { stopPropagation(): void; preventDefault(): void };
   export default React;
+  namespace React {}
 }
 
 declare module 'react-dom/client' {
@@ -297,6 +330,18 @@ declare namespace JSX {
               value={activeContent}
               onChange={handleEditorChange}
               beforeMount={handleEditorMount}
+              onMount={(editor) => {
+                editorRef.current = editor;
+                const { pendingRevealLine: line, pendingRevealColumn: col, clearPendingReveal: clear } = useFilesStore.getState();
+                if (line) {
+                  setTimeout(() => {
+                    editor.revealLineInCenter(line);
+                    editor.setPosition({ lineNumber: line, column: col ?? 1 });
+                    editor.focus();
+                    clear();
+                  }, 50);
+                }
+              }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 13,
