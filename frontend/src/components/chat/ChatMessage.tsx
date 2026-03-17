@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
-import { FileText, TerminalSquare, Sparkles, CheckCircle2, XCircle, ArrowRight, Check, X } from 'lucide-react';
-import type { Message, PlanOverview, ExecutionTask } from '../../types';
+import { FileText, TerminalSquare, Sparkles, CheckCircle2, XCircle, ArrowRight, Check, X, Package } from 'lucide-react';
+import type { Message, PlanOverview, ExecutionTask, ProjectSummary } from '../../types';
 
 interface ChatMessageProps {
   message: Message;
@@ -132,6 +132,96 @@ function DesignCompleteCard({ architecture, ux }: { architecture: boolean; ux: b
   );
 }
 
+function ProjectSummaryCard({ summary }: { summary: ProjectSummary }) {
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '10px',
+      padding: '12px 14px',
+      fontSize: '13px',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '8px',
+        fontSize: '12px',
+        color: 'var(--success)',
+      }}>
+        <CheckCircle2 size={12} />
+        Project complete
+      </div>
+
+      <p style={{ marginBottom: '12px', lineHeight: '1.5' }}>{summary.summary}</p>
+
+      {summary.tech_stack && summary.tech_stack.length > 0 && (
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '4px' }}>
+            Tech Stack
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {summary.tech_stack.map((tech, i) => (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  color: 'var(--accent)',
+                }}
+              >
+                <Package size={10} />
+                {tech}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {summary.features && summary.features.length > 0 && (
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '4px' }}>
+            Features
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {summary.features.map((feature, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                <Sparkles size={12} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '2px' }} />
+                <span>{feature}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {summary.file_overview && Object.keys(summary.file_overview).length > 0 && (
+        <div>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '4px' }}>
+            Key Files
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {Object.entries(summary.file_overview).map(([file, description]) => (
+              <div key={file} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12px' }}>
+                <FileText size={12} style={{ color: 'var(--text-dim)', flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  <strong style={{ color: 'var(--text)' }}>{file}</strong>
+                  <span style={{ color: 'var(--text-dim)' }}> — {description}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   const isUser = message.role === 'user';
 
@@ -152,6 +242,9 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         )}
         {message.agentCard.type === 'task_progress' && (
           <TaskProgressCard tasks={message.agentCard.tasks} />
+        )}
+        {message.agentCard.type === 'project_summary' && (
+          <ProjectSummaryCard summary={message.agentCard.summary} />
         )}
       </div>
     );
