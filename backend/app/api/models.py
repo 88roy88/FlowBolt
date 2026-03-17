@@ -31,24 +31,31 @@ def _cache_valid() -> bool:
 
 # Map of known Anthropic model-id fragments to friendly display names.
 # Falls back to the raw modelId if no match is found.
-_BEDROCK_FRIENDLY_NAMES: dict[str, str] = {
-    "claude-opus-4": "Claude Opus 4",
-    "claude-sonnet-4": "Claude Sonnet 4",
-    "claude-haiku-4": "Claude Haiku 4",
-    "claude-3-5-sonnet": "Claude 3.5 Sonnet",
-    "claude-3-5-haiku": "Claude 3.5 Haiku",
-    "claude-3-opus": "Claude 3 Opus",
-    "claude-3-sonnet": "Claude 3 Sonnet",
-    "claude-3-haiku": "Claude 3 Haiku",
-    "claude-v2": "Claude 2",
-    "claude-v1": "Claude 1",
-    "claude-instant": "Claude Instant",
-}
+# Ordered most-specific first so longer fragments match before shorter ones.
+_BEDROCK_FRIENDLY_NAMES: list[tuple[str, str]] = [
+    ("claude-opus-4-6", "Claude Opus 4.6"),
+    ("claude-sonnet-4-6", "Claude Sonnet 4.6"),
+    ("claude-haiku-4-5", "Claude Haiku 4.5"),
+    ("claude-opus-4-0", "Claude Opus 4.0"),
+    ("claude-sonnet-4-0", "Claude Sonnet 4.0"),
+    ("claude-opus-4", "Claude Opus 4"),
+    ("claude-sonnet-4", "Claude Sonnet 4"),
+    ("claude-haiku-4", "Claude Haiku 4"),
+    ("claude-3-7-sonnet", "Claude 3.7 Sonnet"),
+    ("claude-3-5-sonnet", "Claude 3.5 Sonnet"),
+    ("claude-3-5-haiku", "Claude 3.5 Haiku"),
+    ("claude-3-opus", "Claude 3 Opus"),
+    ("claude-3-sonnet", "Claude 3 Sonnet"),
+    ("claude-3-haiku", "Claude 3 Haiku"),
+    ("claude-v2", "Claude 2"),
+    ("claude-v1", "Claude 1"),
+    ("claude-instant", "Claude Instant"),
+]
 
 
 def _friendly_name(model_id: str) -> str:
     """Derive a human-friendly name from a Bedrock model ID."""
-    for fragment, name in _BEDROCK_FRIENDLY_NAMES.items():
+    for fragment, name in _BEDROCK_FRIENDLY_NAMES:
         if fragment in model_id:
             return name
     # Fallback: strip provider prefix, replace dots/dashes
@@ -56,7 +63,7 @@ def _friendly_name(model_id: str) -> str:
 
 
 def _fetch_bedrock_models() -> list[dict[str, str]]:
-    """Query AWS Bedrock for available Anthropic foundation models."""
+    """Query AWS Bedrock for available Anthropic cross-region inference profiles."""
     try:
         import boto3  # noqa: F811
     except ImportError:
@@ -65,16 +72,17 @@ def _fetch_bedrock_models() -> list[dict[str, str]]:
 
     try:
         client = boto3.client("bedrock")
-        response = client.list_foundation_models(byProvider="Anthropic")
+        response = client.list_inference_profiles(typeEquals="SYSTEM_DEFINED")
         models: list[dict[str, str]] = []
-        for summary in response.get("modelSummaries", []):
-            model_id: str = summary.get("modelId", "")
-            if not model_id:
+        for profile in response.get("inferenceProfileSummaries", []):
+            profile_id: str = profile.get("inferenceProfileId", "")
+            # Only show US cross-region Anthropic profiles
+            if not profile_id.startswith("us.anthropic."):
                 continue
             models.append(
                 {
-                    "id": f"bedrock/{model_id}",
-                    "name": f"{_friendly_name(model_id)} ({model_id})",
+                    "id": f"bedrock/{profile_id}",
+                    "name": f"{_friendly_name(profile_id)} ({profile_id})",
                     "provider": "bedrock",
                 }
             )
