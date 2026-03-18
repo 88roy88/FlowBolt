@@ -72,7 +72,7 @@ export async function fetchDefaultModel(): Promise<string> {
 }
 
 export async function searchPackages(queryOrId: string): Promise<PackageSearchRecord[]> {
-  return request<PackageSearchRecord[]>(`/package/v1/search/${encodeURIComponent(queryOrId)}`);
+  return request<PackageSearchRecord[]>(`/package/search/${encodeURIComponent(queryOrId)}`);
 }
 
 export function downloadZip(sessionId: string): void {

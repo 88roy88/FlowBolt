@@ -23,12 +23,7 @@ def _client() -> PackageApiClient:
     return PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
 
 
-@router.get("/v1/search/{query_or_id}")
-async def package_search(query_or_id: str):
-    """Proxy search-by-id or autocomplete to FLAPI.
-
-    Mirrors: GET /package/v1/search/{query_or_id}
-    """
+async def _package_search(query_or_id: str):
     if not query_or_id.strip():
         raise HTTPException(status_code=422, detail="query_or_id is required")
 
@@ -38,16 +33,23 @@ async def package_search(query_or_id: str):
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
-@router.post("/v3/{package_id}")
-async def run_package(
-    package_id: str,
-    allQueries: bool | None = Query(default=None),
-    body: Any | None = Body(default=None),
-):
-    """Proxy 'run package' to FLAPI.
+@router.get("/search/{query_or_id}")
+async def package_search(query_or_id: str):
+    """Proxy search-by-id or autocomplete to FLAPI."""
+    return await _package_search(query_or_id)
 
-    Mirrors: POST /package/v3/{package_id}?allQueries=true
-    """
+
+@router.get("/v1/search/{query_or_id}")
+async def package_search_v1(query_or_id: str):
+    """Back-compat alias for older frontend builds."""
+    return await _package_search(query_or_id)
+
+
+async def _run_package(
+    package_id: str,
+    allQueries: bool | None,
+    body: Any | None,
+):
     if not package_id.strip():
         raise HTTPException(status_code=422, detail="package_id is required")
 
@@ -55,4 +57,24 @@ async def run_package(
         return await _client().run_package(package_id, all_queries=allQueries, body=body)
     except PackageApiUpstreamError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post("/{package_id}/run")
+async def run_package(
+    package_id: str,
+    allQueries: bool | None = Query(default=None),
+    body: Any | None = Body(default=None),
+):
+    """Proxy 'run package' to FLAPI."""
+    return await _run_package(package_id, allQueries=allQueries, body=body)
+
+
+@router.post("/v3/{package_id}")
+async def run_package_v3(
+    package_id: str,
+    allQueries: bool | None = Query(default=None),
+    body: Any | None = Body(default=None),
+):
+    """Back-compat alias for older clients."""
+    return await _run_package(package_id, allQueries=allQueries, body=body)
 
