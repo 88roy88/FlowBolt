@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Project } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
+import { useChatStore } from './chat';
 
 interface SessionState {
   currentProject: Project | null;
@@ -12,6 +13,7 @@ interface SessionState {
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  updateProjectSummary: (projectId: string, summary: string) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -22,6 +24,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, sessionId: project.session_id });
+    // Restore the selected model for this project
+    if (project.selected_model) {
+      useChatStore.setState({ selectedModel: project.selected_model });
+    }
   },
 
   async loadProjects() {
@@ -58,5 +64,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     } else {
       set({ projects });
     }
+  },
+
+  updateProjectSummary(projectId: string, summary: string) {
+    set((state) => {
+      const projects = state.projects.map((p) =>
+        p.id === projectId ? { ...p, summary } : p
+      );
+      const currentProject = state.currentProject?.id === projectId
+        ? { ...state.currentProject, summary }
+        : state.currentProject;
+      return { projects, currentProject };
+    });
   },
 }));

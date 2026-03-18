@@ -53,6 +53,13 @@ export async function deleteProject(id: string): Promise<void> {
   await request(`/projects/${id}`, { method: 'DELETE' });
 }
 
+export async function updateProjectModel(projectId: string, model: string): Promise<void> {
+  await request(`/projects/${projectId}/model`, {
+    method: 'PATCH',
+    body: JSON.stringify({ model }),
+  });
+}
+
 export async function fetchPreviewPort(sessionId: string): Promise<number> {
   const data = await request<{ session_id: string; port: number }>(`/preview/${sessionId}/port`);
   return data.port;
@@ -81,4 +88,14 @@ export function downloadZip(sessionId: string): void {
 
 export function downloadSingleHtml(sessionId: string): void {
   window.open(`${BASE}/export/${sessionId}/html`, '_blank');
+}
+
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    await request<Project[]>('/projects');
+    return true;
+  } catch (error) {
+    console.error('Backend health check failed:', error);
+    return false;
+  }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { AlertTriangle, X, Wrench } from 'lucide-react';
+import { AlertTriangle, X, Wrench, RefreshCw } from 'lucide-react';
 import { useErrorStore, type AppError } from '../../stores/errors';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
@@ -94,24 +94,24 @@ export function useErrorCapture() {
 
 function SingleErrorToast({ error }: { error: AppError }) {
   const dismissError = useErrorStore((s) => s.dismissError);
-  const sendMessage = useChatStore((s) => s.sendMessage);
+  const sendFixError = useChatStore((s) => s.sendFixError);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const openFile = useFilesStore((s) => s.openFile);
+  const loadProjects = useSessionStore((s) => s.loadProjects);
 
   const handleFix = () => {
-    const parts: string[] = [
-      `Fix this ${error.source} error:`,
-      '',
-      `**Error:** ${error.message}`,
-    ];
-    if (error.file) {
-      parts.push(`**File:** ${error.file}${error.line ? `:${error.line}` : ''}`);
-    }
-    if (error.stack) {
-      parts.push('', '```', error.stack.slice(0, 500), '```');
-    }
-    sendMessage(parts.join('\n'));
+    sendFixError(error.message, error.file, error.line, error.stack);
     dismissError(error.id);
+  };
+
+  const handleRetry = async () => {
+    dismissError(error.id);
+    try {
+      await loadProjects();
+    } catch (err) {
+      // Error will be re-added by the catch handler in App.tsx
+      console.error('Retry failed:', err);
+    }
   };
 
   return (
@@ -136,7 +136,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
           letterSpacing: '0.5px',
           marginBottom: '4px',
         }}>
-          {error.source === 'build' ? 'Build Error' : 'Runtime Error'}
+          {error.source === 'build' ? 'Build Error' : error.source === 'runtime' ? 'Runtime Error' : 'Connection Error'}
         </div>
         <div style={{
           fontSize: '13px',
@@ -179,28 +179,51 @@ function SingleErrorToast({ error }: { error: AppError }) {
             {error.file}{error.line ? `:${error.line}` : ''}
           </button>
         )}
-        <button
-          onClick={handleFix}
-          disabled={isStreaming}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            marginLeft: 'auto',
-            gap: '4px',
-            marginTop: '10px',
-            padding: '4px 10px',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: isStreaming ? 'var(--text-dim)' : 'var(--accent)',
-            border: `1px solid ${isStreaming ? 'var(--border)' : 'var(--accent)'}`,
-            borderRadius: '4px',
-            cursor: isStreaming ? 'not-allowed' : 'pointer',
-            opacity: isStreaming ? 0.5 : 1,
-          }}
-        >
-          <Wrench size={12} />
-          Fix with AI
-        </button>
+        {error.source === 'connection' ? (
+          <button
+            onClick={handleRetry}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: 'auto',
+              gap: '4px',
+              marginTop: '10px',
+              padding: '4px 10px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--accent)',
+              border: '1px solid var(--accent)',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            <RefreshCw size={12} />
+            Retry
+          </button>
+        ) : (
+          <button
+            onClick={handleFix}
+            disabled={isStreaming}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: 'auto',
+              gap: '4px',
+              marginTop: '10px',
+              padding: '4px 10px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: isStreaming ? 'var(--text-dim)' : 'var(--accent)',
+              border: `1px solid ${isStreaming ? 'var(--border)' : 'var(--accent)'}`,
+              borderRadius: '4px',
+              cursor: isStreaming ? 'not-allowed' : 'pointer',
+              opacity: isStreaming ? 0.5 : 1,
+            }}
+          >
+            <Wrench size={12} />
+            Fix with AI
+          </button>
+        )}
       </div>
       <button
         onClick={() => dismissError(error.id)}

@@ -1,21 +1,29 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask } from '../types';
+import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary, FixStep } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
-import { fetchModels, fetchDefaultModel, fetchChatHistory } from '../services/api';
+import { fetchModels, fetchDefaultModel, fetchChatHistory, updateProjectModel } from '../services/api';
 import type { PackageSearchRecord } from '../types';
 
 const CARD_PREFIX = '<!--agent-card:';
 const CARD_SUFFIX = '-->';
 
-function parseAgentCard(content: string): AgentCard | undefined {
-  if (!content.startsWith(CARD_PREFIX)) return undefined;
-  const endIdx = content.indexOf(CARD_SUFFIX);
+function parseAgentCard(content: string): { card: AgentCard; remainingContent: string } | undefined {
+  const cardIdx = content.indexOf(CARD_PREFIX);
+  if (cardIdx === -1) return undefined;
+
+  const endIdx = content.indexOf(CARD_SUFFIX, cardIdx);
   if (endIdx === -1) return undefined;
+
   try {
-    const json = content.slice(CARD_PREFIX.length, endIdx);
-    return JSON.parse(json) as AgentCard;
+    const json = content.slice(cardIdx + CARD_PREFIX.length, endIdx);
+    const card = JSON.parse(json) as AgentCard;
+
+    // Extract text before the card (if any)
+    const textBefore = content.slice(0, cardIdx).trim();
+
+    return { card, remainingContent: textBefore };
   } catch {
     return undefined;
   }
@@ -34,9 +42,12 @@ interface ChatState {
   agentPhase: AgentPhase;
   planOverview: PlanOverview | null;
   executionTasks: ExecutionTask[];
+  fixSteps: FixStep[];
   designProgress: { architecture: string | null; ux: string | null };
+  projectSummary: ProjectSummary | null;
   // Actions
   sendMessage: (content: string) => void;
+  sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'reject' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
   loadHistory: (sessionId: string) => Promise<void>;
@@ -67,7 +78,166 @@ export const useChatStore = create<ChatState>((set, get) => ({
   agentPhase: 'idle',
   planOverview: null,
   executionTasks: [],
+  fixSteps: [],
   designProgress: { architecture: null, ux: null },
+  projectSummary: null,
+
+  sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
+    const sessionId = useSessionStore.getState().sessionId;
+    if (!sessionId) return;
+
+    // Create a user message with error fix request card
+    const userMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content: '',
+      timestamp: Date.now(),
+      agentCard: {
+        type: 'error_fix_request',
+        errorMessage,
+        errorFile,
+        errorLine,
+        errorStack,
+      },
+    };
+
+    // Set streaming state to show activity - clear any previous fix steps
+    set((state) => ({
+      messages: [...state.messages, userMessage],
+      isStreaming: true,
+      currentAssistantMessage: '',
+      actions: [],
+      error: null,
+      agentPhase: 'idle',
+      planOverview: null,
+      executionTasks: [],
+      fixSteps: [],  // Clear previous fix steps when starting a new fix
+    }));
+
+    const socket = getChatSocket(sessionId);
+
+    if (activeHandler && activeSessionId === sessionId) {
+      socket.offMessage(activeHandler);
+    }
+
+    const handler = (msg: WSMessage) => {
+      switch (msg.type) {
+        case 'phase': {
+          set({ agentPhase: msg.phase });
+          break;
+        }
+        case 'fix_step': {
+          set((state) => {
+            const existingStepIndex = state.fixSteps.findIndex((s) => s.step === msg.step);
+            if (existingStepIndex >= 0) {
+              // Update existing step
+              const updatedSteps = [...state.fixSteps];
+              updatedSteps[existingStepIndex] = {
+                id: updatedSteps[existingStepIndex].id,
+                step: msg.step,
+                status: msg.status,
+                message: msg.message,
+              };
+              return { fixSteps: updatedSteps };
+            } else {
+              // Add new step
+              return {
+                fixSteps: [
+                  ...state.fixSteps,
+                  {
+                    id: generateId(),
+                    step: msg.step,
+                    status: msg.status,
+                    message: msg.message,
+                  },
+                ],
+              };
+            }
+          });
+          break;
+        }
+        case 'text': {
+          set((state) => ({
+            currentAssistantMessage: state.currentAssistantMessage + msg.content,
+          }));
+          break;
+        }
+        case 'file': {
+          set((state) => ({
+            actions: [
+              ...state.actions,
+              { type: 'file', path: msg.path, content: msg.content },
+            ],
+          }));
+          const filesStore = useFilesStore.getState();
+          if (filesStore.openFiles.has(msg.path)) {
+            filesStore.updateFileContent(msg.path, msg.content);
+          }
+          filesStore.loadFileTree();
+          break;
+        }
+        case 'error': {
+          set({ error: msg.message, isStreaming: false, agentPhase: 'idle' });
+          socket.offMessage(handler);
+          activeHandler = null;
+          break;
+        }
+        case 'action_complete': {
+          const state = get();
+
+          // For fix progress, create a frontend message to keep card visible
+          // Backend already saved to database, so on refresh we'll see that version
+          if (state.fixSteps.length > 0) {
+            const fixMessage: Message = {
+              id: generateId(),
+              role: 'assistant',
+              content: state.currentAssistantMessage,
+              timestamp: Date.now(),
+              agentCard: {
+                type: 'fix_progress',
+                steps: [...state.fixSteps],
+              },
+            };
+            set((s) => ({
+              messages: [...s.messages, fixMessage],
+              currentAssistantMessage: '',
+              actions: [],
+              fixSteps: [],
+              isStreaming: false,
+              agentPhase: 'idle',
+            }));
+          } else {
+            // Old behavior for non-fix flows
+            set({
+              currentAssistantMessage: '',
+              actions: [],
+              isStreaming: false,
+              agentPhase: 'idle',
+            });
+          }
+          socket.offMessage(handler);
+          activeHandler = null;
+          useFilesStore.getState().loadFileTree();
+          break;
+        }
+      }
+    };
+
+    activeHandler = handler;
+    activeSessionId = sessionId;
+    socket.onMessage(handler);
+
+    const { selectedModel } = get();
+    const msg: WSMessage = {
+      type: 'fix_error',
+      error_message: errorMessage,
+      error_file: errorFile,
+      error_line: errorLine,
+      error_stack: errorStack,
+      model: selectedModel || undefined,
+    };
+    socket.send(msg);
+  },
 
   sendMessage(content: string) {
     const sessionId = useSessionStore.getState().sessionId;
@@ -156,6 +326,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }));
           if (msg.file) {
             useFilesStore.getState().loadFileTree();
+          }
+          break;
+        }
+        case 'project_summary': {
+          set({ projectSummary: msg.summary });
+          // Bake the summary into chat as a card
+          const summaryMsg: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            agentCard: { type: 'project_summary', summary: msg.summary },
+          };
+          set((s) => ({ messages: [...s.messages, summaryMsg] }));
+          // Update projects store so Info icon appears without refresh
+          const currentProject = useSessionStore.getState().currentProject;
+          if (currentProject) {
+            useSessionStore.getState().updateProjectSummary(
+              currentProject.id,
+              JSON.stringify(msg.summary)
+            );
           }
           break;
         }
@@ -318,23 +509,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const history = await fetchChatHistory(sessionId);
       const messages: Message[] = history.map((m) => {
-        const card = parseAgentCard(m.content);
+        const parsed = parseAgentCard(m.content);
         return {
           id: m.id,
           role: m.role as 'user' | 'assistant',
-          content: card ? '' : m.content,
+          content: parsed ? parsed.remainingContent : m.content,
           timestamp: new Date(m.created_at).getTime(),
-          agentCard: card,
+          agentCard: parsed?.card,
         };
       });
-      set({ messages, currentAssistantMessage: '', actions: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
+      set({ messages, currentAssistantMessage: '', actions: [], fixSteps: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
   },
 
   clearMessages() {
-    set({ messages: [], currentAssistantMessage: '', actions: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
+    set({ messages: [], currentAssistantMessage: '', actions: [], fixSteps: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
   },
 
   clearError() {
@@ -347,11 +538,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSelectedModel(model: string) {
     set({ selectedModel: model });
+    // Save the selected model to the project
+    const currentProject = useSessionStore.getState().currentProject;
+    if (currentProject) {
+      updateProjectModel(currentProject.id, model).catch((err) => {
+        console.error('Failed to save selected model:', err);
+      });
+    }
   },
 
   setSelectedPackage(pkg) {
     set({ selectedPackage: pkg });
   },
+
 
   async loadModels() {
     try {

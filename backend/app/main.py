@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 import litellm
+from langfuse import Langfuse
 
 from app.api import chat, errors, export, files, models, package_api, preview, projects, server_log, terminal
 from app.config import settings
@@ -28,11 +29,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: initialise DB on startup, clean up sandboxes on shutdown."""
     # Langfuse observability (optional) — using langfuse 2.59.7 (compatible with litellm)
     if settings.LANGFUSE_PUBLIC_KEY:
-        # TODO: remove from here.
-        os.environ["LANGFUSE_PUBLIC_KEY"] = "pk-lf-5b72f594-fa75-4a2d-847f-d037a6cf34f8"
-        os.environ["LANGFUSE_SECRET_KEY"] = "sk-lf-4ebc8ff8-da65-484b-8747-6af8ab49b600"
-        os.environ["LANGFUSE_HOST"] = "https://cloud.langfuse.com"
-        # set langfuse as a callback, litellm will send the data to langfuse
+        os.environ["LANGFUSE_PUBLIC_KEY"] = settings.LANGFUSE_PUBLIC_KEY
+        os.environ["LANGFUSE_SECRET_KEY"] = settings.LANGFUSE_SECRET_KEY
+        os.environ["LANGFUSE_HOST"] = settings.LANGFUSE_HOST
+
+        # Initialize Langfuse client for decorator usage
+        Langfuse()
+
+        # Set langfuse as a callback, litellm will send the data to langfuse
         litellm.success_callback = ["langfuse"]
         litellm.failure_callback = ["langfuse"]
         logger.info("Langfuse tracing enabled (host=%s)", settings.LANGFUSE_HOST)

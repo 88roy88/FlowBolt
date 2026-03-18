@@ -36,6 +36,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
 
         {"type": "message", "content": "user prompt text"}
         {"type": "plan_response", "action": "accept" | "reject" | "modify", "feedback": "..."}
+        {"type": "fix_error", "error_message": "...", "error_file": "...", "error_line": 123, "error_stack": "..."}
 
     Server sends a stream of::
 
@@ -101,6 +102,38 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 except Exception:
                     logger.exception("[chat] Plan response error for session %s", session_id)
                     await websocket.send_json({"type": "error", "message": "Plan handling failed"})
+
+            elif msg_type == "fix_error":
+                error_message = data.get("error_message", "")
+                error_file = data.get("error_file")
+                error_line = data.get("error_line")
+                error_stack = data.get("error_stack")
+                selected_model = data.get("model")
+                logger.info("[chat] Fix error request: file=%s session=%s", error_file, session_id)
+
+                # Save user message with agent card
+                card_data = {
+                    "type": "error_fix_request",
+                    "errorMessage": error_message,
+                    "errorFile": error_file,
+                    "errorLine": error_line,
+                    "errorStack": error_stack,
+                }
+                # Serialize as HTML comment for parsing on reload
+                card_content = f"<!--agent-card:{json.dumps(card_data)}-->"
+                await save_message(project.id, "user", card_content)
+
+                try:
+                    await orchestrator.handle_fix_error(
+                        error_message=error_message,
+                        error_file=error_file,
+                        error_line=error_line,
+                        error_stack=error_stack,
+                        model=selected_model,
+                    )
+                except Exception:
+                    logger.exception("[chat] Fix error handling failed for session %s", session_id)
+                    await websocket.send_json({"type": "error", "message": "Error fix failed"})
 
     except WebSocketDisconnect:
         logger.info("[chat] WebSocket disconnected for session %s", session_id)
