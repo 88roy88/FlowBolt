@@ -108,10 +108,12 @@ export function EditorPanel() {
 
       const sharedCompilerOptions: Parameters<typeof tsDefaults.setCompilerOptions>[0] = {
         target: monaco.languages.typescript.ScriptTarget.ESNext,
-        module: monaco.languages.typescript.ModuleKind.ESNext,
+        // Use NodeNext so Monaco's TS resolver matches TypeScript behavior for
+        // explicit TS/TSX extensions like: `import App from './App.tsx'`.
+        module: monaco.languages.typescript.ModuleKind.NodeNext,
         // Matches Vite/modern bundlers and makes TS accept explicit .ts/.tsx extensions
         // when `allowImportingTsExtensions` is enabled.
-        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.Bundler,
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeNext,
         jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
         allowJs: true,
         allowNonTsExtensions: true,
@@ -140,6 +142,9 @@ export function EditorPanel() {
       tsDefaults.setEagerModelSync(true);
       jsDefaults.setEagerModelSync(true);
 
+      // Ambient type declarations injected into Monaco so that
+      // imports inside generated files (like `vite.config.ts`) can be resolved
+      // even though Monaco runs without full access to `node_modules`.
       const reactTypes = `
 declare module 'react' {
   export function useState<T>(initial: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void];
@@ -171,6 +176,17 @@ declare module 'react' {
 
 declare module 'react-dom/client' {
   export function createRoot(container: Element): { render(element: any): void };
+}
+
+// Minimal Vite + plugin-react declarations for Monaco.
+// Monaco runs TS in a virtual environment and cannot reliably resolve node_modules.
+declare module 'vite' {
+  export function defineConfig(config: any): any;
+}
+
+declare module '@vitejs/plugin-react' {
+  const react: any;
+  export default react;
 }
 
 declare module 'react/jsx-runtime' {
@@ -248,8 +264,10 @@ declare module '*.webp' {
 `;
 
       if (!monacoTypesInitialized) {
-        tsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
-        jsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
+        // Use stable but unique virtual file names for TS and JS workers.
+        // This avoids cases where both workers share the same extraLib filename.
+        tsDefaults.addExtraLib(reactTypes, 'file:///monaco/ambient/react-vite.d.ts');
+        jsDefaults.addExtraLib(reactTypes, 'file:///monaco/ambient/react-vite.js.d.ts');
         monacoTypesInitialized = true;
       }
     } catch (err) {

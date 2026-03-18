@@ -98,7 +98,10 @@ async def list_files(session_id: str, path: str = "/") -> list[FileEntry]:
             if name.startswith(".") or name in SKIP_DIRS:
                 continue
             abs_path = os.path.join(dir_path, name)
+            # Monaco/TypeScript resolver עובדים עם URI בצורה עקבית (עם `/`).
+            # ב-Windows `os.path.relpath` מחזיר `\`, וזה עלול לבלבל את רזולוציית ה-importים.
             rel_path = "/" + os.path.relpath(abs_path, workspace)
+            rel_path = rel_path.replace("\\", "/")
             is_dir = os.path.isdir(abs_path)
             children = _build_tree(abs_path) if is_dir else None
             entries.append(FileEntry(name=name, path=rel_path, is_directory=is_dir, children=children))

@@ -146,6 +146,10 @@ Rules:
 6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
 7. Import from already-completed files using their exact export names.
 8. Do NOT include shell actions — only file actions.
+9. When importing from a completed file, match the export style:
+   - If that file uses `export default ...`, you MUST import it as `import X from "./path"`.
+   - If that file uses named exports (`export const/function/interface/type ...`), import it as `import { X } from "./path"`.
+10. Prefer named exports for React components (no `export default` in `src/components/*` files).
 """
 
 
