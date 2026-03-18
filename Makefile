@@ -1,4 +1,4 @@
-.PHONY: dev dev-backend dev-frontend build run clean install
+.PHONY: dev dev-backend dev-frontend dev-mocks build run run-all clean install
 
 # Development — run backend and frontend separately
 dev: dev-backend dev-frontend
@@ -8,6 +8,9 @@ dev-backend:
 
 dev-frontend:
 	cd frontend && pnpm dev
+
+dev-mocks:
+	cd mocks && npm install && node server.js
 
 # Install dependencies
 install:
@@ -25,6 +28,9 @@ build:
 # Run via Docker Compose
 run:
 	docker compose up -d
+
+run-all:
+	docker compose up -d --build
 
 # Stop containers
 stop:
