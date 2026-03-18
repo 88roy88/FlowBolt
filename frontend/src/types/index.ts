@@ -53,6 +53,18 @@ export interface AIModel {
   provider: string;
 }
 
+export interface PackageSearchRecord {
+  Id: number;
+  Name: string;
+  Purpose?: string;
+  Description?: string;
+  UserName?: string;
+  TimedPackageCount?: number;
+  Tags?: string;
+  Subjects?: string;
+  [key: string]: unknown;
+}
+
 // Agent types
 export type AgentPhase =
   | 'idle'

@@ -1,4 +1,4 @@
-import type { FileEntry, Project, AIModel } from '../types';
+import type { FileEntry, Project, AIModel, PackageSearchRecord } from '../types';
 
 const BASE = '/api';
 
@@ -76,6 +76,10 @@ export async function fetchModels(): Promise<AIModel[]> {
 export async function fetchDefaultModel(): Promise<string> {
   const data = await request<{ model: string }>('/models/default');
   return data.model;
+}
+
+export async function searchPackages(queryOrId: string): Promise<PackageSearchRecord[]> {
+  return request<PackageSearchRecord[]>(`/package/search/${encodeURIComponent(queryOrId)}`);
 }
 
 export function downloadZip(sessionId: string): void {

@@ -1,0 +1,42 @@
+# Local dev core stack: Redis, mocks, and MinIO.
+# vLLM model services are defined in docker-compose.models.yaml.
+
+services:
+  redis-stack:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mocks:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: sh -c "npm install && node server.js"
+    ports:
+      - "4000:4000"
+    environment:
+      MOCK_PORT: "4000"
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: "minioadmin"
+      MINIO_ROOT_PASSWORD: "minioadminpassword"
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./data/minio:/data
+
