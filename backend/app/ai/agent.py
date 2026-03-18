@@ -271,7 +271,7 @@ class AgentOrchestrator:
         # Include project summary for classifier context
         classify_content = content
         project = await get_project_by_session(self.session_id)
-        if project and project.summwary:
+        if project and project.summary:
             try:
                 summary_data = json.loads(project.summary)
                 classify_content = (

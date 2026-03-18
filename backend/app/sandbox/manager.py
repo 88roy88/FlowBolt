@@ -376,6 +376,12 @@ class SandboxManager:
         so the dev server never blocks on a full pipe buffer.  Users can view
         the log via ``tail -f .dev-server.log`` in the terminal.
         """
+        if os.name == "nt":
+            # Windows: asyncio subprocess support and *nix shell assumptions vary by environment.
+            # The core app works without auto-starting per-sandbox dev servers, so skip here.
+            logger.info("Skipping sandbox dev server startup on Windows (session %s)", session_id)
+            return
+
         info = self._sandboxes.get(session_id)
         if info is None:
             logger.warning("Cannot start dev server: no sandbox for %s", session_id)
