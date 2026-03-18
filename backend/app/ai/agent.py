@@ -20,7 +20,6 @@ from app.ai.provider import complete_chat, stream_chat
 from app.sandbox.nsjail import exec_in_sandbox
 from app.ai.task_tree import Task, WorkPlan
 from app.ai.prompts import (
-    CLASSIFY_PROMPT,
     ARCHITECTURE_PROMPT,
     UX_DESIGN_PROMPT,
     USER_PLAN_PROMPT,
@@ -112,7 +111,16 @@ class AgentOrchestrator:
         is_new = await self._classify(content)
 
         if not is_new:
-            await self._simple_flow(content)
+            from app.ai.followup_agent import FollowUpAgent
+
+            agent = FollowUpAgent(
+                session_id=self.session_id,
+                project_id=self.project_id,
+                ws_send=self.ws_send,
+                model=self.model,
+                trace_id=self._trace_id,
+            )
+            await agent.run(content)
             return
 
         # 2. Fetch package data if package_id is provided
@@ -262,13 +270,13 @@ class AgentOrchestrator:
 
     @observe(name="classify-request", as_type="span")
     async def _classify(self, content: str) -> bool:
-        """Return True if this is a new project request, False for follow-up."""
+        """Return True if this is a new project request, False for follow-up.
+
+        Deterministic: if the project already has assistant messages, it's
+        always a follow-up.  Only the very first message is treated as new.
+        """
         history = await get_messages(self.project_id)
-        # Only count real assistant messages, not card metadata
-        assistant_msgs = [
-            m for m in history
-            if m.role == "assistant" and not m.content.startswith(CARD_PREFIX)
-        ]
+        assistant_msgs = [m for m in history if m.role == "assistant"]
         if len(assistant_msgs) == 0:
             logger.info("[agent] First message — classifying as new_project")
             langfuse_context.update_current_observation(
@@ -276,41 +284,11 @@ class AgentOrchestrator:
             )
             return True
 
-        # Include project summary for classifier context
-        classify_content = content
-        project = await get_project_by_session(self.session_id)
-        if project and project.summary:
-            try:
-                summary_data = json.loads(project.summary)
-                classify_content = (
-                    f"[Existing project: {summary_data.get('summary', '')}]\n\n"
-                    f"User message: {content}"
-                )
-            except (json.JSONDecodeError, AttributeError):
-                pass
-
-        messages = [{"role": "user", "content": classify_content}]
-        try:
-            raw = await complete_chat(
-                messages,
-                CLASSIFY_PROMPT,
-                model=self.model,
-                metadata=self._llm_metadata("classify")
-            )
-            data = json.loads(raw.strip())
-            classification = data.get("classification", "follow_up")
-            logger.info("[agent] Classification: %s", classification)
-            is_new = classification == "new_project"
-            langfuse_context.update_current_observation(
-                metadata={"classification": classification, "is_new_project": is_new}
-            )
-            return is_new
-        except Exception:
-            logger.exception("[agent] Classification failed, defaulting to follow_up")
-            langfuse_context.update_current_observation(
-                metadata={"classification": "follow_up", "reason": "error_fallback"}
-            )
-            return False
+        logger.info("[agent] Existing project — classifying as follow_up")
+        langfuse_context.update_current_observation(
+            metadata={"classification": "follow_up", "reason": "has_assistant_messages"}
+        )
+        return False
 
     async def _fetch_and_analyze_package(self, package_id: str) -> dict | None:
         """Fetch package data and analyze it with AI.

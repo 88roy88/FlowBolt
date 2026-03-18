@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { Loader2, CheckCircle2, Search, Wrench, Save, TestTube, RefreshCw, XCircle } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
-import { ChatMessage } from './ChatMessage';
+import { ChatMessage, FollowUpProgress } from './ChatMessage';
 import { PromptInput } from './PromptInput';
 import { ChevronDown, Check } from 'lucide-react';
 import { ThemeToggle } from '../layout/ThemeToggle';
@@ -169,6 +169,7 @@ const PHASE_LABELS: Record<AgentPhase, string> = {
   awaiting_approval: 'Review the plan below',
   executing: 'Building...',
   fixing: 'Fixing error...',
+  exploring: 'Exploring codebase...',
   complete: 'Done!',
 };
 
@@ -354,20 +355,21 @@ function PhaseIndicator({ phase }: { phase: AgentPhase }) {
 export function ChatPanel() {
   const {
     messages, isStreaming, currentAssistantMessage, actions, error, clearError,
-    agentPhase, planOverview, executionTasks, designProgress, fixSteps,
+    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs,
   } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentAssistantMessage, agentPhase, executionTasks, fixSteps]);
+  }, [messages, currentAssistantMessage, agentPhase, executionTasks, fixSteps, followUpSteps]);
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
   const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
   const showFixProgress = fixSteps.length > 0 && isStreaming;
-  const showStreamingMessage = isStreaming && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress;
-  const showPhaseIndicator = agentPhase === 'classifying' || agentPhase === 'planning';
+  const showFollowUpProgress = followUpSteps.length > 0 && isStreaming;
+  const showStreamingMessage = isStreaming && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
+  const showPhaseIndicator = agentPhase === 'classifying' || agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
 
   return (
     <div style={{
@@ -425,6 +427,17 @@ export function ChatPanel() {
 
         {/* Fix progress */}
         {showFixProgress && <FixProgressLive steps={fixSteps} content={currentAssistantMessage} />}
+
+        {/* Follow-up exploration progress */}
+        {showFollowUpProgress && (
+          <FollowUpProgress
+            steps={followUpSteps}
+            answer={currentAssistantMessage || undefined}
+            filesChanged={actions.filter((a) => a.type === 'file' && a.path).map((a) => a.path!)}
+            diffs={followUpDiffs.length > 0 ? followUpDiffs : undefined}
+            isLive
+          />
+        )}
 
         {/* Streaming message (follow-up flow) */}
         {showStreamingMessage && (

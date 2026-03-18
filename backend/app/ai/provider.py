@@ -46,6 +46,37 @@ async def complete_chat(
     return content
 
 
+async def complete_chat_with_tools(
+    messages: list[dict],
+    system_prompt: str,
+    tools: list[dict],
+    model: str | None = None,
+    metadata: dict | None = None,
+    tool_choice: str = "auto",
+):
+    """Non-streaming completion with tool/function calling support.
+
+    Returns the full response object so the caller can inspect ``tool_calls``.
+    """
+    resolved_model = model or settings.AI_MODEL
+
+    full_messages: list[dict] = [
+        {"role": "system", "content": system_prompt},
+        *messages,
+    ]
+
+    response = await litellm.acompletion(
+        model=resolved_model,
+        messages=full_messages,
+        tools=tools,
+        tool_choice=tool_choice,
+        stream=False,
+        metadata=metadata or {},
+    )
+
+    return response
+
+
 async def stream_chat(
     messages: list[dict],
     system_prompt: str,
