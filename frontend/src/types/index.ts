@@ -4,6 +4,7 @@ export interface Message {
   content: string;
   actions?: Action[];
   timestamp: number;
+  package?: { id: number; name: string } | null;
   // Agent card data (persisted in chat history)
   agentCard?: AgentCard;
 }
@@ -21,7 +22,8 @@ export type AgentCard =
   | { type: 'task_progress'; tasks: ExecutionTask[] }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'error_fix_request'; errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string }
-  | { type: 'fix_progress'; steps: FixStep[] };
+  | { type: 'fix_progress'; steps: FixStep[] }
+  | { type: 'package_fetched'; packageId: string; packageName: string; dataSchema: string; relevantFields?: string };
 
 export interface Action {
   type: 'file' | 'shell';
@@ -69,6 +71,7 @@ export interface PackageSearchRecord {
 export type AgentPhase =
   | 'idle'
   | 'classifying'
+  | 'fetching_package'
   | 'designing'
   | 'planning'
   | 'awaiting_approval'
@@ -110,7 +113,7 @@ export interface FixStep {
 }
 
 export type WSMessage =
-  | { type: 'message'; content: string; model?: string }
+  | { type: 'message'; content: string; model?: string; packageId?: number }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }
@@ -124,4 +127,6 @@ export type WSMessage =
   | { type: 'plan_response'; action: 'accept' | 'reject' | 'modify'; feedback?: string }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'fix_step'; step: 'discover' | 'generate' | 'write' | 'validate' | 'retry'; status: 'running' | 'completed' | 'failed'; message: string }
-  | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; model?: string };
+  | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; model?: string }
+  | { type: 'package_fetched'; package_id: string; package_name: string; data_schema: string; relevant_fields?: string }
+  | { type: 'package_error'; message: string };

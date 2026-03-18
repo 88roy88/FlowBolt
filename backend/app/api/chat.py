@@ -80,14 +80,35 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
             if msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
+                package_id: int | None = data.get("packageId")
                 logger.info("[chat] User message (%d chars): %.100s...", len(user_content), user_content)
 
-                # Save user message
-                await save_message(project.id, "user", user_content)
+                # Save user message with package metadata if provided
+                if package_id is not None:
+                    # Fetch package name from the search API
+                    from app.api.package_api import _package_search
+                    try:
+                        search_results = await _package_search(str(package_id))
+                        package_name = search_results[0].get("Name", f"Package #{package_id}") if search_results else f"Package #{package_id}"
+                    except Exception:
+                        logger.warning("[chat] Failed to fetch package name for ID %s", package_id)
+                        package_name = f"Package #{package_id}"
+
+                    # Embed package info as HTML comment
+                    package_metadata = {
+                        "type": "package_context",
+                        "packageId": package_id,
+                        "packageName": package_name,
+                    }
+                    package_comment = f"<!--package-meta:{json.dumps(package_metadata)}-->"
+                    message_with_metadata = f"{package_comment}\n{user_content}"
+                    await save_message(project.id, "user", message_with_metadata)
+                else:
+                    await save_message(project.id, "user", user_content)
 
                 # Delegate to orchestrator
                 try:
-                    await orchestrator.handle_message(user_content, model=selected_model)
+                    await orchestrator.handle_message(user_content, model=selected_model, package_id=str(package_id) if package_id is not None else None)
                 except Exception:
                     logger.exception("[chat] Orchestrator error for session %s", session_id)
                     await websocket.send_json({"type": "error", "message": "AI processing failed"})

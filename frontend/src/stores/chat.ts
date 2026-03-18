@@ -4,10 +4,11 @@ import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
 import { fetchModels, fetchDefaultModel, fetchChatHistory, updateProjectModel } from '../services/api';
-import type { PackageSearchRecord } from '../types';
 
 const CARD_PREFIX = '<!--agent-card:';
 const CARD_SUFFIX = '-->';
+const PACKAGE_META_PREFIX = '<!--package-meta:';
+const PACKAGE_META_SUFFIX = '-->';
 
 function parseAgentCard(content: string): { card: AgentCard; remainingContent: string } | undefined {
   const cardIdx = content.indexOf(CARD_PREFIX);
@@ -29,6 +30,26 @@ function parseAgentCard(content: string): { card: AgentCard; remainingContent: s
   }
 }
 
+function parsePackageMeta(content: string): { packageId: number; packageName: string; remainingContent: string } | undefined {
+  const metaIdx = content.indexOf(PACKAGE_META_PREFIX);
+  if (metaIdx === -1) return undefined;
+
+  const endIdx = content.indexOf(PACKAGE_META_SUFFIX, metaIdx);
+  if (endIdx === -1) return undefined;
+
+  try {
+    const json = content.slice(metaIdx + PACKAGE_META_PREFIX.length, endIdx);
+    const meta = JSON.parse(json) as { type: string; packageId: number; packageName: string };
+
+    // Extract text after the package meta (remove the comment line)
+    const afterMeta = content.slice(endIdx + PACKAGE_META_SUFFIX.length).trim();
+
+    return { packageId: meta.packageId, packageName: meta.packageName, remainingContent: afterMeta };
+  } catch {
+    return undefined;
+  }
+}
+
 interface ChatState {
   messages: Message[];
   isStreaming: boolean;
@@ -37,7 +58,6 @@ interface ChatState {
   error: string | null;
   models: AIModel[];
   selectedModel: string | null;
-  selectedPackage: Pick<PackageSearchRecord, 'Id' | 'Name'> | null;
   // Agent state
   agentPhase: AgentPhase;
   planOverview: PlanOverview | null;
@@ -45,6 +65,8 @@ interface ChatState {
   fixSteps: FixStep[];
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
+  // Package integration
+  selectedPackage: { id: number; name: string } | null;
   // Actions
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
@@ -55,7 +77,7 @@ interface ChatState {
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
   setSelectedModel: (model: string) => void;
-  setSelectedPackage: (pkg: Pick<PackageSearchRecord, 'Id' | 'Name'> | null) => void;
+  setSelectedPackage: (pkg: { id: number; name: string } | null) => void;
   loadModels: () => Promise<void>;
 }
 
@@ -74,13 +96,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   models: [],
   selectedModel: null,
-  selectedPackage: null,
   agentPhase: 'idle',
   planOverview: null,
   executionTasks: [],
   fixSteps: [],
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
+  selectedPackage: null,
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const sessionId = useSessionStore.getState().sessionId;
@@ -243,11 +265,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const sessionId = useSessionStore.getState().sessionId;
     if (!sessionId) return;
 
+    const { selectedPackage, selectedModel } = get();
+
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
       content,
       timestamp: Date.now(),
+      package: selectedPackage ? { id: selectedPackage.id, name: selectedPackage.name } : null,
     };
 
     set((state) => ({
@@ -263,6 +288,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     const socket = getChatSocket(sessionId);
+    const assistantId = generateId();
 
     if (activeHandler && activeSessionId === sessionId) {
       socket.offMessage(activeHandler);
@@ -379,6 +405,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }));
           break;
         }
+        case 'package_fetched': {
+          // Create a message card for package fetched
+          const packageMsg: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            agentCard: {
+              type: 'package_fetched',
+              packageId: msg.package_id,
+              packageName: msg.package_name,
+              dataSchema: msg.data_schema,
+              relevantFields: msg.relevant_fields,
+            },
+          };
+          set((s) => ({ messages: [...s.messages, packageMsg] }));
+          break;
+        }
+        case 'package_error': {
+          // Package fetch failed - show error but don't block the flow
+          console.warn(`Package error: ${msg.message}`);
+          // Could optionally set a non-blocking warning message
+          break;
+        }
         case 'error': {
           set({ error: msg.message, isStreaming: false, agentPhase: 'idle' });
           socket.offMessage(handler);
@@ -436,10 +486,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     activeSessionId = sessionId;
     socket.onMessage(handler);
 
-    const { selectedModel } = get();
-    const msg: WSMessage = selectedModel
-      ? { type: 'message', content, model: selectedModel }
-      : { type: 'message', content };
+    const msg: WSMessage = {
+      type: 'message',
+      content,
+      ...(selectedModel && { model: selectedModel }),
+      ...(selectedPackage && { packageId: selectedPackage.id }),
+    };
     socket.send(msg);
   },
 
@@ -509,13 +561,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const history = await fetchChatHistory(sessionId);
       const messages: Message[] = history.map((m) => {
-        const parsed = parseAgentCard(m.content);
+        let content = m.content;
+        let agentCard: AgentCard | undefined;
+        let packageInfo: { id: number; name: string } | null = null;
+
+        // Parse agent card
+        const cardParsed = parseAgentCard(content);
+        if (cardParsed) {
+          agentCard = cardParsed.card;
+          content = cardParsed.remainingContent;
+        }
+
+        // Parse package metadata (for user messages)
+        if (m.role === 'user') {
+          const packageParsed = parsePackageMeta(content);
+          if (packageParsed) {
+            packageInfo = { id: packageParsed.packageId, name: packageParsed.packageName };
+            content = packageParsed.remainingContent;
+          }
+        }
+
         return {
           id: m.id,
           role: m.role as 'user' | 'assistant',
-          content: parsed ? parsed.remainingContent : m.content,
+          content,
           timestamp: new Date(m.created_at).getTime(),
-          agentCard: parsed?.card,
+          agentCard,
+          package: packageInfo,
         };
       });
       set({ messages, currentAssistantMessage: '', actions: [], fixSteps: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
@@ -547,10 +619,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  setSelectedPackage(pkg) {
+  setSelectedPackage(pkg: { id: number; name: string } | null) {
     set({ selectedPackage: pkg });
   },
-
 
   async loadModels() {
     try {
