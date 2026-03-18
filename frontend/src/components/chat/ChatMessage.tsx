@@ -134,7 +134,7 @@ function DesignCompleteCard({ architecture, ux }: { architecture: boolean; ux: b
   );
 }
 
-function PackageFetchedCard({ packageId, packageName, dataSchema, relevantFields }: { packageId: string; packageName: string; dataSchema: string; relevantFields?: string }) {
+function CasesFetchedCard({ cases }: { cases: { packageId: string; packageName: string; dataSchema: string; relevantFields?: string }[] }) {
   return (
     <div style={{
       background: 'var(--surface)',
@@ -152,43 +152,47 @@ function PackageFetchedCard({ packageId, packageName, dataSchema, relevantFields
         color: 'var(--success)',
       }}>
         <CheckCircle2 size={12} />
-        Package data fetched
+        {cases.length === 1 ? 'Case data fetched' : `${cases.length} cases fetched`}
       </div>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '8px 10px',
-        background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
-        borderRadius: '6px',
-        marginBottom: '8px',
-      }}>
-        <Package size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 500 }}>{packageName}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ID: {packageId}</div>
+      {cases.map((c) => (
+        <div key={c.packageId} style={{ marginBottom: '8px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 10px',
+            background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+            borderRadius: '6px',
+            marginBottom: '6px',
+          }}>
+            <Package size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 500 }}>{c.packageName}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ID: {c.packageId}</div>
+            </div>
+          </div>
+          {c.dataSchema && (
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--text)',
+              lineHeight: '1.5',
+              marginBottom: c.relevantFields ? '4px' : '0',
+            }}>
+              <strong>Data:</strong> {c.dataSchema}
+            </div>
+          )}
+          {c.relevantFields && (
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--text-dim)',
+              lineHeight: '1.5',
+            }}>
+              <strong>Relevant fields:</strong> {c.relevantFields}
+            </div>
+          )}
         </div>
-      </div>
-      {dataSchema && (
-        <div style={{
-          fontSize: '12px',
-          color: 'var(--text)',
-          lineHeight: '1.5',
-          marginBottom: relevantFields ? '6px' : '0',
-        }}>
-          <strong>Data:</strong> {dataSchema}
-        </div>
-      )}
-      {relevantFields && (
-        <div style={{
-          fontSize: '12px',
-          color: 'var(--text-dim)',
-          lineHeight: '1.5',
-        }}>
-          <strong>Relevant fields:</strong> {relevantFields}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -755,13 +759,16 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return (
       <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
         <div style={{ maxWidth: '85%' }}>
+          {message.agentCard.type === 'cases_fetched' && (
+            <CasesFetchedCard cases={message.agentCard.cases} />
+          )}
           {message.agentCard.type === 'package_fetched' && (
-            <PackageFetchedCard
-              packageId={message.agentCard.packageId}
-              packageName={message.agentCard.packageName}
-              dataSchema={message.agentCard.dataSchema}
-              relevantFields={message.agentCard.relevantFields}
-            />
+            <CasesFetchedCard cases={[{
+              packageId: message.agentCard.packageId,
+              packageName: message.agentCard.packageName,
+              dataSchema: message.agentCard.dataSchema,
+              relevantFields: message.agentCard.relevantFields,
+            }]} />
           )}
           {message.agentCard.type === 'design_complete' && (
             <DesignCompleteCard architecture={message.agentCard.architecture} ux={message.agentCard.ux} />
@@ -808,7 +815,29 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         fontSize: '14px',
         lineHeight: '1.6',
       }}>
-        {isUser && message.package && (
+        {isUser && message.cases && message.cases.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: 6 }}>
+            {message.cases.map((c) => (
+              <div key={c.id} style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: 'rgba(76, 167, 255, 0.14)',
+                border: '1px solid rgba(76, 167, 255, 0.25)',
+                color: 'var(--text)',
+                fontSize: 12,
+              }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Case</span>
+                <span style={{ fontWeight: 600 }}>{c.name}</span>
+                <span style={{ color: 'var(--text-dim)' }}>#{c.id}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Backward compat for old single-package messages */}
+        {isUser && !message.cases && message.package && (
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -821,7 +850,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
             fontSize: 12,
             marginBottom: 6,
           }}>
-            <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Package</span>
+            <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Case</span>
             <span style={{ fontWeight: 600 }}>{message.package.name}</span>
             <span style={{ color: 'var(--text-dim)' }}>#{message.package.id}</span>
           </div>

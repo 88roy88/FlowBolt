@@ -66,6 +66,21 @@ async def write_file(session_id: str, path: str, content: str) -> None:
     )
 
 
+async def edit_file(session_id: str, path: str, search: str, replace: str) -> None:
+    """Apply a search/replace edit to a file.
+
+    Raises ValueError if search string is not found in the file.
+    """
+    full = _resolve_safe(session_id, path)
+    with open(full, "r", encoding="utf-8") as fh:
+        content = fh.read()
+    if search not in content:
+        raise ValueError(f"Search string not found in {path}")
+    content = content.replace(search, replace, 1)
+    with open(full, "w", encoding="utf-8") as fh:
+        fh.write(content)
+
+
 async def delete_file(session_id: str, path: str) -> None:
     """Delete a file (or empty directory) inside the sandbox."""
     full = _resolve_safe(session_id, path)

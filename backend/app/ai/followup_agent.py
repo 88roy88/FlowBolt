@@ -18,7 +18,7 @@ from app.ai.provider import complete_chat_with_tools
 from app.ai.prompts.followup import FOLLOWUP_SYSTEM_PROMPT, FOLLOWUP_TOOLS
 from app.models.chat import get_messages, save_message
 from app.models.project import get_project_by_session
-from app.sandbox.filesystem import read_file, write_file, list_files
+from app.sandbox.filesystem import read_file, write_file, edit_file, list_files
 from app.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -382,7 +382,9 @@ class FollowUpAgent:
         except FileNotFoundError:
             return f"Error: File not found: {path}"
 
-        if search not in current:
+        try:
+            await edit_file(self.session_id, path, search, replace)
+        except ValueError:
             lines = current.splitlines()
             snippet = "\n".join(lines[:40])
             if len(lines) > 40:
@@ -393,8 +395,7 @@ class FollowUpAgent:
                 f"Current file content:\n```\n{snippet}\n```"
             )
 
-        new_content = current.replace(search, replace, 1)
-        await write_file(self.session_id, path, new_content)
+        new_content = await read_file(self.session_id, path)
         await self.ws_send({"type": "file", "path": path, "content": new_content})
 
         diff_str = _make_diff(path, current, new_content)

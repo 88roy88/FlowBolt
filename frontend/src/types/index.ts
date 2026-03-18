@@ -4,6 +4,8 @@ export interface Message {
   content: string;
   actions?: Action[];
   timestamp: number;
+  cases?: { id: number; name: string }[];
+  /** @deprecated kept for backward compat with old chat history */
   package?: { id: number; name: string } | null;
   // Agent card data (persisted in chat history)
   agentCard?: AgentCard;
@@ -23,6 +25,8 @@ export type AgentCard =
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'error_fix_request'; errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string }
   | { type: 'fix_progress'; steps: FixStep[] }
+  | { type: 'cases_fetched'; cases: { packageId: string; packageName: string; dataSchema: string; relevantFields?: string }[] }
+  /** @deprecated kept for backward compat with old chat history */
   | { type: 'package_fetched'; packageId: string; packageName: string; dataSchema: string; relevantFields?: string }
   | { type: 'followup_progress'; steps: FollowUpStep[]; answer?: string; filesChanged?: string[]; diffs?: FileDiff[] };
 
@@ -72,7 +76,7 @@ export interface PackageSearchRecord {
 export type AgentPhase =
   | 'idle'
   | 'classifying'
-  | 'fetching_package'
+  | 'fetching_cases'
   | 'designing'
   | 'planning'
   | 'awaiting_approval'
@@ -129,7 +133,7 @@ export interface FollowUpStep {
 }
 
 export type WSMessage =
-  | { type: 'message'; content: string; model?: string; packageId?: number }
+  | { type: 'message'; content: string; model?: string; caseIds?: number[] }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }
@@ -144,6 +148,9 @@ export type WSMessage =
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'fix_step'; step: 'discover' | 'generate' | 'write' | 'validate' | 'retry'; status: 'running' | 'completed' | 'failed'; message: string }
   | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; model?: string }
+  | { type: 'cases_fetched'; cases: { package_id: string; package_name: string; data_schema: string; relevant_fields?: string }[] }
+  | { type: 'case_error'; message: string }
+  /** @deprecated kept for backward compat */
   | { type: 'package_fetched'; package_id: string; package_name: string; data_schema: string; relevant_fields?: string }
   | { type: 'package_error'; message: string }
   | { type: 'followup_step'; tool: string; args: Record<string, string>; status: string; result_preview?: string; iteration: number }

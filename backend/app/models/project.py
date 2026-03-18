@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -33,6 +34,7 @@ class Project:
     selected_model: str = ""
     package_id: str = ""
     package_context: str = ""
+    cases: str = "[]"
 
 
 async def init_db() -> None:
@@ -91,6 +93,14 @@ async def init_db() -> None:
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
             await db.execute("ALTER TABLE projects ADD COLUMN package_context TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass  # Column already exists
+
+    # Migration-safe: add cases column if it doesn't exist
+    async with aiosqlite.connect(_get_db_path()) as db:
+        try:
+            await db.execute("ALTER TABLE projects ADD COLUMN cases TEXT DEFAULT '[]'")
             await db.commit()
         except Exception:
             pass  # Column already exists
@@ -173,6 +183,43 @@ async def update_project_package(project_id: str, package_id: str, package_conte
             (package_id, package_context, datetime.now(timezone.utc).isoformat(), project_id),
         )
         await db.commit()
+
+
+async def update_project_cases(project_id: str, cases: list[dict]) -> None:
+    """Update the cases column (JSON array) for a project."""
+    async with aiosqlite.connect(_get_db_path()) as db:
+        await db.execute(
+            "UPDATE projects SET cases = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(cases), datetime.now(timezone.utc).isoformat(), project_id),
+        )
+        await db.commit()
+
+
+async def get_project_cases(project_id: str) -> list[dict]:
+    """Read the cases column, falling back to old package_id/package_context for backward compat."""
+    async with aiosqlite.connect(_get_db_path()) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT cases, package_id, package_context FROM projects WHERE id = ?", (project_id,)) as cur:
+            row = await cur.fetchone()
+            if row is None:
+                return []
+            cases_raw = row["cases"]
+            if cases_raw and cases_raw != "[]":
+                try:
+                    return json.loads(cases_raw)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            # Backward compat: synthesize from old columns
+            pkg_id = row["package_id"]
+            pkg_ctx = row["package_context"]
+            if pkg_id:
+                try:
+                    ctx = json.loads(pkg_ctx) if pkg_ctx else {}
+                except (json.JSONDecodeError, TypeError):
+                    ctx = {}
+                ctx["package_id"] = pkg_id
+                return [ctx]
+            return []
 
 
 async def delete_project(project_id: str) -> None:

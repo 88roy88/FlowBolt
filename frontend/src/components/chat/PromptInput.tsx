@@ -1,16 +1,19 @@
 import { useState, useRef, useCallback } from 'react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
-import { ArrowUp, Loader2 } from 'lucide-react';
-import { PackageSelector } from './PackageSelector';
+import { ArrowUp, Loader2, Database, X } from 'lucide-react';
+import { CaseSelector } from './CaseSelector';
 
 export function PromptInput() {
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
+  const [showCaseSelector, setShowCaseSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const agentPhase = useChatStore((s) => s.agentPhase);
+  const selectedCases = useChatStore((s) => s.selectedCases);
+  const removeCase = useChatStore((s) => s.removeCase);
   const sessionId = useSessionStore((s) => s.sessionId);
 
   const adjustHeight = useCallback(() => {
@@ -52,7 +55,7 @@ export function PromptInput() {
 
   const busyLabel =
     agentPhase === 'classifying' ? 'Analyzing' :
-    agentPhase === 'fetching_package' ? 'Fetching package data' :
+    agentPhase === 'fetching_cases' ? 'Fetching case data' :
     agentPhase === 'designing' ? 'Designing' :
     agentPhase === 'planning' ? 'Planning' :
     agentPhase === 'executing' ? 'Building' :
@@ -65,10 +68,56 @@ export function PromptInput() {
       background: 'var(--surface)',
       flexShrink: 0,
     }}>
-      {/* Package selector - only show when not busy */}
-      {!isBusy && sessionId && (
-        <div style={{ marginBottom: '10px' }}>
-          <PackageSelector />
+      {/* Case selector - shown when toggled */}
+      {!isBusy && sessionId && showCaseSelector && (
+        <div style={{ marginBottom: '10px', position: 'relative' }}>
+          <CaseSelector isOpen={showCaseSelector} />
+        </div>
+      )}
+      {/* Selected case badges (always visible when cases are selected) */}
+      {!showCaseSelector && selectedCases.length > 0 && (
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '6px',
+          marginBottom: '8px',
+        }}>
+          {selectedCases.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                borderRadius: '6px',
+                fontSize: '12px',
+              }}
+            >
+              <span style={{ fontWeight: 500 }}>{c.name}</span>
+              <button
+                onClick={() => removeCase(c.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '3px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-dim)',
+                  padding: 0,
+                }}
+                title="Remove case"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
       {isBusy && (
@@ -100,6 +149,52 @@ export function PromptInput() {
             : '0 1px 3px rgba(0,0,0,0.08)',
         }}
       >
+        {/* Case selector toggle icon */}
+        {!isBusy && sessionId && (
+          <button
+            onClick={() => setShowCaseSelector((v) => !v)}
+            style={{
+              position: 'relative',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              background: showCaseSelector
+                ? 'color-mix(in srgb, var(--accent) 15%, transparent)'
+                : 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: selectedCases.length > 0 ? 'var(--accent)' : 'var(--text-dim)',
+              flexShrink: 0,
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            title={showCaseSelector ? 'Hide case selector' : 'Attach cases'}
+          >
+            <Database size={16} />
+            {selectedCases.length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                width: '14px',
+                height: '14px',
+                borderRadius: '7px',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: '9px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+              }}>
+                {selectedCases.length}
+              </span>
+            )}
+          </button>
+        )}
         <textarea
           ref={textareaRef}
           value={value}

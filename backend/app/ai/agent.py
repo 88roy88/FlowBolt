@@ -65,9 +65,9 @@ class AgentOrchestrator:
         # Store trace_id and observation_id to maintain single trace across multiple method calls
         self._trace_id: str | None = None
         self._observation_id: str | None = None
-        # Package integration context
-        self._package_context: dict | None = None
-        self._package_id: str | None = None
+        # Case integration context (multiple cases)
+        self._case_contexts: list[dict] = []
+        self._case_ids: list[str] = []
 
     def _llm_metadata(self, generation_name: str) -> dict:
         """Build metadata for LiteLLM calls with trace context."""
@@ -85,12 +85,12 @@ class AgentOrchestrator:
         self,
         content: str,
         model: str | None = None,
-        package_id: str | None = None,
+        case_ids: list[str] | None = None,
     ) -> None:
         """Process a new user message through the agent pipeline."""
         self.model = model
         self._user_content = content
-        self._package_id = package_id
+        self._case_ids = case_ids or []
 
         # Capture trace_id to maintain single trace across method calls
         self._trace_id = langfuse_context.get_current_trace_id()
@@ -123,21 +123,47 @@ class AgentOrchestrator:
             await agent.run(content)
             return
 
-        # 2. Fetch package data if package_id is provided
-        if package_id:
-            await self.ws_send({"type": "phase", "phase": "fetching_package"})
-            self._package_context = await self._fetch_and_analyze_package(package_id)
+        # 2. Fetch case data if case_ids are provided
+        if self._case_ids:
+            await self.ws_send({"type": "phase", "phase": "fetching_cases"})
+            results = await asyncio.gather(
+                *[self._fetch_and_analyze_case(cid) for cid in self._case_ids]
+            )
+            self._case_contexts = [ctx for ctx in results if ctx is not None]
 
             # Save to project
-            if self._package_context:
-                from app.models.project import get_project_by_session, update_project_package
-                project = await get_project_by_session(self.session_id)
-                if project:
-                    await update_project_package(
-                        project.id,
-                        package_id,
-                        json.dumps(self._package_context)
-                    )
+            if self._case_contexts:
+                from app.models.project import update_project_cases
+                await update_project_cases(self.project_id, self._case_contexts)
+
+            # Send cases_fetched WS event with list of case summaries
+            if self._case_contexts:
+                await self.ws_send({
+                    "type": "cases_fetched",
+                    "cases": [
+                        {
+                            "package_id": ctx["package_id"],
+                            "package_name": ctx["package_name"],
+                            "data_schema": ctx.get("data_schema", ""),
+                            "relevant_fields": ctx.get("relevant_fields", ""),
+                        }
+                        for ctx in self._case_contexts
+                    ],
+                })
+
+                # Save cases fetched card to chat history
+                await save_message(self.project_id, "assistant", encode_card({
+                    "type": "cases_fetched",
+                    "cases": [
+                        {
+                            "packageId": ctx["package_id"],
+                            "packageName": ctx["package_name"],
+                            "dataSchema": ctx.get("data_schema", ""),
+                            "relevantFields": ctx.get("relevant_fields", ""),
+                        }
+                        for ctx in self._case_contexts
+                    ],
+                }))
 
         # 3. Design (parallel, internal)
         await self.ws_send({"type": "phase", "phase": "designing"})
@@ -290,7 +316,7 @@ class AgentOrchestrator:
         )
         return False
 
-    async def _fetch_and_analyze_package(self, package_id: str) -> dict | None:
+    async def _fetch_and_analyze_case(self, package_id: str) -> dict | None:
         """Fetch package data and analyze it with AI.
 
         Returns structured package context or None if fetch fails.
@@ -306,7 +332,7 @@ class AgentOrchestrator:
             if not search_results:
                 logger.warning("[agent] No package found for ID: %s", package_id)
                 await self.ws_send({
-                    "type": "package_error",
+                    "type": "case_error",
                     "message": f"Package {package_id} not found"
                 })
                 return None
@@ -393,38 +419,20 @@ Respond with ONLY a JSON object:
                 "integration_notes": analysis.get("integration_notes", "")
             }
 
-            # Send success message to frontend
-            await self.ws_send({
-                "type": "package_fetched",
-                "package_id": package_id,
-                "package_name": package_name,
-                "data_schema": analysis.get("data_schema", "Package data fetched successfully"),
-                "relevant_fields": analysis.get("relevant_fields", "")
-            })
-
-            # Save package fetch card to chat history
-            await save_message(self.project_id, "assistant", encode_card({
-                "type": "package_fetched",
-                "packageId": package_id,
-                "packageName": package_name,
-                "dataSchema": analysis.get("data_schema", "Package data structure"),
-                "relevantFields": analysis.get("relevant_fields", "")
-            }))
-
-            logger.info("[agent] Package context created for: %s", package_name)
+            logger.info("[agent] Case context created for: %s", package_name)
             return package_context
 
         except PackageApiUpstreamError as e:
             logger.warning("[agent] Package API error: %s", e)
             await self.ws_send({
-                "type": "package_error",
+                "type": "case_error",
                 "message": f"Failed to fetch package data: {e}"
             })
             return None
         except Exception as e:
             logger.exception("[agent] Unexpected error fetching package")
             await self.ws_send({
-                "type": "package_error",
+                "type": "case_error",
                 "message": "An unexpected error occurred while fetching package data"
             })
             return None
@@ -435,15 +443,12 @@ Respond with ONLY a JSON object:
 
     @observe(name="design-architecture", as_type="span")
     async def _design_architecture(self, content: str) -> dict:
-        # Build user message with package context if available
+        # Build user message with case contexts if available
         user_message = content
-        if self._package_context:
-            pkg_ctx = self._package_context
-            user_message = f"""{content}
-
-## Package Data Integration
-
-You are integrating data from package: {pkg_ctx['package_name']} (ID: {pkg_ctx['package_id']})
+        if self._case_contexts:
+            case_sections = []
+            for pkg_ctx in self._case_contexts:
+                case_sections.append(f"""### Case: {pkg_ctx['package_name']} (ID: {pkg_ctx['package_id']})
 
 Data Schema: {pkg_ctx['data_schema']}
 Relevant Fields: {pkg_ctx['relevant_fields']}
@@ -456,9 +461,18 @@ Sample data:
 
 Integration Notes: {pkg_ctx['integration_notes']}
 
-Your architecture MUST include components that fetch, display, and interact with this package data.
+The generated code should call the package API endpoint at /api/package/{pkg_ctx['package_id']}/run""")
+
+            user_message = f"""{content}
+
+## Case Data Integration
+
+You are integrating data from the following cases:
+
+{chr(10).join(case_sections)}
+
+Your architecture MUST include components that fetch, display, and interact with this case data.
 Design components appropriate for the data characteristics and user's needs.
-The generated code should call the package API endpoint at /api/package/{pkg_ctx['package_id']}/run
 """
 
         messages = [{"role": "user", "content": user_message}]
@@ -569,30 +583,33 @@ The generated code should call the package API endpoint at /api/package/{pkg_ctx
             "user_preferences": self._user_overview.get("decisions", []),
         }
 
-        # Include package context if available
-        if self._package_context:
-            merge_data["package_integration"] = {
-                "package_id": self._package_context["package_id"],
-                "package_name": self._package_context["package_name"],
-                "data_schema": self._package_context["data_schema"],
-                "relevant_fields": self._package_context["relevant_fields"],
-                "data_characteristics": self._package_context["data_characteristics"],
-                "integration_notes": self._package_context["integration_notes"]
-            }
+        # Include case contexts if available
+        if self._case_contexts:
+            merge_data["case_integrations"] = [
+                {
+                    "package_id": ctx["package_id"],
+                    "package_name": ctx["package_name"],
+                    "data_schema": ctx["data_schema"],
+                    "relevant_fields": ctx["relevant_fields"],
+                    "data_characteristics": ctx["data_characteristics"],
+                    "integration_notes": ctx["integration_notes"],
+                }
+                for ctx in self._case_contexts
+            ]
 
         merge_input = json.dumps(merge_data, indent=2)
 
-        # Build system prompt with package guidance if available
+        # Build system prompt with case guidance if available
         system_prompt = MERGE_PROMPT
-        if self._package_context:
-            system_prompt += f"""
+        if self._case_contexts:
+            system_prompt += """
 
-## Package Integration Tasks
+## Case Data Integration Tasks
 
-When package_integration is present in the input, you MUST create tasks for:
-1. TypeScript interfaces for the package data structure
-2. A custom hook (e.g., usePackageData) that fetches data from /api/package/{{package_id}}/run
-3. Components that display and interact with the package data
+When case_integrations is present in the input, you MUST create tasks for each case:
+1. TypeScript interfaces for each case's data structure
+2. A custom hook (e.g., useCaseData) that fetches data from /api/package/{package_id}/run for each case
+3. Components that display and interact with the case data
 
 Ensure proper dependency ordering: types → hooks → components → App integration.
 """
@@ -721,7 +738,7 @@ Ensure proper dependency ordering: types → hooks → components → App integr
             ux_design=self._work_plan.ux_design,
             dependency_files=dependency_files or None,
             other_completed_files=other_completed_files or None,
-            package_context=self._package_context,
+            case_contexts=self._case_contexts or None,
         )
 
         try:
