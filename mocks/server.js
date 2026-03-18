@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorBody } from './errorBody.js';
-import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubLibs, putRun, getRun } from './stubData.js';
+import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubEcommerceResults, stubHRResults, stubLogisticsResults, stubLibs, putRun, getRun } from './stubData.js';
 
 const app = express();
 app.use(cors());
@@ -26,6 +26,9 @@ const stubSearchResultsRaw = [
   { Id: 2, Logo: '', Name: 'User Analytics Package', Type: 'Package' },
   { Id: 3, Logo: '', Name: 'Intelligence Briefing', Type: 'Package' },
   { Id: 4, Logo: '', Name: 'People & Photos', Type: 'Package' },
+  { Id: 5, Logo: '', Name: 'E-commerce Analytics', Type: 'Package' },
+  { Id: 6, Logo: '', Name: 'HR & Workforce', Type: 'Package' },
+  { Id: 7, Logo: '', Name: 'Logistics & Shipping', Type: 'Package' },
   { Id: 99, Logo: '', Name: 'Internal Template', Type: 'Template' },
 ];
 const PACKAGE_TYPE = 'Package';
@@ -205,6 +208,9 @@ function buildPackageSearchRecordById(id) {
     2: { Id: 2, Name: 'User Analytics Package', ...base },
     3: { Id: 3, Name: 'Intelligence Briefing', ...base, Tags: JSON.stringify([{ value: 'מודיעין', label: 'מודיעין' }]) },
     4: { Id: 4, Name: 'People & Photos', ...base, Tags: JSON.stringify([{ value: 'אנשים', label: 'אנשים' }]) },
+    5: { Id: 5, Name: 'E-commerce Analytics', ...base, Tags: JSON.stringify([{ value: 'אי-קומרס', label: 'אי-קומרס' }]) },
+    6: { Id: 6, Name: 'HR & Workforce', ...base, Tags: JSON.stringify([{ value: 'משאבי אנוש', label: 'משאבי אנוש' }]) },
+    7: { Id: 7, Name: 'Logistics & Shipping', ...base, Tags: JSON.stringify([{ value: 'לוגיסטיקה', label: 'לוגיסטיקה' }]) },
     572903: { Id: 572903, Name: 'כרטסת - base', ...base },
   };
 
@@ -244,6 +250,9 @@ function getRunResults(packageId) {
   const id = String(packageId).trim();
   if (id === '3') return { results: { ...stubIntelligenceResults } };
   if (id === '4') return { results: { ...stubPeopleWithPhotosResults } };
+  if (id === '5') return { results: { ...stubEcommerceResults } };
+  if (id === '6') return { results: { ...stubHRResults } };
+  if (id === '7') return { results: { ...stubLogisticsResults } };
   return { results: { ...stubPackageResults } };
 }
 
