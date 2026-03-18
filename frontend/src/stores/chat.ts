@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary, FixStep } from '../types';
+import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
@@ -63,6 +63,8 @@ interface ChatState {
   planOverview: PlanOverview | null;
   executionTasks: ExecutionTask[];
   fixSteps: FixStep[];
+  followUpSteps: FollowUpStep[];
+  followUpDiffs: FileDiff[];
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
   // Package integration
@@ -100,6 +102,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   planOverview: null,
   executionTasks: [],
   fixSteps: [],
+  followUpSteps: [],
+  followUpDiffs: [],
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
   selectedPackage: null,
@@ -284,6 +288,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       agentPhase: 'idle',
       planOverview: null,
       executionTasks: [],
+      followUpSteps: [],
+      followUpDiffs: [],
       designProgress: { architecture: null, ux: null },
     }));
 
@@ -376,6 +382,44 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
           break;
         }
+        case 'followup_step': {
+          set((state) => {
+            if (msg.status === 'running') {
+              const stepId = generateId();
+              return {
+                followUpSteps: [
+                  ...state.followUpSteps,
+                  {
+                    id: stepId,
+                    tool: msg.tool as FollowUpStep['tool'],
+                    args: msg.args,
+                    status: 'running',
+                    iteration: msg.iteration,
+                  },
+                ],
+              };
+            } else {
+              // Update the last running step for this tool+iteration
+              const steps = [...state.followUpSteps];
+              const idx = steps.findLastIndex(
+                (s) => s.tool === msg.tool && s.iteration === msg.iteration && s.status === 'running'
+              );
+              if (idx >= 0) {
+                steps[idx] = {
+                  ...steps[idx],
+                  status: msg.status as FollowUpStep['status'],
+                  resultPreview: msg.result_preview,
+                };
+              }
+              return { followUpSteps: steps };
+            }
+          });
+          break;
+        }
+        case 'followup_diffs': {
+          set({ followUpDiffs: msg.diffs });
+          break;
+        }
         case 'text': {
           set((state) => ({
             currentAssistantMessage: state.currentAssistantMessage + msg.content,
@@ -439,8 +483,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const state = get();
           const newMessages: Message[] = [];
 
-          // Save streaming text as a message (follow-up flow)
-          if (state.currentAssistantMessage) {
+          // Save follow-up progress card
+          if (state.followUpSteps.length > 0) {
+            const filesChanged = state.actions
+              .filter((a) => a.type === 'file' && a.path)
+              .map((a) => a.path!);
+            newMessages.push({
+              id: generateId(),
+              role: 'assistant',
+              content: state.currentAssistantMessage,
+              actions: state.actions.length > 0 ? [...state.actions] : undefined,
+              timestamp: Date.now(),
+              agentCard: {
+                type: 'followup_progress',
+                steps: [...state.followUpSteps],
+                answer: state.currentAssistantMessage || undefined,
+                filesChanged: filesChanged.length > 0 ? filesChanged : undefined,
+                diffs: state.followUpDiffs.length > 0 ? [...state.followUpDiffs] : undefined,
+              },
+            });
+          } else if (state.currentAssistantMessage) {
+            // Save streaming text as a message (follow-up flow)
             newMessages.push({
               id: generateId(),
               role: 'assistant',
@@ -473,6 +536,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             agentPhase: 'idle',
             planOverview: null,
             executionTasks: [],
+            followUpSteps: [],
+            followUpDiffs: [],
           }));
           socket.offMessage(handler);
           activeHandler = null;
@@ -590,14 +655,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           package: packageInfo,
         };
       });
-      set({ messages, currentAssistantMessage: '', actions: [], fixSteps: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
+      set({ messages, currentAssistantMessage: '', actions: [], fixSteps: [], followUpSteps: [], followUpDiffs: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
   },
 
   clearMessages() {
-    set({ messages: [], currentAssistantMessage: '', actions: [], fixSteps: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
+    set({ messages: [], currentAssistantMessage: '', actions: [], fixSteps: [], followUpSteps: [], followUpDiffs: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
   },
 
   clearError() {
