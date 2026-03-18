@@ -102,42 +102,45 @@ export function EditorPanel() {
   };
 
   const handleEditorMount = useCallback((monaco: Monaco) => {
-    if (monacoTypesInitialized) return;
-    monacoTypesInitialized = true;
+    try {
+      const tsDefaults = monaco.languages.typescript.typescriptDefaults;
+      const jsDefaults = monaco.languages.typescript.javascriptDefaults;
 
-    const tsDefaults = monaco.languages.typescript.typescriptDefaults;
-    const jsDefaults = monaco.languages.typescript.javascriptDefaults;
+      const sharedCompilerOptions: Parameters<typeof tsDefaults.setCompilerOptions>[0] = {
+        target: monaco.languages.typescript.ScriptTarget.ESNext,
+        module: monaco.languages.typescript.ModuleKind.ESNext,
+        // Matches Vite/modern bundlers and makes TS accept explicit .ts/.tsx extensions
+        // when `allowImportingTsExtensions` is enabled.
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.Bundler,
+        jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+        allowJs: true,
+        allowNonTsExtensions: true,
+        // Allows imports with explicit TS/TSX extensions, e.g.:
+        //   import App from './App.tsx'
+        allowImportingTsExtensions: true,
+        esModuleInterop: true,
+        strict: true,
+        skipLibCheck: true,
+        noEmit: true,
+      };
 
-    const sharedCompilerOptions: Parameters<typeof tsDefaults.setCompilerOptions>[0] = {
-      target: monaco.languages.typescript.ScriptTarget.ESNext,
-      module: monaco.languages.typescript.ModuleKind.ESNext,
-      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
-      allowJs: true,
-      allowNonTsExtensions: true,
-      esModuleInterop: true,
-      strict: true,
-      skipLibCheck: true,
-      noEmit: true,
-    };
+      tsDefaults.setCompilerOptions(sharedCompilerOptions);
+      jsDefaults.setCompilerOptions(sharedCompilerOptions);
 
-    tsDefaults.setCompilerOptions(sharedCompilerOptions);
-    jsDefaults.setCompilerOptions(sharedCompilerOptions);
+      tsDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+      });
 
-    tsDefaults.setDiagnosticsOptions({
-      noSemanticValidation: false,
-      noSyntaxValidation: false,
-    });
+      jsDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+      });
 
-    jsDefaults.setDiagnosticsOptions({
-      noSemanticValidation: false,
-      noSyntaxValidation: false,
-    });
+      tsDefaults.setEagerModelSync(true);
+      jsDefaults.setEagerModelSync(true);
 
-    tsDefaults.setEagerModelSync(true);
-    jsDefaults.setEagerModelSync(true);
-
-    const reactTypes = `
+      const reactTypes = `
 declare module 'react' {
   export function useState<T>(initial: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void];
   export function useEffect(effect: () => void | (() => void), deps?: any[]): void;
@@ -182,10 +185,77 @@ declare namespace JSX {
   }
   type Element = any;
 }
+
+// Minimal Vite-like asset module declarations.
+// Without these, Monaco's TS worker will complain about imports like:
+//   import reactLogo from '../assets/react.svg'
+declare module '*.svg' {
+  const src: string;
+  export default src;
+}
+declare module '*.png' {
+  const src: string;
+  export default src;
+}
+declare module '*.css' {
+  const src: string;
+  export default src;
+}
+declare module '*.scss' {
+  const src: string;
+  export default src;
+}
+declare module '*.sass' {
+  const src: string;
+  export default src;
+}
+declare module '*.less' {
+  const src: string;
+  export default src;
+}
+declare module '*.module.css' {
+  const classes: Record<string, string>;
+  export default classes;
+}
+declare module '*.module.scss' {
+  const classes: Record<string, string>;
+  export default classes;
+}
+declare module '*.module.sass' {
+  const classes: Record<string, string>;
+  export default classes;
+}
+declare module '*.module.less' {
+  const classes: Record<string, string>;
+  export default classes;
+}
+declare module '*.jpg' {
+  const src: string;
+  export default src;
+}
+declare module '*.jpeg' {
+  const src: string;
+  export default src;
+}
+declare module '*.gif' {
+  const src: string;
+  export default src;
+}
+declare module '*.webp' {
+  const src: string;
+  export default src;
+}
 `;
 
-    tsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
-    jsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
+      if (!monacoTypesInitialized) {
+        tsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
+        jsDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
+        monacoTypesInitialized = true;
+      }
+    } catch (err) {
+      console.error('Monaco types init failed, will retry on next mount:', err);
+      monacoTypesInitialized = false;
+    }
   }, []);
 
   return (
