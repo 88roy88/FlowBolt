@@ -313,6 +313,18 @@ class SandboxManager:
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, session_id)
         os.makedirs(workspace_dir, exist_ok=True)
 
+        if os.name == "nt":
+            # Windows: prefer "process=None" mode (one-shot commands) to avoid
+            # relying on *nix shells / unsupported subprocess session features.
+            info = SandboxInfo(
+                session_id=session_id,
+                workspace_dir=workspace_dir,
+                port=port,
+                process=None,
+            )
+            self._sandboxes[session_id] = info
+            return info
+
         cmd = build_nsjail_command(session_id, workspace_dir, port, command=None)
 
         process = await asyncio.create_subprocess_exec(
