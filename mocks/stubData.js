@@ -63,6 +63,7 @@ export const stubPeopleWithPhotosResults = {
     { id: 'p4', name: 'Casey Morgan', phone: '+1-555-201-1004', last_seen_location: 'Main Office', image_url: 'https://picsum.photos/seed/p4/400/400' },
     { id: 'p5', name: 'Riley Taylor', phone: '+1-555-201-1005', last_seen_location: 'Lab 2', image_url: 'https://picsum.photos/seed/p5/400/400' },
     { id: 'p6', name: 'Quinn Adams', phone: '+1-555-201-1006', last_seen_location: 'Parking Lot', image_url: 'https://picsum.photos/seed/p6/400/400' },
+    { id: 'p7', name: 'Rivka M', phone: '+1-555-201-1006', last_seen_location: 'Parking Lot', image_url: 'https://picsum.photos/seed/p7/400/400' },
   ],
   photos: [
     { id: 'img1', photo_id: 'p1', url: 'https://picsum.photos/seed/p1/400/400', caption: 'Alex Chen' },
@@ -71,8 +72,50 @@ export const stubPeopleWithPhotosResults = {
     { id: 'img4', photo_id: 'p4', url: 'https://picsum.photos/seed/p4/400/400', caption: 'Casey Morgan' },
     { id: 'img5', photo_id: 'p5', url: 'https://picsum.photos/seed/p5/400/400', caption: 'Riley Taylor' },
     { id: 'img6', photo_id: 'p6', url: 'https://picsum.photos/seed/p6/400/400', caption: 'Quinn Adams' },
+    { id: 'img7', photo_id: 'p7', url: 'https://picsum.photos/seed/p7/400/400', caption: 'Quinn Adams' },
   ],
 };
+
+/**
+ * Real-time metrics package: package 5. Returns metrics that change every 10 seconds.
+ * Simulates a live dashboard with server stats, transactions, etc.
+ */
+export function getRealtimeMetrics() {
+  const now = Date.now();
+  const cycleSeconds = Math.floor(now / 10000) % 10; // Changes every 10 seconds, cycles through 10 states
+
+  return {
+    servers: [
+      { id: 'srv-001', name: 'Web Server 1', cpu: 45 + (cycleSeconds * 5), memory: 62 + (cycleSeconds * 3), status: cycleSeconds < 8 ? 'healthy' : 'warning' },
+      { id: 'srv-002', name: 'Web Server 2', cpu: 38 + (cycleSeconds * 4), memory: 58 + (cycleSeconds * 2), status: 'healthy' },
+      { id: 'srv-003', name: 'Database Primary', cpu: 72 - (cycleSeconds * 2), memory: 85 + (cycleSeconds * 1), status: cycleSeconds > 7 ? 'warning' : 'healthy' },
+      { id: 'srv-004', name: 'Cache Server', cpu: 25 + (cycleSeconds * 3), memory: 42 + (cycleSeconds * 4), status: 'healthy' },
+    ],
+    transactions: {
+      total: 15000 + (cycleSeconds * 1250),
+      success: 14700 + (cycleSeconds * 1200),
+      failed: 300 + (cycleSeconds * 50),
+      rate_per_second: 125 + (cycleSeconds * 15),
+    },
+    users: {
+      active: 2340 + (cycleSeconds * 180),
+      peak_today: 3500 + (cycleSeconds * 50),
+      new_signups: 45 + (cycleSeconds * 5),
+    },
+    metrics: {
+      response_time_ms: 145 + (cycleSeconds * 12),
+      error_rate: 2.1 + (cycleSeconds * 0.3),
+      throughput_mbps: 850 + (cycleSeconds * 50),
+    },
+    alerts: cycleSeconds > 6 ? [
+      { id: 'alert-1', severity: 'warning', message: 'High CPU usage on srv-003', timestamp: new Date(now - 30000).toISOString() },
+      { id: 'alert-2', severity: 'info', message: 'Scheduled maintenance in 2 hours', timestamp: new Date(now - 60000).toISOString() },
+    ] : [
+      { id: 'alert-2', severity: 'info', message: 'All systems operational', timestamp: new Date(now - 5000).toISOString() },
+    ],
+    timestamp: new Date(now).toISOString(),
+  };
+}
 
 /** Stub lib descriptors for GET /api/libs (server-spec §3.1). */
 export const stubLibs = [

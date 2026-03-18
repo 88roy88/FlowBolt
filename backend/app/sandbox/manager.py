@@ -313,6 +313,18 @@ class SandboxManager:
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, session_id)
         os.makedirs(workspace_dir, exist_ok=True)
 
+        if os.name == "nt":
+            # Windows: prefer "process=None" mode (one-shot commands) to avoid
+            # relying on *nix shells / unsupported subprocess session features.
+            info = SandboxInfo(
+                session_id=session_id,
+                workspace_dir=workspace_dir,
+                port=port,
+                process=None,
+            )
+            self._sandboxes[session_id] = info
+            return info
+
         cmd = build_nsjail_command(session_id, workspace_dir, port, command=None)
 
         process = await asyncio.create_subprocess_exec(
@@ -376,6 +388,12 @@ class SandboxManager:
         so the dev server never blocks on a full pipe buffer.  Users can view
         the log via ``tail -f .dev-server.log`` in the terminal.
         """
+        if os.name == "nt":
+            # Windows: asyncio subprocess support and *nix shell assumptions vary by environment.
+            # The core app works without auto-starting per-sandbox dev servers, so skip here.
+            logger.info("Skipping sandbox dev server startup on Windows (session %s)", session_id)
+            return
+
         info = self._sandboxes.get(session_id)
         if info is None:
             logger.warning("Cannot start dev server: no sandbox for %s", session_id)

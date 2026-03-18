@@ -133,6 +133,65 @@ function DesignCompleteCard({ architecture, ux }: { architecture: boolean; ux: b
   );
 }
 
+function PackageFetchedCard({ packageId, packageName, dataSchema, relevantFields }: { packageId: string; packageName: string; dataSchema: string; relevantFields?: string }) {
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '10px',
+      padding: '12px 14px',
+      fontSize: '13px',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '8px',
+        fontSize: '12px',
+        color: 'var(--success)',
+      }}>
+        <CheckCircle2 size={12} />
+        Package data fetched
+      </div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '8px 10px',
+        background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+        borderRadius: '6px',
+        marginBottom: '8px',
+      }}>
+        <Package size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 500 }}>{packageName}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ID: {packageId}</div>
+        </div>
+      </div>
+      {dataSchema && (
+        <div style={{
+          fontSize: '12px',
+          color: 'var(--text)',
+          lineHeight: '1.5',
+          marginBottom: relevantFields ? '6px' : '0',
+        }}>
+          <strong>Data:</strong> {dataSchema}
+        </div>
+      )}
+      {relevantFields && (
+        <div style={{
+          fontSize: '12px',
+          color: 'var(--text-dim)',
+          lineHeight: '1.5',
+        }}>
+          <strong>Relevant fields:</strong> {relevantFields}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProjectSummaryCard({ summary }: { summary: ProjectSummary }) {
   return (
     <div style={{
@@ -409,6 +468,14 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return (
       <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
         <div style={{ maxWidth: '85%' }}>
+          {message.agentCard.type === 'package_fetched' && (
+            <PackageFetchedCard
+              packageId={message.agentCard.packageId}
+              packageName={message.agentCard.packageName}
+              dataSchema={message.agentCard.dataSchema}
+              relevantFields={message.agentCard.relevantFields}
+            />
+          )}
           {message.agentCard.type === 'design_complete' && (
             <DesignCompleteCard architecture={message.agentCard.architecture} ux={message.agentCard.ux} />
           )}
@@ -451,6 +518,24 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         fontSize: '14px',
         lineHeight: '1.6',
       }}>
+        {isUser && message.package && (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '3px 8px',
+            borderRadius: 999,
+            background: 'rgba(76, 167, 255, 0.14)',
+            border: '1px solid rgba(76, 167, 255, 0.25)',
+            color: 'var(--text)',
+            fontSize: 12,
+            marginBottom: 6,
+          }}>
+            <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Package</span>
+            <span style={{ fontWeight: 600 }}>{message.package.name}</span>
+            <span style={{ color: 'var(--text-dim)' }}>#{message.package.id}</span>
+          </div>
+        )}
         {isUser ? (
           <p style={{ whiteSpace: 'pre-wrap' }}>{message.content}</p>
         ) : (

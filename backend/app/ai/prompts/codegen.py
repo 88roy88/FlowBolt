@@ -11,6 +11,7 @@ def get_codegen_prompt(
     ux_design: dict,
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
+    package_context: dict | None = None,
 ) -> str:
     """Build a focused code-generation prompt for a single task.
 
@@ -32,9 +33,40 @@ def get_codegen_prompt(
     other_completed_files:
         Dict of {path: content} for files from non-dependency tasks.
         Only export summaries are shown to save tokens.
+    package_context:
+        Optional package integration context if user selected a package.
     """
     completed_section = ""
     parts: list[str] = []
+
+    # Package context section
+    package_section = ""
+    if package_context:
+        import json as json_module
+        package_section = f"""
+
+## Package Data Integration
+
+You are integrating data from package: {package_context['package_name']} (ID: {package_context['package_id']})
+
+**Data Schema:** {package_context['data_schema']}
+**Relevant Fields:** {package_context['relevant_fields']}
+**Data Characteristics:** {package_context['data_characteristics']}
+
+Sample data structure:
+```json
+{json_module.dumps(package_context['sample_data'], indent=2)[:1000]}
+```
+
+**Integration Notes:** {package_context['integration_notes']}
+
+When implementing components that use package data:
+- Fetch data from the endpoint: /api/package/{package_context['package_id']}/run
+- Use the fetch API or create a custom hook to handle the API call
+- Include proper loading and error states
+- Focus on the relevant fields identified above for the user's use case
+- Transform the raw API response according to the data schema and characteristics described above
+"""
 
     # Full content for direct dependency files
     if dependency_files:
@@ -90,7 +122,7 @@ as part of a larger project.
 ```json
 {_compact_json(ux_design)}
 ```
-{completed_section}
+{package_section}{completed_section}
 
 ## Output Format
 
