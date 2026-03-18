@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorBody } from './errorBody.js';
-import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubLibs, putRun, getRun } from './stubData.js';
+import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubLibs, putRun, getRun, getRealtimeMetrics } from './stubData.js';
 
 const app = express();
 app.use(cors());
@@ -26,6 +26,7 @@ const stubSearchResultsRaw = [
   { Id: 2, Logo: '', Name: 'User Analytics Package', Type: 'Package' },
   { Id: 3, Logo: '', Name: 'Intelligence Briefing', Type: 'Package' },
   { Id: 4, Logo: '', Name: 'People & Photos', Type: 'Package' },
+  { Id: 5, Logo: '', Name: 'Real-Time Server Dashboard', Type: 'Package' },
   { Id: 99, Logo: '', Name: 'Internal Template', Type: 'Template' },
 ];
 const PACKAGE_TYPE = 'Package';
@@ -205,6 +206,7 @@ function buildPackageSearchRecordById(id) {
     2: { Id: 2, Name: 'User Analytics Package', ...base },
     3: { Id: 3, Name: 'Intelligence Briefing', ...base, Tags: JSON.stringify([{ value: 'מודיעין', label: 'מודיעין' }]) },
     4: { Id: 4, Name: 'People & Photos', ...base, Tags: JSON.stringify([{ value: 'אנשים', label: 'אנשים' }]) },
+    5: { Id: 5, Name: 'Real-Time Server Dashboard', ...base, Tags: JSON.stringify([{ value: 'real-time', label: 'real-time' }, { value: 'monitoring', label: 'monitoring' }]) },
     572903: { Id: 572903, Name: 'כרטסת - base', ...base },
   };
 
@@ -244,6 +246,7 @@ function getRunResults(packageId) {
   const id = String(packageId).trim();
   if (id === '3') return { results: { ...stubIntelligenceResults } };
   if (id === '4') return { results: { ...stubPeopleWithPhotosResults } };
+  if (id === '5') return { results: getRealtimeMetrics() };
   return { results: { ...stubPackageResults } };
 }
 
