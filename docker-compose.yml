@@ -8,6 +8,18 @@ services:
       - backend
     restart: unless-stopped
 
+  mocks:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./mocks:/app
+    command: sh -c "npm install && node server.js"
+    ports:
+      - "4000:4000"
+    environment:
+      MOCK_PORT: "4000"
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend

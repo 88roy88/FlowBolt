@@ -8,6 +8,7 @@ import os
 import shutil
 import signal
 from dataclasses import dataclass
+from typing import IO
 
 from app.config import settings
 from app.sandbox.nsjail import build_nsjail_command
@@ -37,6 +38,101 @@ async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
         await proc.wait()
     except ProcessLookupError:
         pass
+
+
+def patch_tsconfig(workspace_dir: str) -> None:
+    """Disable verbatimModuleSyntax in tsconfig.app.json and tsconfig.node.json."""
+    import json as _json
+    import re
+
+    def strip_json_comments(text: str) -> str:
+        """Strip comments and trailing commas from JSON to make it parseable.
+
+        This handles JSONC (JSON with Comments) format commonly used in tsconfig.json files.
+        Properly handles strings to avoid removing // or /* inside string values.
+        """
+        result = []
+        in_string = False
+        escape_next = False
+        i = 0
+
+        while i < len(text):
+            char = text[i]
+
+            # Handle string state
+            if escape_next:
+                result.append(char)
+                escape_next = False
+                i += 1
+                continue
+
+            if char == '\\' and in_string:
+                escape_next = True
+                result.append(char)
+                i += 1
+                continue
+
+            if char == '"':
+                in_string = not in_string
+                result.append(char)
+                i += 1
+                continue
+
+            # Skip comments only when not in a string
+            if not in_string:
+                # Check for single-line comment
+                if i + 1 < len(text) and text[i:i+2] == '//':
+                    # Skip until end of line
+                    while i < len(text) and text[i] != '\n':
+                        i += 1
+                    continue
+
+                # Check for multi-line comment
+                if i + 1 < len(text) and text[i:i+2] == '/*':
+                    # Skip until */
+                    i += 2
+                    while i + 1 < len(text):
+                        if text[i:i+2] == '*/':
+                            i += 2
+                            break
+                        i += 1
+                    continue
+
+            result.append(char)
+            i += 1
+
+        clean_text = ''.join(result)
+        # Remove trailing commas before closing braces/brackets
+        clean_text = re.sub(r',(\s*[}\]])', r'\1', clean_text)
+        return clean_text
+
+    for name in ("tsconfig.app.json", "tsconfig.node.json"):
+        path = os.path.join(workspace_dir, name)
+        if not os.path.isfile(path):
+            continue
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Strip comments and trailing commas before parsing
+            clean_content = strip_json_comments(content)
+            data = _json.loads(clean_content)
+        except _json.JSONDecodeError as e:
+            logger.warning("Failed to parse %s: %s", path, e)
+            continue
+        except Exception as e:
+            logger.warning("Failed to read %s: %s", path, e)
+            continue
+
+        opts = data.get("compilerOptions", {})
+        if opts.pop("verbatimModuleSyntax", None) is not None:
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    _json.dump(data, f, indent=2)
+                    f.write("\n")
+            except Exception as e:
+                logger.warning("Failed to write %s: %s", path, e)
 
 
 def write_vite_config(session_id: str, workspace_dir: str | None = None) -> None:
@@ -111,6 +207,66 @@ def inject_error_reporter(workspace_dir: str) -> None:
         f.write(html)
 
 
+def write_tailwind_config(workspace_dir: str) -> None:
+    """Write tailwind.config.js for Tailwind CSS v3."""
+    config = (
+        "/** @type {import('tailwindcss').Config} */\n"
+        "export default {\n"
+        "  content: [\n"
+        '    "./index.html",\n'
+        '    "./src/**/*.{js,ts,jsx,tsx}",\n'
+        "  ],\n"
+        "  theme: {\n"
+        "    extend: {},\n"
+        "  },\n"
+        "  plugins: [],\n"
+        "}\n"
+    )
+    path = os.path.join(workspace_dir, "tailwind.config.js")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(config)
+
+
+def write_postcss_config(workspace_dir: str) -> None:
+    """Write postcss.config.js for Tailwind CSS."""
+    config = (
+        "export default {\n"
+        "  plugins: {\n"
+        "    tailwindcss: {},\n"
+        "    autoprefixer: {},\n"
+        "  },\n"
+        "}\n"
+    )
+    path = os.path.join(workspace_dir, "postcss.config.js")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(config)
+
+
+def inject_tailwind_directives(workspace_dir: str) -> None:
+    """Add @tailwind directives to src/index.css."""
+    css_path = os.path.join(workspace_dir, "src", "index.css")
+    if not os.path.isfile(css_path):
+        return
+
+    with open(css_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Don't inject if already present
+    if "@tailwind" in content:
+        return
+
+    # Prepend Tailwind directives
+    tailwind_directives = (
+        "@tailwind base;\n"
+        "@tailwind components;\n"
+        "@tailwind utilities;\n\n"
+    )
+    content = tailwind_directives + content
+
+    with open(css_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
 @dataclass
 class SandboxInfo:
     """Runtime information for a single sandbox."""
@@ -120,7 +276,7 @@ class SandboxInfo:
     port: int
     process: asyncio.subprocess.Process | None = None
     dev_process: asyncio.subprocess.Process | None = None
-    _dev_log_file: object | None = None  # file handle for .dev-server.log
+    _dev_log_file: IO[bytes] | None = None  # file handle for .dev-server.log
 
 
 class SandboxManager:
@@ -234,21 +390,22 @@ class SandboxManager:
         from app.sandbox.nsjail import _nsjail_available
 
         if not _nsjail_available():
-            # macOS dev: use `script -q` to run in a PTY so node/pnpm use
-            # line buffering and output ANSI colors.  `script` writes the
-            # transcript directly to log_path with immediate flushing.
+            # macOS dev: run pnpm directly with FORCE_COLOR for ANSI output.
             dev_cmd = f"pnpm dev --port {info.port} --host 0.0.0.0"
-            cmd = [
-                "script", "-q", log_path,
-                "/bin/bash", "-c", f"cd {info.workspace_dir} && {dev_cmd}",
-            ]
+            log_file = open(log_path, "wb")  # noqa: SIM115
+
+            env = os.environ.copy()
+            env["FORCE_COLOR"] = "1"
+
             info.dev_process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                "/bin/bash", "-c", f"cd {info.workspace_dir} && {dev_cmd}",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
                 start_new_session=True,
             )
-            info._dev_log_file = None
+            info._dev_log_file = log_file
         else:
             log_file = open(log_path, "wb")  # noqa: SIM115
 
@@ -377,11 +534,15 @@ class SandboxManager:
             self._sandboxes[name] = info
             logger.info("Restored sandbox for session %s (port %d)", name, port)
 
-        # Patch vite configs, inject error reporter, and restart dev servers
+        # Patch configs, inject error reporter, ensure Tailwind configs, and restart dev servers
         for name, info in self._sandboxes.items():
             if os.path.isfile(os.path.join(info.workspace_dir, "package.json")):
                 write_vite_config(name, info.workspace_dir)
                 inject_error_reporter(info.workspace_dir)
+                # Ensure Tailwind configs exist (idempotent)
+                write_tailwind_config(info.workspace_dir)
+                write_postcss_config(info.workspace_dir)
+                inject_tailwind_directives(info.workspace_dir)
                 asyncio.create_task(self.start_dev_server(name))
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, Search, Wrench, Save, TestTube, RefreshCw, XCircle } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
@@ -7,7 +7,7 @@ import { ChevronDown, Check } from 'lucide-react';
 import { ThemeToggle } from '../layout/ThemeToggle';
 import { WorkPlanView } from './WorkPlanView';
 import { TaskProgress } from './TaskProgress';
-import type { AIModel, AgentPhase } from '../../types';
+import type { AIModel, AgentPhase, FixStep } from '../../types';
 
 function ModelSelector() {
   const { models, selectedModel, setSelectedModel, loadModels } = useChatStore();
@@ -168,8 +168,122 @@ const PHASE_LABELS: Record<AgentPhase, string> = {
   planning: 'Building work plan...',
   awaiting_approval: 'Review the plan below',
   executing: 'Building...',
+  fixing: 'Fixing error...',
   complete: 'Done!',
 };
+
+function getStepIcon(step: FixStep['step']) {
+  switch (step) {
+    case 'discover':
+      return Search;
+    case 'generate':
+      return Wrench;
+    case 'write':
+      return Save;
+    case 'validate':
+      return TestTube;
+    case 'retry':
+      return RefreshCw;
+  }
+}
+
+function FixProgressLive({ steps, content }: { steps: FixStep[]; content?: string }) {
+  const completed = steps.filter((s) => s.status === 'completed').length;
+  const failed = steps.filter((s) => s.status === 'failed').length;
+  const total = steps.length;
+  const hasRunning = steps.some((s) => s.status === 'running');
+
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '12px',
+      padding: '14px 16px',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '12px',
+        fontSize: '13px',
+        fontWeight: 500,
+        color: failed > 0 ? 'var(--danger)' : hasRunning ? 'var(--accent)' : 'var(--success)',
+      }}>
+        {hasRunning ? (
+          <>
+            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            Fixing error...
+          </>
+        ) : failed > 0 ? (
+          <>
+            <XCircle size={14} />
+            Error fix completed with issues
+          </>
+        ) : (
+          <>
+            <CheckCircle2 size={14} />
+            Error fixed successfully!
+          </>
+        )}
+      </div>
+
+      {/* Explanation text */}
+      {content && (
+        <div style={{
+          marginBottom: '12px',
+          padding: '10px',
+          background: 'var(--bg)',
+          borderRadius: '6px',
+          fontSize: '12px',
+          lineHeight: '1.6',
+          color: 'var(--text)',
+        }}>
+          {content}
+        </div>
+      )}
+
+      {/* Steps */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {steps.map((step) => {
+          const StepIcon = getStepIcon(step.step);
+          return (
+            <div
+              key={step.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                background: step.status === 'running' ? 'rgba(137, 180, 250, 0.08)' : 'transparent',
+                fontSize: '13px',
+                transition: 'background 0.2s',
+              }}
+            >
+              {step.status === 'running' ? (
+                <Loader2 size={14} style={{ color: 'var(--accent)', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
+              ) : step.status === 'completed' ? (
+                <StepIcon size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+              ) : (
+                <XCircle size={14} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+              )}
+              <span style={{ color: step.status === 'failed' ? 'var(--danger)' : 'var(--text)' }}>
+                {step.message}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 function DesignProgress({ designProgress }: { designProgress: { architecture: string | null; ux: string | null } }) {
   return (
@@ -240,18 +354,19 @@ function PhaseIndicator({ phase }: { phase: AgentPhase }) {
 export function ChatPanel() {
   const {
     messages, isStreaming, currentAssistantMessage, actions, error, clearError,
-    agentPhase, planOverview, executionTasks, designProgress,
+    agentPhase, planOverview, executionTasks, designProgress, fixSteps,
   } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentAssistantMessage, agentPhase, executionTasks]);
+  }, [messages, currentAssistantMessage, agentPhase, executionTasks, fixSteps]);
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
   const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
-  const showStreamingMessage = isStreaming && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress;
+  const showFixProgress = fixSteps.length > 0 && isStreaming;
+  const showStreamingMessage = isStreaming && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress;
   const showPhaseIndicator = agentPhase === 'classifying' || agentPhase === 'planning';
 
   return (
@@ -307,6 +422,9 @@ export function ChatPanel() {
 
         {/* Task execution progress */}
         {showTaskProgress && <TaskProgress tasks={executionTasks} />}
+
+        {/* Fix progress */}
+        {showFixProgress && <FixProgressLive steps={fixSteps} content={currentAssistantMessage} />}
 
         {/* Streaming message (follow-up flow) */}
         {showStreamingMessage && (

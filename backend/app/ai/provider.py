@@ -13,6 +13,7 @@ async def complete_chat(
     messages: list[dict],
     system_prompt: str,
     model: str | None = None,
+    metadata: dict | None = None,
 ) -> str:
     """Non-streaming completion for classification, planning, merging.
 
@@ -36,15 +37,20 @@ async def complete_chat(
         model=resolved_model,
         messages=full_messages,
         stream=False,
+        metadata=metadata or {},
     )
 
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("LLM returned empty response")
+    return content
 
 
 async def stream_chat(
     messages: list[dict],
     system_prompt: str,
     model: str | None = None,
+    metadata: dict | None = None,
 ) -> AsyncIterator[str]:
     """Stream an AI chat completion, yielding content deltas.
 
@@ -68,6 +74,7 @@ async def stream_chat(
         model=resolved_model,
         messages=full_messages,
         stream=True,
+        metadata=metadata or {},
     )
 
     async for chunk in response:

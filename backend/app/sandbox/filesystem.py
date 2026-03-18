@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from langfuse.decorators import observe, langfuse_context
+
 from app.config import settings
 from app.sandbox.manager import sandbox_manager
 
@@ -51,12 +53,17 @@ async def read_file(session_id: str, path: str) -> str:
         return fh.read()
 
 
+@observe(name="write-file", as_type="span")
 async def write_file(session_id: str, path: str, content: str) -> None:
     """Write *content* to a file inside the sandbox, creating parent dirs as needed."""
     full = _resolve_safe(session_id, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
     with open(full, "w", encoding="utf-8") as fh:
         fh.write(content)
+    # Add metadata about the file written
+    langfuse_context.update_current_observation(
+        metadata={"file_path": path, "content_length": len(content)}
+    )
 
 
 async def delete_file(session_id: str, path: str) -> None:

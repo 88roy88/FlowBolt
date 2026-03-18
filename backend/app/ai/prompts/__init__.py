@@ -6,6 +6,7 @@ from app.ai.prompts.ux_design import UX_DESIGN_PROMPT
 from app.ai.prompts.merge import MERGE_PROMPT
 from app.ai.prompts.user_plan import USER_PLAN_PROMPT
 from app.ai.prompts.codegen import get_codegen_prompt
+from app.ai.prompts.summary import SUMMARY_PROMPT
 
 __all__ = [
     "CLASSIFY_PROMPT",
@@ -14,4 +15,5 @@ __all__ = [
     "MERGE_PROMPT",
     "USER_PLAN_PROMPT",
     "get_codegen_prompt",
+    "SUMMARY_PROMPT",
 ]

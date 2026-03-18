@@ -23,12 +23,14 @@ function createReconnectingSocket(
   onOpen?: () => void,
   onMessage?: (data: string) => void,
   onClose?: () => void,
+  onError?: (error: Event) => void,
 ): { sendOrQueue: (data: string) => void; close: () => void } {
   let socket: WebSocket | null = null;
   let closed = false;
   let retryDelay = 1000;
   const maxRetryDelay = 30000;
   const pendingQueue: string[] = [];
+  let hasConnectedOnce = false;
 
   function flushQueue() {
     while (pendingQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
@@ -41,6 +43,7 @@ function createReconnectingSocket(
     socket = new WebSocket(url);
 
     socket.addEventListener('open', () => {
+      hasConnectedOnce = true;
       retryDelay = 1000;
       flushQueue();
       onOpen?.();
@@ -61,7 +64,11 @@ function createReconnectingSocket(
       }
     });
 
-    socket.addEventListener('error', () => {
+    socket.addEventListener('error', (event) => {
+      // Only report initial connection errors (not reconnection attempts)
+      if (!hasConnectedOnce) {
+        onError?.(event);
+      }
       socket?.close();
     });
   }
@@ -107,6 +114,17 @@ export function getChatSocket(sessionId: string): ChatSocket {
     () => {
       // on close — don't remove from map, reconnect will handle it
     },
+    () => {
+      // on error — notify user of connection issues
+      if (typeof window !== 'undefined') {
+        import('../stores/errors').then(({ useErrorStore }) => {
+          useErrorStore.getState().pushError({
+            source: 'connection',
+            message: 'Failed to establish WebSocket connection to backend. Chat may not work properly.',
+          });
+        });
+      }
+    },
   );
 
   const socket: ChatSocket = {
@@ -147,6 +165,7 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
   let closed = false;
   let retryDelay = 1000;
   const pendingQueue: ArrayBuffer[] = [];
+  let hasConnectedOnce = false;
 
   function flushQueue() {
     while (pendingQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
@@ -162,6 +181,7 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
     socket = ws;
 
     ws.addEventListener('open', () => {
+      hasConnectedOnce = true;
       retryDelay = 1000;
       flushQueue();
     });
@@ -187,6 +207,15 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
     });
 
     ws.addEventListener('error', () => {
+      // Only report initial connection errors
+      if (!hasConnectedOnce && typeof window !== 'undefined') {
+        import('../stores/errors').then(({ useErrorStore }) => {
+          useErrorStore.getState().pushError({
+            source: 'connection',
+            message: 'Failed to establish terminal WebSocket connection to backend.',
+          });
+        });
+      }
       ws.close();
     });
   }

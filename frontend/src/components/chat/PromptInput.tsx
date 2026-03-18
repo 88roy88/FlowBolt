@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
-import { Send } from 'lucide-react';
+import { ArrowUp, Loader2 } from 'lucide-react';
 import { searchPackages } from '../../services/api';
 import type { PackageSearchRecord } from '../../types';
 
@@ -10,6 +10,7 @@ export function PromptInput() {
   const [packageQuery, setPackageQuery] = useState('');
   const [packageResults, setPackageResults] = useState<Pick<PackageSearchRecord, 'Id' | 'Name'>[]>([]);
   const [packageLoading, setPackageLoading] = useState(false);
+  const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const selectedPackage = useChatStore((s) => s.selectedPackage);
@@ -22,7 +23,7 @@ export function PromptInput() {
     const el = textareaRef.current;
     if (el) {
       el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
     }
   }, []);
 
@@ -80,6 +81,7 @@ export function PromptInput() {
 
     return () => window.clearTimeout(handle);
   }, [sessionId, disabled, trimmedPackageQuery]);
+  const canSend = !!value.trim() && !disabled;
 
   const placeholder = !sessionId
     ? 'Select a project first'
@@ -89,9 +91,16 @@ export function PromptInput() {
         ? 'AI is working...'
         : 'Describe what you want to build...';
 
+  const busyLabel =
+    agentPhase === 'classifying' ? 'Analyzing' :
+    agentPhase === 'designing' ? 'Designing' :
+    agentPhase === 'planning' ? 'Planning' :
+    agentPhase === 'executing' ? 'Building' :
+    'Thinking';
+
   return (
     <div style={{
-      padding: '12px 16px',
+      padding: '10px 14px',
       borderTop: '1px solid var(--border)',
       background: 'var(--surface)',
       flexShrink: 0,
@@ -197,15 +206,35 @@ export function PromptInput() {
         )}
       </div>
 
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: '8px',
-        background: 'var(--bg)',
-        border: '1px solid var(--border)',
-        borderRadius: '10px',
-        padding: '8px 12px',
-      }}>
+      {isBusy && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          fontSize: '12px',
+          color: 'var(--accent)',
+          marginBottom: '8px',
+        }}>
+          <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+          <span>{busyLabel}...</span>
+        </div>
+      )}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: '8px',
+          background: 'var(--bg)',
+          border: `1px solid ${focused && !disabled ? 'var(--accent)' : 'var(--border)'}`,
+          borderRadius: '12px',
+          padding: '4px 4px 4px 14px',
+          transition: 'border-color 0.15s, box-shadow 0.15s',
+          boxShadow: focused && !disabled
+            ? '0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent)'
+            : '0 1px 3px rgba(0,0,0,0.08)',
+        }}
+      >
         <textarea
           ref={textareaRef}
           value={value}
@@ -214,6 +243,8 @@ export function PromptInput() {
             adjustHeight();
           }}
           onKeyDown={handleKeyDown}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
@@ -222,34 +253,33 @@ export function PromptInput() {
             resize: 'none',
             fontSize: '14px',
             lineHeight: '1.5',
-            maxHeight: '150px',
+            maxHeight: '200px',
+            padding: '6px 0',
             opacity: disabled ? 0.5 : 1,
           }}
         />
         <button
           onClick={handleSubmit}
-          disabled={disabled || !value.trim()}
+          disabled={!canSend}
           style={{
-            padding: '6px',
-            borderRadius: '6px',
-            color: value.trim() && !disabled ? 'var(--accent)' : 'var(--text-dim)',
-            opacity: value.trim() && !disabled ? 1 : 0.4,
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '8px',
+            background: canSend ? 'var(--accent)' : 'var(--border)',
+            color: canSend ? '#fff' : 'var(--text-dim)',
+            opacity: canSend ? 1 : 0.4,
             flexShrink: 0,
+            transition: 'background 0.15s, opacity 0.15s',
+            cursor: canSend ? 'pointer' : 'default',
           }}
           title="Send message"
         >
-          <Send size={18} />
+          <ArrowUp size={16} strokeWidth={2.5} />
         </button>
       </div>
-      {isBusy && (
-        <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '6px', textAlign: 'center' }}>
-          {agentPhase === 'classifying' ? 'Analyzing...' :
-           agentPhase === 'designing' ? 'Designing...' :
-           agentPhase === 'planning' ? 'Planning...' :
-           agentPhase === 'executing' ? 'Building...' :
-           'AI is responding...'}
-        </p>
-      )}
     </div>
   );
 }
