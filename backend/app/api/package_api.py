@@ -23,7 +23,7 @@ def _client() -> PackageApiClient:
     return PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
 
 
-async def _package_search(query_or_id: str):
+async def _package_search(query_or_id: str) -> list[Any]:
     if not query_or_id.strip():
         raise HTTPException(status_code=422, detail="query_or_id is required")
 
@@ -34,14 +34,8 @@ async def _package_search(query_or_id: str):
 
 
 @router.get("/search/{query_or_id}")
-async def package_search(query_or_id: str):
+async def package_search(query_or_id: str) -> list[Any]:
     """Proxy search-by-id or autocomplete to FLAPI."""
-    return await _package_search(query_or_id)
-
-
-@router.get("/v1/search/{query_or_id}")
-async def package_search_v1(query_or_id: str):
-    """Back-compat alias for older frontend builds."""
     return await _package_search(query_or_id)
 
 
@@ -66,15 +60,5 @@ async def run_package(
     body: Any | None = Body(default=None),
 ):
     """Proxy 'run package' to FLAPI."""
-    return await _run_package(package_id, allQueries=allQueries, body=body)
-
-
-@router.post("/v3/{package_id}")
-async def run_package_v3(
-    package_id: str,
-    allQueries: bool | None = Query(default=None),
-    body: Any | None = Body(default=None),
-):
-    """Back-compat alias for older clients."""
     return await _run_package(package_id, allQueries=allQueries, body=body)
 
