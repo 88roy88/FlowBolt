@@ -3,18 +3,106 @@ import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import { Download, FileCode, Search, Files } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
-import { downloadZip, downloadSingleHtml, searchFiles, type SearchResult } from '../../services/api';
+import { downloadZip, downloadSingleHtml, fetchFileContent, searchFiles, type SearchResult } from '../../services/api';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
+import type { FileEntry } from '../../types';
 
 const FILE_TREE_MIN = 120;
 const FILE_TREE_MAX = 400;
 
 let monacoTypesInitialized = false;
+let monacoImportDefinitionProviderInitialized = false;
+
+const toMonacoUri = (path: string) => {
+  const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
+  return `file:///${normalized}`;
+};
+
+const normalizeProjectPath = (path: string) => path.replace(/\\/g, '/').replace(/^\/+/, '');
+
+const normalizeSegments = (segments: string[]) => {
+  const out: string[] = [];
+  for (const seg of segments) {
+    if (!seg || seg === '.') continue;
+    if (seg === '..') {
+      out.pop();
+      continue;
+    }
+    out.push(seg);
+  }
+  return out;
+};
+
+const resolveRelativeImportPath = (fromPath: string, importPath: string, fileSet: Set<string>): string | null => {
+  if (!importPath.startsWith('.')) return null;
+
+  const from = normalizeProjectPath(fromPath);
+  const baseDir = from.includes('/') ? from.slice(0, from.lastIndexOf('/')) : '';
+  const resolvedSegments = normalizeSegments([...baseDir.split('/'), ...importPath.split('/')]);
+  const baseResolved = resolvedSegments.join('/');
+
+  const candidates = [
+    baseResolved,
+    `${baseResolved}.ts`,
+    `${baseResolved}.tsx`,
+    `${baseResolved}.js`,
+    `${baseResolved}.jsx`,
+    `${baseResolved}.mjs`,
+    `${baseResolved}.cjs`,
+    `${baseResolved}.json`,
+    `${baseResolved}.css`,
+    `${baseResolved}.scss`,
+    `${baseResolved}.sass`,
+    `${baseResolved}.less`,
+    `${baseResolved}.svg`,
+    `${baseResolved}.png`,
+    `${baseResolved}.jpg`,
+    `${baseResolved}.jpeg`,
+    `${baseResolved}.gif`,
+    `${baseResolved}.webp`,
+    `${baseResolved}/index.ts`,
+    `${baseResolved}/index.tsx`,
+    `${baseResolved}/index.js`,
+    `${baseResolved}/index.jsx`,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeProjectPath(candidate);
+    if (fileSet.has(normalized)) return normalized;
+  }
+
+  return null;
+};
+
+const findImportedModuleForSymbol = (source: string, symbol: string): string | null => {
+  const defaultImportRegex = /import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g;
+  for (const match of source.matchAll(defaultImportRegex)) {
+    if (match[1] === symbol) return match[2] ?? null;
+  }
+
+  const namespaceImportRegex = /import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g;
+  for (const match of source.matchAll(namespaceImportRegex)) {
+    if (match[1] === symbol) return match[2] ?? null;
+  }
+
+  const namedImportRegex = /import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g;
+  for (const match of source.matchAll(namedImportRegex)) {
+    const specifiers = (match[1] ?? '').split(',').map((part) => part.trim()).filter(Boolean);
+    for (const specifier of specifiers) {
+      const [imported, aliased] = specifier.split(/\s+as\s+/).map((s) => s.trim());
+      const localName = aliased || imported;
+      if (localName === symbol) return match[2] ?? null;
+    }
+  }
+
+  return null;
+};
 
 export function EditorPanel() {
   const {
+    fileTree,
     openFiles,
     activeFilePath,
     updateFileContent,
@@ -28,6 +116,8 @@ export function EditorPanel() {
   const sessionId = useSessionStore((s: { sessionId: string | null }) => s.sessionId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
+  const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
    const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
 
@@ -38,6 +128,23 @@ export function EditorPanel() {
   const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestIdRef = useRef(0);
+  const hydratedModelsRef = useRef<Set<string>>(new Set());
+  const indexedFilesRef = useRef<Set<string>>(new Set());
+
+  const flattenFiles = useCallback((entries: FileEntry[]): string[] => {
+    const out: string[] = [];
+    const stack = [...entries];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) continue;
+      if (current.is_directory) {
+        if (current.children?.length) stack.push(...current.children);
+      } else {
+        out.push(current.path);
+      }
+    }
+    return out;
+  }, []);
 
   const handleFileTreeResize = useCallback((delta: number) => {
     setFileTreeWidth((w: number) => Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, w + delta)));
@@ -120,6 +227,45 @@ export function EditorPanel() {
     return langMap[ext ?? ''] ?? 'plaintext';
   };
 
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco || !sessionId || fileTree.length === 0) return;
+
+    let cancelled = false;
+    const files = flattenFiles(fileTree)
+      .filter((p: string) => /\.(ts|tsx|js|jsx|mjs|cjs|json|css|scss|sass|less)$/.test(p))
+      .slice(0, 350);
+
+    const hydrateModels = async () => {
+      for (const path of files) {
+        if (cancelled) return;
+        const uri = toMonacoUri(path);
+        if (hydratedModelsRef.current.has(uri)) continue;
+        if (monaco.editor.getModel(monaco.Uri.parse(uri))) {
+          hydratedModelsRef.current.add(uri);
+          continue;
+        }
+        try {
+          const content = await fetchFileContent(sessionId, path);
+          if (cancelled) return;
+          monaco.editor.createModel(content, getLanguage(path), monaco.Uri.parse(uri));
+          hydratedModelsRef.current.add(uri);
+        } catch {
+          // Some files may be unavailable; skip and continue.
+        }
+      }
+    };
+
+    void hydrateModels();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, fileTree, flattenFiles]);
+
+  useEffect(() => {
+    indexedFilesRef.current = new Set(flattenFiles(fileTree).map((path: string) => normalizeProjectPath(path)));
+  }, [fileTree, flattenFiles]);
+
   const performSearch = useCallback(async () => {
     if (!sessionId) return;
     const query = searchQuery.trim();
@@ -168,27 +314,28 @@ export function EditorPanel() {
 
   const handleEditorMount = useCallback((monaco: Monaco) => {
     try {
+      monacoRef.current = monaco;
       const tsDefaults = monaco.languages.typescript.typescriptDefaults;
       const jsDefaults = monaco.languages.typescript.javascriptDefaults;
 
       const sharedCompilerOptions: Parameters<typeof tsDefaults.setCompilerOptions>[0] = {
-        target: monaco.languages.typescript.ScriptTarget.ESNext,
-        // Use NodeNext so Monaco's TS resolver matches TypeScript behavior for
-        // explicit TS/TSX extensions like: `import App from './App.tsx'`.
-        module: monaco.languages.typescript.ModuleKind.NodeNext,
-        // Matches Vite/modern bundlers and makes TS accept explicit .ts/.tsx extensions
-        // when `allowImportingTsExtensions` is enabled.
-        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeNext,
+        // Mirror frontend/tsconfig.app.json so Monaco diagnostics match the real build.
+        target: monaco.languages.typescript.ScriptTarget.ES2020,
+        module: monaco.languages.typescript.ModuleKind.ESNext,
+        // Vite uses TS "bundler" module resolution (not NodeNext).
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.Bundler,
         jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
         allowJs: true,
         allowNonTsExtensions: true,
-        // Allows imports with explicit TS/TSX extensions, e.g.:
-        //   import App from './App.tsx'
         allowImportingTsExtensions: true,
         esModuleInterop: true,
+        isolatedModules: true,
+        resolveJsonModule: true,
+        useDefineForClassFields: true,
         strict: true,
         skipLibCheck: true,
         noEmit: true,
+        baseUrl: 'file:///',
       };
 
       tsDefaults.setCompilerOptions(sharedCompilerOptions);
@@ -335,9 +482,36 @@ declare module '*.webp' {
         jsDefaults.addExtraLib(reactTypes, 'file:///monaco/ambient/react-vite.js.d.ts');
         monacoTypesInitialized = true;
       }
+
+      if (!monacoImportDefinitionProviderInitialized) {
+        const definitionProvider = {
+          provideDefinition(model: Parameters<Monaco['editor']['createModel']>[0] extends never ? never : any, position: any) {
+            const word = model.getWordAtPosition(position);
+            if (!word?.word) return null;
+
+            const importPath = findImportedModuleForSymbol(model.getValue(), word.word);
+            if (!importPath) return null;
+
+            const currentPath = normalizeProjectPath(decodeURIComponent(model.uri.path));
+            const targetPath = resolveRelativeImportPath(currentPath, importPath, indexedFilesRef.current);
+            if (!targetPath) return null;
+
+            const uri = monaco.Uri.parse(toMonacoUri(targetPath));
+            return {
+              uri,
+              range: new monaco.Range(1, 1, 1, 1),
+            };
+          },
+        };
+
+        monaco.languages.registerDefinitionProvider('typescript', definitionProvider);
+        monaco.languages.registerDefinitionProvider('javascript', definitionProvider);
+        monacoImportDefinitionProviderInitialized = true;
+      }
     } catch (err) {
       console.error('Monaco types init failed, will retry on next mount:', err);
       monacoTypesInitialized = false;
+      monacoImportDefinitionProviderInitialized = false;
     }
   }, []);
 
@@ -583,12 +757,45 @@ declare module '*.webp' {
             <Editor
               theme={editorTheme}
               language={getLanguage(activeFilePath)}
-              path={activeFilePath}
+              path={activeFilePath ? toMonacoUri(activeFilePath) : undefined}
               value={activeContent}
               onChange={handleEditorChange}
               beforeMount={handleEditorMount}
               onMount={(editor: Parameters<OnMount>[0]) => {
                 editorRef.current = editor;
+                importNavigationDisposableRef.current?.dispose();
+                importNavigationDisposableRef.current = editor.onMouseDown((event: any) => {
+                  const browserEvent = event?.event;
+                  const isCtrlOrCmd = Boolean(browserEvent?.ctrlKey || browserEvent?.metaKey);
+                  if (!isCtrlOrCmd) return;
+
+                  const position = event?.target?.position;
+                  if (!position) return;
+
+                  const model = editor.getModel();
+                  if (!model) return;
+
+                  const lineText = model.getLineContent(position.lineNumber) ?? '';
+                  if (!lineText.includes('import')) return;
+
+                  const word = model.getWordAtPosition(position);
+                  if (!word?.word) return;
+
+                  const importPath = findImportedModuleForSymbol(model.getValue(), word.word);
+                  if (!importPath) return;
+
+                  const currentPath = normalizeProjectPath(decodeURIComponent(model.uri.path));
+                  const targetPath = resolveRelativeImportPath(currentPath, importPath, indexedFilesRef.current);
+                  if (!targetPath) return;
+
+                  browserEvent?.preventDefault?.();
+                  browserEvent?.stopPropagation?.();
+                  void openFile(targetPath, 1, 1);
+                });
+                editor.onDidDispose(() => {
+                  importNavigationDisposableRef.current?.dispose();
+                  importNavigationDisposableRef.current = null;
+                });
                 const { pendingRevealLine: line, pendingRevealColumn: col, clearPendingReveal: clear } = useFilesStore.getState();
                 if (line) {
                   setTimeout(() => {
@@ -608,6 +815,14 @@ declare module '*.webp' {
                 wordWrap: 'on',
                 tabSize: 2,
                 automaticLayout: true,
+                definitionLinkOpensInPeek: false,
+                gotoLocation: {
+                  multipleDefinitions: 'goto',
+                  multipleDeclarations: 'goto',
+                  multipleImplementations: 'goto',
+                  multipleReferences: 'peek',
+                  multipleTypeDefinitions: 'goto',
+                },
               }}
             />
           </div>
