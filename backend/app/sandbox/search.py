@@ -262,12 +262,15 @@ async def search_across_files(
         for rel, (_rel, abs_path, _mtime_ns, _size) in idx.overflow.items():
             if total >= max_results:
                 break
+            remaining = max_results - total
+            if remaining <= 0:
+                break
             hits = await _search_overflow_file(
                 rel,
                 abs_path,
                 needle,
                 case_sensitive=case_sensitive,
-                max_hits=max_hits_per_file,
+                max_hits=min(max_hits_per_file, remaining),
             )
             if hits:
                 out.append(

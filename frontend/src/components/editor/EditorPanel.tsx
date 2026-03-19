@@ -164,6 +164,11 @@ export function EditorPanel() {
   const searchRequestIdRef = useRef(0);
   const hydratedModelsRef = useRef<Set<string>>(new Set());
   const indexedFilesRef = useRef<Set<string>>(new Set());
+  const openFilesRef = useRef(openFiles);
+
+  useEffect(() => {
+    openFilesRef.current = openFiles;
+  }, [openFiles]);
 
   useEffect(() => {
     const monaco = monacoRef.current;
@@ -329,7 +334,7 @@ export function EditorPanel() {
     const hydrateModels = async () => {
       const tasks = files.map(async (path: string) => {
         const uri = toMonacoUri(path);
-        if (hydratedModelsRef.current.has(uri) || openFiles.has(path)) return;
+        if (hydratedModelsRef.current.has(uri) || openFilesRef.current.has(path)) return;
   
         try {
           const content = await fetchFileContent(sessionId, path);
@@ -354,7 +359,7 @@ export function EditorPanel() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, fileTree, flattenFiles, openFiles]);
+  }, [sessionId, fileTree, flattenFiles]);
   
   useEffect(() => {
     indexedFilesRef.current = new Set(flattenFiles(fileTree).map((path: string) => normalizeProjectPath(path)));

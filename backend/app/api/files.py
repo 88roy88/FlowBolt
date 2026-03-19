@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.sandbox.filesystem import list_files, read_file, write_file
 from app.sandbox.search import search_across_files
@@ -19,10 +19,10 @@ class WriteFileRequest(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query: str
+    query: str = Field(min_length=1, max_length=1000)
     case_sensitive: bool = False
-    max_results: int = 2000
-    max_hits_per_file: int = 200
+    max_results: int = Field(default=2000, ge=1, le=5000)
+    max_hits_per_file: int = Field(default=200, ge=1, le=500)
 
 
 @router.get("/tree")
