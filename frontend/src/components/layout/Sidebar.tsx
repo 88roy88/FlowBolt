@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Trash2, FolderKanban, PanelLeftClose, Info, X, Sparkles, FileText, Package } from 'lucide-react';
+import { Plus, Trash2, FolderKanban, PanelLeftClose, Info } from 'lucide-react';
 import type { ProjectSummary } from '../../types';
+import { SummaryModal } from './SummaryModal';
 
 type SidebarProps = {
   onCloseSidebar?: () => void;
@@ -23,12 +24,10 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
     setShowInput(false);
     await createProject(name);
     clearMessages();
-    // Update URL hash and load data for the new project
     const session = useSessionStore.getState();
     if (session.currentProject) {
       window.location.hash = `#/project/${session.currentProject.session_id}`;
       loadHistory(session.currentProject.session_id);
-      // Poll for scaffold to finish
       let attempts = 0;
       const interval = setInterval(async () => {
         attempts++;
@@ -72,7 +71,6 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const handleShowSummary = (e: React.MouseEvent, project: typeof projects[number]) => {
     e.stopPropagation();
     if (!project.summary) return;
-
     try {
       const parsedSummary = JSON.parse(project.summary) as ProjectSummary;
       setSummaryModal({ projectName: project.name, summary: parsedSummary });
@@ -262,122 +260,11 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
 
       {/* Summary Modal */}
       {summaryModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10000,
-          }}
-          onClick={() => setSummaryModal(null)}
-        >
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              padding: '20px',
-              maxWidth: '500px',
-              maxHeight: '80vh',
-              overflow: 'auto',
-              position: 'relative',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setSummaryModal(null)}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                padding: '4px',
-                color: 'var(--text-dim)',
-                borderRadius: '4px',
-              }}
-              title="Close"
-            >
-              <X size={18} />
-            </button>
-
-            <h3 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: 600, paddingRight: '24px' }}>
-              {summaryModal.projectName}
-            </h3>
-
-            <p style={{ marginBottom: '16px', lineHeight: '1.6', color: 'var(--text)' }}>
-              {summaryModal.summary.summary}
-            </p>
-
-            {summaryModal.summary.tech_stack && summaryModal.summary.tech_stack.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px' }}>
-                  Tech Stack
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {summaryModal.summary.tech_stack.map((tech, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '4px 10px',
-                        background: 'var(--bg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        color: 'var(--accent)',
-                      }}
-                    >
-                      <Package size={12} />
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {summaryModal.summary.features && summaryModal.summary.features.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px' }}>
-                  Features
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {summaryModal.summary.features.map((feature, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <Sparkles size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '2px' }} />
-                      <span style={{ fontSize: '13px', lineHeight: '1.5' }}>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {summaryModal.summary.file_overview && Object.keys(summaryModal.summary.file_overview).length > 0 && (
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px' }}>
-                  Key Files
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {Object.entries(summaryModal.summary.file_overview).map(([file, description]) => (
-                    <div key={file} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px' }}>
-                      <FileText size={13} style={{ color: 'var(--text-dim)', flexShrink: 0, marginTop: '2px' }} />
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{file}</strong>
-                        <span style={{ color: 'var(--text-dim)' }}> — {description}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <SummaryModal
+          projectName={summaryModal.projectName}
+          summary={summaryModal.summary}
+          onClose={() => setSummaryModal(null)}
+        />
       )}
     </div>
   );
