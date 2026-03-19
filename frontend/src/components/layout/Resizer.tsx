@@ -11,6 +11,7 @@ type ResizerProps = {
 export function Resizer({ direction, onDrag, style }: ResizerProps) {
   const isVertical = direction === 'vertical';
   const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const startPosRef = useRef(0);
 
   const handleMouseDown = useCallback(
@@ -25,7 +26,6 @@ export function Resizer({ direction, onDrag, style }: ResizerProps) {
   useEffect(() => {
     if (!isDragging) return;
 
-    // Block pointer events on iframes while dragging (they swallow mouse events)
     const iframes = document.querySelectorAll('iframe');
     iframes.forEach((f) => (f.style.pointerEvents = 'none'));
 
@@ -45,11 +45,15 @@ export function Resizer({ direction, onDrag, style }: ResizerProps) {
     };
   }, [isDragging, isVertical, onDrag]);
 
+  const active = isDragging || isHovered;
+
   return (
     <div
       role="separator"
       aria-orientation={direction}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         flexShrink: 0,
         width: isVertical ? '100%' : HIT_SIZE,
@@ -57,23 +61,21 @@ export function Resizer({ direction, onDrag, style }: ResizerProps) {
         cursor: isVertical ? 'row-resize' : 'col-resize',
         position: 'relative',
         zIndex: 2,
-        // The visible 1px line is drawn via the pseudo-element-like border
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         ...style,
       }}
     >
-      {/* Visible 1px line */}
       <div
         style={{
           position: 'absolute',
           ...(isVertical
-            ? { left: 0, right: 0, top: '50%', height: 1, transform: 'translateY(-50%)' }
-            : { top: 0, bottom: 0, left: '50%', width: 1, transform: 'translateX(-50%)' }
+            ? { left: 0, right: 0, top: '50%', height: active ? 2 : 1, transform: 'translateY(-50%)' }
+            : { top: 0, bottom: 0, left: '50%', width: active ? 2 : 1, transform: 'translateX(-50%)' }
           ),
-          background: isDragging ? 'var(--primary)' : 'var(--border)',
-          transition: isDragging ? 'none' : 'background 0.15s ease',
+          background: active ? 'var(--primary)' : 'var(--border)',
+          transition: 'background 0.15s ease, width 0.1s ease, height 0.1s ease',
         }}
       />
     </div>

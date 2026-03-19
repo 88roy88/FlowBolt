@@ -148,7 +148,7 @@ export function PromptInput() {
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none text-[15px] leading-normal max-h-[200px] py-2 bg-transparent disabled:opacity-50"
+          className="flex-1 resize-none text-[15px] leading-normal max-h-[200px] py-1 bg-transparent disabled:opacity-50"
         />
 
         <button
@@ -164,7 +164,7 @@ export function PromptInput() {
           <ArrowUp size={16} strokeWidth={2.5} />
         </button>
       </div>
-      <div className="flex items-center justify-between mt-1.5 px-1">
+      <div className="flex items-center justify-between mt-1.5 pt-1 px-1">
         <div className="flex items-center gap-2">
           <ModelSelector />
           {selectedCases.length > 0 && (

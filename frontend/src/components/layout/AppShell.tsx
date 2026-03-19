@@ -111,13 +111,13 @@ export function AppShell() {
       <button onClick={() => setSidebarOpen(true)} title="Expand sidebar" className="mb-1 shrink-0">
         <FlowLogo size={18} className="text-[#2bbcc4]" />
       </button>
-      <div className="w-6 h-px bg-border shrink-0" />
+      <div className="w-8 h-px bg-border shrink-0" />
       <div className="flex-1 flex flex-col items-center gap-1.5 py-1 overflow-hidden">
         {projects.map((p) => (
           <button
             key={p.id}
             onClick={() => handleRailSelect(p)}
-            className={`w-8 h-8 rounded-md text-[10px] font-bold flex items-center justify-center transition-all duration-150 shrink-0 ${
+            className={`w-8 h-8 rounded-md text-xs font-bold flex items-center justify-center transition-all duration-150 shrink-0 ${
               p.id === currentProject?.id
                 ? `${getColor(p.name)} ring-1 ring-primary/40`
                 : `${getColor(p.name)} opacity-50 hover:opacity-100`
@@ -153,7 +153,7 @@ export function AppShell() {
           onMouseEnter={() => { if (!hoverLockRef.current) setSidebarHover(true); }}
           onMouseLeave={() => closeSidebar()}
         >
-          <div className="w-12 h-full bg-surface border-r border-border flex flex-col">
+          <div className="w-14 h-full bg-surface border-r border-border flex flex-col">
             <IconRail />
           </div>
 
@@ -194,7 +194,7 @@ export function AppShell() {
                 <button
                   key={hint}
                   onClick={() => useChatStore.getState().sendMessage(hint)}
-                  className="px-3 py-1.5 text-xs text-muted-foreground bg-surface border border-border rounded-full shadow-[var(--shadow-sm)] hover:border-primary/50 hover:text-primary hover:bg-accent-bg transition-all duration-150 cursor-pointer"
+                  className="px-3 py-1.5 text-xs text-foreground/80 bg-muted/40 border border-border/80 rounded-full shadow-[var(--shadow-sm)] hover:border-primary/50 hover:text-primary hover:bg-accent-bg transition-all duration-150 cursor-pointer"
                 >
                   {hint}
                 </button>
