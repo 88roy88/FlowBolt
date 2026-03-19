@@ -97,7 +97,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
       <div
         className={`max-w-[85%] px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
-          isUser ? 'bg-user-bubble border border-primary/20' : 'bg-assistant-bubble border border-border'
+          isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
         }`}
       >
         {isUser && message.cases && message.cases.length > 0 && (

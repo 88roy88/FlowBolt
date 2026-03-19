@@ -65,7 +65,6 @@ export function AppShell() {
               width: sidebarWidth,
               minWidth: sidebarWidth,
               overflow: 'hidden',
-              borderRight: '1px solid var(--border)',
               background: 'var(--surface)',
               display: 'flex',
               flexDirection: 'column',
@@ -109,6 +108,7 @@ export function AppShell() {
           <div style={{ flex: mainSplit, minWidth: 0, overflow: 'hidden' }}>
             <ChatPanel />
           </div>
+
           <Resizer direction="horizontal" onDrag={handleMainSplitResize} />
           <div style={{ flex: 1 - mainSplit, minWidth: 0, overflow: 'hidden' }}>
             <EditorPanel />
@@ -133,7 +133,7 @@ export function AppShell() {
               <button
                 key={tab.id}
                 onClick={() => setBottomTab(tab.id)}
-                className={`px-4 py-1.5 text-[13px] font-medium border-b-2 transition-colors duration-150 ${
+                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors duration-150 ${
                   bottomTab === tab.id
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'

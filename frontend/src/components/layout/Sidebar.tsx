@@ -138,7 +138,7 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
             <div
               key={project.id}
               onClick={() => handleSelect(project)}
-              className={`flex items-center gap-2 p-2 cursor-pointer mb-0.5 transition-colors duration-100 rounded-r-md ${
+              className={`group flex items-center gap-2 p-2 cursor-pointer mb-0.5 transition-colors duration-100 rounded-r-md ${
                 isActive
                   ? 'bg-background border-l-2 border-primary'
                   : 'hover:bg-muted/50 border-l-2 border-transparent'
@@ -151,19 +151,26 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
                   <Info size={14} />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={(e) => handleDelete(e, project.id)}
-                title={pendingDeleteId === project.id ? 'Click again to confirm' : 'Delete project'}
-                className={`transition-all duration-150 ${
-                  pendingDeleteId === project.id
-                    ? 'opacity-100 text-destructive bg-destructive/10'
-                    : 'opacity-50 hover:opacity-100'
-                }`}
-              >
-                <Trash2 size={14} />
-              </Button>
+              {pendingDeleteId === project.id ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={(e) => handleDelete(e, project.id)}
+                  className="text-xs h-6 px-2"
+                >
+                  Delete?
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={(e) => handleDelete(e, project.id)}
+                  title="Delete project"
+                  className="opacity-0 group-hover:opacity-50 hover:!opacity-100"
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
             </div>
           );
         })}

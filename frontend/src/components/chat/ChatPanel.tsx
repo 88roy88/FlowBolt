@@ -36,7 +36,7 @@ export function ChatPanel() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-border bg-surface shrink-0">
-        <span className="uppercase tracking-wider text-[11px] text-muted-foreground font-semibold">Chat</span>
+        <span className="text-[13px] font-semibold tracking-tight">Chat</span>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <ModelSelector />
@@ -56,7 +56,7 @@ export function ChatPanel() {
               {['A dashboard with charts', 'A todo app with drag & drop', 'A landing page'].map((hint) => (
                 <button
                   key={hint}
-                  className="px-3 py-1.5 text-xs text-muted-foreground bg-surface border border-border rounded-full hover:border-primary hover:text-primary transition-colors duration-150 cursor-pointer"
+                  className="px-3 py-1.5 text-xs text-muted-foreground bg-surface border border-border rounded-full shadow-[var(--shadow-sm)] hover:border-primary/50 hover:text-primary hover:bg-accent-bg transition-all duration-150 cursor-pointer"
                 >
                   {hint}
                 </button>

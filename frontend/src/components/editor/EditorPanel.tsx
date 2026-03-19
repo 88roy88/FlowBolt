@@ -86,14 +86,13 @@ export function EditorPanel() {
         style={{
           width: fileTreeWidth,
           minWidth: fileTreeWidth,
-          borderRight: '1px solid var(--border)',
           overflow: 'auto',
           background: 'var(--surface)',
           flexShrink: 0,
         }}
       >
         <div className="flex items-center justify-between px-3 py-[7px] border-b border-border">
-          <span className="uppercase tracking-wider text-[11px] text-muted-foreground font-semibold">Files</span>
+          <span className="text-[13px] font-semibold tracking-tight">Files</span>
 
           <div className="flex gap-1">
             <button

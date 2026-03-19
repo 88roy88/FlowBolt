@@ -163,25 +163,46 @@ interface ReadOnlySocket {
 
 export function createServerLogSocket(sessionId: string): ReadOnlySocket {
   const handlers: Array<(data: string) => void> = [];
-  const decoder = new TextDecoder();
 
-  const { close } = createReconnectingSocket(
-    `${getWsBase()}/ws/server-log/${sessionId}`,
-    undefined,
-    (data) => {
-      // data may arrive as string from the reconnecting socket wrapper
-      handlers.forEach((h) => h(data));
-    },
-  );
+  let socket: WebSocket | null = null;
+  let closed = false;
 
-  // Also listen for binary data via a raw approach — but since createReconnectingSocket
-  // already converts to string via event.data, we handle it there.
+  function connect() {
+    if (closed) return;
+    socket = new WebSocket(`${getWsBase()}/ws/server-log/${sessionId}`);
+    socket.binaryType = 'arraybuffer';
+
+    socket.addEventListener('message', (event) => {
+      let text: string;
+      if (event.data instanceof ArrayBuffer) {
+        text = new TextDecoder().decode(event.data);
+      } else {
+        text = event.data as string;
+      }
+      handlers.forEach((h) => h(text));
+    });
+
+    socket.addEventListener('close', () => {
+      socket = null;
+      if (!closed) setTimeout(connect, 2000);
+    });
+
+    socket.addEventListener('error', () => {
+      socket?.close();
+    });
+  }
+
+  connect();
 
   return {
     onData(handler: (data: string) => void) {
       handlers.push(handler);
     },
-    close,
+    close() {
+      closed = true;
+      socket?.close();
+      socket = null;
+    },
   };
 }
 

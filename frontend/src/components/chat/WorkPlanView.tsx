@@ -4,6 +4,7 @@ import type { PlanOverview } from '../../types';
 import { useChatStore } from '../../stores/chat';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import { CardWrapper } from './cards/CardWrapper';
 
 interface WorkPlanViewProps {
   overview: PlanOverview;
@@ -25,7 +26,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <CardWrapper className="p-4">
       {/* Summary */}
       <p className="text-sm leading-relaxed mb-4">{overview.summary}</p>
 
@@ -102,6 +103,6 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
           Start over
         </Button>
       </div>
-    </div>
+    </CardWrapper>
   );
 }
