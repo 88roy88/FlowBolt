@@ -1,5 +1,3 @@
-"""WebSocket endpoint for AI chat interactions."""
-
 from __future__ import annotations
 
 import json
@@ -9,7 +7,8 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from app.ai.agent import AgentOrchestrator
+from app.ai.agents import BuildAgent, FollowUpAgent, FixErrorAgent
+from app.ai.helpers import CARD_PREFIX
 from app.models.chat import get_messages, save_message
 from app.models.project import get_project_by_session
 
@@ -18,9 +17,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _is_new_project(project_id: str) -> bool:
+    history = await get_messages(project_id)
+    return not any(m.role == "assistant" for m in history)
+
+
 @router.get("/api/chat/{session_id}/history")
 async def chat_history(session_id: str):
-    """Return saved chat messages for a session."""
     project = await get_project_by_session(session_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Unknown session")
@@ -30,99 +33,81 @@ async def chat_history(session_id: str):
 
 @router.websocket("/ws/chat/{session_id}")
 async def chat_ws(websocket: WebSocket, session_id: str) -> None:
-    """Bidirectional WebSocket for chat.
-
-    Client sends::
-
-        {"type": "message", "content": "user prompt text"}
-        {"type": "plan_response", "action": "accept" | "reject" | "modify", "feedback": "..."}
-        {"type": "fix_error", "error_message": "...", "error_file": "...", "error_line": 123, "error_stack": "..."}
-
-    Server sends a stream of::
-
-        {"type": "phase", "phase": "classifying" | "designing" | "planning" | "awaiting_approval" | "executing" | "complete"}
-        {"type": "design_progress", "stream": "architecture" | "ux", "content": "..."}
-        {"type": "work_plan", "plan": {...}}
-        {"type": "task_update", "taskId": "...", "status": "running" | "completed" | "failed", "file": "..."}
-        {"type": "text", "content": "..."}
-        {"type": "file", "path": "...", "content": "..."}
-        {"type": "shell_output", "command": "...", "output": "..."}
-        {"type": "action_complete"}
-    """
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", session_id)
 
     project = await get_project_by_session(session_id)
     if project is None:
-        logger.warning("[chat] No project found for session %s", session_id)
         await websocket.send_json({"type": "error", "message": "Unknown session"})
         await websocket.close()
         return
 
-    logger.info("[chat] Project %s found for session %s", project.id, session_id)
-
     async def ws_send(msg: dict) -> None:
         await websocket.send_json(msg)
 
-    orchestrator = AgentOrchestrator(
-        session_id=session_id,
-        project_id=project.id,
-        ws_send=ws_send,
-    )
+    # BuildAgent persists across messages (holds plan state for approval flow)
+    build_agent: BuildAgent | None = None
 
     try:
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
             msg_type = data.get("type")
-            logger.info("[chat] Received message type=%s session=%s", msg_type, session_id)
 
             if msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
                 case_ids: list[int] = data.get("caseIds") or []
-                logger.info("[chat] User message (%d chars): %.100s...", len(user_content), user_content)
 
-                # Save user message with cases metadata if provided
+                # Save user message
                 if case_ids:
-                    # Fetch case names from the search API
                     from app.api.package_api import _package_search
                     case_names: list[str] = []
                     for cid in case_ids:
                         try:
-                            search_results = await _package_search(str(cid))
-                            name = search_results[0].get("Name", f"Case #{cid}") if search_results else f"Case #{cid}"
+                            results = await _package_search(str(cid))
+                            name = results[0].get("Name", f"Case #{cid}") if results else f"Case #{cid}"
                         except Exception:
-                            logger.warning("[chat] Failed to fetch case name for ID %s", cid)
                             name = f"Case #{cid}"
                         case_names.append(name)
 
-                    # Embed cases info as HTML comment
-                    cases_metadata = {
-                        "type": "cases_context",
-                        "caseIds": case_ids,
-                        "caseNames": case_names,
-                    }
-                    cases_comment = f"<!--cases-meta:{json.dumps(cases_metadata)}-->"
-                    message_with_metadata = f"{cases_comment}\n{user_content}"
-                    await save_message(project.id, "user", message_with_metadata)
+                    cases_meta = json.dumps({"type": "cases_context", "caseIds": case_ids, "caseNames": case_names})
+                    await save_message(project.id, "user", f"<!--cases-meta:{cases_meta}-->\n{user_content}")
                 else:
                     await save_message(project.id, "user", user_content)
 
-                # Delegate to orchestrator
                 try:
-                    await orchestrator.handle_message(user_content, model=selected_model, case_ids=[str(cid) for cid in case_ids] if case_ids else None)
+                    is_new = await _is_new_project(project.id)
+
+                    if is_new:
+                        build_agent = BuildAgent(
+                            session_id=session_id, project_id=project.id,
+                            ws_send=ws_send, model=selected_model,
+                        )
+                        await build_agent.run(
+                            user_content,
+                            case_ids=[str(cid) for cid in case_ids] if case_ids else None,
+                        )
+                    else:
+                        agent = FollowUpAgent(
+                            session_id=session_id, project_id=project.id,
+                            ws_send=ws_send, model=selected_model,
+                        )
+                        await agent.run(user_content)
                 except Exception:
-                    logger.exception("[chat] Orchestrator error for session %s", session_id)
+                    logger.exception("[chat] Agent error for session %s", session_id)
                     await websocket.send_json({"type": "error", "message": "AI processing failed"})
 
             elif msg_type == "plan_response":
                 action = data.get("action", "reject")
                 feedback = data.get("feedback")
-                logger.info("[chat] Plan response: action=%s session=%s", action, session_id)
+
+                if build_agent is None:
+                    await websocket.send_json({"type": "error", "message": "No active build session"})
+                    continue
 
                 try:
-                    await orchestrator.handle_plan_response(action, feedback)
+                    await build_agent.handle_plan_response(action, feedback)
                 except Exception:
                     logger.exception("[chat] Plan response error for session %s", session_id)
                     await websocket.send_json({"type": "error", "message": "Plan handling failed"})
@@ -133,9 +118,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 error_line = data.get("error_line")
                 error_stack = data.get("error_stack")
                 selected_model = data.get("model")
-                logger.info("[chat] Fix error request: file=%s session=%s", error_file, session_id)
 
-                # Save user message with agent card
                 card_data = {
                     "type": "error_fix_request",
                     "errorMessage": error_message,
@@ -143,20 +126,21 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                     "errorLine": error_line,
                     "errorStack": error_stack,
                 }
-                # Serialize as HTML comment for parsing on reload
-                card_content = f"<!--agent-card:{json.dumps(card_data)}-->"
-                await save_message(project.id, "user", card_content)
+                await save_message(project.id, "user", f"{CARD_PREFIX}{json.dumps(card_data)}-->")
 
                 try:
-                    await orchestrator.handle_fix_error(
+                    agent = FixErrorAgent(
+                        session_id=session_id, project_id=project.id,
+                        ws_send=ws_send, model=selected_model,
+                    )
+                    await agent.run(
                         error_message=error_message,
                         error_file=error_file,
                         error_line=error_line,
                         error_stack=error_stack,
-                        model=selected_model,
                     )
                 except Exception:
-                    logger.exception("[chat] Fix error handling failed for session %s", session_id)
+                    logger.exception("[chat] Fix error failed for session %s", session_id)
                     await websocket.send_json({"type": "error", "message": "Error fix failed"})
 
     except WebSocketDisconnect:

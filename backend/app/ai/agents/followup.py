@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from collections.abc import Callable, Awaitable
 from dataclasses import dataclass
 
 from langfuse.decorators import observe, langfuse_context
 
+from app.ai.agents.base import BaseAgent
 from app.ai.core.tools import FunctionTool, ToolExecutor
 from app.ai.core.messages import Message
 from app.ai.provider import complete_chat_with_tools
@@ -33,26 +33,14 @@ class FileDiff:
     diff: str
 
 
-class FollowUpAgent:
+class FollowUpAgent(BaseAgent):
 
-    def __init__(
-        self,
-        session_id: str,
-        project_id: str,
-        ws_send: Callable[[dict], Awaitable[None]],
-        model: str | None = None,
-        trace_id: str | None = None,
-    ) -> None:
-        self.session_id = session_id
-        self.project_id = project_id
-        self.ws_send = ws_send
-        self.model = model
-        self.trace_id = trace_id
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._steps: list[dict] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
         self._iteration = 0
-
         self._executor = self._build_tool_executor()
 
     def _build_tool_executor(self) -> ToolExecutor:
@@ -99,16 +87,7 @@ class FollowUpAgent:
             FunctionTool(_edit_file, name="edit_file"),
         ])
 
-    def _llm_metadata(self, generation_name: str) -> dict:
-        trace_id = self.trace_id or langfuse_context.get_current_trace_id()
-        observation_id = langfuse_context.get_current_observation_id()
-        return {
-            "existing_trace_id": trace_id,
-            "parent_observation_id": observation_id,
-            "generation_name": generation_name,
-        }
-
-    @observe(name="followup-run")
+    @observe(name="followup-agent-run")
     async def run(self, content: str) -> None:
         langfuse_context.update_current_observation(tags=["follow-up-agent"])
 
@@ -150,7 +129,6 @@ class FollowUpAgent:
         await self.ws_send({"type": "phase", "phase": "complete"})
         await self.ws_send({"type": "action_complete"})
 
-    @observe(name="followup-build-context")
     async def _build_context(self) -> dict:
         project = await get_project_by_session(self.session_id)
         summary = ""
@@ -185,7 +163,6 @@ class FollowUpAgent:
                 lines.append(f"{prefix}{entry.name}")
         return "\n".join(lines)
 
-    @observe(name="followup-react-loop")
     async def _react_loop(self, messages: list[Message], system_prompt: str) -> str:
         working_messages: list[dict] = [m.to_dict() for m in messages]
         tool_schemas = self._executor.get_schemas()

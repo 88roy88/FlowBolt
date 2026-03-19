@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Awaitable, Callable
 
 from langfuse.decorators import observe
 
+from app.ai.agents.base import BaseAgent
 from app.ai.core.messages import Message
 from app.ai.parser import ActionParser
 from app.ai.provider import stream_chat
@@ -18,23 +18,7 @@ from app.models.chat import save_message
 logger = logging.getLogger(__name__)
 
 
-class FixErrorAgent:
-
-    def __init__(
-        self,
-        session_id: str,
-        project_id: str,
-        ws_send: Callable[[dict], Awaitable[None]],
-        model: str | None = None,
-        trace_id: str | None = None,
-        llm_metadata: Callable[[str], dict] | None = None,
-    ) -> None:
-        self.session_id = session_id
-        self.project_id = project_id
-        self.ws_send = ws_send
-        self.model = model
-        self._trace_id = trace_id
-        self._llm_metadata = llm_metadata or (lambda name: {})
+class FixErrorAgent(BaseAgent):
 
     @observe(name="fix-error-agent-run")
     async def run(
@@ -48,7 +32,6 @@ class FixErrorAgent:
         fix_steps: list[dict] = []
         explanation_text = ""
 
-        # Step 1: Discover files
         await self._send_step(fix_steps, "discover", "running", "Discovering files to fix...")
         file_contents = await self._discover_files(error_file)
         await self._send_step(fix_steps, "discover", "completed", f"Found {len(file_contents)} file(s) to analyze")
@@ -57,7 +40,6 @@ class FixErrorAgent:
             await self.ws_send({"type": "error", "message": "Could not read source files to fix error"})
             return
 
-        # Step 2: Generate fix
         await self._send_step(fix_steps, "generate", "running", "Generating fix with AI...")
 
         prompt = render_fix_error_direct(
@@ -74,10 +56,8 @@ class FixErrorAgent:
 
         try:
             async for chunk in stream_chat(
-                [Message.user("Fix the error.")],
-                prompt,
-                model=self.model,
-                metadata=self._llm_metadata("fix_error_direct"),
+                [Message.user("Fix the error.")], prompt,
+                model=self.model, metadata=self._llm_metadata("fix_error_direct"),
             ):
                 full_text.append(chunk)
                 parser.feed(chunk)
@@ -88,7 +68,6 @@ class FixErrorAgent:
             await self.ws_send({"type": "phase", "phase": "idle"})
             return
 
-        # Extract explanation (text before the artifact)
         full_response = "".join(full_text)
         artifact_start = full_response.find("<boltArtifact")
         cut = artifact_start if artifact_start != -1 else len(full_response)
@@ -99,17 +78,13 @@ class FixErrorAgent:
 
         await self._send_step(fix_steps, "generate", "completed", f"Generated fix for {len(generated_files)} file(s)")
 
-        # Step 3: Write files
         if generated_files:
             await self._send_step(fix_steps, "write", "running", "Writing fixed files...")
-
             for path, content in generated_files:
                 await write_file(self.session_id, path, content)
                 await self.ws_send({"type": "file", "path": path, "content": content})
-
             await self._send_step(fix_steps, "write", "completed", f"Wrote {len(generated_files)} file(s)")
 
-            # Step 4: Validate
             await self._send_step(fix_steps, "validate", "running", "Validating fix...")
             errors = await self._build()
 
@@ -121,7 +96,6 @@ class FixErrorAgent:
             else:
                 await self._send_step(fix_steps, "validate", "completed", "Fix validated successfully!")
 
-        # Save to chat history
         if fix_steps:
             card = encode_card({"type": "fix_progress", "steps": fix_steps})
             content = f"{explanation_text}\n\n{card}" if explanation_text else card
@@ -132,7 +106,6 @@ class FixErrorAgent:
 
     async def _send_step(self, steps: list[dict], step: str, status: str, message: str) -> None:
         await self.ws_send({"type": "fix_step", "step": step, "status": status, "message": message})
-        # Update or append
         for s in steps:
             if s["step"] == step:
                 s["status"] = status
@@ -144,8 +117,7 @@ class FixErrorAgent:
         files_to_read: list[str] = []
 
         if error_file:
-            file_path = self._normalize_path(error_file)
-            files_to_read.append(file_path)
+            files_to_read.append(self._normalize_path(error_file))
         else:
             try:
                 tree = await list_files(self.session_id)
@@ -160,11 +132,9 @@ class FixErrorAgent:
         file_contents: dict[str, str] = {}
         for path in files_to_read[:10]:
             try:
-                content = await read_file(self.session_id, path)
-                file_contents[path] = content
+                file_contents[path] = await read_file(self.session_id, path)
             except Exception:
                 logger.warning("[fix-error] Could not read %s", path)
-                # Fallback: read all src files if specific file failed
                 if not file_contents and error_file:
                     try:
                         tree = await list_files(self.session_id)
@@ -179,7 +149,6 @@ class FixErrorAgent:
                                 break
                     except Exception:
                         pass
-
         return file_contents
 
     def _normalize_path(self, path: str) -> str:
@@ -203,29 +172,23 @@ class FixErrorAgent:
             async for line in sandbox_manager.get_sandbox(self.session_id).exec("pnpm build 2>&1"):
                 lines.append(line.rstrip())
             output = "\n".join(lines).strip()
-            has_errors = output and ("error" in output.lower() or "failed" in output.lower())
-            return output if has_errors else ""
+            return output if output and ("error" in output.lower() or "failed" in output.lower()) else ""
         except Exception:
             logger.exception("[fix-error] Build failed")
             return ""
 
     async def _retry_fix(self, errors: str, completed_files: dict[str, str]) -> None:
         prompt = render_fix_errors(errors=errors, files=completed_files)
-
-        generated_files: list[tuple[str, str]] = []
-        parser = ActionParser(on_file_action=lambda p, c: generated_files.append((p, c)))
-
+        generated: list[tuple[str, str]] = []
+        parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
         try:
             async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")],
-                prompt,
-                model=self.model,
-                metadata=self._llm_metadata("fix_error_retry"),
+                [Message.user("Fix the TypeScript errors.")], prompt,
+                model=self.model, metadata=self._llm_metadata("fix_error_retry"),
             ):
                 parser.feed(chunk)
             parser.flush()
-
-            for path, content in generated_files:
+            for path, content in generated:
                 await write_file(self.session_id, path, content)
                 await self.ws_send({"type": "file", "path": path, "content": content})
         except Exception:

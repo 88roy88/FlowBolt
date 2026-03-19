@@ -47,7 +47,53 @@ instead of one call per task that generates all files via bolt XML.
 
 ## B4. Frontend refactor
 
-- Split `ChatMessage.tsx` (967 lines) into separate card components
-- Split `chat.ts` store (766 lines) into focused stores (messages, agent-phase, follow-up, models)
-- Extract duplicated icon mappings, spinner animations, dropdown components
-- Build shared base components (Card, Button, Dropdown, Spinner)
+Architecture refactoring is ~85% done (cards extracted, stores split, icons centralized).
+Remaining work is styling consolidation:
+
+- 295 inline `style={{}}` blocks — need CSS modules or design system
+- Spinner animation hardcoded in 10 places — use CSS class from App.css
+- No shared Button component (all buttons use inline styles)
+- No shared Dropdown component (CaseSelector + ModelSelector duplicate logic)
+- Large components: FollowUpProgress (168), PromptInput (245), CaseSelector (238)
+- `/components/ui/` directory exists but is empty
+
+## B5. FollowUp agent memory management
+
+The ReACT loop in `followup_agent.py` appends every tool call and result to
+`working_messages` without any pruning. With up to 15 iterations and tools
+returning full file contents (500+ lines), the conversation can easily exceed
+context limits.
+
+**Options:**
+- Summarize older tool results (replace full file content with "read file X, 200 lines")
+- Sliding window: keep last N tool call/result pairs, summarize the rest
+- Truncate large tool results beyond a token budget
+- Track token count and compress when approaching the model's context limit
+
+**Where:** `followup_agent.py` `_react_loop()` — between iterations, before the
+next `complete_chat_with_tools` call.
+
+## B6. FollowUp agent case support
+
+The follow-up agent should support receiving case IDs (like the create flow does)
+so users can integrate new data sources into an existing project without starting over.
+
+**What to do:**
+- Accept `case_ids` parameter in `FollowUpAgent.run()`
+- Fetch and analyze case data (reuse `DesignService.fetch_and_analyze_case`)
+- Include case context in the follow-up system prompt so the agent knows about
+  available data endpoints when making edits
+
+## B7. Rename "package" to "case" in backend
+
+The backend still uses "package" terminology in several places while the frontend
+and user-facing layer use "case". Align naming for consistency.
+
+**Files to update:**
+- `integrations/package_api.py` → rename to `case_api.py`, class `CaseApiClient`
+- `api/package_api.py` → rename to `api/case_api.py`
+- `services/design.py` — `fetch_and_analyze_case` already uses "case" but internally
+  calls `PackageApiClient` and references `package_id`, `package_name`
+- `prompts/templates/codegen.jinja2` — uses `ctx.package_name`, `ctx.package_id`
+- `state.py` — `case_contexts` field already correct, but dict keys inside are
+  `package_id`, `package_name` etc.
