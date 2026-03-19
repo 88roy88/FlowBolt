@@ -96,7 +96,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
       <div
-        className={`max-w-[85%] px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
+        className={`max-w-[85%] min-w-0 overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
           isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
         }`}
       >
@@ -109,7 +109,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <div className="markdown-content break-words">
+          <div className="markdown-content break-words overflow-hidden">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
@@ -117,13 +117,13 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
                   const isInline = !className;
                   if (isInline) {
                     return (
-                      <code className="bg-background px-1.5 py-0.5 rounded text-[13px] font-mono" {...props}>
+                      <code className="bg-background px-1.5 py-0.5 rounded text-[13px] font-mono break-all" {...props}>
                         {children}
                       </code>
                     );
                   }
                   return (
-                    <pre className="bg-background p-3 rounded-md overflow-auto text-[13px] font-mono my-2">
+                    <pre className="bg-background p-3 rounded-md overflow-x-auto text-[13px] font-mono my-2 max-w-full">
                       <code {...props}>{children}</code>
                     </pre>
                   );

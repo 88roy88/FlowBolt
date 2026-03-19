@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { ArrowDown } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
@@ -15,10 +16,33 @@ export function ChatPanel() {
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs,
   } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentAssistantMessage, agentPhase, executionTasks, fixSteps, followUpSteps]);
+  }, []);
+
+  // Auto-scroll on new content
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    // Only auto-scroll if already near the bottom
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (isNearBottom) scrollToBottom();
+  }, [messages, currentAssistantMessage, agentPhase, executionTasks, fixSteps, followUpSteps, scrollToBottom]);
+
+  // Track scroll position to show/hide the button
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollBtn(distFromBottom > 200);
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
@@ -30,10 +54,10 @@ export function ChatPanel() {
   const showTypingDots = isStreaming && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden relative">
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto p-4 flex flex-col gap-4 scroll-smooth">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-4 flex flex-col gap-4 scroll-smooth">
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}
@@ -79,6 +103,17 @@ export function ChatPanel() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollBtn && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-[120px] left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-surface border border-border shadow-[var(--shadow-md)] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150 z-10"
+          title="Scroll to bottom"
+        >
+          <ArrowDown size={16} />
+        </button>
+      )}
 
       {/* Error banner */}
       {error && (
