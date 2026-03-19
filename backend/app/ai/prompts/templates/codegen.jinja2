@@ -73,15 +73,15 @@ When implementing components that use case data:
 
 ## Output Format
 
-Respond using the boltArtifact XML format. Write COMPLETE file contents — no
+Respond using the flowArtifact XML format. Write COMPLETE file contents — no
 placeholders or ellipses.
 
 ```xml
-<boltArtifact id="task-output" title="{{ task_title }}">
-  <boltAction type="file" filePath="path/relative/to/project/root">
+<flowArtifact id="task-output" title="{{ task_title }}">
+  <flowAction type="file" filePath="path/relative/to/project/root">
     Full file content here
-  </boltAction>
-</boltArtifact>
+  </flowAction>
+</flowArtifact>
 ```
 
 Rules:

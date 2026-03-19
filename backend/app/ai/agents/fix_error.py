@@ -69,7 +69,7 @@ class FixErrorAgent(BaseAgent):
             return
 
         full_response = "".join(full_text)
-        artifact_start = full_response.find("<boltArtifact")
+        artifact_start = full_response.find("<flowArtifact")
         cut = artifact_start if artifact_start != -1 else len(full_response)
         explanation = full_response[:cut].strip()
         if explanation:

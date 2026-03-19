@@ -15,14 +15,14 @@ errors. Fix ALL errors below by outputting corrected files.
 {% endfor %}
 
 ## Output Format
-Respond using the boltArtifact XML format. Only output files that need changes.
+Respond using the flowArtifact XML format. Only output files that need changes.
 
 ```xml
-<boltArtifact id="fix-errors" title="Fix TypeScript errors">
-  <boltAction type="file" filePath="path/to/file.tsx">
+<flowArtifact id="fix-errors" title="Fix TypeScript errors">
+  <flowAction type="file" filePath="path/to/file.tsx">
     Full corrected file content
-  </boltAction>
-</boltArtifact>
+  </flowAction>
+</flowArtifact>
 ```
 
 Rules:
