@@ -28,6 +28,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (project.selected_model) {
       useChatStore.setState({ selectedModel: project.selected_model });
     }
+    useChatStore.getState().clearCases();
   },
 
   async loadProjects() {

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { FileText, TerminalSquare, Sparkles, CheckCircle2, XCircle, ArrowRight, Check, X, Package, AlertTriangle, ChevronDown, ChevronRight, Loader2, Search, Wrench, Save, TestTube, RefreshCw } from 'lucide-react';
-import type { Message, PlanOverview, ExecutionTask, ProjectSummary, FixStep } from '../../types';
+import remarkGfm from 'remark-gfm';
+import { FileText, TerminalSquare, Sparkles, CheckCircle2, XCircle, ArrowRight, Check, X, Package, AlertTriangle, ChevronDown, ChevronRight, Loader2, Search, Wrench, Save, TestTube, RefreshCw, FolderSearch, Pencil } from 'lucide-react';
+import type { Message, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../../types';
 
 interface ChatMessageProps {
   message: Message;
@@ -133,7 +134,7 @@ function DesignCompleteCard({ architecture, ux }: { architecture: boolean; ux: b
   );
 }
 
-function PackageFetchedCard({ packageId, packageName, dataSchema, relevantFields }: { packageId: string; packageName: string; dataSchema: string; relevantFields?: string }) {
+function CasesFetchedCard({ cases }: { cases: { packageId: string; packageName: string; dataSchema: string; relevantFields?: string }[] }) {
   return (
     <div style={{
       background: 'var(--surface)',
@@ -151,43 +152,47 @@ function PackageFetchedCard({ packageId, packageName, dataSchema, relevantFields
         color: 'var(--success)',
       }}>
         <CheckCircle2 size={12} />
-        Package data fetched
+        {cases.length === 1 ? 'Case data fetched' : `${cases.length} cases fetched`}
       </div>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '8px 10px',
-        background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
-        borderRadius: '6px',
-        marginBottom: '8px',
-      }}>
-        <Package size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 500 }}>{packageName}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ID: {packageId}</div>
+      {cases.map((c) => (
+        <div key={c.packageId} style={{ marginBottom: '8px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 10px',
+            background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+            borderRadius: '6px',
+            marginBottom: '6px',
+          }}>
+            <Package size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 500 }}>{c.packageName}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ID: {c.packageId}</div>
+            </div>
+          </div>
+          {c.dataSchema && (
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--text)',
+              lineHeight: '1.5',
+              marginBottom: c.relevantFields ? '4px' : '0',
+            }}>
+              <strong>Data:</strong> {c.dataSchema}
+            </div>
+          )}
+          {c.relevantFields && (
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--text-dim)',
+              lineHeight: '1.5',
+            }}>
+              <strong>Relevant fields:</strong> {c.relevantFields}
+            </div>
+          )}
         </div>
-      </div>
-      {dataSchema && (
-        <div style={{
-          fontSize: '12px',
-          color: 'var(--text)',
-          lineHeight: '1.5',
-          marginBottom: relevantFields ? '6px' : '0',
-        }}>
-          <strong>Data:</strong> {dataSchema}
-        </div>
-      )}
-      {relevantFields && (
-        <div style={{
-          fontSize: '12px',
-          color: 'var(--text-dim)',
-          lineHeight: '1.5',
-        }}>
-          <strong>Relevant fields:</strong> {relevantFields}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -455,6 +460,292 @@ function FixProgressCard({ steps, content }: { steps: FixStep[]; content?: strin
   );
 }
 
+function getFollowUpToolIcon(tool: FollowUpStep['tool']) {
+  switch (tool) {
+    case 'grep':
+      return Search;
+    case 'glob':
+      return FolderSearch;
+    case 'read_file':
+      return FileText;
+    case 'write_file':
+      return Save;
+    case 'edit_file':
+      return Pencil;
+  }
+}
+
+function getFollowUpToolLabel(tool: FollowUpStep['tool'], args: Record<string, string>, isRunning?: boolean) {
+  switch (tool) {
+    case 'grep':
+      return isRunning
+        ? `Searching for '${args.pattern || ''}'${args.path && args.path !== '/' ? ` in ${args.path}` : ''}`
+        : `Searched for '${args.pattern || ''}'${args.path && args.path !== '/' ? ` in ${args.path}` : ''}`;
+    case 'glob':
+      return isRunning ? `Finding files: ${args.pattern || ''}` : `Found files: ${args.pattern || ''}`;
+    case 'read_file':
+      return isRunning ? `Reading ${args.path || ''}` : `Read ${args.path || ''}`;
+    case 'write_file':
+      return isRunning ? `Writing ${args.path || ''}` : `Wrote ${args.path || ''}`;
+    case 'edit_file':
+      return isRunning ? `Editing ${args.path || ''}` : `Edited ${args.path || ''}`;
+  }
+}
+
+function DiffBlock({ fileDiff }: { fileDiff: FileDiff }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const lines = fileDiff.diff.split('\n');
+  // Count additions and deletions (skip header lines starting with --- +++ @@)
+  let additions = 0;
+  let deletions = 0;
+  for (const line of lines) {
+    if (line.startsWith('+') && !line.startsWith('+++')) additions++;
+    else if (line.startsWith('-') && !line.startsWith('---')) deletions++;
+  }
+
+  return (
+    <div style={{
+      border: '1px solid var(--border)',
+      borderRadius: '6px',
+      overflow: 'hidden',
+    }}>
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '6px 10px',
+          background: 'var(--bg)',
+          cursor: 'pointer',
+          fontSize: '12px',
+        }}
+      >
+        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <FileText size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+        <span style={{ fontFamily: 'var(--font-mono)', flex: 1 }}>{fileDiff.path}</span>
+        <span style={{ display: 'flex', gap: '6px', fontSize: '11px', flexShrink: 0 }}>
+          {additions > 0 && <span style={{ color: '#a6e3a1' }}>+{additions}</span>}
+          {deletions > 0 && <span style={{ color: '#f38ba8' }}>-{deletions}</span>}
+        </span>
+      </div>
+      {isExpanded && (
+        <div style={{
+          overflow: 'auto',
+          maxHeight: '300px',
+          fontSize: '11px',
+          fontFamily: 'var(--font-mono)',
+          lineHeight: '1.5',
+        }}>
+          {lines.map((line, i) => {
+            // Skip empty trailing line
+            if (i === lines.length - 1 && line === '') return null;
+            let bg = 'transparent';
+            let color = 'var(--text-dim)';
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+              bg = 'rgba(166, 227, 161, 0.1)';
+              color = '#a6e3a1';
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+              bg = 'rgba(243, 139, 168, 0.1)';
+              color = '#f38ba8';
+            } else if (line.startsWith('@@')) {
+              color = 'var(--accent)';
+            }
+            return (
+              <div
+                key={i}
+                style={{
+                  padding: '0 10px',
+                  background: bg,
+                  color,
+                  whiteSpace: 'pre',
+                  minHeight: '18px',
+                }}
+              >
+                {line}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }: {
+  steps: FollowUpStep[];
+  answer?: string;
+  filesChanged?: string[];
+  diffs?: FileDiff[];
+  isLive?: boolean;
+}) {
+  const completed = steps.filter((s) => s.status === 'completed').length;
+  const inProgress = isLive || steps.some((s) => s.status === 'running');
+  const hasDiffs = diffs && diffs.length > 0;
+
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: '12px',
+      padding: '14px 16px',
+      fontSize: '13px',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '12px',
+        fontSize: '13px',
+        fontWeight: 500,
+        color: inProgress ? 'var(--accent)' : 'var(--success)',
+      }}>
+        {inProgress ? (
+          <>
+            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            Exploring codebase...
+          </>
+        ) : (
+          <>
+            <CheckCircle2 size={14} />
+            Done ({completed} {completed === 1 ? 'step' : 'steps'})
+          </>
+        )}
+      </div>
+
+      {/* Steps with previews */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {steps.map((step) => {
+          const ToolIcon = getFollowUpToolIcon(step.tool);
+          return (
+            <div
+              key={step.id}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                background: step.status === 'running' ? 'rgba(137, 180, 250, 0.08)' : 'transparent',
+                fontSize: '13px',
+                transition: 'background 0.2s',
+              }}
+            >
+              {step.status === 'running' ? (
+                <Loader2 size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px', animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <ToolIcon size={14} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '1px' }} />
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ color: 'var(--text)' }}>
+                  {getFollowUpToolLabel(step.tool, step.args, step.status === 'running')}
+                </span>
+                {step.status === 'completed' && step.resultPreview && step.tool !== 'write_file' && step.tool !== 'edit_file' && (
+                  <div style={{
+                    marginTop: '4px',
+                    padding: '4px 6px',
+                    background: 'var(--bg)',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--text-dim)',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    maxHeight: '60px',
+                    overflow: 'hidden',
+                  }}>
+                    {step.resultPreview}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Files changed with diffs */}
+      {hasDiffs && (
+        <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginBottom: '8px',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: 'var(--text-dim)',
+          }}>
+            Files changed
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {diffs.map((d) => (
+              <DiffBlock key={d.path} fileDiff={d} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback: file list without diffs */}
+      {!hasDiffs && filesChanged && filesChanged.length > 0 && (
+        <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginBottom: '6px',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: 'var(--text-dim)',
+          }}>
+            Files changed
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            {filesChanged.map((filePath) => (
+              <div
+                key={filePath}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                }}
+              >
+                <FileText size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                <span style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{filePath}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Answer text */}
+      {answer && (
+        <div className="markdown-content" style={{
+          marginTop: '10px',
+          borderTop: '1px solid var(--border)',
+          paddingTop: '10px',
+          fontSize: '13px',
+          lineHeight: '1.6',
+          color: 'var(--text)',
+          wordBreak: 'break-word',
+        }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   const isUser = message.role === 'user';
 
@@ -468,13 +759,16 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return (
       <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
         <div style={{ maxWidth: '85%' }}>
+          {message.agentCard.type === 'cases_fetched' && (
+            <CasesFetchedCard cases={message.agentCard.cases} />
+          )}
           {message.agentCard.type === 'package_fetched' && (
-            <PackageFetchedCard
-              packageId={message.agentCard.packageId}
-              packageName={message.agentCard.packageName}
-              dataSchema={message.agentCard.dataSchema}
-              relevantFields={message.agentCard.relevantFields}
-            />
+            <CasesFetchedCard cases={[{
+              packageId: message.agentCard.packageId,
+              packageName: message.agentCard.packageName,
+              dataSchema: message.agentCard.dataSchema,
+              relevantFields: message.agentCard.relevantFields,
+            }]} />
           )}
           {message.agentCard.type === 'design_complete' && (
             <DesignCompleteCard architecture={message.agentCard.architecture} ux={message.agentCard.ux} />
@@ -499,6 +793,9 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
           {message.agentCard.type === 'fix_progress' && (
             <FixProgressCard steps={message.agentCard.steps} content={message.content} />
           )}
+          {message.agentCard.type === 'followup_progress' && (
+            <FollowUpProgress steps={message.agentCard.steps} answer={message.agentCard.answer} filesChanged={message.agentCard.filesChanged} diffs={message.agentCard.diffs} />
+          )}
         </div>
       </div>
     );
@@ -518,7 +815,29 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         fontSize: '14px',
         lineHeight: '1.6',
       }}>
-        {isUser && message.package && (
+        {isUser && message.cases && message.cases.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: 6 }}>
+            {message.cases.map((c) => (
+              <div key={c.id} style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: 'rgba(76, 167, 255, 0.14)',
+                border: '1px solid rgba(76, 167, 255, 0.25)',
+                color: 'var(--text)',
+                fontSize: 12,
+              }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Case</span>
+                <span style={{ fontWeight: 600 }}>{c.name}</span>
+                <span style={{ color: 'var(--text-dim)' }}>#{c.id}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Backward compat for old single-package messages */}
+        {isUser && !message.cases && message.package && (
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -531,7 +850,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
             fontSize: 12,
             marginBottom: 6,
           }}>
-            <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Package</span>
+            <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Case</span>
             <span style={{ fontWeight: 600 }}>{message.package.name}</span>
             <span style={{ color: 'var(--text-dim)' }}>#{message.package.id}</span>
           </div>
@@ -541,6 +860,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         ) : (
           <div className="markdown-content" style={{ wordBreak: 'break-word' }}>
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
                 code({ children, className, ...props }) {
                   const isInline = !className;
@@ -637,6 +957,10 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         }
         .markdown-content p { margin: 4px 0; }
         .markdown-content ul, .markdown-content ol { padding-left: 20px; margin: 4px 0; }
+        .markdown-content table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+        .markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+        .markdown-content th { background: var(--bg); font-weight: 600; }
+        .markdown-content tr:nth-child(even) { background: rgba(255,255,255,0.02); }
       `}</style>
     </div>
   );

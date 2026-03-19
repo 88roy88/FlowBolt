@@ -41,6 +41,9 @@ class ActionParser:
         Fired when a complete ``<boltAction type="file">`` is parsed.
     on_shell_action(command: str)
         Fired when a complete ``<boltAction type="shell">`` is parsed.
+    on_edit_action(path: str, search_str: str, replace_str: str)
+        Fired when a complete ``<boltAction type="edit">`` with
+        ``<search>``/``<replace>`` children is parsed.
     """
 
     def __init__(
@@ -48,10 +51,12 @@ class ActionParser:
         on_text: Callable[[str], None] | None = None,
         on_file_action: Callable[[str, str], None] | None = None,
         on_shell_action: Callable[[str], None] | None = None,
+        on_edit_action: Callable[[str, str, str], None] | None = None,
     ) -> None:
         self.on_text = on_text or (lambda _t: None)
         self.on_file_action = on_file_action or (lambda _p, _c: None)
         self.on_shell_action = on_shell_action or (lambda _c: None)
+        self.on_edit_action = on_edit_action or (lambda _p, _s, _r: None)
 
         self._buffer: str = ""
         self._state: _State = _State.TEXT
@@ -146,11 +151,23 @@ class ActionParser:
                     self.on_file_action(self._action_file_path, body)
                 elif self._action_type == "shell":
                     self.on_shell_action(body)
+                elif self._action_type == "edit":
+                    self._parse_edit_action(self._action_file_path, body)
 
                 self._action_type = ""
                 self._action_file_path = ""
                 self._action_body = ""
                 self._state = _State.IN_ARTIFACT
+
+    _SEARCH_RE = re.compile(r"<search>\n?(.*?)\n?</search>", re.DOTALL)
+    _REPLACE_RE = re.compile(r"<replace>\n?(.*?)\n?</replace>", re.DOTALL)
+
+    def _parse_edit_action(self, path: str, body: str) -> None:
+        """Extract ``<search>``/``<replace>`` pairs from an edit action body."""
+        searches = self._SEARCH_RE.findall(body)
+        replaces = self._REPLACE_RE.findall(body)
+        for search_str, replace_str in zip(searches, replaces):
+            self.on_edit_action(path, search_str, replace_str)
 
     def flush(self) -> None:
         """Flush any remaining buffered text (call at end of stream)."""

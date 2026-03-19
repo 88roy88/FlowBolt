@@ -63,7 +63,7 @@ export const stubPeopleWithPhotosResults = {
     { id: 'p4', name: 'Casey Morgan', phone: '+1-555-201-1004', last_seen_location: 'Main Office', image_url: 'https://picsum.photos/seed/p4/400/400' },
     { id: 'p5', name: 'Riley Taylor', phone: '+1-555-201-1005', last_seen_location: 'Lab 2', image_url: 'https://picsum.photos/seed/p5/400/400' },
     { id: 'p6', name: 'Quinn Adams', phone: '+1-555-201-1006', last_seen_location: 'Parking Lot', image_url: 'https://picsum.photos/seed/p6/400/400' },
-    { id: 'p7', name: 'Rivka M', phone: '+1-555-201-1006', last_seen_location: 'Parking Lot', image_url: 'https://picsum.photos/seed/p7/400/400' },
+    { id: 'p7', name: 'Rivky K', phone: '+1-555-201-1006', last_seen_location: 'Parking Lot', image_url: 'https://picsum.photos/seed/p7/400/400' },
   ],
   photos: [
     { id: 'img1', photo_id: 'p1', url: 'https://picsum.photos/seed/p1/400/400', caption: 'Alex Chen' },
@@ -73,6 +73,19 @@ export const stubPeopleWithPhotosResults = {
     { id: 'img5', photo_id: 'p5', url: 'https://picsum.photos/seed/p5/400/400', caption: 'Riley Taylor' },
     { id: 'img6', photo_id: 'p6', url: 'https://picsum.photos/seed/p6/400/400', caption: 'Quinn Adams' },
     { id: 'img7', photo_id: 'p7', url: 'https://picsum.photos/seed/p7/400/400', caption: 'Quinn Adams' },
+  ],
+};
+
+/** People Hebrew names: package 6. Same person IDs as package 4, with Hebrew names — for testing merge/join. */
+export const stubPeopleHebrewResults = {
+  people: [
+    { id: 'p1', hebrew_name: 'אלכס חן', department: 'הנדסה', rank: 'סגן' },
+    { id: 'p2', hebrew_name: 'סם ריברה', department: 'מודיעין', rank: 'סרן' },
+    { id: 'p3', hebrew_name: 'ג\'ורדן לי', department: 'לוגיסטיקה', rank: 'רב-סרן' },
+    { id: 'p4', hebrew_name: 'קייסי מורגן', department: 'תקשוב', rank: 'סגן' },
+    { id: 'p5', hebrew_name: 'ריילי טיילור', department: 'הנדסה', rank: 'סרן' },
+    { id: 'p6', hebrew_name: 'קווין אדמס', department: 'מבצעים', rank: 'רב-סרן' },
+    { id: 'p7', hebrew_name: 'רבקה מ', department: 'מודיעין', rank: 'סגן-אלוף' },
   ],
 };
 
