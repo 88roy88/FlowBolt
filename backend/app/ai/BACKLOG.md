@@ -1,6 +1,6 @@
 # AI Builder Backlog
 
-## B0. Decouple agents from WebSocket — DB as source of truth (NEXT)
+## ~~B0. Decouple agents from WebSocket — DB as source of truth~~ DONE
 
 **Problem:** Agents take `ws_send` and call it directly. Browser refresh kills the
 build. State lives only in memory.
@@ -291,3 +291,199 @@ Add per-workspace size limit.
 
 Currently uses string format logging. Switch to JSON structured logs for production
 (easier to search, aggregate, alert on).
+
+---
+
+## I5. Standardized tracing decorators
+
+Port `@observe_flow`, `@observe_step`, `@observe_tool`, `@observe_llm_call` from
+primesrc's `core/tracing.py`. Currently agents use ad-hoc `@observe(name=...)` and
+manual `langfuse_client.span()` / `.end()` calls (especially in BuildAgent's
+`_accept_plan` with 3 manual spans).
+
+What to port:
+- `@observe_flow` — wraps Flow.run with trace-level observation
+- `@observe_step` — wraps step functions with span tracking (input/output state)
+- `@observe_tool` — wraps tool execution with tool-type observation
+- `@observe_llm_call` — wraps LLM calls with token/cost tracking
+
+Adapt from primesrc's Bedrock-specific implementation to our LiteLLM usage.
+Replace manual span management in BuildAgent with decorators.
+
+---
+
+## A6. Structured output for JSON prompts
+
+Several prompts ask the LLM to respond with "ONLY a JSON object" and then we parse
+it with `_parse_json_response` which strips markdown fences and does fallback
+extraction. This is fragile — the LLM sometimes wraps JSON in text or returns
+malformed JSON.
+
+Use structured output (tool calling / response_format) instead:
+- Define Pydantic models for each expected response (ArchitectureDesign, UXDesign,
+  UserPlanOverview, TechnicalPlan, ProjectSummary, PackageAnalysis)
+- Use LiteLLM's `response_format` parameter or tool-based extraction (like
+  primesrc's `chat_structured`)
+- Eliminates JSON parsing failures, markdown fence stripping, and fallback logic
+- `_parse_json_response` helper can be deleted
+
+**Candidate prompts:**
+- `architecture.jinja2` → `ArchitectureDesign` model
+- `ux_design.jinja2` → `UXDesign` model
+- `user_plan.jinja2` → `UserPlanOverview` model
+- `merge.jinja2` → `TechnicalPlan` model
+- `summary.jinja2` → `ProjectSummary` model
+- `classify.jinja2` → `ClassificationResult` model
+- Package analysis in BuildAgent → `PackageAnalysis` model
+
+**NOT candidates** (free-form output):
+- `codegen.jinja2` — outputs XML/code, not JSON
+- `fix_errors.jinja2` — outputs XML/code
+- `followup.jinja2` — outputs text + tool calls
+
+---
+
+## I6. CI/CD pipeline
+
+No CI/CD exists. Set up:
+
+**CI (on every PR):**
+- Python linting (ruff)
+- TypeScript type checking (tsc --noEmit)
+- Frontend build (vite build)
+- Python tests (once B12 test coverage exists)
+- Frontend tests (once added)
+
+**CD (on merge to main):**
+- Build Docker images (backend + frontend)
+- Push to container registry
+- Deploy to staging environment
+- Optional: deploy to production with manual approval
+
+**Tooling:** GitHub Actions (already using GitHub for PRs).
+
+**Files to create:**
+- `.github/workflows/ci.yml` — lint, type-check, build, test
+- `.github/workflows/deploy.yml` — build + push + deploy
+- `Makefile` targets for `lint`, `typecheck`, `test` (some already exist)
+
+---
+
+## I7. Migrate to Postgres + SQLModel + Alembic
+
+**Current state:** Raw `aiosqlite` with hand-written SQL, no ORM, fragile ALTER TABLE
+migrations that swallow errors. SQLite is single-writer and can't scale to multiple
+server instances.
+
+**Target:**
+- **Postgres** as the database (jsonb for BuildState, proper concurrency, scales horizontally)
+- **SQLModel** as the ORM (Pydantic models that double as DB tables — we already use
+  Pydantic for BuildState, Message, etc.)
+- **Alembic** for schema migrations (replaces the 6 fragile ALTER TABLE blocks in
+  `models/project.py` and manual CREATE TABLE in `init_db`)
+
+**Migration path:**
+1. Add `sqlmodel`, `alembic`, `asyncpg` (or `psycopg`) to dependencies
+2. Define SQLModel table classes for Project, ChatMessage, AgentEvent
+3. Set up Alembic with `alembic init` and auto-migration generation
+4. Replace raw SQL in `models/project.py`, `models/chat.py`, `models/events.py`
+   with SQLModel queries
+5. Replace `aiosqlite.connect()` with async SQLModel session
+6. Add `DATABASE_URL` config supporting both `sqlite:///` and `postgresql://`
+7. Generate initial Alembic migration from existing schema
+8. Test with both SQLite (dev) and Postgres (staging/prod)
+
+**Why Postgres over alternatives:**
+- Data is relational (projects → messages → events, FK cascades)
+- `jsonb` for BuildState snapshots and agent event payloads
+- Proper connection pooling, concurrent writes, indexed queries
+- Industry standard, well-supported by SQLModel/SQLAlchemy
+
+**Why not Redis:** No need for in-memory cache or pub/sub at this stage.
+The in-process asyncio.Queue handles real-time notifications. If we go
+multi-process, Redis pub/sub could supplement Postgres — not replace it.
+
+**Why not MongoDB:** Data is relational. Would lose cascade deletes,
+transactions, and typed schemas.
+
+---
+
+## B13. Agent state persistence to DB
+
+Part of B0 that wasn't completed. Persist BuildState to DB at phase transitions
+so agents can survive server restarts (not just browser refreshes).
+
+**What to add:**
+- `agent_phase` and `agent_state` columns on projects table
+- `update_agent_phase(session_id, phase)` / `get_agent_state(session_id)`
+- BuildAgent writes state after: design complete, plan overview, technical plan, execution
+- On server restart: check for sessions with non-idle phase, resume or mark as failed
+
+**Depends on:** I7 (cleaner with Alembic migrations) or can be done with raw ALTER TABLE
+
+---
+
+## F11. React Query for frontend data fetching
+
+Replace manual fetch/loading/caching logic with TanStack Query (react-query).
+
+**What it gives us:**
+- Loading/pending states (fixes empty state flash on refresh)
+- Stale-while-revalidate (instant project switching)
+- Automatic refetch on window focus, reconnect, interval
+- Cache invalidation (`queryClient.invalidateQueries`)
+- Deduplication, retry with backoff, error boundaries
+
+**What it replaces:**
+- Manual `loadProjects()`, `loadHistory()`, `loadFileTree()`, `loadModels()` calls
+- `isCreating` state in session store
+- `pollFileTree` utility
+- Manual loading state tracking
+
+**What stays in Zustand:**
+- Agent UI state (phase, planOverview, tasks, streaming) — driven by WS events, not REST
+
+---
+
+## F12. Auto-generated API client (orval)
+
+Use **orval** to auto-generate a fully typed react-query client from the FastAPI
+OpenAPI spec. One command produces typed hooks for every endpoint.
+
+**Setup:**
+- FastAPI already serves `/openapi.json`
+- `npx orval` reads the spec → generates hooks + types
+- Add `orval.config.ts` with react-query output mode
+- Run as a build step or `pnpm generate-api`
+
+**What it generates:**
+- `useProjects()`, `useCreateProject()`, `useDeleteProject()` — react-query hooks
+- Request/response TypeScript types from backend Pydantic models
+- Automatic cache invalidation on mutations
+
+**What gets deleted:**
+- `frontend/src/services/api.ts` (manual fetch functions)
+- Most of `frontend/src/types/index.ts` (API types auto-generated)
+- Manual type duplication between backend and frontend
+
+**Backend prerequisites:**
+- Add Pydantic response models to all endpoints (some return raw dicts)
+- Consistent endpoint tagging for grouping
+- Proper request body models (some already have them)
+
+**Why orval:** Generates react-query hooks directly (not just a fetch client).
+Alternatives: `@hey-api/openapi-ts` (generates client, pair with react-query manually),
+`openapi-typescript` (types only).
+
+---
+
+## B14. Frontend reconnect handling
+
+Part of B0 that needs verification. Backend replays events on WS connect, but
+frontend may not handle receiving a batch of historical events correctly.
+
+**What to verify/fix:**
+- Frontend processes replayed events the same as live events
+- No duplicate UI state from replaying events that were already processed
+- Phase indicator shows correct state on reconnect
+- Task progress, file tree, and chat history are consistent after reconnect
