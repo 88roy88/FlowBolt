@@ -3,14 +3,13 @@ import { useErrorStore, type AppError } from '../../stores/errors';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
+import { Button } from '../ui/button';
 
 export { useErrorCapture } from '../../hooks/useErrorCapture';
 
 function normalizeFilePath(filePath: string): string {
   const srcIdx = filePath.indexOf('/src/');
-  if (srcIdx !== -1) {
-    return filePath.slice(srcIdx);
-  }
+  if (srcIdx !== -1) return filePath.slice(srcIdx);
   if (!filePath.startsWith('/src/')) {
     if (!filePath.startsWith('/')) filePath = '/' + filePath;
     return '/src' + filePath;
@@ -40,111 +39,37 @@ function SingleErrorToast({ error }: { error: AppError }) {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '10px',
-      padding: '12px 14px',
-      background: 'var(--surface)',
-      border: '1px solid var(--danger)',
-      borderRadius: '8px',
-      maxWidth: '420px',
-      boxShadow: 'var(--shadow-lg)',
-    }}>
-      <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: '11px',
-          fontWeight: 600,
-          color: 'var(--danger)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          marginBottom: '4px',
-        }}>
+    <div className="flex items-start gap-2.5 p-3 bg-card border border-destructive rounded-lg max-w-[420px] shadow-[var(--shadow-lg)]">
+      <AlertTriangle size={18} className="text-destructive shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-semibold text-destructive uppercase tracking-wider mb-1">
           {error.source === 'build' ? 'Build Error' : error.source === 'runtime' ? 'Runtime Error' : 'Connection Error'}
         </div>
-        <div style={{
-          fontSize: '13px',
-          color: 'var(--text)',
-          lineHeight: '1.4',
-          wordBreak: 'break-word',
-        }}>
-          {error.message.length > 150
-            ? error.message.slice(0, 150) + '...'
-            : error.message}
+        <div className="text-[13px] leading-snug break-words">
+          {error.message.length > 150 ? error.message.slice(0, 150) + '...' : error.message}
         </div>
         {error.file && (
           <button
             onClick={() => openFile(normalizeFilePath(error.file!), error.line, error.column)}
-            style={{
-              display: 'block',
-              fontSize: '11px',
-              color: 'var(--accent)',
-              marginTop: '6px',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
+            className="block text-[11px] text-primary underline mt-1.5 text-left cursor-pointer"
             title="Open in editor"
           >
             {error.file}{error.line ? `:${error.line}` : ''}
           </button>
         )}
         {error.source === 'connection' ? (
-          <button
-            onClick={handleRetry}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginLeft: 'auto',
-              gap: '4px',
-              marginTop: '10px',
-              padding: '4px 10px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'var(--accent)',
-              border: '1px solid var(--accent)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
+          <Button variant="outline" size="sm" onClick={handleRetry} className="mt-2.5 ml-auto">
             <RefreshCw size={12} />
             Retry
-          </button>
+          </Button>
         ) : (
-          <button
-            onClick={handleFix}
-            disabled={isStreaming}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginLeft: 'auto',
-              gap: '4px',
-              marginTop: '10px',
-              padding: '4px 10px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: isStreaming ? 'var(--text-dim)' : 'var(--accent)',
-              border: `1px solid ${isStreaming ? 'var(--border)' : 'var(--accent)'}`,
-              borderRadius: '4px',
-              cursor: isStreaming ? 'not-allowed' : 'pointer',
-              opacity: isStreaming ? 0.5 : 1,
-            }}
-          >
+          <Button variant="outline" size="sm" onClick={handleFix} disabled={isStreaming} className="mt-2.5 ml-auto">
             <Wrench size={12} />
             Fix with AI
-          </button>
+          </Button>
         )}
       </div>
-      <button
-        onClick={() => dismissError(error.id)}
-        style={{
-          padding: '2px',
-          color: 'var(--text-dim)',
-          flexShrink: 0,
-        }}
-        title="Dismiss"
-      >
+      <button onClick={() => dismissError(error.id)} className="p-0.5 text-muted-foreground shrink-0" title="Dismiss">
         <X size={14} />
       </button>
     </div>
@@ -153,19 +78,10 @@ function SingleErrorToast({ error }: { error: AppError }) {
 
 export function ErrorToast() {
   const errors = useErrorStore((s) => s.errors);
-
   if (errors.length === 0) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '16px',
-      right: '16px',
-      zIndex: 9999,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '8px',
-    }}>
+    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2">
       {errors.map((error) => (
         <SingleErrorToast key={error.id} error={error} />
       ))}

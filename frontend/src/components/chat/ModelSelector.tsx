@@ -8,9 +8,7 @@ export function ModelSelector() {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    loadModels();
-  }, [loadModels]);
+  useEffect(() => { loadModels(); }, [loadModels]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, AIModel[]> = {};
@@ -26,79 +24,30 @@ export function ModelSelector() {
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative' }}>
+    <div ref={dropdownRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '4px 10px',
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-          borderRadius: '999px',
-          color: 'var(--text)',
-          fontSize: '12px',
-          cursor: 'pointer',
-          maxWidth: '260px',
-        }}
+        className="flex items-center gap-1.5 px-2.5 py-1 bg-background border border-border rounded-full text-xs cursor-pointer max-w-[260px]"
         title={current?.id ?? 'Loading models…'}
       >
-        <span style={{ fontWeight: 500, color: 'var(--text-dim)' }}>Model</span>
-        <span
-          style={{
-            flex: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            textAlign: 'left',
-          }}
-        >
-          {current?.name ?? current?.id ?? 'Loading models…'}
-        </span>
-        <ChevronDown size={14} style={{ flexShrink: 0, opacity: 0.7 }} />
+        <span className="font-medium text-muted-foreground">Model</span>
+        <span className="flex-1 truncate text-left">{current?.name ?? current?.id ?? 'Loading models…'}</span>
+        <ChevronDown size={14} className="shrink-0 opacity-70" />
       </button>
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '110%',
-            right: 0,
-            marginTop: '4px',
-            minWidth: '260px',
-            maxHeight: '320px',
-            overflow: 'auto',
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            boxShadow: 'var(--shadow-lg)',
-            zIndex: 40,
-          }}
-        >
+        <div className="absolute top-full right-0 mt-1 min-w-[260px] max-h-80 overflow-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] z-40">
           {Object.entries(grouped).map(([provider, providerModels]) => (
             <div key={provider}>
-              <div
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '11px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  color: 'var(--text-dim)',
-                  borderBottom: '1px solid var(--dropdown-divider)',
-                  background: 'var(--dropdown-header-bg)',
-                }}
-              >
+              <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-[var(--dropdown-divider)] bg-[var(--dropdown-header-bg)]">
                 {provider}
               </div>
               {providerModels.map((m) => {
@@ -107,43 +56,13 @@ export function ModelSelector() {
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedModel(m.id);
-                      setOpen(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '6px 10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: isActive ? 'var(--accent-bg-strong)' : 'transparent',
-                      border: 'none',
-                      borderBottom: '1px solid var(--dropdown-divider)',
-                      color: 'var(--text)',
-                      fontSize: '12px',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                    }}
+                    onClick={() => { setSelectedModel(m.id); setOpen(false); }}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left cursor-pointer border-b border-[var(--dropdown-divider)] ${
+                      isActive ? 'bg-[var(--accent-bg-strong)]' : 'hover:bg-muted/50'
+                    }`}
                   >
-                    <Check
-                      size={14}
-                      style={{
-                        opacity: isActive ? 1 : 0,
-                        color: 'var(--accent)',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        flex: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {m.name}
-                    </span>
+                    <Check size={14} className={`shrink-0 text-primary ${isActive ? 'opacity-100' : 'opacity-0'}`} />
+                    <span className="flex-1 truncate">{m.name}</span>
                   </button>
                 );
               })}

@@ -1,13 +1,10 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
-const baseStyle: CSSProperties = {
-  background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: '12px',
-  padding: '14px 16px',
-  fontSize: '13px',
-};
-
-export function CardWrapper({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <div style={{ ...baseStyle, ...style }}>{children}</div>;
+export function CardWrapper({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn('rounded-xl border border-border bg-card p-3.5 text-[13px]', className)}>
+      {children}
+    </div>
+  );
 }

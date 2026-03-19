@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { FileText, TerminalSquare } from 'lucide-react';
 import type { Message } from '../../types';
+import { Badge } from '../ui/badge';
 import {
   CasesFetchedCard,
   DesignCompleteCard,
@@ -62,23 +63,13 @@ function AgentCardRenderer({ message }: { message: Message }) {
 
 function CaseBadges({ cases }: { cases: { id: number; name: string }[] }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: 6 }}>
+    <div className="flex flex-wrap gap-1 mb-1.5">
       {cases.map((c) => (
-        <div key={c.id} style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '3px 8px',
-          borderRadius: 999,
-          background: 'var(--accent-bg)',
-          border: '1px solid var(--accent-border)',
-          color: 'var(--text)',
-          fontSize: 12,
-        }}>
-          <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Case</span>
-          <span style={{ fontWeight: 600 }}>{c.name}</span>
-          <span style={{ color: 'var(--text-dim)' }}>#{c.id}</span>
-        </div>
+        <Badge key={c.id} variant="accent">
+          <span className="text-muted-foreground font-semibold">Case</span>
+          <span className="font-semibold">{c.name}</span>
+          <span className="text-muted-foreground">#{c.id}</span>
+        </Badge>
       ))}
     </div>
   );
@@ -94,8 +85,8 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   // Agent card messages
   if (message.agentCard) {
     return (
-      <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-        <div style={{ maxWidth: '85%' }}>
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <div className="max-w-[85%]">
           <AgentCardRenderer message={message} />
         </div>
       </div>
@@ -103,30 +94,22 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-    }}>
-      <div style={{
-        maxWidth: '85%',
-        padding: '10px 14px',
-        borderRadius: '12px',
-        background: isUser ? 'var(--user-bubble)' : 'var(--assistant-bubble)',
-        border: '1px solid var(--border)',
-        fontSize: '14px',
-        lineHeight: '1.6',
-      }}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[85%] px-3.5 py-2.5 rounded-xl border border-border text-sm leading-relaxed ${
+          isUser ? 'bg-user-bubble' : 'bg-assistant-bubble'
+        }`}
+      >
         {isUser && message.cases && message.cases.length > 0 && (
           <CaseBadges cases={message.cases} />
         )}
-        {/* Backward compat for old single-package messages */}
         {isUser && !message.cases && message.package && (
           <CaseBadges cases={[{ id: message.package.id, name: message.package.name }]} />
         )}
         {isUser ? (
-          <p style={{ whiteSpace: 'pre-wrap' }}>{message.content}</p>
+          <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <div className="markdown-content" style={{ wordBreak: 'break-word' }}>
+          <div className="markdown-content break-words">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
@@ -134,30 +117,13 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
                   const isInline = !className;
                   if (isInline) {
                     return (
-                      <code
-                        style={{
-                          background: 'var(--bg)',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          fontSize: '13px',
-                          fontFamily: 'var(--font-mono)',
-                        }}
-                        {...props}
-                      >
+                      <code className="bg-background px-1.5 py-0.5 rounded text-[13px] font-mono" {...props}>
                         {children}
                       </code>
                     );
                   }
                   return (
-                    <pre style={{
-                      background: 'var(--bg)',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      overflow: 'auto',
-                      fontSize: '13px',
-                      fontFamily: 'var(--font-mono)',
-                      margin: '8px 0',
-                    }}>
+                    <pre className="bg-background p-3 rounded-md overflow-auto text-[13px] font-mono my-2">
                       <code {...props}>{children}</code>
                     </pre>
                   );
@@ -167,49 +133,24 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
               {message.content}
             </ReactMarkdown>
             {isStreaming && (
-              <span style={{
-                display: 'inline-block',
-                width: '6px',
-                height: '16px',
-                background: 'var(--accent)',
-                marginLeft: '2px',
-                animation: 'blink 1s step-end infinite',
-                verticalAlign: 'text-bottom',
-              }} />
+              <span className="inline-block w-1.5 h-4 bg-primary ml-0.5 align-text-bottom animate-[blink_1s_step-end_infinite]" />
             )}
           </div>
         )}
 
         {/* Action indicators */}
         {message.actions && message.actions.length > 0 && (
-          <div style={{
-            marginTop: '8px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-          }}>
+          <div className="mt-2 flex flex-col gap-1">
             {message.actions.map((action, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '12px',
-                  color: 'var(--text-dim)',
-                  padding: '4px 8px',
-                  background: 'var(--bg)',
-                  borderRadius: '4px',
-                }}
-              >
+              <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 bg-background rounded">
                 {action.type === 'file' ? (
                   <>
-                    <FileText size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                    <FileText size={14} className="text-primary shrink-0" />
                     <span className="truncate">{action.path}</span>
                   </>
                 ) : (
                   <>
-                    <TerminalSquare size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                    <TerminalSquare size={14} className="text-success shrink-0" />
                     <span className="truncate">{action.command}</span>
                   </>
                 )}
@@ -218,18 +159,6 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes blink {
-          50% { opacity: 0; }
-        }
-        .markdown-content p { margin: 4px 0; }
-        .markdown-content ul, .markdown-content ol { padding-left: 20px; margin: 4px 0; }
-        .markdown-content table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
-        .markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
-        .markdown-content th { background: var(--bg); font-weight: 600; }
-        .markdown-content tr:nth-child(even) { background: var(--table-stripe); }
-      `}</style>
     </div>
   );
 }

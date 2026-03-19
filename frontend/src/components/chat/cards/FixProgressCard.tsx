@@ -13,22 +13,14 @@ export function FixProgressCard({ steps, content, isLive }: {
   const total = steps.length;
   const hasRunning = steps.some((s) => s.status === 'running');
 
-  const headerColor = failed > 0 ? 'var(--danger)' : (isLive && hasRunning) ? 'var(--accent)' : 'var(--success)';
+  const headerColor = failed > 0 ? 'text-destructive' : (isLive && hasRunning) ? 'text-primary' : 'text-success';
 
   return (
     <CardWrapper>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '12px',
-        fontSize: '13px',
-        fontWeight: 500,
-        color: headerColor,
-      }}>
+      <div className={`flex items-center gap-1.5 mb-3 text-[13px] font-medium ${headerColor}`}>
         {isLive && hasRunning ? (
           <>
-            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            <Loader2 size={14} className="animate-spin" />
             Fixing error...
           </>
         ) : failed > 0 ? (
@@ -45,44 +37,29 @@ export function FixProgressCard({ steps, content, isLive }: {
       </div>
 
       {content && (
-        <div style={{
-          marginBottom: '12px',
-          padding: '10px',
-          background: 'var(--bg)',
-          borderRadius: '6px',
-          fontSize: '12px',
-          lineHeight: '1.6',
-          color: 'var(--text)',
-        }}>
+        <div className="mb-3 p-2.5 bg-background rounded-md text-xs leading-relaxed">
           {content}
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div className="flex flex-col gap-1.5">
         {steps.map((step) => {
           const StepIcon = getStepIcon(step.step);
           return (
             <div
               key={step.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 8px',
-                borderRadius: '6px',
-                background: step.status === 'running' ? 'var(--running-bg)' : 'transparent',
-                fontSize: '13px',
-                transition: 'background 0.2s',
-              }}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
+                step.status === 'running' ? 'bg-running-bg' : ''
+              }`}
             >
               {step.status === 'running' ? (
-                <Loader2 size={14} style={{ color: 'var(--accent)', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
+                <Loader2 size={14} className="text-primary shrink-0 animate-spin" />
               ) : step.status === 'completed' ? (
-                <StepIcon size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                <StepIcon size={14} className="text-success shrink-0" />
               ) : (
-                <XCircle size={14} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+                <XCircle size={14} className="text-destructive shrink-0" />
               )}
-              <span style={{ color: step.status === 'failed' ? 'var(--danger)' : 'var(--text)' }}>
+              <span className={step.status === 'failed' ? 'text-destructive' : ''}>
                 {step.message}
               </span>
             </div>

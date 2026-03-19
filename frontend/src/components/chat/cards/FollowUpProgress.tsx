@@ -20,18 +20,10 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
   return (
     <CardWrapper>
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '12px',
-        fontSize: '13px',
-        fontWeight: 500,
-        color: inProgress ? 'var(--accent)' : 'var(--success)',
-      }}>
+      <div className={`flex items-center gap-1.5 mb-3 text-[13px] font-medium ${inProgress ? 'text-primary' : 'text-success'}`}>
         {inProgress ? (
           <>
-            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            <Loader2 size={14} className="animate-spin" />
             Exploring codebase...
           </>
         ) : (
@@ -43,46 +35,25 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
       </div>
 
       {/* Steps */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div className="flex flex-col gap-1.5">
         {steps.map((step) => {
           const ToolIcon = getFollowUpToolIcon(step.tool);
           return (
             <div
               key={step.id}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
-                padding: '6px 8px',
-                borderRadius: '6px',
-                background: step.status === 'running' ? 'var(--running-bg)' : 'transparent',
-                fontSize: '13px',
-                transition: 'background 0.2s',
-              }}
+              className={`flex items-start gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
+                step.status === 'running' ? 'bg-running-bg' : ''
+              }`}
             >
               {step.status === 'running' ? (
-                <Loader2 size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px', animation: 'spin 1s linear infinite' }} />
+                <Loader2 size={14} className="text-primary shrink-0 mt-px animate-spin" />
               ) : (
-                <ToolIcon size={14} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '1px' }} />
+                <ToolIcon size={14} className="text-success shrink-0 mt-px" />
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ color: 'var(--text)' }}>
-                  {getFollowUpToolLabel(step.tool, step.args, step.status === 'running')}
-                </span>
+              <div className="flex-1 min-w-0">
+                <span>{getFollowUpToolLabel(step.tool, step.args, step.status === 'running')}</span>
                 {step.status === 'completed' && step.resultPreview && step.tool !== 'write_file' && step.tool !== 'edit_file' && (
-                  <div style={{
-                    marginTop: '4px',
-                    padding: '4px 6px',
-                    background: 'var(--bg)',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--text-dim)',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-all',
-                    maxHeight: '60px',
-                    overflow: 'hidden',
-                  }}>
+                  <div className="mt-1 px-1.5 py-1 bg-background rounded text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all max-h-[60px] overflow-hidden">
                     {step.resultPreview}
                   </div>
                 )}
@@ -94,72 +65,32 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
 
       {/* Files changed with diffs */}
       {hasDiffs && (
-        <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            marginBottom: '8px',
-            fontSize: '12px',
-            fontWeight: 500,
-            color: 'var(--text-dim)',
-          }}>
-            Files changed
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {diffs.map((d) => (
-              <DiffBlock key={d.path} fileDiff={d} />
-            ))}
+        <div className="mt-2.5 border-t border-border pt-2.5">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Files changed</div>
+          <div className="flex flex-col gap-1.5">
+            {diffs.map((d) => <DiffBlock key={d.path} fileDiff={d} />)}
           </div>
         </div>
       )}
 
-      {/* Fallback: file list without diffs */}
+      {/* Fallback file list */}
       {!hasDiffs && filesChanged && filesChanged.length > 0 && (
-        <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            marginBottom: '6px',
-            fontSize: '12px',
-            fontWeight: 500,
-            color: 'var(--text-dim)',
-          }}>
-            Files changed
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <div className="mt-2.5 border-t border-border pt-2.5">
+          <div className="text-xs font-medium text-muted-foreground mb-1.5">Files changed</div>
+          <div className="flex flex-col gap-0.5">
             {filesChanged.map((filePath) => (
-              <div
-                key={filePath}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                }}
-              >
-                <FileText size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                <span style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{filePath}</span>
+              <div key={filePath} className="flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                <FileText size={12} className="text-primary shrink-0" />
+                <span className="font-mono">{filePath}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Answer text */}
+      {/* Answer */}
       {answer && (
-        <div className="markdown-content" style={{
-          marginTop: '10px',
-          borderTop: '1px solid var(--border)',
-          paddingTop: '10px',
-          fontSize: '13px',
-          lineHeight: '1.6',
-          color: 'var(--text)',
-          wordBreak: 'break-word',
-        }}>
+        <div className="markdown-content mt-2.5 border-t border-border pt-2.5 text-[13px] leading-relaxed break-words">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
         </div>
       )}

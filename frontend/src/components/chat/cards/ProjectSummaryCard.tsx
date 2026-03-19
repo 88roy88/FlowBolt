@@ -6,14 +6,7 @@ import { ProjectSummaryContent } from './ProjectSummaryContent';
 export function ProjectSummaryCard({ summary }: { summary: ProjectSummary }) {
   return (
     <CardWrapper>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontSize: '12px',
-        color: 'var(--success)',
-      }}>
+      <div className="flex items-center gap-1.5 mb-2 text-xs text-success">
         <CheckCircle2 size={12} />
         Project complete
       </div>

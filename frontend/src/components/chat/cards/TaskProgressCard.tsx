@@ -9,32 +9,21 @@ export function TaskProgressCard({ tasks }: { tasks: ExecutionTask[] }) {
 
   return (
     <CardWrapper>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontSize: '12px',
-        color: failed > 0 ? 'var(--danger)' : 'var(--success)',
-      }}>
+      <div className={`flex items-center gap-1.5 mb-2 text-xs ${failed > 0 ? 'text-destructive' : 'text-success'}`}>
         {failed > 0 ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
-        {failed > 0
-          ? `Built ${completed}/${total} tasks (${failed} failed)`
-          : `Built ${completed}/${total} tasks`}
+        {failed > 0 ? `Built ${completed}/${total} tasks (${failed} failed)` : `Built ${completed}/${total} tasks`}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+      <div className="flex flex-col gap-0.5">
         {tasks.map((task) => (
-          <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+          <div key={task.id} className="flex items-center gap-1.5 text-xs">
             {task.status === 'completed' ? (
-              <CheckCircle2 size={11} style={{ color: 'var(--success)', flexShrink: 0 }} />
+              <CheckCircle2 size={11} className="text-success shrink-0" />
             ) : task.status === 'failed' ? (
-              <XCircle size={11} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+              <XCircle size={11} className="text-destructive shrink-0" />
             ) : (
-              <span style={{ width: 11, height: 11, flexShrink: 0 }} />
+              <span className="w-[11px] h-[11px] shrink-0" />
             )}
-            <span style={{ color: task.status === 'failed' ? 'var(--danger)' : 'var(--text)' }}>
-              {task.title}
-            </span>
+            <span className={task.status === 'failed' ? 'text-destructive' : ''}>{task.title}</span>
           </div>
         ))}
       </div>

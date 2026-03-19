@@ -1,3 +1,14 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/*
+ * Design system tokens — single source of truth.
+ * shadcn components use --background, --foreground, etc.
+ * Our custom components can use either naming convention.
+ */
+
 :root {
   color-scheme: dark;
 }
@@ -5,21 +16,44 @@
 /* Dark theme (default) */
 :root,
 :root[data-theme='dark'] {
-  --bg: #1e1e2e;
+  /* Core palette */
+  --background: #1e1e2e;
+  --foreground: #cdd6f4;
   --surface: #2a2a3e;
-  --text: #cdd6f4;
-  --text-dim: #a6adc8;
+  --muted: #313244;
+  --muted-foreground: #a6adc8;
+
+  /* Brand */
+  --primary: #89b4fa;
+  --primary-foreground: #1e1e2e;
   --accent: #89b4fa;
-  --accent-hover: #74a8f7;
-  --border: #45475a;
-  --danger: #f38ba8;
+  --accent-foreground: #1e1e2e;
+
+  /* Semantic */
+  --destructive: #f38ba8;
+  --destructive-foreground: #1e1e2e;
   --success: #a6e3a1;
+  --success-foreground: #1e1e2e;
   --warning: #f9e2af;
+  --warning-foreground: #1e1e2e;
+
+  /* Chrome */
+  --border: #45475a;
+  --input: #45475a;
+  --ring: #89b4fa;
+  --radius: 0.5rem;
+
+  /* Card / Popover */
+  --card: #2a2a3e;
+  --card-foreground: #cdd6f4;
+  --popover: #2a2a3e;
+  --popover-foreground: #cdd6f4;
+
+  /* Chat-specific */
   --user-bubble: #313244;
   --assistant-bubble: #2a2a3e;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
-  /* Semantic colors */
+  /* Semantic tints */
   --text-on-accent: #ffffff;
   --accent-bg: rgba(137, 180, 250, 0.14);
   --accent-border: rgba(137, 180, 250, 0.25);
@@ -39,25 +73,50 @@
   --dropdown-divider: rgba(255, 255, 255, 0.03);
   --table-stripe: rgba(255, 255, 255, 0.02);
   --preview-bg: #1e1e2e;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* Legacy aliases (used by non-migrated components) */
+  --bg: var(--background);
+  --text: var(--foreground);
+  --text-dim: var(--muted-foreground);
+  --danger: var(--destructive);
+  --accent-hover: #74a8f7;
 }
 
 /* Light theme */
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #f5f5f7;
+
+  --background: #f5f5f7;
+  --foreground: #111827;
   --surface: #ffffff;
-  --text: #111827;
-  --text-dim: #6b7280;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
   --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --border: #d1d5db;
-  --danger: #dc2626;
+  --accent-foreground: #ffffff;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
   --success: #16a34a;
+  --success-foreground: #ffffff;
   --warning: #ca8a04;
+  --warning-foreground: #ffffff;
+
+  --border: #d1d5db;
+  --input: #d1d5db;
+  --ring: #2563eb;
+
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+
   --user-bubble: #e5f0ff;
   --assistant-bubble: #f3f4f6;
 
-  /* Semantic colors */
   --text-on-accent: #ffffff;
   --accent-bg: rgba(37, 99, 235, 0.1);
   --accent-border: rgba(37, 99, 235, 0.25);
@@ -77,109 +136,114 @@
   --dropdown-divider: rgba(0, 0, 0, 0.06);
   --table-stripe: rgba(0, 0, 0, 0.02);
   --preview-bg: #ffffff;
+
+  --bg: var(--background);
+  --text: var(--foreground);
+  --text-dim: var(--muted-foreground);
+  --danger: var(--destructive);
+  --accent-hover: #1d4ed8;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Register our tokens with Tailwind v4 */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-user-bubble: var(--user-bubble);
+  --color-assistant-bubble: var(--assistant-bubble);
+  --color-text-on-accent: var(--text-on-accent);
+  --color-accent-bg: var(--accent-bg);
+  --color-running-bg: var(--running-bg);
+  --color-danger-bg: var(--danger-bg);
+  --color-diff-add: var(--diff-add);
+  --color-diff-remove: var(--diff-remove);
+  --color-overlay: var(--overlay);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-mono: var(--font-mono);
 }
 
-html,
-body,
-#root {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
+/*
+ * Override Tailwind preflight where it conflicts with our app.
+ * These go in @layer base so they override preflight (which is also in base layer),
+ * and order-after means they win.
+ */
+@layer base {
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--background);
+    color: var(--foreground);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Restore our button/input resets on top of preflight */
+  button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+  }
+
+  input, textarea {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    outline: none;
+  }
+
+  a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
 }
 
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-}
-
-input,
-textarea {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: none;
-  outline: none;
-}
-
-a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-dim);
-}
-
-.flex {
-  display: flex;
-}
-
-.flex-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.justify-between {
-  justify-content: space-between;
-}
-
-.gap-sm {
-  gap: 8px;
-}
-
-.gap-md {
-  gap: 12px;
-}
-
-.overflow-hidden {
-  overflow: hidden;
-}
-
-.overflow-auto {
-  overflow: auto;
-}
-
+/* These are outside any layer — highest precedence */
 .truncate {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -188,4 +252,16 @@ a {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Markdown content styling */
+.markdown-content p { margin: 4px 0; }
+.markdown-content ul, .markdown-content ol { padding-left: 20px; margin: 4px 0; }
+.markdown-content table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+.markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.markdown-content th { background: var(--background); font-weight: 600; }
+.markdown-content tr:nth-child(even) { background: var(--table-stripe); }
+
+@keyframes blink {
+  50% { opacity: 0; }
 }

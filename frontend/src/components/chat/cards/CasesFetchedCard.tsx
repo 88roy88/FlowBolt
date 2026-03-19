@@ -11,51 +11,26 @@ interface CaseInfo {
 export function CasesFetchedCard({ cases }: { cases: CaseInfo[] }) {
   return (
     <CardWrapper>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontSize: '12px',
-        color: 'var(--success)',
-      }}>
+      <div className="flex items-center gap-1.5 mb-2 text-xs text-success">
         <CheckCircle2 size={12} />
         {cases.length === 1 ? 'Case data fetched' : `${cases.length} cases fetched`}
       </div>
       {cases.map((c) => (
-        <div key={c.packageId} style={{ marginBottom: '8px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 10px',
-            background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
-            borderRadius: '6px',
-            marginBottom: '6px',
-          }}>
-            <Package size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 500 }}>{c.packageName}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ID: {c.packageId}</div>
+        <div key={c.packageId} className="mb-2">
+          <div className="flex items-center gap-2 p-2 bg-[color-mix(in_srgb,var(--primary)_8%,transparent)] border border-[color-mix(in_srgb,var(--primary)_20%,transparent)] rounded-md mb-1.5">
+            <Package size={14} className="text-primary shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium">{c.packageName}</div>
+              <div className="text-[11px] text-muted-foreground">ID: {c.packageId}</div>
             </div>
           </div>
           {c.dataSchema && (
-            <div style={{
-              fontSize: '12px',
-              color: 'var(--text)',
-              lineHeight: '1.5',
-              marginBottom: c.relevantFields ? '4px' : '0',
-            }}>
+            <div className={`text-xs leading-normal ${c.relevantFields ? 'mb-1' : ''}`}>
               <strong>Data:</strong> {c.dataSchema}
             </div>
           )}
           {c.relevantFields && (
-            <div style={{
-              fontSize: '12px',
-              color: 'var(--text-dim)',
-              lineHeight: '1.5',
-            }}>
+            <div className="text-xs text-muted-foreground leading-normal">
               <strong>Relevant fields:</strong> {c.relevantFields}
             </div>
           )}

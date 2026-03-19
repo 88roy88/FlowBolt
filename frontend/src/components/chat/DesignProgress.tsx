@@ -4,23 +4,21 @@ import { CardWrapper } from './cards/CardWrapper';
 export function DesignProgress({ designProgress }: { designProgress: { architecture: string | null; ux: string | null } }) {
   return (
     <CardWrapper>
-      <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '10px' }}>
-        Designing...
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+      <div className="text-[13px] font-medium mb-2.5">Designing...</div>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 text-[13px]">
           {designProgress.architecture ? (
-            <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+            <CheckCircle2 size={14} className="text-success" />
           ) : (
-            <Loader2 size={14} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+            <Loader2 size={14} className="text-primary animate-spin" />
           )}
           <span>Architecture</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+        <div className="flex items-center gap-2 text-[13px]">
           {designProgress.ux ? (
-            <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+            <CheckCircle2 size={14} className="text-success" />
           ) : (
-            <Loader2 size={14} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+            <Loader2 size={14} className="text-primary animate-spin" />
           )}
           <span>UI/UX</span>
         </div>

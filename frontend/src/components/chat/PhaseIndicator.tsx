@@ -19,22 +19,12 @@ export function PhaseIndicator({ phase }: { phase: AgentPhase }) {
   if (!label) return null;
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      padding: '8px 14px',
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: '8px',
-      fontSize: '13px',
-      color: 'var(--text-dim)',
-    }}>
+    <div className="flex items-center gap-2 px-3.5 py-2 bg-surface border border-border rounded-lg text-[13px] text-muted-foreground">
       {phase !== 'complete' && phase !== 'awaiting_approval' && (
-        <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+        <Loader2 size={14} className="animate-spin" />
       )}
       {phase === 'complete' && (
-        <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+        <CheckCircle2 size={14} className="text-success" />
       )}
       {label}
     </div>

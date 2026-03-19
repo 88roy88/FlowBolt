@@ -31,43 +31,18 @@ export function ChatPanel() {
   const showPhaseIndicator = agentPhase === 'classifying' || agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      overflow: 'hidden',
-    }}>
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div
-        style={{
-          padding: '10px 16px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
-          fontSize: '13px',
-          fontWeight: 600,
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
-        }}
-      >
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border bg-surface text-[13px] font-semibold shrink-0">
         <span>Chat</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="flex items-center gap-2">
           <ThemeToggle />
           <ModelSelector />
         </div>
       </div>
 
       {/* Messages */}
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-      }}>
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}
@@ -105,22 +80,9 @@ export function ChatPanel() {
 
       {/* Error banner */}
       {error && (
-        <div style={{
-          padding: '8px 16px',
-          background: 'var(--danger-bg)',
-          borderTop: '1px solid var(--danger)',
-          color: 'var(--danger)',
-          fontSize: '13px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
+        <div className="flex items-center justify-between px-4 py-2 bg-danger-bg border-t border-destructive text-destructive text-[13px] shrink-0">
           <span>{error}</span>
-          <button
-            onClick={clearError}
-            style={{ color: 'var(--danger)', padding: '2px 6px', fontSize: '12px' }}
-          >
+          <button onClick={clearError} className="text-destructive px-1.5 py-0.5 text-xs">
             Dismiss
           </button>
         </div>

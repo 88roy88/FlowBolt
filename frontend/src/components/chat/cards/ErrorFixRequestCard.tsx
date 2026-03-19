@@ -12,21 +12,14 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
 
   return (
     <CardWrapper>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontSize: '12px',
-        color: 'var(--danger)',
-      }}>
+      <div className="flex items-center gap-1.5 mb-2 text-xs text-destructive">
         <AlertTriangle size={14} />
         Fix error request
       </div>
 
       {errorFile && (
-        <div style={{ marginBottom: '8px', fontSize: '12px', color: 'var(--text-dim)' }}>
-          <FileText size={12} style={{ display: 'inline', marginRight: '4px' }} />
+        <div className="mb-2 text-xs text-muted-foreground">
+          <FileText size={12} className="inline mr-1" />
           <strong>{errorFile}</strong>
           {errorLine && <span>:{errorLine}</span>}
         </div>
@@ -34,48 +27,23 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
 
       <div
         onClick={() => setIsExpanded(!isExpanded)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          cursor: 'pointer',
-          padding: '6px',
-          marginBottom: isExpanded ? '8px' : '0',
-          borderRadius: '6px',
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-        }}
+        className={`flex items-center gap-1.5 cursor-pointer p-1.5 rounded-md bg-background border border-border ${isExpanded ? 'mb-2' : ''}`}
       >
         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <span style={{ fontSize: '12px', fontWeight: 600 }}>Error details</span>
+        <span className="text-xs font-semibold">Error details</span>
       </div>
 
       {isExpanded && (
-        <div style={{
-          padding: '8px',
-          background: 'var(--bg)',
-          borderRadius: '6px',
-          fontSize: '12px',
-          lineHeight: '1.5',
-        }}>
-          <div style={{ marginBottom: errorStack ? '8px' : '0' }}>
-            <strong style={{ color: 'var(--danger)' }}>Message:</strong>
-            <div style={{ marginTop: '4px', color: 'var(--text)' }}>{errorMessage}</div>
+        <div className="p-2 bg-background rounded-md text-xs leading-normal">
+          <div className={errorStack ? 'mb-2' : ''}>
+            <strong className="text-destructive">Message:</strong>
+            <div className="mt-1">{errorMessage}</div>
           </div>
 
           {errorStack && (
             <div>
-              <strong style={{ color: 'var(--text-dim)' }}>Stack trace:</strong>
-              <pre style={{
-                marginTop: '4px',
-                padding: '8px',
-                background: 'var(--surface)',
-                borderRadius: '4px',
-                fontSize: '11px',
-                overflow: 'auto',
-                maxHeight: '200px',
-                fontFamily: 'monospace',
-              }}>
+              <strong className="text-muted-foreground">Stack trace:</strong>
+              <pre className="mt-1 p-2 bg-surface rounded text-[11px] overflow-auto max-h-[200px] font-mono">
                 {errorStack}
               </pre>
             </div>
