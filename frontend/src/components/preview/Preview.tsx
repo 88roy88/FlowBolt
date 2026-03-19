@@ -111,7 +111,7 @@ export function Preview() {
             flex: 1,
             width: '100%',
             border: 'none',
-            background: '#ffffff',
+            background: 'var(--preview-bg)',
           }}
           title="App Preview"
         />

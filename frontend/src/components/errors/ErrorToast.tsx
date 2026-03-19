@@ -46,17 +46,17 @@ function SingleErrorToast({ error }: { error: AppError }) {
       gap: '10px',
       padding: '12px 14px',
       background: 'var(--surface)',
-      border: '1px solid #f38ba8',
+      border: '1px solid var(--danger)',
       borderRadius: '8px',
       maxWidth: '420px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+      boxShadow: 'var(--shadow-lg)',
     }}>
-      <AlertTriangle size={18} style={{ color: '#f38ba8', flexShrink: 0, marginTop: '2px' }} />
+      <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: '11px',
           fontWeight: 600,
-          color: '#f38ba8',
+          color: 'var(--danger)',
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
           marginBottom: '4px',

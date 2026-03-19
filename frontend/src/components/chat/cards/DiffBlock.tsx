@@ -34,8 +34,8 @@ export function DiffBlock({ fileDiff }: { fileDiff: FileDiff }) {
         <FileText size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
         <span style={{ fontFamily: 'var(--font-mono)', flex: 1 }}>{fileDiff.path}</span>
         <span style={{ display: 'flex', gap: '6px', fontSize: '11px', flexShrink: 0 }}>
-          {additions > 0 && <span style={{ color: '#a6e3a1' }}>+{additions}</span>}
-          {deletions > 0 && <span style={{ color: '#f38ba8' }}>-{deletions}</span>}
+          {additions > 0 && <span style={{ color: 'var(--diff-add)' }}>+{additions}</span>}
+          {deletions > 0 && <span style={{ color: 'var(--diff-remove)' }}>-{deletions}</span>}
         </span>
       </div>
       {isExpanded && (
@@ -51,11 +51,11 @@ export function DiffBlock({ fileDiff }: { fileDiff: FileDiff }) {
             let bg = 'transparent';
             let color = 'var(--text-dim)';
             if (line.startsWith('+') && !line.startsWith('+++')) {
-              bg = 'rgba(166, 227, 161, 0.1)';
-              color = '#a6e3a1';
+              bg = 'var(--diff-add-bg)';
+              color = 'var(--diff-add)';
             } else if (line.startsWith('-') && !line.startsWith('---')) {
-              bg = 'rgba(243, 139, 168, 0.1)';
-              color = '#f38ba8';
+              bg = 'var(--diff-remove-bg)';
+              color = 'var(--diff-remove)';
             } else if (line.startsWith('@@')) {
               color = 'var(--accent)';
             }

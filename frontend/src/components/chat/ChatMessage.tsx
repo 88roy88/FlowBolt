@@ -70,8 +70,8 @@ function CaseBadges({ cases }: { cases: { id: number; name: string }[] }) {
           gap: 6,
           padding: '3px 8px',
           borderRadius: 999,
-          background: 'rgba(76, 167, 255, 0.14)',
-          border: '1px solid rgba(76, 167, 255, 0.25)',
+          background: 'var(--accent-bg)',
+          border: '1px solid var(--accent-border)',
           color: 'var(--text)',
           fontSize: 12,
         }}>
@@ -228,7 +228,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         .markdown-content table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
         .markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
         .markdown-content th { background: var(--bg); font-weight: 600; }
-        .markdown-content tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+        .markdown-content tr:nth-child(even) { background: var(--table-stripe); }
       `}</style>
     </div>
   );

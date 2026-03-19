@@ -14,9 +14,31 @@
   --border: #45475a;
   --danger: #f38ba8;
   --success: #a6e3a1;
+  --warning: #f9e2af;
   --user-bubble: #313244;
   --assistant-bubble: #2a2a3e;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* Semantic colors */
+  --text-on-accent: #ffffff;
+  --accent-bg: rgba(137, 180, 250, 0.14);
+  --accent-border: rgba(137, 180, 250, 0.25);
+  --accent-bg-strong: rgba(137, 180, 250, 0.15);
+  --danger-bg: rgba(243, 139, 168, 0.15);
+  --success-bg: rgba(166, 227, 161, 0.1);
+  --running-bg: rgba(137, 180, 250, 0.08);
+  --diff-add: #a6e3a1;
+  --diff-add-bg: rgba(166, 227, 161, 0.1);
+  --diff-remove: #f38ba8;
+  --diff-remove-bg: rgba(243, 139, 168, 0.1);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --dropdown-header-bg: rgba(0, 0, 0, 0.25);
+  --dropdown-divider: rgba(255, 255, 255, 0.03);
+  --table-stripe: rgba(255, 255, 255, 0.02);
+  --preview-bg: #1e1e2e;
 }
 
 /* Light theme */
@@ -31,8 +53,30 @@
   --border: #d1d5db;
   --danger: #dc2626;
   --success: #16a34a;
+  --warning: #ca8a04;
   --user-bubble: #e5f0ff;
   --assistant-bubble: #f3f4f6;
+
+  /* Semantic colors */
+  --text-on-accent: #ffffff;
+  --accent-bg: rgba(37, 99, 235, 0.1);
+  --accent-border: rgba(37, 99, 235, 0.25);
+  --accent-bg-strong: rgba(37, 99, 235, 0.15);
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --success-bg: rgba(22, 163, 74, 0.1);
+  --running-bg: rgba(37, 99, 235, 0.06);
+  --diff-add: #16a34a;
+  --diff-add-bg: rgba(22, 163, 74, 0.1);
+  --diff-remove: #dc2626;
+  --diff-remove-bg: rgba(220, 38, 38, 0.1);
+  --overlay: rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --dropdown-header-bg: rgba(0, 0, 0, 0.04);
+  --dropdown-divider: rgba(0, 0, 0, 0.06);
+  --table-stripe: rgba(0, 0, 0, 0.02);
+  --preview-bg: #ffffff;
 }
 
 *,

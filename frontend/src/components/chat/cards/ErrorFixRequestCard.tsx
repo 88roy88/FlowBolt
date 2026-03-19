@@ -18,7 +18,7 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
         gap: '6px',
         marginBottom: '8px',
         fontSize: '12px',
-        color: '#f38ba8',
+        color: 'var(--danger)',
       }}>
         <AlertTriangle size={14} />
         Fix error request
@@ -59,7 +59,7 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
           lineHeight: '1.5',
         }}>
           <div style={{ marginBottom: errorStack ? '8px' : '0' }}>
-            <strong style={{ color: '#f38ba8' }}>Message:</strong>
+            <strong style={{ color: 'var(--danger)' }}>Message:</strong>
             <div style={{ marginTop: '4px', color: 'var(--text)' }}>{errorMessage}</div>
           </div>
 

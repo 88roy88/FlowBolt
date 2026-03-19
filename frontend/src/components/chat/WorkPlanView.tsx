@@ -149,7 +149,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
             fontSize: '13px',
             fontWeight: 500,
             background: 'var(--success)',
-            color: '#fff',
+            color: 'var(--text-on-accent)',
             border: 'none',
             cursor: 'pointer',
           }}
@@ -167,8 +167,8 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
             borderRadius: '6px',
             fontSize: '13px',
             fontWeight: 500,
-            background: 'var(--warning, #e5a50a)',
-            color: '#fff',
+            background: 'var(--warning)',
+            color: 'var(--text-on-accent)',
             border: 'none',
             cursor: 'pointer',
           }}

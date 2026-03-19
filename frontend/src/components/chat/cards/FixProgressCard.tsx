@@ -70,7 +70,7 @@ export function FixProgressCard({ steps, content, isLive }: {
                 gap: '8px',
                 padding: '6px 8px',
                 borderRadius: '6px',
-                background: step.status === 'running' ? 'rgba(137, 180, 250, 0.08)' : 'transparent',
+                background: step.status === 'running' ? 'var(--running-bg)' : 'transparent',
                 fontSize: '13px',
                 transition: 'background 0.2s',
               }}

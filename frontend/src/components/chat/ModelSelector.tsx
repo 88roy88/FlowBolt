@@ -82,7 +82,7 @@ export function ModelSelector() {
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: '8px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            boxShadow: 'var(--shadow-lg)',
             zIndex: 40,
           }}
         >
@@ -95,8 +95,8 @@ export function ModelSelector() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   color: 'var(--text-dim)',
-                  borderBottom: '1px solid rgba(255,255,255,0.03)',
-                  background: 'rgba(0,0,0,0.25)',
+                  borderBottom: '1px solid var(--dropdown-divider)',
+                  background: 'var(--dropdown-header-bg)',
                 }}
               >
                 {provider}
@@ -117,9 +117,9 @@ export function ModelSelector() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      background: isActive ? 'rgba(76, 167, 255, 0.15)' : 'transparent',
+                      background: isActive ? 'var(--accent-bg-strong)' : 'transparent',
                       border: 'none',
-                      borderBottom: '1px solid rgba(255,255,255,0.03)',
+                      borderBottom: '1px solid var(--dropdown-divider)',
                       color: 'var(--text)',
                       fontSize: '12px',
                       textAlign: 'left',

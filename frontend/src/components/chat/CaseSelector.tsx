@@ -163,7 +163,7 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          boxShadow: 'var(--shadow-md)',
           zIndex: 1000,
         }}>
           {isLoading ? (

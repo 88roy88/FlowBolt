@@ -146,7 +146,7 @@ export function PromptInput() {
           transition: 'border-color 0.15s, box-shadow 0.15s',
           boxShadow: focused && !disabled
             ? '0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent)'
-            : '0 1px 3px rgba(0,0,0,0.08)',
+            : 'var(--shadow-sm)',
         }}
       >
         {/* Case selector toggle icon */}
@@ -182,7 +182,7 @@ export function PromptInput() {
                 height: '14px',
                 borderRadius: '7px',
                 background: 'var(--accent)',
-                color: '#fff',
+                color: 'var(--text-on-accent)',
                 fontSize: '9px',
                 fontWeight: 700,
                 display: 'flex',
@@ -229,7 +229,7 @@ export function PromptInput() {
             justifyContent: 'center',
             borderRadius: '8px',
             background: canSend ? 'var(--accent)' : 'var(--border)',
-            color: canSend ? '#fff' : 'var(--text-dim)',
+            color: canSend ? 'var(--text-on-accent)' : 'var(--text-dim)',
             opacity: canSend ? 1 : 0.4,
             flexShrink: 0,
             transition: 'background 0.15s, opacity 0.15s',

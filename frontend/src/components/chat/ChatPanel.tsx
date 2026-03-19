@@ -107,7 +107,7 @@ export function ChatPanel() {
       {error && (
         <div style={{
           padding: '8px 16px',
-          background: 'rgba(243, 139, 168, 0.15)',
+          background: 'var(--danger-bg)',
           borderTop: '1px solid var(--danger)',
           color: 'var(--danger)',
           fontSize: '13px',
