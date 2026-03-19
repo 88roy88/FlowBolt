@@ -1,95 +1,21 @@
-import { useEffect, useRef } from 'react';
 import { AlertTriangle, X, Wrench, RefreshCw } from 'lucide-react';
 import { useErrorStore, type AppError } from '../../stores/errors';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
 
-function getWsBase(): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}`;
-}
+export { useErrorCapture } from '../../hooks/useErrorCapture';
 
-/** Connect to the build-error WebSocket and listen for runtime errors from the preview iframe. */
-export function useErrorCapture() {
-  const sessionId = useSessionStore((s) => s.sessionId);
-  const pushError = useErrorStore((s) => s.pushError);
-  const clearErrors = useErrorStore((s) => s.clearErrors);
-  const wsRef = useRef<WebSocket | null>(null);
-
-  // Build errors via WebSocket
-  useEffect(() => {
-    if (!sessionId) return;
-    clearErrors();
-
-    let closed = false;
-    let retryDelay = 2000;
-
-    function connect() {
-      if (closed) return;
-      const ws = new WebSocket(`${getWsBase()}/ws/errors/${sessionId}`);
-      wsRef.current = ws;
-
-      ws.addEventListener('message', (event) => {
-        try {
-          const data = JSON.parse(event.data as string);
-          pushError({
-            source: 'build',
-            message: data.message ?? '',
-            file: data.file,
-            line: data.line,
-            column: data.column,
-            stack: data.stack,
-          });
-        } catch { /* ignore */ }
-      });
-
-      ws.addEventListener('close', () => {
-        wsRef.current = null;
-        if (!closed) {
-          setTimeout(() => {
-            retryDelay = Math.min(retryDelay * 2, 30000);
-            connect();
-          }, retryDelay);
-        }
-      });
-
-      ws.addEventListener('open', () => {
-        retryDelay = 2000;
-      });
-
-      ws.addEventListener('error', () => {
-        ws.close();
-      });
-    }
-
-    connect();
-
-    return () => {
-      closed = true;
-      wsRef.current?.close();
-      wsRef.current = null;
-    };
-  }, [sessionId, pushError, clearErrors]);
-
-  // Runtime errors from preview iframe via postMessage
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (!event.data || event.data.type !== 'runtime-error') return;
-      const d = event.data;
-      pushError({
-        source: 'runtime',
-        message: d.message ?? 'Unknown runtime error',
-        file: d.file || undefined,
-        line: d.line || undefined,
-        column: d.column || undefined,
-        stack: d.stack || undefined,
-      });
-    }
-
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [pushError]);
+function normalizeFilePath(filePath: string): string {
+  const srcIdx = filePath.indexOf('/src/');
+  if (srcIdx !== -1) {
+    return filePath.slice(srcIdx);
+  }
+  if (!filePath.startsWith('/src/')) {
+    if (!filePath.startsWith('/')) filePath = '/' + filePath;
+    return '/src' + filePath;
+  }
+  return filePath;
 }
 
 function SingleErrorToast({ error }: { error: AppError }) {
@@ -109,7 +35,6 @@ function SingleErrorToast({ error }: { error: AppError }) {
     try {
       await loadProjects();
     } catch (err) {
-      // Error will be re-added by the catch handler in App.tsx
       console.error('Retry failed:', err);
     }
   };
@@ -150,21 +75,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
         </div>
         {error.file && (
           <button
-            onClick={() => {
-              // Normalize path to match editor's workspace-relative format
-              let filePath = error.file!;
-              // Strip absolute workspace prefix if present
-              const srcIdx = filePath.indexOf('/src/');
-              if (srcIdx !== -1) {
-                filePath = filePath.slice(srcIdx);
-              } else if (!filePath.startsWith('/src/')) {
-                // Vite reports paths relative to project root (e.g. /components/Foo.tsx)
-                // but the actual file lives under /src/
-                if (!filePath.startsWith('/')) filePath = '/' + filePath;
-                filePath = '/src' + filePath;
-              }
-              openFile(filePath, error.line, error.column);
-            }}
+            onClick={() => openFile(normalizeFilePath(error.file!), error.line, error.column)}
             style={{
               display: 'block',
               fontSize: '11px',

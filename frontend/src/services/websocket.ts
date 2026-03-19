@@ -156,6 +156,52 @@ export function closeChatSocket(sessionId: string): void {
 // Keep createChatSocket as alias for backwards compat during transition
 export const createChatSocket = getChatSocket;
 
+interface ReadOnlySocket {
+  onData(handler: (data: string) => void): void;
+  close(): void;
+}
+
+export function createServerLogSocket(sessionId: string): ReadOnlySocket {
+  const handlers: Array<(data: string) => void> = [];
+  const decoder = new TextDecoder();
+
+  const { close } = createReconnectingSocket(
+    `${getWsBase()}/ws/server-log/${sessionId}`,
+    undefined,
+    (data) => {
+      // data may arrive as string from the reconnecting socket wrapper
+      handlers.forEach((h) => h(data));
+    },
+  );
+
+  // Also listen for binary data via a raw approach — but since createReconnectingSocket
+  // already converts to string via event.data, we handle it there.
+
+  return {
+    onData(handler: (data: string) => void) {
+      handlers.push(handler);
+    },
+    close,
+  };
+}
+
+export function createErrorSocket(
+  sessionId: string,
+  onError: (data: unknown) => void,
+): { close(): void } {
+  const { close } = createReconnectingSocket(
+    `${getWsBase()}/ws/errors/${sessionId}`,
+    undefined,
+    (data) => {
+      try {
+        onError(JSON.parse(data));
+      } catch { /* ignore malformed */ }
+    },
+  );
+
+  return { close };
+}
+
 export function createTerminalSocket(sessionId: string): TerminalSocket {
   const handlers: Array<(data: string) => void> = [];
   const decoder = new TextDecoder();

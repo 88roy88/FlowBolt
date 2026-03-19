@@ -5,6 +5,7 @@ import { useFilesStore } from '../../stores/files';
 import { Plus, Trash2, FolderKanban, PanelLeftClose, Info } from 'lucide-react';
 import type { ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
+import { pollFileTree } from '../../utils/pollFileTree';
 
 type SidebarProps = {
   onCloseSidebar?: () => void;
@@ -28,15 +29,7 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
     if (session.currentProject) {
       window.location.hash = `#/project/${session.currentProject.session_id}`;
       loadHistory(session.currentProject.session_id);
-      let attempts = 0;
-      const interval = setInterval(async () => {
-        attempts++;
-        await loadFileTree();
-        const tree = useFilesStore.getState().fileTree;
-        if (tree.length > 0 || attempts >= 15) {
-          clearInterval(interval);
-        }
-      }, 2000);
+      pollFileTree();
     }
   };
 
