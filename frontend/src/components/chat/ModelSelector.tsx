@@ -44,7 +44,7 @@ export function ModelSelector() {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-1 min-w-[260px] max-h-80 overflow-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] z-40">
+        <div className="absolute bottom-full left-0 mb-1 min-w-[260px] max-h-80 overflow-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] z-40">
           {Object.entries(grouped).map(([provider, providerModels]) => (
             <div key={provider}>
               <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-[var(--dropdown-divider)] bg-[var(--dropdown-header-bg)]">

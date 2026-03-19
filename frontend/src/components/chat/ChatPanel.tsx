@@ -30,7 +30,7 @@ export function ChatPanel() {
     // Only auto-scroll if already near the bottom
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
     if (isNearBottom) scrollToBottom();
-  }, [messages, currentAssistantMessage, agentPhase, executionTasks, fixSteps, followUpSteps, scrollToBottom]);
+  }, [messages, currentAssistantMessage, agentPhase, planOverview, executionTasks, fixSteps, followUpSteps, scrollToBottom]);
 
   // Track scroll position to show/hide the button
   useEffect(() => {
@@ -43,6 +43,13 @@ export function ChatPanel() {
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Force scroll to bottom when plan overview appears (including on reconnect)
+  useEffect(() => {
+    if (agentPhase === 'awaiting_approval' && planOverview) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [agentPhase, planOverview, scrollToBottom]);
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;

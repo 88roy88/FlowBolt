@@ -122,7 +122,8 @@ export function AppShell() {
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
 
-  const isEmptyState = messages.length === 0 && !isStreaming;
+  const historyLoaded = useChatStore((s) => s.historyLoaded);
+  const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
 
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
@@ -320,7 +321,7 @@ export function AppShell() {
           <>
             <div ref={mainTopRef} className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
               {/* Chat (always visible) */}
-              <div style={{ flex: mainSplit, minWidth: 0 }} className="overflow-hidden">
+              <div style={{ flex: mainSplit, minWidth: 0 }} className="min-h-0 h-full overflow-hidden">
                 <ChatPanel />
               </div>
 
@@ -366,9 +367,9 @@ export function AppShell() {
                     )}
                     <div
                       style={{ flexBasis: `${paneSizes[pane]}%`, flexGrow: 0, flexShrink: 0, minWidth: 0 }}
-                      className="overflow-hidden flex flex-col"
+                      className="overflow-hidden flex flex-col min-h-0 h-full"
                     >
-                      <div className="flex-1 overflow-hidden">
+                      <div className="flex-1 min-h-0 h-full overflow-hidden">
                         {renderPaneContent(pane)}
                       </div>
                     </div>
