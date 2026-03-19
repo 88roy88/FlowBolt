@@ -10,7 +10,7 @@ interface CaseInfo {
 
 export function CasesFetchedCard({ cases }: { cases: CaseInfo[] }) {
   return (
-    <CardWrapper>
+    <CardWrapper accent="primary">
       <div className="flex items-center gap-1.5 mb-2 text-xs text-success">
         <CheckCircle2 size={12} />
         {cases.length === 1 ? 'Case data fetched' : `${cases.length} cases fetched`}

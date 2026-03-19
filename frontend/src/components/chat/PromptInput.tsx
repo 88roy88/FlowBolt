@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
 import { CaseSelector } from './CaseSelector';
+import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 
 export function PromptInput() {
@@ -44,6 +45,22 @@ export function PromptInput() {
   const disabled = isBusy || !sessionId;
   const canSend = !!value.trim() && !disabled;
 
+  // Global keyboard shortcut: Cmd+K or / to focus
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        textareaRef.current?.focus();
+      }
+      if (e.key === '/' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault();
+        textareaRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const placeholder = !sessionId
     ? 'Select a project first'
     : agentPhase === 'awaiting_approval'
@@ -61,7 +78,7 @@ export function PromptInput() {
     'Thinking';
 
   return (
-    <div className="px-3.5 py-2.5 border-t border-border bg-surface shrink-0">
+    <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
       {/* Case selector */}
       {!isBusy && sessionId && showCaseSelector && (
         <div className="mb-2.5 relative">
@@ -114,7 +131,7 @@ export function PromptInput() {
           >
             <Database size={16} />
             {selectedCases.length > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[9px] font-bold flex items-center justify-center leading-none">
+              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
                 {selectedCases.length}
               </span>
             )}
@@ -131,7 +148,7 @@ export function PromptInput() {
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none text-sm leading-normal max-h-[200px] py-2 bg-transparent disabled:opacity-50"
+          className="flex-1 resize-none text-[15px] leading-normal max-h-[200px] py-2 bg-transparent disabled:opacity-50"
         />
 
         <button
@@ -148,13 +165,18 @@ export function PromptInput() {
         </button>
       </div>
       <div className="flex items-center justify-between mt-1.5 px-1">
-        <span className="text-[10px] text-muted-foreground/50">
-          {selectedCases.length > 0 && `${selectedCases.length} case${selectedCases.length > 1 ? 's' : ''} attached`}
-        </span>
-        <span className="text-[10px] text-muted-foreground/60">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[9px] font-mono">Enter</kbd> send
+        <div className="flex items-center gap-2">
+          <ModelSelector />
+          {selectedCases.length > 0 && (
+            <span className="text-[10px] text-muted-foreground/50">
+              {selectedCases.length} case{selectedCases.length > 1 ? 's' : ''} attached
+            </span>
+          )}
+        </div>
+        <span className="text-[11px] text-muted-foreground/60">
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Enter</kbd> send
           <span className="mx-1">·</span>
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[9px] font-mono">Shift+Enter</kbd> new line
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Shift+Enter</kbd> new line
         </span>
       </div>
     </div>

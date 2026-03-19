@@ -33,6 +33,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   async loadProjects() {
     const projects = await api.fetchProjects();
+    // Newest first
+    projects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     set({ projects });
   },
 
@@ -40,7 +42,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isCreating: true });
     try {
       const project = await api.createProject(name);
-      const projects = [...get().projects, project];
+      const projects = [project, ...get().projects];
       set({ projects, currentProject: project, sessionId: project.session_id });
     } finally {
       set({ isCreating: false });

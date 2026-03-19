@@ -1,12 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { FlowBrand } from '../ui/flow-logo';
 import { useChatStore } from '../../stores/chat';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
-import { ThemeToggle } from '../layout/ThemeToggle';
 import { WorkPlanView } from './WorkPlanView';
 import { TaskProgress } from './TaskProgress';
-import { ModelSelector } from './ModelSelector';
 import { PhaseIndicator } from './PhaseIndicator';
 import { DesignProgress } from './DesignProgress';
 import { FixProgressCard } from './cards/FixProgressCard';
@@ -34,37 +31,9 @@ export function ChatPanel() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-border bg-surface shrink-0">
-        <span className="text-[13px] font-semibold tracking-tight">Chat</span>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <ModelSelector />
-        </div>
-      </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-4 scroll-smooth">
-        {/* Empty state */}
-        {messages.length === 0 && !isStreaming && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-8 py-12 select-none">
-            <FlowBrand size="lg" />
-            <p className="text-sm text-muted-foreground max-w-[300px] leading-relaxed">
-              Describe what you want to build and the AI will design, plan, and code it for you.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 mt-2">
-              {['A dashboard with charts', 'A todo app with drag & drop', 'A landing page'].map((hint) => (
-                <button
-                  key={hint}
-                  className="px-3 py-1.5 text-xs text-muted-foreground bg-surface border border-border rounded-full shadow-[var(--shadow-sm)] hover:border-primary/50 hover:text-primary hover:bg-accent-bg transition-all duration-150 cursor-pointer"
-                >
-                  {hint}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}

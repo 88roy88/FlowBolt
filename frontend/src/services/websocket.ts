@@ -274,15 +274,6 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
     });
 
     ws.addEventListener('error', () => {
-      // Only report initial connection errors
-      if (!hasConnectedOnce && typeof window !== 'undefined') {
-        import('../stores/errors').then(({ useErrorStore }) => {
-          useErrorStore.getState().pushError({
-            source: 'connection',
-            message: 'Failed to establish terminal WebSocket connection to backend.',
-          });
-        });
-      }
       ws.close();
     });
   }

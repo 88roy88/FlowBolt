@@ -11,7 +11,7 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <CardWrapper>
+    <CardWrapper accent="destructive">
       <div className="flex items-center gap-1.5 mb-2 text-xs text-destructive">
         <AlertTriangle size={14} />
         Fix error request

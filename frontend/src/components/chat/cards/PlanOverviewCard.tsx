@@ -4,7 +4,7 @@ import { CardWrapper } from './CardWrapper';
 
 export function PlanOverviewCard({ overview, accepted }: { overview: PlanOverview; accepted: boolean }) {
   return (
-    <CardWrapper>
+    <CardWrapper accent="primary">
       <div className={`flex items-center gap-1.5 mb-2 text-xs ${accepted ? 'text-success' : 'text-muted-foreground'}`}>
         {accepted ? <Check size={12} /> : <X size={12} />}
         {accepted ? 'Plan accepted' : 'Plan rejected'}

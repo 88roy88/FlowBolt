@@ -17,9 +17,9 @@
 :root,
 :root[data-theme='dark'] {
   /* Core palette */
-  --background: #1e1e2e;
+  --background: #181825;
   --foreground: #cdd6f4;
-  --surface: #2a2a3e;
+  --surface: #1e1e2e;
   --muted: #313244;
   --muted-foreground: #a6adc8;
 
@@ -33,9 +33,9 @@
   --destructive: #f38ba8;
   --destructive-foreground: #1e1e2e;
   --success: #a6e3a1;
-  --success-foreground: #1e1e2e;
+  --success-foreground: #11111b;
   --warning: #f9e2af;
-  --warning-foreground: #1e1e2e;
+  --warning-foreground: #11111b;
 
   /* Chrome */
   --border: #45475a;
@@ -44,14 +44,14 @@
   --radius: 0.5rem;
 
   /* Card / Popover */
-  --card: #2a2a3e;
+  --card: #1e1e2e;
   --card-foreground: #cdd6f4;
-  --popover: #2a2a3e;
+  --popover: #1e1e2e;
   --popover-foreground: #cdd6f4;
 
   /* Chat-specific */
   --user-bubble: rgba(137, 180, 250, 0.13);
-  --assistant-bubble: #2a2a3e;
+  --assistant-bubble: #1e1e2e;
 
   /* Semantic tints */
   --text-on-accent: #ffffff;
@@ -72,7 +72,7 @@
   --dropdown-header-bg: rgba(0, 0, 0, 0.25);
   --dropdown-divider: rgba(255, 255, 255, 0.03);
   --table-stripe: rgba(255, 255, 255, 0.02);
-  --preview-bg: #1e1e2e;
+  --preview-bg: #181825;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
   /* Legacy aliases (used by non-migrated components) */
@@ -158,7 +158,9 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -225,12 +227,18 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
+    outline: 1px solid color-mix(in srgb, var(--ring) 50%, transparent);
+    outline-offset: 1px;
     border-radius: 4px;
   }
 
   :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Don't show focus ring on input containers that handle their own focus styles */
+  textarea:focus-visible,
+  input:focus-visible {
     outline: none;
   }
 
@@ -274,6 +282,16 @@
 
 @keyframes blink {
   50% { opacity: 0; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-12px); }
 }
 
 /* Message & card entrance animations */

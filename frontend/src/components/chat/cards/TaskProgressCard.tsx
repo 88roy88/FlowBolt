@@ -8,7 +8,7 @@ export function TaskProgressCard({ tasks }: { tasks: ExecutionTask[] }) {
   const total = tasks.length;
 
   return (
-    <CardWrapper>
+    <CardWrapper accent="success">
       <div className={`flex items-center gap-1.5 mb-2 text-xs ${failed > 0 ? 'text-destructive' : 'text-success'}`}>
         {failed > 0 ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
         {failed > 0 ? `Built ${completed}/${total} tasks (${failed} failed)` : `Built ${completed}/${total} tasks`}

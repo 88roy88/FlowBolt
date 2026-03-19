@@ -81,7 +81,7 @@ export function ErrorToast() {
   if (errors.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2">
+    <div className="fixed top-3 right-3 z-[9999] flex flex-col gap-2">
       {errors.map((error) => (
         <SingleErrorToast key={error.id} error={error} />
       ))}

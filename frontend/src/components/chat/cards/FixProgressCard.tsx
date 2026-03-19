@@ -16,7 +16,7 @@ export function FixProgressCard({ steps, content, isLive }: {
   const headerColor = failed > 0 ? 'text-destructive' : (isLive && hasRunning) ? 'text-primary' : 'text-success';
 
   return (
-    <CardWrapper>
+    <CardWrapper accent={failed > 0 ? 'destructive' : 'success'}>
       <div className={`flex items-center gap-1.5 mb-3 text-[13px] font-medium ${headerColor}`}>
         {isLive && hasRunning ? (
           <>

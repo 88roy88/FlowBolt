@@ -18,7 +18,7 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
   const hasDiffs = diffs && diffs.length > 0;
 
   return (
-    <CardWrapper>
+    <CardWrapper accent="primary">
       {/* Header */}
       <div className={`flex items-center gap-1.5 mb-3 text-[13px] font-medium ${inProgress ? 'text-primary' : 'text-success'}`}>
         {inProgress ? (
