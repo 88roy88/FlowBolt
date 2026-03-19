@@ -4,8 +4,6 @@ import asyncio
 import json
 import logging
 import uuid
-from collections.abc import Awaitable, Callable
-
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
 
@@ -42,6 +40,10 @@ class BuildAgent(BaseAgent):
         super().__init__(**kwargs)
         self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
         self._observation_id: str | None = None
+        # Pause/resume for plan approval
+        self._approval_event = asyncio.Event()
+        self._approval_action: str = "reject"
+        self._approval_feedback: str | None = None
 
     # -- Entry point --
 
@@ -60,7 +62,7 @@ class BuildAgent(BaseAgent):
 
         # Fetch case data
         if self._state.case_ids:
-            await self.ws_send({"type": "phase", "phase": "fetching_cases"})
+            await self.emit({"type": "phase", "phase": "fetching_cases"})
             results = await asyncio.gather(
                 *[self._fetch_and_analyze_case(cid) for cid in self._state.case_ids]
             )
@@ -70,7 +72,7 @@ class BuildAgent(BaseAgent):
                 from app.models.project import update_project_cases
                 await update_project_cases(self.project_id, self._state.case_contexts)
 
-                await self.ws_send({
+                await self.emit({
                     "type": "cases_fetched",
                     "cases": [
                         {
@@ -96,7 +98,7 @@ class BuildAgent(BaseAgent):
                 }))
 
         # Design (parallel)
-        await self.ws_send({"type": "phase", "phase": "designing"})
+        await self.emit({"type": "phase", "phase": "designing"})
         self._state.architecture, self._state.ux_design = await asyncio.gather(
             self._design_architecture(),
             self._design_ux(),
@@ -109,28 +111,38 @@ class BuildAgent(BaseAgent):
         }))
 
         # Build user overview
-        await self.ws_send({"type": "phase", "phase": "planning"})
+        await self.emit({"type": "phase", "phase": "planning"})
         self._state.user_overview = await self._build_user_overview()
 
-        # Present for approval
+        # Present for approval and wait
         self._state.phase = "awaiting_approval"
-        await self.ws_send({"type": "phase", "phase": "awaiting_approval"})
-        await self.ws_send({"type": "plan_overview", "overview": self._state.user_overview})
+        await self.emit({"type": "phase", "phase": "awaiting_approval"})
+        await self.emit({"type": "plan_overview", "overview": self._state.user_overview})
 
-    # -- Plan response --
+        # Approval loop: wait for user response, handle modify/reject/accept
+        while True:
+            self._approval_event.clear()
+            await self._approval_event.wait()
 
-    async def handle_plan_response(self, action: str, feedback: str | None = None) -> None:
-        if action == "accept":
-            await self._accept_plan()
-        elif action == "modify" and feedback:
-            await self.ws_send({"type": "phase", "phase": "planning"})
-            self._state.user_overview = await self._rebuild_overview_with_feedback(feedback)
-            self._state.phase = "awaiting_approval"
-            await self.ws_send({"type": "phase", "phase": "awaiting_approval"})
-            await self.ws_send({"type": "plan_overview", "overview": self._state.user_overview})
-        elif action == "reject":
-            self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
-            await self.ws_send({"type": "phase", "phase": "idle"})
+            if self._approval_action == "accept":
+                break
+            elif self._approval_action == "modify" and self._approval_feedback:
+                await self.emit({"type": "phase", "phase": "planning"})
+                self._state.user_overview = await self._rebuild_overview_with_feedback(self._approval_feedback)
+                self._state.phase = "awaiting_approval"
+                await self.emit({"type": "phase", "phase": "awaiting_approval"})
+                await self.emit({"type": "plan_overview", "overview": self._state.user_overview})
+            elif self._approval_action == "reject":
+                self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
+                await self.emit({"type": "phase", "phase": "idle"})
+                return
+
+        await self._accept_plan()
+
+    def signal_plan_response(self, action: str, feedback: str | None = None) -> None:
+        self._approval_action = action
+        self._approval_feedback = feedback
+        self._approval_event.set()
 
     async def _accept_plan(self) -> None:
         await save_message(self.project_id, "assistant", encode_card({
@@ -142,13 +154,13 @@ class BuildAgent(BaseAgent):
         langfuse_client = Langfuse()
 
         # Build technical plan
-        await self.ws_send({"type": "phase", "phase": "planning"})
+        await self.emit({"type": "phase", "phase": "planning"})
         span_plan = langfuse_client.span(trace_id=self._trace_id, name="build-technical-plan")
         self._observation_id = span_plan.id
         self._state.work_plan = await self._build_technical_plan()
         span_plan.end()
 
-        await self.ws_send({
+        await self.emit({
             "type": "task_list",
             "tasks": [{"id": t.id, "title": t.title, "status": t.status} for t in self._state.work_plan.tasks],
         })
@@ -162,7 +174,7 @@ class BuildAgent(BaseAgent):
             },
         )
         self._observation_id = span_exec.id
-        await self.ws_send({"type": "phase", "phase": "executing"})
+        await self.emit({"type": "phase", "phase": "executing"})
         await self._execute()
         span_exec.end()
 
@@ -180,8 +192,8 @@ class BuildAgent(BaseAgent):
 
         self._state.phase = "idle"
         self._state.work_plan = None
-        await self.ws_send({"type": "phase", "phase": "complete"})
-        await self.ws_send({"type": "action_complete"})
+        await self.emit({"type": "phase", "phase": "complete"})
+        await self.emit({"type": "action_complete"})
 
     # -- Design --
 
@@ -190,7 +202,7 @@ class BuildAgent(BaseAgent):
             package_api = PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
             search_results = await package_api.search(package_id)
             if not search_results:
-                await self.ws_send({"type": "case_error", "message": f"Package {package_id} not found"})
+                await self.emit({"type": "case_error", "message": f"Package {package_id} not found"})
                 return None
 
             metadata = search_results[0] if isinstance(search_results, list) else search_results
@@ -226,11 +238,11 @@ class BuildAgent(BaseAgent):
             return {"package_id": package_id, "package_name": package_name, "sample_data": sample_data, **analysis}
 
         except PackageApiUpstreamError as e:
-            await self.ws_send({"type": "case_error", "message": f"Failed to fetch package data: {e}"})
+            await self.emit({"type": "case_error", "message": f"Failed to fetch package data: {e}"})
             return None
         except Exception:
             logger.exception("[build] Unexpected error fetching package")
-            await self.ws_send({"type": "case_error", "message": "Unexpected error fetching package data"})
+            await self.emit({"type": "case_error", "message": "Unexpected error fetching package data"})
             return None
 
     @observe(name="design-architecture")
@@ -250,22 +262,22 @@ class BuildAgent(BaseAgent):
 
         try:
             raw = await complete_chat([Message.user(user_message)], ARCHITECTURE_PROMPT, model=self.model, metadata=self._llm_metadata("design_architecture"))
-            await self.ws_send({"type": "design_progress", "stream": "architecture", "content": "complete"})
+            await self.emit({"type": "design_progress", "stream": "architecture", "content": "complete"})
             return parse_json_response(raw)
         except Exception:
             logger.exception("[build] Architecture design failed")
-            await self.ws_send({"type": "design_progress", "stream": "architecture", "content": "failed"})
+            await self.emit({"type": "design_progress", "stream": "architecture", "content": "failed"})
             return {}
 
     @observe(name="design-ux")
     async def _design_ux(self) -> dict:
         try:
             raw = await complete_chat([Message.user(self._state.user_content)], UX_DESIGN_PROMPT, model=self.model, metadata=self._llm_metadata("design_ux"))
-            await self.ws_send({"type": "design_progress", "stream": "ux", "content": "complete"})
+            await self.emit({"type": "design_progress", "stream": "ux", "content": "complete"})
             return parse_json_response(raw)
         except Exception:
             logger.exception("[build] UX design failed")
-            await self.ws_send({"type": "design_progress", "stream": "ux", "content": "failed"})
+            await self.emit({"type": "design_progress", "stream": "ux", "content": "failed"})
             return {}
 
     @observe(name="build-user-overview")
@@ -361,7 +373,7 @@ class BuildAgent(BaseAgent):
             raise RuntimeError("No work plan available")
 
         task.status = "running"
-        await self.ws_send({"type": "task_update", "taskId": task.id, "status": "running"})
+        await self.emit({"type": "task_update", "taskId": task.id, "status": "running"})
 
         dep_paths: set[str] = set()
         for dep_id in task.depends_on:
@@ -390,17 +402,17 @@ class BuildAgent(BaseAgent):
                 await write_file(self.session_id, path, content)
                 self._state.completed_files[path] = content
                 paths.append(path)
-                await self.ws_send({"type": "task_update", "taskId": task.id, "status": "running", "file": path})
-                await self.ws_send({"type": "file", "path": path, "content": content})
+                await self.emit({"type": "task_update", "taskId": task.id, "status": "running", "file": path})
+                await self.emit({"type": "file", "path": path, "content": content})
 
             self._state.task_files[task.id] = paths
             task.status = "completed"
-            await self.ws_send({"type": "task_update", "taskId": task.id, "status": "completed"})
+            await self.emit({"type": "task_update", "taskId": task.id, "status": "completed"})
         except Exception as exc:
             logger.exception("[build] Task %s failed", task.id)
             task.status = "failed"
             task.error = str(exc)
-            await self.ws_send({"type": "task_update", "taskId": task.id, "status": "failed"})
+            await self.emit({"type": "task_update", "taskId": task.id, "status": "failed"})
 
     async def _typecheck(self) -> str:
         try:
@@ -425,7 +437,7 @@ class BuildAgent(BaseAgent):
 
     @observe(name="fix-errors-auto")
     async def _fix_errors(self, errors: str) -> None:
-        await self.ws_send({"type": "phase", "phase": "fixing"})
+        await self.emit({"type": "phase", "phase": "fixing"})
         prompt = render_fix_errors(errors=errors, files=self._state.completed_files)
         try:
             generated: list[tuple[str, str]] = []
@@ -437,7 +449,7 @@ class BuildAgent(BaseAgent):
             for path, content in generated:
                 await write_file(self.session_id, path, content)
                 self._state.completed_files[path] = content
-                await self.ws_send({"type": "file", "path": path, "content": content})
+                await self.emit({"type": "file", "path": path, "content": content})
         except Exception:
             logger.exception("[build] Error fix pass failed")
 
@@ -450,6 +462,6 @@ class BuildAgent(BaseAgent):
             summary_data = parse_json_response(raw)
             if summary_data:
                 await update_project_summary(self.project_id, json.dumps(summary_data, ensure_ascii=False))
-                await self.ws_send({"type": "project_summary", "summary": summary_data})
+                await self.emit({"type": "project_summary", "summary": summary_data})
         except Exception:
             logger.exception("[build] Summary generation failed")

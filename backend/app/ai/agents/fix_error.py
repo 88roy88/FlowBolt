@@ -28,7 +28,7 @@ class FixErrorAgent(BaseAgent):
         error_line: int | None = None,
         error_stack: str | None = None,
     ) -> None:
-        await self.ws_send({"type": "phase", "phase": "fixing"})
+        await self.emit({"type": "phase", "phase": "fixing"})
         fix_steps: list[dict] = []
         explanation_text = ""
 
@@ -37,7 +37,7 @@ class FixErrorAgent(BaseAgent):
         await self._send_step(fix_steps, "discover", "completed", f"Found {len(file_contents)} file(s) to analyze")
 
         if not file_contents:
-            await self.ws_send({"type": "error", "message": "Could not read source files to fix error"})
+            await self.emit({"type": "error", "message": "Could not read source files to fix error"})
             return
 
         await self._send_step(fix_steps, "generate", "running", "Generating fix with AI...")
@@ -64,8 +64,8 @@ class FixErrorAgent(BaseAgent):
             parser.flush()
         except Exception:
             logger.exception("[fix-error] Generation failed")
-            await self.ws_send({"type": "error", "message": "Failed to fix error"})
-            await self.ws_send({"type": "phase", "phase": "idle"})
+            await self.emit({"type": "error", "message": "Failed to fix error"})
+            await self.emit({"type": "phase", "phase": "idle"})
             return
 
         full_response = "".join(full_text)
@@ -73,7 +73,7 @@ class FixErrorAgent(BaseAgent):
         cut = artifact_start if artifact_start != -1 else len(full_response)
         explanation = full_response[:cut].strip()
         if explanation:
-            await self.ws_send({"type": "text", "content": explanation + "\n\n"})
+            await self.emit({"type": "text", "content": explanation + "\n\n"})
             explanation_text = explanation
 
         await self._send_step(fix_steps, "generate", "completed", f"Generated fix for {len(generated_files)} file(s)")
@@ -82,7 +82,7 @@ class FixErrorAgent(BaseAgent):
             await self._send_step(fix_steps, "write", "running", "Writing fixed files...")
             for path, content in generated_files:
                 await write_file(self.session_id, path, content)
-                await self.ws_send({"type": "file", "path": path, "content": content})
+                await self.emit({"type": "file", "path": path, "content": content})
             await self._send_step(fix_steps, "write", "completed", f"Wrote {len(generated_files)} file(s)")
 
             await self._send_step(fix_steps, "validate", "running", "Validating fix...")
@@ -101,11 +101,11 @@ class FixErrorAgent(BaseAgent):
             content = f"{explanation_text}\n\n{card}" if explanation_text else card
             await save_message(self.project_id, "assistant", content)
 
-        await self.ws_send({"type": "action_complete"})
-        await self.ws_send({"type": "phase", "phase": "idle"})
+        await self.emit({"type": "action_complete"})
+        await self.emit({"type": "phase", "phase": "idle"})
 
     async def _send_step(self, steps: list[dict], step: str, status: str, message: str) -> None:
-        await self.ws_send({"type": "fix_step", "step": step, "status": status, "message": message})
+        await self.emit({"type": "fix_step", "step": step, "status": status, "message": message})
         for s in steps:
             if s["step"] == step:
                 s["status"] = status
@@ -190,6 +190,6 @@ class FixErrorAgent(BaseAgent):
             parser.flush()
             for path, content in generated:
                 await write_file(self.session_id, path, content)
-                await self.ws_send({"type": "file", "path": path, "content": content})
+                await self.emit({"type": "file", "path": path, "content": content})
         except Exception:
             logger.exception("[fix-error] Retry fix failed")

@@ -61,7 +61,7 @@ class FollowUpAgent(BaseAgent):
         async def _write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
             status, diff_str = await write_file_with_diff(sid, path, content)
-            await self.ws_send({"type": "file", "path": path, "content": content})
+            await self.emit({"type": "file", "path": path, "content": content})
             if diff_str:
                 self._diffs.append(FileDiff(path=path, diff=diff_str))
             if path not in self._files_changed:
@@ -73,7 +73,7 @@ class FollowUpAgent(BaseAgent):
             status, diff_str = await edit_file_with_context(sid, path, search, replace)
             if diff_str:
                 new_content = await read_file(sid, path)
-                await self.ws_send({"type": "file", "path": path, "content": new_content})
+                await self.emit({"type": "file", "path": path, "content": new_content})
                 self._diffs.append(FileDiff(path=path, diff=diff_str))
             if path not in self._files_changed:
                 self._files_changed.append(path)
@@ -91,7 +91,7 @@ class FollowUpAgent(BaseAgent):
     async def run(self, content: str) -> None:
         langfuse_context.update_current_observation(tags=["follow-up-agent"])
 
-        await self.ws_send({"type": "phase", "phase": "exploring"})
+        await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
 
         history = await get_messages(self.project_id)
@@ -108,7 +108,7 @@ class FollowUpAgent(BaseAgent):
         answer = await self._react_loop(messages, system_prompt)
 
         if answer:
-            await self.ws_send({"type": "text", "content": answer})
+            await self.emit({"type": "text", "content": answer})
 
         card = encode_card({
             "type": "followup_progress",
@@ -121,13 +121,13 @@ class FollowUpAgent(BaseAgent):
         await save_message(self.project_id, "assistant", assistant_content)
 
         if self._diffs:
-            await self.ws_send({
+            await self.emit({
                 "type": "followup_diffs",
                 "diffs": [{"path": d.path, "diff": d.diff} for d in self._diffs],
             })
 
-        await self.ws_send({"type": "phase", "phase": "complete"})
-        await self.ws_send({"type": "action_complete"})
+        await self.emit({"type": "phase", "phase": "complete"})
+        await self.emit({"type": "action_complete"})
 
     async def _build_context(self) -> dict:
         project = await get_project_by_session(self.session_id)
@@ -199,7 +199,7 @@ class FollowUpAgent(BaseAgent):
                     "status": "running",
                     "iteration": self._iteration,
                 }
-                await self.ws_send({"type": "followup_step", **step_data})
+                await self.emit({"type": "followup_step", **step_data})
 
                 result = await self._executor.execute(tool_name, tool_use_id=tool_call.id, **args)
                 result_str = str(result.value) if not result.is_error else f"Error: {result.value}"
@@ -207,7 +207,7 @@ class FollowUpAgent(BaseAgent):
                 preview = result_str[:200] + "..." if len(result_str) > 200 else result_str
                 step_data["status"] = "completed"
                 step_data["result_preview"] = preview
-                await self.ws_send({"type": "followup_step", **step_data})
+                await self.emit({"type": "followup_step", **step_data})
 
                 self._steps.append({
                     "id": str(uuid.uuid4()),

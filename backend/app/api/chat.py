@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -8,8 +9,10 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.ai.agents import BuildAgent, FollowUpAgent, FixErrorAgent
+from app.ai.agent_registry import register, get as get_agent, remove as remove_agent
 from app.ai.helpers import CARD_PREFIX
 from app.models.chat import get_messages, save_message
+from app.models.events import subscribe, unsubscribe, get_events, clear_events
 from app.models.project import get_project_by_session
 
 logger = logging.getLogger(__name__)
@@ -20,6 +23,17 @@ router = APIRouter()
 async def _is_new_project(project_id: str) -> bool:
     history = await get_messages(project_id)
     return not any(m.role == "assistant" for m in history)
+
+
+async def _run_agent_safe(session_id: str, coro) -> None:
+    try:
+        await coro
+    except Exception:
+        logger.exception("[chat] Background agent failed for session %s", session_id)
+        from app.models.events import emit_event
+        await emit_event(session_id, {"type": "error", "message": "AI processing failed"})
+    finally:
+        remove_agent(session_id)
 
 
 @router.get("/api/chat/{session_id}/history")
@@ -42,13 +56,26 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
         await websocket.close()
         return
 
-    async def ws_send(msg: dict) -> None:
-        await websocket.send_json(msg)
+    # Replay existing events from DB (reconnect support)
+    existing_events = await get_events(session_id)
+    for evt in existing_events:
+        try:
+            await websocket.send_json(evt.payload)
+        except Exception:
+            return
 
-    # BuildAgent persists across messages (holds plan state for approval flow)
-    build_agent: BuildAgent | None = None
+    # Subscribe to live events
+    queue = subscribe(session_id)
 
-    try:
+    async def _forward_events() -> None:
+        try:
+            while True:
+                event = await queue.get()
+                await websocket.send_json(event)
+        except Exception:
+            pass
+
+    async def _receive_actions() -> None:
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
@@ -76,41 +103,38 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 else:
                     await save_message(project.id, "user", user_content)
 
-                try:
-                    is_new = await _is_new_project(project.id)
+                # Clear old events for this session (new agent run)
+                await clear_events(session_id)
 
-                    if is_new:
-                        build_agent = BuildAgent(
-                            session_id=session_id, project_id=project.id,
-                            ws_send=ws_send, model=selected_model,
-                        )
-                        await build_agent.run(
-                            user_content,
-                            case_ids=[str(cid) for cid in case_ids] if case_ids else None,
-                        )
-                    else:
-                        agent = FollowUpAgent(
-                            session_id=session_id, project_id=project.id,
-                            ws_send=ws_send, model=selected_model,
-                        )
-                        await agent.run(user_content)
-                except Exception:
-                    logger.exception("[chat] Agent error for session %s", session_id)
-                    await websocket.send_json({"type": "error", "message": "AI processing failed"})
+                is_new = await _is_new_project(project.id)
+
+                if is_new:
+                    agent = BuildAgent(
+                        session_id=session_id, project_id=project.id,
+                        model=selected_model,
+                    )
+                    register(session_id, agent)
+                    asyncio.create_task(_run_agent_safe(
+                        session_id,
+                        agent.run(user_content, case_ids=[str(cid) for cid in case_ids] if case_ids else None),
+                    ))
+                else:
+                    agent = FollowUpAgent(
+                        session_id=session_id, project_id=project.id,
+                        model=selected_model,
+                    )
+                    register(session_id, agent)
+                    asyncio.create_task(_run_agent_safe(session_id, agent.run(user_content)))
 
             elif msg_type == "plan_response":
                 action = data.get("action", "reject")
                 feedback = data.get("feedback")
 
-                if build_agent is None:
+                agent = get_agent(session_id)
+                if isinstance(agent, BuildAgent):
+                    agent.signal_plan_response(action, feedback)
+                else:
                     await websocket.send_json({"type": "error", "message": "No active build session"})
-                    continue
-
-                try:
-                    await build_agent.handle_plan_response(action, feedback)
-                except Exception:
-                    logger.exception("[chat] Plan response error for session %s", session_id)
-                    await websocket.send_json({"type": "error", "message": "Plan handling failed"})
 
             elif msg_type == "fix_error":
                 error_message = data.get("error_message", "")
@@ -128,27 +152,30 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 }
                 await save_message(project.id, "user", f"{CARD_PREFIX}{json.dumps(card_data)}-->")
 
-                try:
-                    agent = FixErrorAgent(
-                        session_id=session_id, project_id=project.id,
-                        ws_send=ws_send, model=selected_model,
-                    )
-                    await agent.run(
-                        error_message=error_message,
-                        error_file=error_file,
-                        error_line=error_line,
-                        error_stack=error_stack,
-                    )
-                except Exception:
-                    logger.exception("[chat] Fix error failed for session %s", session_id)
-                    await websocket.send_json({"type": "error", "message": "Error fix failed"})
+                await clear_events(session_id)
 
+                agent = FixErrorAgent(
+                    session_id=session_id, project_id=project.id,
+                    model=selected_model,
+                )
+                register(session_id, agent)
+                asyncio.create_task(_run_agent_safe(
+                    session_id,
+                    agent.run(error_message=error_message, error_file=error_file, error_line=error_line, error_stack=error_stack),
+                ))
+
+    forward_task = asyncio.create_task(_forward_events())
+
+    try:
+        await _receive_actions()
     except WebSocketDisconnect:
         logger.info("[chat] WebSocket disconnected for session %s", session_id)
     except Exception:
         logger.exception("[chat] Unhandled error in chat WebSocket for session %s", session_id)
+    finally:
+        forward_task.cancel()
         try:
-            await websocket.send_json({"type": "error", "message": "Internal server error"})
-            await websocket.close()
-        except Exception:
+            await forward_task
+        except asyncio.CancelledError:
             pass
+        unsubscribe(session_id, queue)

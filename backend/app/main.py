@@ -17,6 +17,7 @@ from langfuse import Langfuse
 from app.api import chat, errors, export, files, models, package_api, preview, projects, server_log, terminal
 from app.config import settings
 from app.models.project import init_db
+from app.models.events import init_events_table
 from app.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Initialising database...")
     await init_db()
+    await init_events_table()
     logger.info("Database ready.")
 
     logger.info("Restoring existing sandbox workspaces...")
