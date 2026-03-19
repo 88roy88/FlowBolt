@@ -165,6 +165,27 @@ export function EditorPanel() {
   const hydratedModelsRef = useRef<Set<string>>(new Set());
   const indexedFilesRef = useRef<Set<string>>(new Set());
 
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco) return;
+
+    hydratedModelsRef.current.clear();
+    indexedFilesRef.current.clear();
+
+    for (const model of monaco.editor.getModels()) {
+      const uri = model.uri.toString();
+
+      if (
+        uri === 'file:///monaco/ambient/react-vite.d.ts' ||
+        uri === 'file:///monaco/ambient/react-vite.js.d.ts'
+      ) {
+        continue;
+      }
+
+      model.dispose();
+    }
+  }, [sessionId]);
+  
   const flattenFiles = useCallback((entries: FileEntry[]): string[] => {
     const out: string[] = [];
     const stack = [...entries];
@@ -290,38 +311,51 @@ export function EditorPanel() {
   useEffect(() => {
     const monaco = monacoRef.current;
     if (!monaco || !sessionId || fileTree.length === 0) return;
-
+  
     let cancelled = false;
+  
     const files = flattenFiles(fileTree)
-      .filter((p: string) => /\.(ts|tsx|js|jsx|mjs|cjs|json|css|scss|sass|less)$/.test(p))
-      .slice(0, 350);
+      .map((p: string) => normalizeProjectPath(p))
+      .filter((p: string) => /\.(ts|tsx|js|jsx|mjs|cjs|json|css|scss|sass|less)$/.test(p));
 
+    // Ensure module paths exist in Monaco immediately to avoid transient
+    // "Cannot find module" diagnostics while file contents are still loading.
+    for (const path of files) {
+      const uri = monaco.Uri.parse(toMonacoUri(path));
+      if (monaco.editor.getModel(uri)) continue;
+      monaco.editor.createModel('', getLanguage(path), uri);
+    }
+  
     const hydrateModels = async () => {
-      for (const path of files) {
-        if (cancelled) return;
+      const tasks = files.map(async (path: string) => {
         const uri = toMonacoUri(path);
-        if (hydratedModelsRef.current.has(uri)) continue;
-        if (monaco.editor.getModel(monaco.Uri.parse(uri))) {
-          hydratedModelsRef.current.add(uri);
-          continue;
-        }
+        if (hydratedModelsRef.current.has(uri) || openFiles.has(path)) return;
+  
         try {
           const content = await fetchFileContent(sessionId, path);
           if (cancelled) return;
-          monaco.editor.createModel(content, getLanguage(path), monaco.Uri.parse(uri));
+
+          const model = monaco.editor.getModel(monaco.Uri.parse(uri));
+          if (!model) return;
+          if (model.getValue() !== content) {
+            model.setValue(content);
+          }
           hydratedModelsRef.current.add(uri);
         } catch {
-          // Some files may be unavailable; skip and continue.
+          // ignore
         }
-      }
+      });
+  
+      await Promise.allSettled(tasks);
     };
-
+  
     void hydrateModels();
+  
     return () => {
       cancelled = true;
     };
-  }, [sessionId, fileTree, flattenFiles]);
-
+  }, [sessionId, fileTree, flattenFiles, openFiles]);
+  
   useEffect(() => {
     indexedFilesRef.current = new Set(flattenFiles(fileTree).map((path: string) => normalizeProjectPath(path)));
   }, [fileTree, flattenFiles]);
