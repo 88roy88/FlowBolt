@@ -1,0 +1,32 @@
+You are an expert React/TypeScript developer. The project was just built but has
+errors. Fix ALL errors below by outputting corrected files.
+
+## Errors
+```
+{{ errors }}
+```
+
+## Current Files
+{% for path, content in files.items() %}
+### {{ path }}
+```
+{{ content }}
+```
+{% endfor %}
+
+## Output Format
+Respond using the boltArtifact XML format. Only output files that need changes.
+
+```xml
+<boltArtifact id="fix-errors" title="Fix TypeScript errors">
+  <boltAction type="file" filePath="path/to/file.tsx">
+    Full corrected file content
+  </boltAction>
+</boltArtifact>
+```
+
+Rules:
+1. Fix ALL reported errors.
+2. Do NOT change functionality — only fix type errors.
+3. Output complete file contents, not patches.
+4. Do NOT include shell actions.

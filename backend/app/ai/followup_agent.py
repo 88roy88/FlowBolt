@@ -1,30 +1,28 @@
-"""ReACT-loop follow-up agent for codebase exploration and targeted edits."""
-
 from __future__ import annotations
 
-import asyncio
-import difflib
 import json
 import logging
-import os
 import uuid
 from collections.abc import Callable, Awaitable
 from dataclasses import dataclass
-from pathlib import Path
 
 from langfuse.decorators import observe, langfuse_context
 
+from app.ai.core.tools import FunctionTool, ToolExecutor
+from app.ai.core.messages import Message
 from app.ai.provider import complete_chat_with_tools
-from app.ai.prompts.followup import FOLLOWUP_SYSTEM_PROMPT, FOLLOWUP_TOOLS
+from app.ai.prompts import render_followup
+from app.ai.helpers import CARD_PREFIX, encode_card
+from app.ai.tools.grep import grep
+from app.ai.tools.glob import glob
+from app.ai.tools.read_file import read_file_with_lines
+from app.ai.tools.write_file import write_file_with_diff
+from app.ai.tools.edit_file import edit_file_with_context
 from app.models.chat import get_messages, save_message
 from app.models.project import get_project_by_session
-from app.sandbox.filesystem import read_file, write_file, edit_file, list_files
-from app.sandbox.manager import sandbox_manager
+from app.sandbox.filesystem import list_files, read_file
 
 logger = logging.getLogger(__name__)
-
-CARD_PREFIX = "<!--agent-card:"
-CARD_SUFFIX = "-->"
 
 MAX_ITERATIONS = 15
 
@@ -32,25 +30,10 @@ MAX_ITERATIONS = 15
 @dataclass
 class FileDiff:
     path: str
-    diff: str  # unified diff string
-
-
-def _encode_card(card_data: dict) -> str:
-    return f"{CARD_PREFIX}{json.dumps(card_data, separators=(',', ':'))}{CARD_SUFFIX}"
-
-
-def _make_diff(path: str, old: str, new: str) -> str:
-    old_lines = old.splitlines(keepends=True)
-    new_lines = new.splitlines(keepends=True)
-    return "".join(difflib.unified_diff(
-        old_lines, new_lines,
-        fromfile=f"a/{path}", tofile=f"b/{path}",
-        lineterm="",
-    ))
+    diff: str
 
 
 class FollowUpAgent:
-    """ReACT agent that explores the codebase before making targeted edits."""
 
     def __init__(
         self,
@@ -70,6 +53,52 @@ class FollowUpAgent:
         self._files_changed: list[str] = []
         self._iteration = 0
 
+        self._executor = self._build_tool_executor()
+
+    def _build_tool_executor(self) -> ToolExecutor:
+        sid = self.session_id
+
+        async def _grep(pattern: str, path: str = "/", file_pattern: str | None = None) -> str:
+            """Search for a pattern in the codebase using regex. Returns matching lines with file paths and line numbers."""
+            return await grep(sid, pattern, path, file_pattern)
+
+        async def _glob(pattern: str) -> str:
+            """Find files matching a glob pattern. Returns file paths."""
+            return await glob(sid, pattern)
+
+        async def _read_file(path: str) -> str:
+            """Read the full content of a file with line numbers. Always read a file before editing it."""
+            return await read_file_with_lines(sid, path)
+
+        async def _write_file(path: str, content: str) -> str:
+            """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
+            status, diff_str = await write_file_with_diff(sid, path, content)
+            await self.ws_send({"type": "file", "path": path, "content": content})
+            if diff_str:
+                self._diffs.append(FileDiff(path=path, diff=diff_str))
+            if path not in self._files_changed:
+                self._files_changed.append(path)
+            return status
+
+        async def _edit_file(path: str, search: str, replace: str) -> str:
+            """Apply a targeted search-and-replace edit. The search string must match exactly."""
+            status, diff_str = await edit_file_with_context(sid, path, search, replace)
+            if diff_str:
+                new_content = await read_file(sid, path)
+                await self.ws_send({"type": "file", "path": path, "content": new_content})
+                self._diffs.append(FileDiff(path=path, diff=diff_str))
+            if path not in self._files_changed:
+                self._files_changed.append(path)
+            return status
+
+        return ToolExecutor([
+            FunctionTool(_grep, name="grep"),
+            FunctionTool(_glob, name="glob"),
+            FunctionTool(_read_file, name="read_file"),
+            FunctionTool(_write_file, name="write_file"),
+            FunctionTool(_edit_file, name="edit_file"),
+        ])
+
     def _llm_metadata(self, generation_name: str) -> dict:
         trace_id = self.trace_id or langfuse_context.get_current_trace_id()
         observation_id = langfuse_context.get_current_observation_id()
@@ -79,42 +108,30 @@ class FollowUpAgent:
             "generation_name": generation_name,
         }
 
-    # ------------------------------------------------------------------
-    # Main entry point
-    # ------------------------------------------------------------------
-
     @observe(name="followup-run")
     async def run(self, content: str) -> None:
-        """Process a follow-up message using the ReACT loop."""
-        langfuse_context.update_current_observation(
-            tags=["follow-up-agent"],
-        )
+        langfuse_context.update_current_observation(tags=["follow-up-agent"])
 
-        # 1. Build context
         await self.ws_send({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
 
-        # 2. Load chat history
         history = await get_messages(self.project_id)
         messages = [
-            {"role": m.role, "content": m.content}
+            Message(role=m.role, content=m.content)
             for m in history
             if not m.content.startswith(CARD_PREFIX)
         ]
 
-        # 3. ReACT loop (tools handle both reads AND writes)
-        system_prompt = FOLLOWUP_SYSTEM_PROMPT.format(
+        system_prompt = render_followup(
             project_summary=context["summary"],
             file_tree=context["file_tree"],
         )
         answer = await self._react_loop(messages, system_prompt)
 
-        # 4. Stream the final text answer to the client
         if answer:
             await self.ws_send({"type": "text", "content": answer})
 
-        # 5. Save message and send completion
-        card = _encode_card({
+        card = encode_card({
             "type": "followup_progress",
             "steps": self._steps,
             "answer": answer or None,
@@ -124,7 +141,6 @@ class FollowUpAgent:
         assistant_content = (answer + "\n" + card) if answer else card
         await save_message(self.project_id, "assistant", assistant_content)
 
-        # Send diffs to frontend for live card rendering
         if self._diffs:
             await self.ws_send({
                 "type": "followup_diffs",
@@ -134,21 +150,17 @@ class FollowUpAgent:
         await self.ws_send({"type": "phase", "phase": "complete"})
         await self.ws_send({"type": "action_complete"})
 
-    # ------------------------------------------------------------------
-    # Context building
-    # ------------------------------------------------------------------
-
     @observe(name="followup-build-context")
     async def _build_context(self) -> dict:
         project = await get_project_by_session(self.session_id)
         summary = ""
         if project and project.summary:
             try:
-                summary_data = json.loads(project.summary)
+                data = json.loads(project.summary)
                 summary = (
-                    f"{summary_data.get('summary', '')}\n"
-                    f"Tech stack: {', '.join(summary_data.get('tech_stack', []))}\n"
-                    f"Features: {', '.join(summary_data.get('features', []))}\n"
+                    f"{data.get('summary', '')}\n"
+                    f"Tech stack: {', '.join(data.get('tech_stack', []))}\n"
+                    f"Features: {', '.join(data.get('features', []))}\n"
                 )
             except (json.JSONDecodeError, AttributeError):
                 summary = "(no project summary available)"
@@ -173,21 +185,17 @@ class FollowUpAgent:
                 lines.append(f"{prefix}{entry.name}")
         return "\n".join(lines)
 
-    # ------------------------------------------------------------------
-    # ReACT loop
-    # ------------------------------------------------------------------
-
     @observe(name="followup-react-loop")
-    async def _react_loop(self, messages: list[dict], system_prompt: str) -> str:
-        """Core ReACT loop: call LLM, execute tools, repeat until done."""
-        working_messages = list(messages)
+    async def _react_loop(self, messages: list[Message], system_prompt: str) -> str:
+        working_messages: list[dict] = [m.to_dict() for m in messages]
+        tool_schemas = self._executor.get_schemas()
         last_content = ""
 
         for self._iteration in range(MAX_ITERATIONS):
             response = await complete_chat_with_tools(
                 messages=working_messages,
                 system_prompt=system_prompt,
-                tools=FOLLOWUP_TOOLS,
+                tools=tool_schemas,
                 model=self.model,
                 metadata=self._llm_metadata(f"followup-react-{self._iteration}"),
             )
@@ -208,7 +216,6 @@ class FollowUpAgent:
                 except json.JSONDecodeError:
                     args = {}
 
-                # Send running step
                 step_data = {
                     "tool": tool_name,
                     "args": {k: v for k, v in args.items() if k != "content"},
@@ -217,16 +224,14 @@ class FollowUpAgent:
                 }
                 await self.ws_send({"type": "followup_step", **step_data})
 
-                # Execute tool
-                result = await self._execute_tool(tool_name, args)
+                result = await self._executor.execute(tool_name, tool_use_id=tool_call.id, **args)
+                result_str = str(result.value) if not result.is_error else f"Error: {result.value}"
 
-                # Send completed step
-                preview = result[:200] + "..." if len(result) > 200 else result
+                preview = result_str[:200] + "..." if len(result_str) > 200 else result_str
                 step_data["status"] = "completed"
                 step_data["result_preview"] = preview
                 await self.ws_send({"type": "followup_step", **step_data})
 
-                # Track step for card persistence
                 self._steps.append({
                     "id": str(uuid.uuid4()),
                     "tool": tool_name,
@@ -239,169 +244,8 @@ class FollowUpAgent:
                 working_messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
-                    "content": result,
+                    "content": result_str,
                 })
 
         logger.warning("[followup-agent] Hit max iterations (%d)", MAX_ITERATIONS)
         return last_content
-
-    # ------------------------------------------------------------------
-    # Tool implementations
-    # ------------------------------------------------------------------
-
-    @observe(name="followup-execute-tool")
-    async def _execute_tool(self, tool_name: str, args: dict) -> str:
-        try:
-            if tool_name == "grep":
-                return await self._tool_grep(
-                    args["pattern"],
-                    args.get("path", "/"),
-                    args.get("file_pattern"),
-                )
-            elif tool_name == "glob":
-                return await self._tool_glob(args["pattern"])
-            elif tool_name == "read_file":
-                return await self._tool_read_file(args["path"])
-            elif tool_name == "write_file":
-                return await self._tool_write_file(args["path"], args["content"])
-            elif tool_name == "edit_file":
-                return await self._tool_edit_file(
-                    args["path"], args["search"], args["replace"],
-                )
-            else:
-                return f"Unknown tool: {tool_name}"
-        except Exception as e:
-            return f"Error: {e}"
-
-    async def _tool_grep(self, pattern: str, path: str = "/", file_pattern: str | None = None) -> str:
-        """Run ripgrep in the sandbox workspace."""
-        sandbox = sandbox_manager.get_sandbox(self.session_id)
-        if sandbox is None:
-            return "Error: No sandbox found"
-
-        workspace = os.path.realpath(sandbox.workspace_dir)
-        search_path = os.path.realpath(os.path.join(workspace, path.lstrip("/")))
-
-        if not search_path.startswith(workspace):
-            return "Error: Path traversal detected"
-
-        cmd = [
-            "rg", "--no-heading", "--line-number", "--max-count", "50",
-            "--glob", "!node_modules",
-            "--glob", "!.git",
-            "--glob", "!dist",
-            "--glob", "!.next",
-        ]
-        if file_pattern:
-            cmd.extend(["--glob", file_pattern])
-        cmd.extend([pattern, search_path])
-
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
-            output = stdout.decode("utf-8", errors="replace")
-
-            lines = []
-            for line in output.splitlines()[:50]:
-                if line.startswith(workspace):
-                    line = line[len(workspace):]
-                lines.append(line)
-
-            if not lines:
-                return "No matches found."
-            return "\n".join(lines)
-        except asyncio.TimeoutError:
-            return "Error: grep timed out"
-        except FileNotFoundError:
-            return "Error: ripgrep (rg) not available"
-
-    async def _tool_glob(self, pattern: str) -> str:
-        """Find files matching a glob pattern in the sandbox."""
-        sandbox = sandbox_manager.get_sandbox(self.session_id)
-        if sandbox is None:
-            return "Error: No sandbox found"
-
-        workspace = Path(os.path.realpath(sandbox.workspace_dir))
-        SKIP = {"node_modules", ".git", "dist", ".next", ".cache", "__pycache__"}
-
-        results = []
-        for p in workspace.glob(pattern):
-            if any(part in SKIP for part in p.parts):
-                continue
-            rel = "/" + str(p.relative_to(workspace))
-            results.append(rel)
-            if len(results) >= 100:
-                break
-
-        if not results:
-            return "No files found matching pattern."
-        return "\n".join(sorted(results))
-
-    async def _tool_read_file(self, path: str) -> str:
-        """Read a file from the sandbox with line numbers."""
-        try:
-            content = await read_file(self.session_id, path)
-        except (FileNotFoundError, PermissionError) as e:
-            return f"Error: {e}"
-
-        lines = content.splitlines()
-        if len(lines) > 500:
-            lines = lines[:500]
-            numbered = [f"{i + 1:4d} | {line}" for i, line in enumerate(lines)]
-            numbered.append(f"\n... (truncated at 500 lines, file has {len(content.splitlines())} total)")
-            return "\n".join(numbered)
-
-        return "\n".join(f"{i + 1:4d} | {line}" for i, line in enumerate(lines))
-
-    async def _tool_write_file(self, path: str, content: str) -> str:
-        """Write full file content, creating it if needed. Returns diff."""
-        try:
-            old_content = await read_file(self.session_id, path)
-        except FileNotFoundError:
-            old_content = ""
-
-        await write_file(self.session_id, path, content)
-        await self.ws_send({"type": "file", "path": path, "content": content})
-
-        diff_str = _make_diff(path, old_content, content)
-        if diff_str:
-            self._diffs.append(FileDiff(path=path, diff=diff_str))
-        if path not in self._files_changed:
-            self._files_changed.append(path)
-
-        return f"OK — wrote {path} ({len(content.splitlines())} lines)"
-
-    async def _tool_edit_file(self, path: str, search: str, replace: str) -> str:
-        """Search-and-replace edit. Returns diff on success, error with file content on failure."""
-        try:
-            current = await read_file(self.session_id, path)
-        except FileNotFoundError:
-            return f"Error: File not found: {path}"
-
-        try:
-            await edit_file(self.session_id, path, search, replace)
-        except ValueError:
-            lines = current.splitlines()
-            snippet = "\n".join(lines[:40])
-            if len(lines) > 40:
-                snippet += f"\n... ({len(lines)} lines total)"
-            return (
-                f"Error: search string not found in {path}. "
-                f"The search must match the file exactly (including whitespace).\n\n"
-                f"Current file content:\n```\n{snippet}\n```"
-            )
-
-        new_content = await read_file(self.session_id, path)
-        await self.ws_send({"type": "file", "path": path, "content": new_content})
-
-        diff_str = _make_diff(path, current, new_content)
-        if diff_str:
-            self._diffs.append(FileDiff(path=path, diff=diff_str))
-        if path not in self._files_changed:
-            self._files_changed.append(path)
-
-        return f"OK — edited {path}"
