@@ -41,6 +41,12 @@ export function AppShell() {
     setMainSplit((s) => Math.min(MAIN_SPLIT_MAX, Math.max(MAIN_SPLIT_MIN, s + delta / width)));
   }, []);
 
+  const bottomTabs: { id: BottomTab; label: string }[] = [
+    { id: 'server', label: 'Server' },
+    { id: 'terminal', label: 'Terminal' },
+    { id: 'preview', label: 'Preview' },
+  ];
+
   return (
     <div
       style={{
@@ -49,9 +55,9 @@ export function AppShell() {
         height: '100%',
         width: '100%',
         overflow: 'hidden',
+        boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)',
       }}
     >
-      {/* When closed: vertical \"Projects\" tab on the left. When open: full projects sidebar with internal close button. */}
       {sidebarOpen ? (
         <>
           <div
@@ -74,22 +80,7 @@ export function AppShell() {
           type="button"
           onClick={() => setSidebarOpen(true)}
           title="Show projects panel"
-          style={{
-            width: '48px',
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            background: 'var(--surface)',
-            border: 'none',
-            borderRight: '1px solid var(--border)',
-            color: 'var(--accent)',
-            cursor: 'pointer',
-            fontSize: '10px',
-            fontWeight: 600,
-          }}
+          className="w-12 shrink-0 flex flex-col items-center justify-center gap-1 bg-surface border-r border-border text-primary cursor-pointer text-[10px] font-semibold hover:bg-muted/30 transition-colors"
         >
           <PanelLeftOpen size={22} />
           <span>Projects</span>
@@ -115,19 +106,10 @@ export function AppShell() {
             overflow: 'hidden',
           }}
         >
-          <div
-            style={{
-              flex: mainSplit,
-              minWidth: 0,
-              borderRight: '1px solid var(--border)',
-              overflow: 'hidden',
-            }}
-          >
+          <div style={{ flex: mainSplit, minWidth: 0, overflow: 'hidden' }}>
             <ChatPanel />
           </div>
-
           <Resizer direction="horizontal" onDrag={handleMainSplitResize} />
-
           <div style={{ flex: 1 - mainSplit, minWidth: 0, overflow: 'hidden' }}>
             <EditorPanel />
           </div>
@@ -139,56 +121,27 @@ export function AppShell() {
           style={{
             height: bottomHeight,
             minHeight: BOTTOM_MIN,
-            borderTop: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             flexShrink: 0,
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0',
-              borderBottom: '1px solid var(--border)',
-              background: 'var(--surface)',
-              flexShrink: 0,
-            }}
-          >
-            <button
-              onClick={() => setBottomTab('server')}
-              style={{
-                padding: '6px 16px',
-                fontSize: '13px',
-                color: bottomTab === 'server' ? 'var(--accent)' : 'var(--text-dim)',
-                borderBottom: bottomTab === 'server' ? '2px solid var(--accent)' : '2px solid transparent',
-              }}
-            >
-              Server
-            </button>
-            <button
-              onClick={() => setBottomTab('terminal')}
-              style={{
-                padding: '6px 16px',
-                fontSize: '13px',
-                color: bottomTab === 'terminal' ? 'var(--accent)' : 'var(--text-dim)',
-                borderBottom: bottomTab === 'terminal' ? '2px solid var(--accent)' : '2px solid transparent',
-              }}
-            >
-              Terminal
-            </button>
-            <button
-              onClick={() => setBottomTab('preview')}
-              style={{
-                padding: '6px 16px',
-                fontSize: '13px',
-                color: bottomTab === 'preview' ? 'var(--accent)' : 'var(--text-dim)',
-                borderBottom: bottomTab === 'preview' ? '2px solid var(--accent)' : '2px solid transparent',
-              }}
-            >
-              Preview
-            </button>
+          {/* Bottom tab bar */}
+          <div className="flex items-center border-b border-border bg-surface shrink-0">
+            {bottomTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setBottomTab(tab.id)}
+                className={`px-4 py-1.5 text-[13px] font-medium border-b-2 transition-colors duration-150 ${
+                  bottomTab === tab.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           <div style={{ flex: 1, overflow: 'hidden' }}>

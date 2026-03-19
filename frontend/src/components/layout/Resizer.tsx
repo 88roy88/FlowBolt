@@ -1,7 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-const RESIZER_SIZE = 6;
-
 type ResizerProps = {
   direction: 'horizontal' | 'vertical';
   onDrag: (delta: number) => void;
@@ -46,13 +44,18 @@ export function Resizer({ direction, onDrag, style }: ResizerProps) {
       onMouseDown={handleMouseDown}
       style={{
         flexShrink: 0,
-        width: isVertical ? '100%' : RESIZER_SIZE,
-        height: isVertical ? RESIZER_SIZE : '100%',
+        width: isVertical ? '100%' : 1,
+        height: isVertical ? 1 : '100%',
         cursor: isVertical ? 'row-resize' : 'col-resize',
-        background: isDragging ? 'var(--accent)' : 'var(--border)',
-        opacity: isDragging ? 0.6 : 1,
-        transition: isDragging ? 'none' : 'background 0.15s ease',
-        ...(isVertical ? { minHeight: RESIZER_SIZE } : { minWidth: RESIZER_SIZE }),
+        background: 'var(--border)',
+        boxShadow: isDragging ? '0 0 0 1px var(--primary)' : 'none',
+        transition: isDragging ? 'none' : 'box-shadow 0.15s ease',
+        // Invisible hit area
+        padding: isVertical ? '2px 0' : '0 2px',
+        margin: isVertical ? '-2px 0' : '0 -2px',
+        backgroundClip: 'content-box',
+        position: 'relative',
+        zIndex: 2,
         ...style,
       }}
     />

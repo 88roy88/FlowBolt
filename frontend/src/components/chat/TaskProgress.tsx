@@ -29,7 +29,9 @@ export function TaskProgress({ tasks }: { tasks: ExecutionTask[] }) {
       {/* Progress bar */}
       <div className="h-1 bg-background rounded-sm mb-3.5 overflow-hidden">
         <div
-          className="h-full bg-success rounded-sm transition-all duration-300 ease-out"
+          className={`h-full rounded-sm transition-all duration-500 ease-out ${
+            completed < total ? 'progress-bar-shimmer' : 'bg-success'
+          }`}
           style={{ width: `${total > 0 ? (completed / total) * 100 : 0}%` }}
         />
       </div>

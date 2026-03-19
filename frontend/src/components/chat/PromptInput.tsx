@@ -97,9 +97,9 @@ export function PromptInput() {
 
       {/* Input row */}
       <div
-        className={`flex items-end gap-2 bg-background rounded-xl px-3.5 py-1 transition-all ${
+        className={`flex items-end gap-2 bg-background rounded-xl px-3.5 py-2 transition-all duration-200 ${
           focused && !disabled
-            ? 'border border-primary shadow-[0_0_0_2px_color-mix(in_srgb,var(--primary)_12%,transparent)]'
+            ? 'border border-primary/60 shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_8%,transparent),0_2px_8px_color-mix(in_srgb,var(--primary)_6%,transparent)]'
             : 'border border-border shadow-[var(--shadow-sm)]'
         }`}
       >
@@ -131,21 +131,31 @@ export function PromptInput() {
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none text-sm leading-normal max-h-[200px] py-1.5 bg-transparent disabled:opacity-50"
+          className="flex-1 resize-none text-sm leading-normal max-h-[200px] py-2 bg-transparent disabled:opacity-50"
         />
 
         <button
           onClick={handleSubmit}
           disabled={!canSend}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all ${
+          className={`w-[34px] h-[34px] flex items-center justify-center rounded-lg shrink-0 transition-all duration-150 ${
             canSend
-              ? 'bg-primary text-text-on-accent cursor-pointer'
+              ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
               : 'bg-border text-muted-foreground opacity-40 cursor-default'
           }`}
           title="Send message"
         >
           <ArrowUp size={16} strokeWidth={2.5} />
         </button>
+      </div>
+      <div className="flex items-center justify-between mt-1.5 px-1">
+        <span className="text-[10px] text-muted-foreground/50">
+          {selectedCases.length > 0 && `${selectedCases.length} case${selectedCases.length > 1 ? 's' : ''} attached`}
+        </span>
+        <span className="text-[10px] text-muted-foreground/40">
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[9px] font-mono">Enter</kbd> send
+          <span className="mx-1">·</span>
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[9px] font-mono">Shift+Enter</kbd> new line
+        </span>
       </div>
     </div>
   );

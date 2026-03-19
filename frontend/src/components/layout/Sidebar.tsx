@@ -3,6 +3,7 @@ import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
 import { Plus, Trash2, FolderKanban, PanelLeftClose, Info, Loader2 } from 'lucide-react';
+import { FlowBrand } from '../ui/flow-logo';
 import type { ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { pollFileTree } from '../../utils/pollFileTree';
@@ -20,6 +21,7 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const handleCreate = async () => {
     const name = newName.trim() || 'New Project';
@@ -45,6 +47,12 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      setTimeout(() => setPendingDeleteId(null), 3000);
+      return;
+    }
+    setPendingDeleteId(null);
     const wasSelected = currentProject?.id === id;
     await deleteProject(id);
     if (wasSelected) {
@@ -76,9 +84,9 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
 
   return (
     <div className="flex flex-col h-full p-3">
-      {/* Header */}
+      {/* Header with Flow44 branding */}
       <div className="flex items-center justify-between mb-3">
-        <span className="font-bold text-sm text-primary">AI Builder</span>
+        <FlowBrand size="sm" />
         <div className="flex items-center gap-1">
           {onCloseSidebar && (
             <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title="Hide projects panel">
@@ -124,29 +132,43 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
 
       {/* Project list */}
       <div className="flex-1 overflow-auto">
-        {projects.map((project) => (
-          <div
-            key={project.id}
-            onClick={() => handleSelect(project)}
-            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer mb-0.5 ${
-              currentProject?.id === project.id ? 'bg-background' : 'hover:bg-background/50'
-            }`}
-          >
-            <FolderKanban size={16} className="text-primary shrink-0" />
-            <span className="flex-1 text-[13px] truncate">{project.name}</span>
-            {project.summary && (
-              <Button variant="ghost" size="icon-sm" onClick={(e) => handleShowSummary(e, project)} title="View project summary" className="opacity-50 hover:opacity-100">
-                <Info size={14} />
+        {projects.map((project) => {
+          const isActive = currentProject?.id === project.id;
+          return (
+            <div
+              key={project.id}
+              onClick={() => handleSelect(project)}
+              className={`flex items-center gap-2 p-2 cursor-pointer mb-0.5 transition-colors duration-100 rounded-r-md ${
+                isActive
+                  ? 'bg-background border-l-2 border-primary'
+                  : 'hover:bg-muted/50 border-l-2 border-transparent'
+              }`}
+            >
+              <FolderKanban size={16} className="text-primary shrink-0" />
+              <span className="flex-1 text-[13px] truncate">{project.name}</span>
+              {project.summary && (
+                <Button variant="ghost" size="icon-sm" onClick={(e) => handleShowSummary(e, project)} title="View project summary" className="opacity-50 hover:opacity-100">
+                  <Info size={14} />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(e) => handleDelete(e, project.id)}
+                title={pendingDeleteId === project.id ? 'Click again to confirm' : 'Delete project'}
+                className={`transition-all duration-150 ${
+                  pendingDeleteId === project.id
+                    ? 'opacity-100 text-destructive bg-destructive/10'
+                    : 'opacity-50 hover:opacity-100'
+                }`}
+              >
+                <Trash2 size={14} />
               </Button>
-            )}
-            <Button variant="ghost" size="icon-sm" onClick={(e) => handleDelete(e, project.id)} title="Delete project" className="opacity-50 hover:opacity-100">
-              <Trash2 size={14} />
-            </Button>
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Summary Modal */}
       {summaryModal && (
         <SummaryModal
           projectName={summaryModal.projectName}

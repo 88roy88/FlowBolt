@@ -7,6 +7,8 @@ import { AppShell } from './components/layout/AppShell';
 import { ErrorToast } from './components/errors/ErrorToast';
 import { useErrorCapture } from './hooks/useErrorCapture';
 import { pollFileTree } from './utils/pollFileTree';
+import { Loader2 } from 'lucide-react';
+import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
 
 function getSessionIdFromHash(): string | null {
@@ -127,8 +129,9 @@ export default function App() {
 
   if (loading || checkingBackend) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <p style={{ color: 'var(--text-dim)' }}>Loading...</p>
+      <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
+        <FlowBrand size="lg" />
+        <Loader2 size={20} className="animate-spin text-[#2bbcc4]" />
       </div>
     );
   }
@@ -143,7 +146,7 @@ export default function App() {
         height: '100%',
         gap: '16px',
       }}>
-        <h1 style={{ color: 'var(--accent)', fontSize: '24px' }}>AI Builder</h1>
+        <FlowBrand size="lg" />
         {!backendAvailable ? (
           <>
             <div style={{

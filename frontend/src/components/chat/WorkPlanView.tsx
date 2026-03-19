@@ -35,7 +35,11 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
           <h4 className="text-[13px] font-semibold text-muted-foreground mb-2">What you'll get</h4>
           <div className="flex flex-col gap-1.5">
             {overview.features.map((feature, i) => (
-              <div key={i} className="flex items-start gap-2 p-2 bg-background rounded-lg text-[13px]">
+              <div
+                key={i}
+                className="flex items-start gap-2 p-2 bg-background rounded-lg text-[13px]"
+                style={{ animation: `staggerFadeIn 0.3s cubic-bezier(0.16,1,0.3,1) ${i * 60}ms both` }}
+              >
                 <Sparkles size={14} className="text-primary shrink-0 mt-0.5" />
                 <div>
                   <span className="font-medium">{feature.title}</span>
@@ -85,15 +89,15 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
 
       {/* Action buttons */}
       <div className="flex gap-2">
-        <Button variant="success" onClick={() => respondToPlan('accept')}>
+        <Button variant="success" onClick={() => respondToPlan('accept')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Check size={14} />
           Looks good, build it
         </Button>
-        <Button variant="warning" onClick={handleModify}>
+        <Button variant="warning" onClick={handleModify} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Pencil size={14} />
           {modifyMode ? 'Send feedback' : 'Change something'}
         </Button>
-        <Button variant="outline" onClick={() => respondToPlan('reject')}>
+        <Button variant="outline" onClick={() => respondToPlan('reject')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <X size={14} />
           Start over
         </Button>

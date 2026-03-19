@@ -92,38 +92,17 @@ export function EditorPanel() {
           flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            padding: '6px 12px',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--text-dim)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span>Files</span>
+        <div className="flex items-center justify-between px-3 py-[7px] border-b border-border">
+          <span className="uppercase tracking-wider text-[11px] text-muted-foreground font-semibold">Files</span>
 
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="flex gap-1">
             <button
               title="Export ZIP"
               disabled={!sessionId}
               onClick={() => sessionId && downloadZip(sessionId)}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
-                cursor: sessionId ? 'pointer' : 'not-allowed',
-                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: sessionId ? 1 : 0.4,
-              }}
+              className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
+                sessionId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
             >
               <Download size={13} />
             </button>
@@ -132,17 +111,9 @@ export function EditorPanel() {
               title="Export HTML"
               disabled={!sessionId}
               onClick={() => sessionId && downloadSingleHtml(sessionId)}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
-                cursor: sessionId ? 'pointer' : 'not-allowed',
-                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: sessionId ? 1 : 0.4,
-              }}
+              className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
+                sessionId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
             >
               <FileCode size={13} />
             </button>
