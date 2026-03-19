@@ -1,5 +1,3 @@
-"""WebSocket endpoint for interactive PTY terminal sessions."""
-
 from __future__ import annotations
 
 import asyncio
@@ -7,8 +5,8 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.sandbox.pty import PtyHandle
 from app.sandbox.manager import sandbox_manager
-from app.sandbox.pty import PtyProcess, close_pty, create_pty_process, read_pty, write_pty
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +15,16 @@ router = APIRouter()
 
 @router.websocket("/ws/terminal/{session_id}")
 async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
-    """Bidirectional PTY WebSocket.
-
-    Client sends raw bytes (keystrokes); server sends terminal output bytes.
-    The dev server is managed by sandbox_manager as a background process.
-    """
     await websocket.accept()
 
-    pty_proc: PtyProcess | None = None
+    sandbox = sandbox_manager.get_sandbox(session_id)
+    if sandbox is None:
+        await websocket.close(code=1008, reason="No sandbox")
+        return
+
+    pty: PtyHandle | None = None
     try:
-        pty_proc = create_pty_process(session_id)
+        pty = sandbox.create_pty()
     except Exception:
         logger.exception("Failed to create PTY for session %s", session_id)
         await websocket.close(code=1011, reason="Failed to create terminal")
@@ -35,11 +33,10 @@ async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
     stop_event = asyncio.Event()
 
     async def _reader() -> None:
-        """Continuously read PTY output and send to the WebSocket client."""
         loop = asyncio.get_running_loop()
         while not stop_event.is_set():
             try:
-                data = await loop.run_in_executor(None, read_pty, pty_proc)
+                data = await loop.run_in_executor(None, pty.read)
                 if data:
                     await websocket.send_bytes(data)
                 else:
@@ -52,7 +49,7 @@ async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
     try:
         while True:
             data = await websocket.receive_bytes()
-            write_pty(pty_proc, data)
+            pty.write(data)
     except WebSocketDisconnect:
         logger.info("Terminal WebSocket disconnected for session %s", session_id)
     except Exception:
@@ -64,5 +61,5 @@ async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
             await reader_task
         except asyncio.CancelledError:
             pass
-        if pty_proc is not None:
-            close_pty(pty_proc)
+        if pty is not None:
+            sandbox.close_pty(pty)

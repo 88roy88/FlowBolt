@@ -14,6 +14,7 @@ dependencies = [
     "httpx>=0.28.0",
     "langfuse==2.59.7",
     "boto3>=1.42.68",
+    "pywinpty>=2.0.0; sys_platform == 'win32'",
 ]
 
 [project.scripts]

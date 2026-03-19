@@ -17,7 +17,7 @@ from langfuse.decorators import observe, langfuse_context
 
 from app.ai.parser import ActionParser
 from app.ai.provider import complete_chat, stream_chat
-from app.sandbox.nsjail import exec_in_sandbox
+from app.sandbox.manager import sandbox_manager
 from app.ai.task_tree import Task, WorkPlan
 from app.ai.prompts import (
     ARCHITECTURE_PROMPT,
@@ -634,7 +634,8 @@ Ensure proper dependency ordering: types → hooks → components → App integr
 
     async def _execute(self) -> None:
         """Execute the technical plan layer by layer."""
-        assert self._work_plan is not None
+        if self._work_plan is None:
+            raise RuntimeError("No work plan available")
         self.state = "executing"
         await self.ws_send({"type": "phase", "phase": "executing"})
 
@@ -715,7 +716,8 @@ Ensure proper dependency ordering: types → hooks → components → App integr
             "status": "running",
         })
 
-        assert self._work_plan is not None
+        if self._work_plan is None:
+            raise RuntimeError("No work plan available")
 
         # Split completed files into dependency (full) vs other (exports only)
         dep_file_paths: set[str] = set()
@@ -798,8 +800,7 @@ Ensure proper dependency ordering: types → hooks → components → App integr
         """Run tsc --noEmit and return error output (empty string if clean)."""
         try:
             lines: list[str] = []
-            async for line in exec_in_sandbox(
-                self.session_id,
+            async for line in sandbox_manager.get_sandbox(self.session_id).exec(
                 "npx tsc --noEmit 2>&1",
             ):
                 lines.append(line.rstrip())
@@ -832,8 +833,7 @@ Ensure proper dependency ordering: types → hooks → components → App integr
         typecheck_success = False
         try:
             lines: list[str] = []
-            async for line in exec_in_sandbox(
-                self.session_id,
+            async for line in sandbox_manager.get_sandbox(self.session_id).exec(
                 "npx tsc --noEmit 2>&1",
             ):
                 lines.append(line.rstrip())
@@ -875,8 +875,7 @@ Ensure proper dependency ordering: types → hooks → components → App integr
         build_success = False
         try:
             lines: list[str] = []
-            async for line in exec_in_sandbox(
-                self.session_id,
+            async for line in sandbox_manager.get_sandbox(self.session_id).exec(
                 "pnpm build 2>&1",
             ):
                 lines.append(line.rstrip())
@@ -913,7 +912,8 @@ Ensure proper dependency ordering: types → hooks → components → App integr
     @observe(name="fix-errors-auto", as_type="span")
     async def _fix_errors(self, errors: str) -> None:
         """Ask the LLM to fix typecheck errors, then write the corrected files."""
-        assert self._work_plan is not None
+        if self._work_plan is None:
+            raise RuntimeError("No work plan available")
         await self.ws_send({"type": "phase", "phase": "fixing"})
 
         # Add metadata about the errors being fixed

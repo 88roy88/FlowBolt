@@ -68,8 +68,8 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
-# Disable nsjail in container (force fallback mode like macOS)
-ENV AIB_NSJAIL_BIN=/nonexistent
+# Use namespaced sandbox mode in container (nsjail isolation)
+ENV AIB_SANDBOX_MODE=namespaced
 
 EXPOSE 8000
 

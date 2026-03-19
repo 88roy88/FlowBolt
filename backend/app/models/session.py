@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from app.sandbox.manager import SandboxInfo
+from app.sandbox.base import SandboxInfo
 
 
 @dataclass
