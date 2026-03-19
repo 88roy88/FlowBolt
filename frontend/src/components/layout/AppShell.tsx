@@ -244,7 +244,7 @@ export function AppShell() {
                 onClick={() => setBottomOpen((v) => !v)}
                 className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
               >
-                <ChevronUp size={14} className={`transition-transform duration-200 ${bottomOpen ? '' : 'rotate-180'}`} />
+                <ChevronUp size={14} className={`transition-transform duration-200 ${!bottomOpen ? '' : 'rotate-180'}`} />
                 <span className="font-medium">{bottomTab === 'server' ? 'Server Log' : 'Terminal'}</span>
                 {!bottomOpen && (
                   <div className="flex gap-2 ml-auto">

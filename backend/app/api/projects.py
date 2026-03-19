@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
-from app.models.project import create_project, delete_project, get_project, list_projects, update_project_model
+from app.models.project import create_project, delete_project, get_project, list_projects, rename_project, update_project_model
 from app.models.session import session_registry
 from app.sandbox.manager import sandbox_manager, stamp_vite_config
 
@@ -21,6 +21,10 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 class CreateProjectRequest(BaseModel):
+    name: str
+
+
+class RenameProjectRequest(BaseModel):
     name: str
 
 
@@ -71,6 +75,19 @@ async def create_new_project(body: CreateProjectRequest):
     asyncio.create_task(_scaffold_and_start())
 
     return asdict(project)
+
+
+@router.patch("/{project_id}/name", status_code=200)
+async def rename_existing_project(project_id: str, body: RenameProjectRequest):
+    """Rename a project."""
+    project = await get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+
+    await rename_project(project_id, body.name.strip())
+    return {"success": True}
 
 
 @router.patch("/{project_id}/model", status_code=200)

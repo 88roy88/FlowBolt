@@ -244,15 +244,8 @@ function handleProjectSummary(
   msg: { summary: import('../types').ProjectSummary },
   set: SetState,
 ) {
+  // Store summary but don't add card yet — action_complete will add it after task progress
   set({ projectSummary: msg.summary });
-  const summaryMsg: Message = {
-    id: generateId(),
-    role: 'assistant',
-    content: '',
-    timestamp: Date.now(),
-    agentCard: { type: 'project_summary', summary: msg.summary },
-  };
-  set((s) => ({ messages: [...s.messages, summaryMsg] }));
   const currentProject = useSessionStore.getState().currentProject;
   if (currentProject) {
     useSessionStore.getState().updateProjectSummary(
@@ -383,6 +376,17 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     });
   }
 
+  // Add project summary card after task progress
+  if (state.projectSummary) {
+    newMessages.push({
+      id: generateId(),
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      agentCard: { type: 'project_summary', summary: state.projectSummary },
+    });
+  }
+
   set((s) => ({
     messages: [...s.messages, ...newMessages],
     currentAssistantMessage: '',
@@ -393,6 +397,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     executionTasks: [],
     followUpSteps: [],
     followUpDiffs: [],
+    projectSummary: null,
   }));
   cleanup();
   useFilesStore.getState().loadFileTree();

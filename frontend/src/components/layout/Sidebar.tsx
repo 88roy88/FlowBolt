@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings } from 'lucide-react';
+import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
 import { ThemeToggle } from './ThemeToggle';
 import type { ProjectSummary } from '../../types';
@@ -42,7 +42,7 @@ function getInitials(name: string) {
 }
 
 export function Sidebar({ onCloseSidebar, isPinned, onPin }: SidebarProps) {
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject, isCreating } = useSessionStore();
+  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [newName, setNewName] = useState('');
@@ -50,6 +50,8 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin }: SidebarProps) {
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -109,6 +111,21 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin }: SidebarProps) {
         clearMessages();
       }
     }
+  };
+
+  const startRename = (project: typeof projects[number]) => {
+    setMenuOpenId(null);
+    setRenamingId(project.id);
+    setRenameValue(project.name);
+  };
+
+  const submitRename = async () => {
+    if (!renamingId || !renameValue.trim()) {
+      setRenamingId(null);
+      return;
+    }
+    await renameProject(renamingId, renameValue.trim());
+    setRenamingId(null);
   };
 
   const handleShowSummary = (project: typeof projects[number]) => {
@@ -196,7 +213,22 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin }: SidebarProps) {
                 <div className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${colorClass}`}>
                   {getInitials(project.name)}
                 </div>
-                <span className="flex-1 text-[13px] truncate">{project.name}</span>
+                {renamingId === project.id ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') submitRename();
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                    onBlur={submitRename}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-[13px] bg-background border border-border rounded px-1.5 py-0.5"
+                  />
+                ) : (
+                  <span className="flex-1 text-[13px] truncate">{project.name}</span>
+                )}
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -216,6 +248,13 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin }: SidebarProps) {
                   ref={menuRef}
                   className="absolute right-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
                 >
+                  <button
+                    onClick={() => startRename(project)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <Pencil size={13} className="text-muted-foreground" />
+                    Rename
+                  </button>
                   {project.summary && (
                     <button
                       onClick={() => handleShowSummary(project)}

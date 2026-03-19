@@ -13,6 +13,7 @@ interface SessionState {
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  renameProject: (id: string, name: string) => Promise<void>;
   updateProjectSummary: (projectId: string, summary: string) => void;
 }
 
@@ -67,6 +68,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     } else {
       set({ projects });
     }
+  },
+
+  async renameProject(id: string, name: string) {
+    await api.renameProject(id, name);
+    set((state) => {
+      const projects = state.projects.map((p) => p.id === id ? { ...p, name } : p);
+      const currentProject = state.currentProject?.id === id
+        ? { ...state.currentProject, name }
+        : state.currentProject;
+      return { projects, currentProject };
+    });
   },
 
   updateProjectSummary(projectId: string, summary: string) {

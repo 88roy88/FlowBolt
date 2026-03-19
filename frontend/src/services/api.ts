@@ -53,6 +53,13 @@ export async function deleteProject(id: string): Promise<void> {
   await request(`/projects/${id}`, { method: 'DELETE' });
 }
 
+export async function renameProject(projectId: string, name: string): Promise<void> {
+  await request(`/projects/${projectId}/name`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
 export async function updateProjectModel(projectId: string, model: string): Promise<void> {
   await request(`/projects/${projectId}/model`, {
     method: 'PATCH',
