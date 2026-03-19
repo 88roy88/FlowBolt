@@ -76,6 +76,10 @@ export async function fetchChatHistory(sessionId: string): Promise<{ id: string;
   return request(`/chat/${sessionId}/history`);
 }
 
+export async function fetchAgentEvents(sessionId: string): Promise<Record<string, unknown>[]> {
+  return request(`/chat/${sessionId}/events`);
+}
+
 export async function fetchModels(): Promise<AIModel[]> {
   return request<AIModel[]>('/models');
 }

@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
-import { fetchModels, fetchDefaultModel, fetchChatHistory, updateProjectModel } from '../services/api';
-import { createFixErrorHandler, createSendMessageHandler } from './chatHandlers';
+import { fetchModels, fetchDefaultModel, fetchChatHistory, fetchAgentEvents, updateProjectModel } from '../services/api';
+import { createFixErrorHandler, createSendMessageHandler, setReplayMode } from './chatHandlers';
 
 const CARD_PREFIX = '<!--agent-card:';
 const CARD_SUFFIX = '-->';
@@ -79,6 +79,7 @@ export interface ChatState {
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'reject' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
+  historyLoaded: boolean;
   loadHistory: (sessionId: string) => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
@@ -129,6 +130,7 @@ const RESET_STATE = {
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
+  historyLoaded: false,
   isStreaming: false,
   currentAssistantMessage: '',
   actions: [],
@@ -167,14 +169,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const handler = createFixErrorHandler(set, get, () => detachHandler(socket, handler));
     attachHandler(sessionId, socket, handler);
 
+    const selectedModel = get().selectedModel;
     socket.send({
       type: 'fix_error',
       error_message: errorMessage,
       error_file: errorFile,
       error_line: errorLine,
       error_stack: errorStack,
-      model: get().selectedModel || undefined,
+      model: selectedModel || undefined,
     });
+
+    const currentProject = useSessionStore.getState().currentProject;
+    if (currentProject && selectedModel) {
+      updateProjectModel(currentProject.id, selectedModel).catch(() => {});
+    }
   },
 
   sendMessage(content: string) {
@@ -208,6 +216,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ...(selectedModel && { model: selectedModel }),
       ...(selectedCases.length > 0 && { caseIds: selectedCases.map((c) => c.id) }),
     });
+
+    // Persist the model to the project so it's restored on next visit
+    const currentProject = useSessionStore.getState().currentProject;
+    if (currentProject && selectedModel) {
+      updateProjectModel(currentProject.id, selectedModel).catch(() => {});
+    }
 
     set({ selectedCases: [] });
   },
@@ -264,6 +278,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async loadHistory(sessionId: string) {
+    // Detach any existing handler from the previous session
+    if (activeHandler && activeSessionId && activeSessionId !== sessionId) {
+      const oldSocket = getChatSocket(activeSessionId);
+      detachHandler(oldSocket, activeHandler);
+    }
+
     try {
       const history = await fetchChatHistory(sessionId);
       const messages: Message[] = history.map((m) => {
@@ -294,14 +314,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
           cases: casesInfo,
         };
       });
-      set({ messages, ...RESET_STATE });
+      set({ messages, isStreaming: false, historyLoaded: true, ...RESET_STATE });
+
+      // Attach handler and replay agent events via REST (not WS replay, since
+      // the socket may already be open from a previous visit to this project).
+      const socket = getChatSocket(sessionId);
+      const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler), { replay: true });
+      attachHandler(sessionId, socket, handler);
+
+      // Fetch and replay current agent events from DB
+      try {
+        const events = await fetchAgentEvents(sessionId);
+        for (const evt of events) {
+          handler(evt as import('../types').WSMessage);
+        }
+      } catch {
+        // Events endpoint may not exist yet or session has no events
+      }
+
+      // Switch to live mode for new events from the running agent
+      setReplayMode(false);
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
   },
 
   clearMessages() {
-    set({ messages: [], ...RESET_STATE });
+    set({ messages: [], historyLoaded: false, ...RESET_STATE });
   },
 
   clearError() {

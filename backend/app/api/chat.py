@@ -45,6 +45,12 @@ async def chat_history(session_id: str):
     return [asdict(m) for m in messages]
 
 
+@router.get("/api/chat/{session_id}/events")
+async def chat_events(session_id: str):
+    events = await get_events(session_id)
+    return [evt.payload for evt in events]
+
+
 @router.websocket("/ws/chat/{session_id}")
 async def chat_ws(websocket: WebSocket, session_id: str) -> None:
     await websocket.accept()
@@ -56,15 +62,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
         await websocket.close()
         return
 
-    # Replay existing events from DB (reconnect support)
-    existing_events = await get_events(session_id)
-    for evt in existing_events:
-        try:
-            await websocket.send_json(evt.payload)
-        except Exception:
-            return
-
-    # Subscribe to live events
+    # Subscribe to live events (replay is handled by GET /api/chat/{session_id}/events)
     queue = subscribe(session_id)
 
     async def _forward_events() -> None:

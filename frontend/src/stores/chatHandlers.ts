@@ -7,6 +7,14 @@ type SetState = (
   partial: Partial<import('./chat').ChatState> | ((state: import('./chat').ChatState) => Partial<import('./chat').ChatState>),
 ) => void;
 
+// When true, event handler will update UI state but not add messages to chat
+// (messages are already in chat_messages DB, loaded by loadHistory)
+let _skipMessages = false;
+
+export function setReplayMode(replay: boolean) {
+  _skipMessages = replay;
+}
+
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -92,7 +100,7 @@ export function createFixErrorHandler(
             agentCard: { type: 'fix_progress', steps: [...state.fixSteps] },
           };
           set((s) => ({
-            messages: [...s.messages, fixMessage],
+            messages: _skipMessages ? s.messages : [...s.messages, fixMessage],
             currentAssistantMessage: '',
             actions: [],
             fixSteps: [],
@@ -119,7 +127,9 @@ export function createSendMessageHandler(
   set: SetState,
   get: GetState,
   cleanup: () => void,
+  options?: { replay?: boolean },
 ) {
+  _skipMessages = options?.replay ?? false;
   return (msg: WSMessage) => {
     switch (msg.type) {
       case 'phase':
@@ -217,7 +227,7 @@ function handlePhaseChange(
         ux: dp.ux === 'complete',
       },
     };
-    set((s) => ({ messages: [...s.messages, designMsg] }));
+    if (!_skipMessages) set((s) => ({ messages: [...s.messages, designMsg] }));
   }
 
   set({ agentPhase: msg.phase });
@@ -305,7 +315,7 @@ function handleCasesFetched(
       })),
     },
   };
-  set((s) => ({ messages: [...s.messages, casesMsg] }));
+  if (!_skipMessages) set((s) => ({ messages: [...s.messages, casesMsg] }));
 }
 
 function handlePackageFetched(
@@ -327,7 +337,7 @@ function handlePackageFetched(
       }],
     },
   };
-  set((s) => ({ messages: [...s.messages, packageMsg] }));
+  if (!_skipMessages) set((s) => ({ messages: [...s.messages, packageMsg] }));
 }
 
 function handleActionComplete(set: SetState, get: GetState, cleanup: () => void) {
@@ -388,7 +398,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
   }
 
   set((s) => ({
-    messages: [...s.messages, ...newMessages],
+    messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
     currentAssistantMessage: '',
     actions: [],
     isStreaming: false,
