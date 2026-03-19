@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.sandbox.filesystem import list_files, read_file, write_file
+from app.sandbox.search import search_across_files
 
 router = APIRouter(prefix="/api/files/{session_id}", tags=["files"])
 
@@ -15,6 +16,13 @@ router = APIRouter(prefix="/api/files/{session_id}", tags=["files"])
 class WriteFileRequest(BaseModel):
     path: str
     content: str
+
+
+class SearchRequest(BaseModel):
+    query: str
+    case_sensitive: bool = False
+    max_results: int = 2000
+    max_hits_per_file: int = 200
 
 
 @router.get("/tree")
@@ -45,6 +53,24 @@ async def put_file_content(session_id: str, body: WriteFileRequest):
     try:
         await write_file(session_id, body.path, body.content)
         return {"status": "ok", "path": body.path}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+
+@router.post("/search")
+async def post_search(session_id: str, body: SearchRequest):
+    """Search across workspace files (indexed, in-memory)."""
+    try:
+        results = await search_across_files(
+            session_id,
+            body.query,
+            case_sensitive=body.case_sensitive,
+            max_results=body.max_results,
+            max_hits_per_file=body.max_hits_per_file,
+        )
+        return {"query": body.query, "results": results}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except PermissionError as exc:

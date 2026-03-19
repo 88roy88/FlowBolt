@@ -1,9 +1,9 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
-import { Download, FileCode } from 'lucide-react';
+import { Download, FileCode, Search, Files } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
-import { downloadZip, downloadSingleHtml } from '../../services/api';
+import { downloadZip, downloadSingleHtml, searchFiles, type SearchResult } from '../../services/api';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
@@ -14,15 +14,33 @@ const FILE_TREE_MAX = 400;
 let monacoTypesInitialized = false;
 
 export function EditorPanel() {
-  const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree, pendingRevealLine, pendingRevealColumn, clearPendingReveal } = useFilesStore();
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const {
+    openFiles,
+    activeFilePath,
+    updateFileContent,
+    saveFile,
+    loadFileTree,
+    pendingRevealLine,
+    pendingRevealColumn,
+    clearPendingReveal,
+    openFile,
+  } = useFilesStore();
+  const sessionId = useSessionStore((s: { sessionId: string | null }) => s.sessionId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
    const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
 
+  const [leftTab, setLeftTab] = useState<'files' | 'search'>('files');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchRequestIdRef = useRef(0);
+
   const handleFileTreeResize = useCallback((delta: number) => {
-    setFileTreeWidth((w) => Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, w + delta)));
+    setFileTreeWidth((w: number) => Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, w + delta)));
   }, []);
 
   useEffect(() => {
@@ -52,8 +70,9 @@ export function EditorPanel() {
     const timer = setTimeout(() => {
       const editor = editorRef.current;
       if (!editor) return;
-      editor.revealLineInCenter(line);
-      editor.setPosition({ lineNumber: line, column: col });
+      const pos = { lineNumber: line, column: col };
+      editor.setPosition(pos);
+      editor.revealPositionInCenter(pos);
       editor.focus();
     }, 100);
     clearPendingReveal();
@@ -100,6 +119,52 @@ export function EditorPanel() {
 
     return langMap[ext ?? ''] ?? 'plaintext';
   };
+
+  const performSearch = useCallback(async () => {
+    if (!sessionId) return;
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+
+    const requestId = ++searchRequestIdRef.current;
+    setSearchBusy(true);
+    setSearchResults([]);
+
+    try {
+      const results = await searchFiles(sessionId, query, {
+        caseSensitive: searchCaseSensitive,
+        maxResults: 2000,
+        maxHitsPerFile: 200,
+      });
+      if (searchRequestIdRef.current !== requestId) return;
+      setSearchResults(results);
+    } finally {
+      if (searchRequestIdRef.current === requestId) setSearchBusy(false);
+    }
+  }, [
+    searchCaseSensitive,
+    searchQuery,
+    sessionId,
+  ]);
+
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      const key = e.key?.toLowerCase?.() ?? '';
+      const ctrlOrMeta = e.ctrlKey || e.metaKey;
+
+      if (ctrlOrMeta && key === 'f' && e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        setLeftTab('search');
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const handleEditorMount = useCallback((monaco: Monaco) => {
     try {
@@ -293,6 +358,8 @@ declare module '*.webp' {
           overflow: 'auto',
           background: 'var(--surface)',
           flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <div
@@ -309,7 +376,7 @@ declare module '*.webp' {
             justifyContent: 'space-between',
           }}
         >
-          <span>Files</span>
+          <span>{leftTab === 'files' ? 'Files' : 'Search'}</span>
 
           <div style={{ display: 'flex', gap: '4px' }}>
             <button
@@ -329,6 +396,51 @@ declare module '*.webp' {
               }}
             >
               <Download size={13} />
+            </button>
+
+            <button
+              title="Files"
+              disabled={!sessionId}
+              onClick={() => {
+                if (!sessionId) return;
+                setLeftTab('files');
+              }}
+              style={{
+                background: 'none',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '3px 5px',
+                cursor: sessionId ? 'pointer' : 'not-allowed',
+                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
+                display: 'flex',
+                alignItems: 'center',
+                opacity: sessionId ? 1 : 0.4,
+              }}
+            >
+              <Files size={13} />
+            </button>
+
+            <button
+              title="Search in files (Ctrl+Shift+F)"
+              disabled={!sessionId}
+              onClick={() => {
+                if (!sessionId) return;
+                setLeftTab('search');
+                setTimeout(() => searchInputRef.current?.focus(), 0);
+              }}
+              style={{
+                background: 'none',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '3px 5px',
+                cursor: sessionId ? 'pointer' : 'not-allowed',
+                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
+                display: 'flex',
+                alignItems: 'center',
+                opacity: sessionId ? 1 : 0.4,
+              }}
+            >
+              <Search size={13} />
             </button>
 
             <button
@@ -352,12 +464,118 @@ declare module '*.webp' {
           </div>
         </div>
 
-        <FileTree />
+        {leftTab === 'files' ? (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <FileTree />
+          </div>
+        ) : (
+          <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflow: 'hidden' }}>
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') performSearch();
+              }}
+              placeholder="Search in files..."
+              style={{
+                width: '100%',
+                background: 'var(--bg)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '8px 10px',
+                outline: 'none',
+                fontSize: 13,
+              }}
+            />
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button
+                onClick={performSearch}
+                disabled={searchBusy || !sessionId}
+                style={{
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg)',
+                  cursor: searchBusy ? 'not-allowed' : 'pointer',
+                  color: 'var(--text)',
+                  opacity: searchBusy ? 0.6 : 1,
+                  whiteSpace: 'nowrap',
+                  fontSize: 12,
+                }}
+                title="Search"
+              >
+                {searchBusy ? 'Searching…' : 'Search'}
+              </button>
+
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: 'var(--text-dim)' }}>
+                <input
+                  type="checkbox"
+                  checked={searchCaseSensitive}
+                  onChange={(e) => setSearchCaseSensitive(e.target.checked)}
+                />
+                Case sensitive
+              </label>
+
+              <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-dim)' }}>
+                {searchResults.length ? `${searchResults.reduce((a: number, r: SearchResult) => a + r.hits.length, 0)} matches` : ' '}
+              </div>
+            </div>
+
+            <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+              {searchBusy ? (
+                <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Searching…</div>
+              ) : searchResults.length === 0 ? (
+                <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: '8px 0' }}>
+                  No results. Try another query.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {searchResults.map((r: SearchResult) => (
+                    <div key={r.path} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                        {r.path} ({r.hits.length})
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {r.hits.map((h: { line: number; column: number; preview: string }, idx: number) => (
+                          <button
+                            key={`${r.path}:${h.line}:${h.column}:${idx}`}
+                            onClick={() => {
+                              openFile(r.path, h.line, h.column);
+                            }}
+                            style={{
+                              textAlign: 'left',
+                              padding: '6px 8px',
+                              borderRadius: 8,
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg)',
+                              cursor: 'pointer',
+                              color: 'var(--text)',
+                              fontSize: 13,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                            title="Jump to match"
+                          >
+                            {h.line}:{h.column} {h.preview}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <Resizer direction="horizontal" onDrag={handleFileTreeResize} />
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         <FileTabs />
 
         {activeFilePath && activeContent !== undefined ? (
@@ -369,13 +587,14 @@ declare module '*.webp' {
               value={activeContent}
               onChange={handleEditorChange}
               beforeMount={handleEditorMount}
-              onMount={(editor) => {
+              onMount={(editor: Parameters<OnMount>[0]) => {
                 editorRef.current = editor;
                 const { pendingRevealLine: line, pendingRevealColumn: col, clearPendingReveal: clear } = useFilesStore.getState();
                 if (line) {
                   setTimeout(() => {
-                    editor.revealLineInCenter(line);
-                    editor.setPosition({ lineNumber: line, column: col ?? 1 });
+                    const pos = { lineNumber: line, column: col ?? 1 };
+                    editor.setPosition(pos);
+                    editor.revealPositionInCenter(pos);
                     editor.focus();
                     clear();
                   }, 50);
