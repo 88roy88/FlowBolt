@@ -4,7 +4,6 @@ import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
 import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
-import { ThemeToggle } from './ThemeToggle';
 import type { ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { pollFileTree } from '../../utils/pollFileTree';
@@ -15,6 +14,7 @@ type SidebarProps = {
   onCloseSidebar?: () => void;
   isPinned?: boolean;
   onPin?: () => void;
+  onOpenSettings?: () => void;
 };
 
 // Stable color per project based on name hash
@@ -41,7 +41,7 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ onCloseSidebar, isPinned, onPin }: SidebarProps) {
+export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: SidebarProps) {
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
@@ -282,13 +282,12 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin }: SidebarProps) {
         })}
       </div>
 
-      {/* Bottom: Settings placeholder + Theme toggle */}
-      <div className="border-t border-border px-3 py-2 flex items-center gap-2">
-        <Button variant="ghost" size="sm" className="flex-1 justify-start gap-2 text-muted-foreground">
+      {/* Bottom: Settings */}
+      <div className="border-t border-border px-3 py-2">
+        <Button variant="ghost" size="sm" onClick={onOpenSettings} className="w-full justify-start gap-2 text-muted-foreground">
           <Settings size={14} />
           <span className="text-[13px]">Settings</span>
         </Button>
-        <ThemeToggle />
       </div>
 
       {summaryModal && (

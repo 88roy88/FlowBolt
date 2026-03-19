@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-const HIT_SIZE = 5;
+const HIT_SIZE = 7;
 
 type ResizerProps = {
   direction: 'horizontal' | 'vertical';
@@ -71,11 +71,12 @@ export function Resizer({ direction, onDrag, style }: ResizerProps) {
         style={{
           position: 'absolute',
           ...(isVertical
-            ? { left: 0, right: 0, top: '50%', height: active ? 2 : 1, transform: 'translateY(-50%)' }
-            : { top: 0, bottom: 0, left: '50%', width: active ? 2 : 1, transform: 'translateX(-50%)' }
+            ? { left: 0, right: 0, top: '50%', height: active ? 3 : 1, transform: 'translateY(-50%)' }
+            : { top: 0, bottom: 0, left: '50%', width: active ? 3 : 1, transform: 'translateX(-50%)' }
           ),
           background: active ? 'var(--primary)' : 'var(--border)',
-          transition: 'background 0.15s ease, width 0.1s ease, height 0.1s ease',
+          boxShadow: active ? '0 0 6px color-mix(in srgb, var(--primary) 40%, transparent)' : 'none',
+          transition: 'all 0.15s ease',
         }}
       />
     </div>

@@ -1,99 +1,293 @@
-# AI Module Backlog
+# AI Builder Backlog
+
+## B0. Decouple agents from WebSocket — DB as source of truth (NEXT)
+
+**Problem:** Agents take `ws_send` and call it directly. Browser refresh kills the
+build. State lives only in memory.
+
+**Goal:** DB is the source of truth. Agents write to DB. WebSocket watches DB.
+Browser can disconnect/reconnect freely. Multiple tabs work.
+
+### Architecture
+
+```
+┌──────────┐      ┌────────────┐  subscribe   ┌──────────────┐
+│ Browser  │◄────►│ WebSocket  │◄────────────►│ Notify       │
+│(can drop)│      │ (thin)     │              │ Channel      │
+└──────────┘      └─────┬──────┘              │(asyncio.Queue)│
+                        │ on connect:          └──────▲───────┘
+                        │ read state from DB          │ notify
+                        ▼                       ┌─────┴───────┐
+                  ┌──────────┐  write    ┌──────┴──────┐
+                  │    DB    │◄──────────│   Agent     │
+                  │(sqlite)  │           │ (background │
+                  └──────────┘           │  task)      │
+                                         └─────────────┘
+```
+
+### DB schema: agent_events table
+
+```sql
+CREATE TABLE agent_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_events_session ON agent_events(session_id, id);
+```
+
+Plus add to projects table:
+- `agent_phase TEXT` — current phase (idle, designing, executing, etc.)
+- `agent_state TEXT` — serialized BuildState JSON (for resume after server restart)
+
+### How it works
+
+**Agent side:**
+- `BaseAgent.emit(event)` → INSERT into agent_events + notify channel
+- Agent doesn't know about WebSocket
+- Agent writes BuildState to DB at phase transitions
+- Agent runs as `asyncio.create_task`, not inline in WS handler
+
+**WebSocket side:**
+- On connect: `SELECT * FROM agent_events WHERE session_id = ? ORDER BY id` → send all
+- Subscribe to in-process notify channel for live updates
+- On disconnect: nothing happens (agent keeps running)
+- On reconnect: same as connect — read from DB, subscribe to channel
+
+**Plan approval flow:**
+- BuildAgent writes `plan_overview` event to DB, sets phase to `awaiting_approval`
+- Agent awaits on an `asyncio.Event`
+- User clicks accept → WS handler sets flag
+- Agent resumes execution
+
+### Migration path
+1. Create `agent_events` table + `emit()` helper
+2. Create notify channel (dict of queues)
+3. Update `BaseAgent`: replace `ws_send` with `emit`
+4. Update all agents: `self.ws_send(...)` → `self.emit(...)`
+5. Update `chat.py`: start agents as background tasks, WS reads from DB + subscribes
+6. Add BuildState persistence to DB for resume
+7. Frontend: handle reconnect (re-fetch state on WS open)
+
+---
 
 ## B1. Parallel per-file codegen
 
-Change `ExecutionService._execute_task` to fire one LLM call per file in parallel
-instead of one call per task that generates all files via bolt XML.
+One LLM call per file in parallel instead of one call per task via bolt XML.
 
-**Current flow:**
-- Task has 3-5 files → one LLM call → streams all files via boltArtifact XML
-- `ActionParser` extracts files from the XML stream
+- ~5x faster wall-clock time
+- Delete `ActionParser` (177 lines)
+- Simpler per-file prompts, better error isolation
+- Risk: coherence between sibling files (mitigated by typecheck/fix cycle)
 
-**Proposed flow:**
-- Task has 3-5 files → 3-5 parallel LLM calls → each returns raw file content
-- No XML parsing needed, each call is a simple request/response
+---
 
-**What it enables:**
-- ~5x faster wall-clock time for multi-file tasks
-- Delete `ActionParser` (177 lines) — no more streaming XML state machine
-- Simpler per-file prompts ("write this one file" vs "write these 5 files in XML")
-- Better error isolation — one file fails, others succeed, retry just that file
-- Simpler codegen Jinja template (no boltArtifact output format section)
+## ~~B2. Wire up core framework~~ DONE
 
-**Risk:**
-- Coherence between files in the same task (e.g. a component importing from a sibling).
-  Mitigated by: architecture context provides the interfaces, dependency system ensures
-  types are available, typecheck/fix cycle catches mismatches.
+---
 
-**Changes needed:**
-- `services/execution.py` — replace `stream_chat` + `ActionParser` with parallel `complete_chat`
-- `prompts/templates/codegen.jinja2` — remove boltArtifact output format, simplify to "return the file content"
-- `parser.py` — delete entirely (only used by codegen and fix_errors, both would switch)
-- `prompts/templates/fix_errors.jinja2` — also switch from XML to direct file content
+## B3. Backend code quality fixes
 
-## ~~B2. Wire up `ai/core/` framework to agents~~ DONE
-
-- FollowUpAgent uses `ToolExecutor` + `FunctionTool` (auto-generated schemas from docstrings)
-- All LLM calls use `Message` objects via provider (backward-compat with raw dicts)
-- Deleted manual `FOLLOWUP_TOOLS` dict (142 lines) and `followup.py`
-- Remaining: Wire `Flow` to orchestrator (low priority — current direct service calls work fine)
-
-## B3. Remaining code quality fixes
-
-- `api/errors.py` — bound the dedup set with TTL or max size (memory leak)
-- `ai/provider.py` — add retry with exponential backoff for transient LLM failures
-- `models/project.py` — replace 6 repetitive ALTER TABLE migration blocks
+- `api/errors.py` — bound dedup set (memory leak), use async file I/O
+- `ai/provider.py` — add retry with exponential backoff
+- `models/project.py` — replace 6 repetitive ALTER TABLE blocks with migration helper
 - `sandbox/filesystem.py` — use `run_in_executor` for async file I/O
 
-## B4. Frontend refactor
+---
 
-Architecture refactoring is ~85% done (cards extracted, stores split, icons centralized).
-Remaining work is styling consolidation:
+## ~~B4. Frontend refactor~~ DONE
 
-- 295 inline `style={{}}` blocks — need CSS modules or design system
-- Spinner animation hardcoded in 10 places — use CSS class from App.css
-- No shared Button component (all buttons use inline styles)
-- No shared Dropdown component (CaseSelector + ModelSelector duplicate logic)
-- Large components: FollowUpProgress (168), PromptInput (245), CaseSelector (238)
-- `/components/ui/` directory exists but is empty
+---
 
 ## B5. FollowUp agent memory management
 
-The ReACT loop in `followup_agent.py` appends every tool call and result to
-`working_messages` without any pruning. With up to 15 iterations and tools
-returning full file contents (500+ lines), the conversation can easily exceed
-context limits.
+ReACT loop appends every tool call/result to messages without pruning. Will blow
+context limits on longer sessions.
 
-**Options:**
-- Summarize older tool results (replace full file content with "read file X, 200 lines")
-- Sliding window: keep last N tool call/result pairs, summarize the rest
-- Truncate large tool results beyond a token budget
-- Track token count and compress when approaching the model's context limit
+Options: summarize older results, sliding window, truncate large results, token budget.
 
-**Where:** `followup_agent.py` `_react_loop()` — between iterations, before the
-next `complete_chat_with_tools` call.
+---
 
 ## B6. FollowUp agent case support
 
-The follow-up agent should support receiving case IDs (like the create flow does)
-so users can integrate new data sources into an existing project without starting over.
+Accept `case_ids` in follow-up agent so users can integrate new data sources into
+existing projects without starting over.
 
-**What to do:**
-- Accept `case_ids` parameter in `FollowUpAgent.run()`
-- Fetch and analyze case data (reuse `DesignService.fetch_and_analyze_case`)
-- Include case context in the follow-up system prompt so the agent knows about
-  available data endpoints when making edits
+---
 
 ## B7. Rename "package" to "case" in backend
 
-The backend still uses "package" terminology in several places while the frontend
-and user-facing layer use "case". Align naming for consistency.
+Align backend naming with frontend: `PackageApiClient` → `CaseApiClient`,
+`package_id` → `case_id`, etc.
 
-**Files to update:**
-- `integrations/package_api.py` → rename to `case_api.py`, class `CaseApiClient`
-- `api/package_api.py` → rename to `api/case_api.py`
-- `services/design.py` — `fetch_and_analyze_case` already uses "case" but internally
-  calls `PackageApiClient` and references `package_id`, `package_name`
-- `prompts/templates/codegen.jinja2` — uses `ctx.package_name`, `ctx.package_id`
-- `state.py` — `case_contexts` field already correct, but dict keys inside are
-  `package_id`, `package_name` etc.
+---
+
+## B8. DB connection pooling
+
+Every query opens a fresh `aiosqlite.connect()`. Under concurrent load this is
+wasteful and could exhaust resources. Introduce a shared connection or pool.
+
+---
+
+## B9. Preview iframe security
+
+No `sandbox` attribute on the preview iframe — AI-generated code runs with full
+browser privileges. Add `sandbox="allow-scripts allow-same-origin"` + CSP headers.
+
+---
+
+## B10. Editor save reliability
+
+- Save debounce can lose edits if component unmounts mid-timer
+- No UI feedback when save fails
+- Add save status indicator (saved / saving / error)
+
+---
+
+## B11. Health & readiness endpoints
+
+No `/health` or `/ready` endpoint. Backend going down after startup is invisible
+to the frontend. Add endpoints for load balancers and k8s probes.
+
+---
+
+## B12. Test coverage
+
+Zero tests. Priority targets:
+- Agent flows (build / followup / fix error)
+- ActionParser unit tests
+- Sandbox filesystem security (path traversal)
+- Tool executor
+- Prompt template rendering
+
+---
+
+## F1. Version history / undo
+
+No way to revert AI changes. Auto-snapshot files before each agent run.
+Allow "revert to before last change." Could use git commits in the workspace.
+
+---
+
+## F2. Diff view for AI changes
+
+FollowUpAgent produces diffs but BuildAgent doesn't show what changed.
+Show before/after diff when AI modifies existing files.
+
+---
+
+## F3. Project duplication / cloning
+
+"Duplicate project" — copy workspace + DB records to new session.
+Useful for branching experiments.
+
+---
+
+## F4. Custom npm package support
+
+Currently locked to pre-installed packages. Allow users to add packages
+(agent runs `pnpm add`). Risk: sandbox security, build time increase.
+
+---
+
+## F5. Multi-framework support
+
+Currently React-only. Add Vue, Svelte, or vanilla templates.
+Template selection on project creation.
+
+---
+
+## F6. Deploy to hosting
+
+"Deploy" button that builds and pushes to Vercel/Netlify/Cloudflare Pages.
+Or generates a shareable preview URL.
+
+---
+
+## F7. Image / asset upload
+
+Users can't add images, fonts, or static assets. Add file upload to
+editor panel, write to `public/`.
+
+---
+
+## F8. Project import
+
+Import existing project (ZIP upload or git clone). Bootstrap sandbox
+from user's code instead of blank template.
+
+---
+
+## F9. Collaborative editing
+
+Multiple users on the same project. Partially supported (multiple tabs
+see same sandbox). Missing: cursor awareness, conflict resolution.
+
+---
+
+## F10. AI code review
+
+Before applying changes, show a review step: "Here's what I'm about to change."
+User can accept/reject individual file changes. Like plan approval but at file level.
+
+---
+
+## A1. Prompt versioning & A/B testing
+
+Jinja templates enable this — swap templates per experiment. Track which prompt
+version produced which quality outcome.
+
+---
+
+## A2. Cost tracking per project
+
+LiteLLM returns token usage — aggregate per project. Show users estimated cost.
+
+---
+
+## A3. Streaming feedback during planning
+
+User sees "Planning..." with no feedback for 10-20 seconds. Stream the overview
+as it's generated.
+
+---
+
+## A4. Smarter error recovery
+
+If fix_errors fails twice, try a different approach (rewrite from scratch vs patch).
+Escalate to a more capable model on retry.
+
+---
+
+## A5. Code quality validation
+
+After build succeeds, run ESLint on generated code. Flag issues to user or auto-fix.
+
+---
+
+## I1. CORS lockdown for production
+
+Currently `allow_origins=["*"]`. Should be configurable via env var for production.
+
+---
+
+## I2. Graceful shutdown timeout
+
+`destroy_all()` has no timeout — hanging sandbox blocks server shutdown.
+Add timeout, force-kill after N seconds.
+
+---
+
+## I3. Sandbox disk quotas
+
+No limit on workspace disk usage. AI-generated code could fill the disk.
+Add per-workspace size limit.
+
+---
+
+## I4. Structured logging
+
+Currently uses string format logging. Switch to JSON structured logs for production
+(easier to search, aggregate, alert on).
