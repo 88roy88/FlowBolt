@@ -9,7 +9,7 @@ from langfuse.decorators import observe, langfuse_context
 
 from app.ai.agents.base import BaseAgent
 from app.ai.core.messages import Message
-from app.ai.helpers import encode_card, parse_json_response
+from app.ai.helpers import parse_json_response
 from app.ai.parser import ActionParser
 from app.ai.provider import complete_chat, stream_chat
 from app.ai.prompts import (
@@ -25,7 +25,6 @@ from app.ai.prompts import (
 from app.ai.state import BuildState
 from app.ai.task_tree import Task, WorkPlan
 from app.integrations.package_api import PackageApiClient, PackageApiUpstreamError
-from app.models.chat import save_message
 from app.models.project import update_project_summary
 from app.sandbox.filesystem import write_file
 from app.sandbox.manager import sandbox_manager
@@ -84,18 +83,6 @@ class BuildAgent(BaseAgent):
                         for ctx in self._state.case_contexts
                     ],
                 })
-                await save_message(self.project_id, "assistant", encode_card({
-                    "type": "cases_fetched",
-                    "cases": [
-                        {
-                            "packageId": ctx["package_id"],
-                            "packageName": ctx["package_name"],
-                            "dataSchema": ctx.get("data_schema", ""),
-                            "relevantFields": ctx.get("relevant_fields", ""),
-                        }
-                        for ctx in self._state.case_contexts
-                    ],
-                }))
 
         # Design (parallel)
         await self.emit({"type": "phase", "phase": "designing"})
@@ -103,12 +90,6 @@ class BuildAgent(BaseAgent):
             self._design_architecture(),
             self._design_ux(),
         )
-
-        await save_message(self.project_id, "assistant", encode_card({
-            "type": "design_complete",
-            "architecture": bool(self._state.architecture),
-            "ux": bool(self._state.ux_design),
-        }))
 
         # Build user overview
         await self.emit({"type": "phase", "phase": "planning"})
@@ -133,6 +114,7 @@ class BuildAgent(BaseAgent):
                 await self.emit({"type": "phase", "phase": "awaiting_approval"})
                 await self.emit({"type": "plan_overview", "overview": self._state.user_overview})
             elif self._approval_action == "reject":
+                await self.emit({"type": "plan_rejected", "overview": self._state.user_overview})
                 self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
                 await self.emit({"type": "phase", "phase": "idle"})
                 return
@@ -145,12 +127,7 @@ class BuildAgent(BaseAgent):
         self._approval_event.set()
 
     async def _accept_plan(self) -> None:
-        await save_message(self.project_id, "assistant", encode_card({
-            "type": "plan_overview",
-            "overview": self._state.user_overview,
-            "accepted": True,
-        }))
-
+        await self.emit({"type": "plan_accepted", "overview": self._state.user_overview})
         langfuse_client = Langfuse()
 
         # Build technical plan
@@ -177,11 +154,6 @@ class BuildAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "executing"})
         await self._execute()
         span_exec.end()
-
-        await save_message(self.project_id, "assistant", encode_card({
-            "type": "task_progress",
-            "tasks": [{"id": t.id, "title": t.title, "status": t.status} for t in self._state.work_plan.tasks],
-        }))
 
         # Summary
         span_summary = langfuse_client.span(trace_id=self._trace_id, name="generate-summary")

@@ -10,9 +10,8 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.ai.agents import BuildAgent, FollowUpAgent, FixErrorAgent
 from app.ai.agent_registry import register, get as get_agent, remove as remove_agent
-from app.ai.helpers import CARD_PREFIX
 from app.models.chat import get_messages, save_message
-from app.models.events import subscribe, unsubscribe, get_events, clear_events
+from app.models.events import subscribe, unsubscribe, get_events, emit_event
 from app.models.project import get_project_by_session
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,8 @@ router = APIRouter()
 
 async def _is_new_project(project_id: str) -> bool:
     history = await get_messages(project_id)
-    return not any(m.role == "assistant" for m in history)
+    user_count = sum(1 for m in history if m.role == "user")
+    return user_count <= 1
 
 
 async def _run_agent_safe(session_id: str, coro) -> None:
@@ -30,7 +30,6 @@ async def _run_agent_safe(session_id: str, coro) -> None:
         await coro
     except Exception:
         logger.exception("[chat] Background agent failed for session %s", session_id)
-        from app.models.events import emit_event
         await emit_event(session_id, {"type": "error", "message": "AI processing failed"})
     finally:
         remove_agent(session_id)
@@ -84,7 +83,11 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 selected_model: str | None = data.get("model")
                 case_ids: list[int] = data.get("caseIds") or []
 
-                # Save user message
+                # Save user message (for LLM context in followup agent)
+                await save_message(project.id, "user", user_content)
+
+                # Emit user_message event (for frontend history reconstruction)
+                user_event: dict = {"type": "user_message", "content": user_content}
                 if case_ids:
                     from app.api.package_api import _package_search
                     case_names: list[str] = []
@@ -95,14 +98,11 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                         except Exception:
                             name = f"Case #{cid}"
                         case_names.append(name)
-
-                    cases_meta = json.dumps({"type": "cases_context", "caseIds": case_ids, "caseNames": case_names})
-                    await save_message(project.id, "user", f"<!--cases-meta:{cases_meta}-->\n{user_content}")
-                else:
-                    await save_message(project.id, "user", user_content)
-
-                # Clear old events for this session (new agent run)
-                await clear_events(session_id)
+                    user_event["cases"] = [
+                        {"id": cid, "name": cname}
+                        for cid, cname in zip(case_ids, case_names)
+                    ]
+                await emit_event(session_id, user_event, notify=False)
 
                 is_new = await _is_new_project(project.id)
 
@@ -141,16 +141,23 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 error_stack = data.get("error_stack")
                 selected_model = data.get("model")
 
-                card_data = {
-                    "type": "error_fix_request",
-                    "errorMessage": error_message,
-                    "errorFile": error_file,
-                    "errorLine": error_line,
-                    "errorStack": error_stack,
-                }
-                await save_message(project.id, "user", f"{CARD_PREFIX}{json.dumps(card_data)}-->")
+                # Save user message (for LLM context)
+                error_desc = f"Fix error: {error_message}"
+                if error_file:
+                    error_desc += f" in {error_file}"
+                await save_message(project.id, "user", error_desc)
 
-                await clear_events(session_id)
+                # Emit user_message event (for frontend history reconstruction)
+                await emit_event(session_id, {
+                    "type": "user_message",
+                    "content": "",
+                    "error_fix_request": {
+                        "errorMessage": error_message,
+                        "errorFile": error_file,
+                        "errorLine": error_line,
+                        "errorStack": error_stack,
+                    },
+                }, notify=False)
 
                 agent = FixErrorAgent(
                     session_id=session_id, project_id=project.id,

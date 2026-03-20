@@ -5,13 +5,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-CARD_PREFIX = "<!--agent-card:"
-CARD_SUFFIX = "-->"
-
-
-def encode_card(card_data: dict) -> str:
-    return f"{CARD_PREFIX}{json.dumps(card_data, separators=(',', ':'))}{CARD_SUFFIX}"
-
 
 def parse_json_response(raw: str | None) -> dict:
     if raw is None:

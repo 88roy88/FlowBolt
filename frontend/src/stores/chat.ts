@@ -1,62 +1,9 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
+import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
-import { fetchModels, fetchDefaultModel, fetchChatHistory, fetchAgentEvents, updateProjectModel } from '../services/api';
-import { createFixErrorHandler, createSendMessageHandler, setReplayMode } from './chatHandlers';
-
-const CARD_PREFIX = '<!--agent-card:';
-const CARD_SUFFIX = '-->';
-const CASES_META_PREFIX = '<!--cases-meta:';
-const CASES_META_SUFFIX = '-->';
-const PACKAGE_META_PREFIX = '<!--package-meta:';
-const PACKAGE_META_SUFFIX = '-->';
-
-function parseAgentCard(content: string): { card: AgentCard; remainingContent: string } | undefined {
-  const cardIdx = content.indexOf(CARD_PREFIX);
-  if (cardIdx === -1) return undefined;
-  const endIdx = content.indexOf(CARD_SUFFIX, cardIdx);
-  if (endIdx === -1) return undefined;
-  try {
-    const json = content.slice(cardIdx + CARD_PREFIX.length, endIdx);
-    const card = JSON.parse(json) as AgentCard;
-    const textBefore = content.slice(0, cardIdx).trim();
-    return { card, remainingContent: textBefore };
-  } catch {
-    return undefined;
-  }
-}
-
-function parseCasesMeta(content: string): { cases: { id: number; name: string }[]; remainingContent: string } | undefined {
-  const casesIdx = content.indexOf(CASES_META_PREFIX);
-  if (casesIdx !== -1) {
-    const endIdx = content.indexOf(CASES_META_SUFFIX, casesIdx);
-    if (endIdx !== -1) {
-      try {
-        const json = content.slice(casesIdx + CASES_META_PREFIX.length, endIdx);
-        const meta = JSON.parse(json) as { caseIds: number[]; caseNames: string[] };
-        const cases = meta.caseIds.map((id: number, i: number) => ({ id, name: meta.caseNames[i] || `Case #${id}` }));
-        const afterMeta = content.slice(endIdx + CASES_META_SUFFIX.length).trim();
-        return { cases, remainingContent: afterMeta };
-      } catch { /* fall through */ }
-    }
-  }
-
-  const metaIdx = content.indexOf(PACKAGE_META_PREFIX);
-  if (metaIdx !== -1) {
-    const endIdx = content.indexOf(PACKAGE_META_SUFFIX, metaIdx);
-    if (endIdx !== -1) {
-      try {
-        const json = content.slice(metaIdx + PACKAGE_META_PREFIX.length, endIdx);
-        const meta = JSON.parse(json) as { packageId: number; packageName: string };
-        const afterMeta = content.slice(endIdx + PACKAGE_META_SUFFIX.length).trim();
-        return { cases: [{ id: meta.packageId, name: meta.packageName }], remainingContent: afterMeta };
-      } catch { /* fall through */ }
-    }
-  }
-
-  return undefined;
-}
+import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
+import { createFixErrorHandler, createSendMessageHandler } from './chatHandlers';
 
 export interface ChatState {
   messages: Message[];
@@ -233,42 +180,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = getChatSocket(sessionId);
     socket.send({ type: 'plan_response', action, feedback });
 
-    const state = get();
-
-    if (action === 'accept') {
-      const planMsg: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-        agentCard: { type: 'plan_overview', overview: state.planOverview!, accepted: true },
-      };
-      set((s) => ({
-        messages: [...s.messages, planMsg],
-        isStreaming: true,
-        agentPhase: 'planning',
-        planOverview: null,
-      }));
-    } else if (action === 'reject') {
-      if (state.planOverview) {
-        const planMsg: Message = {
-          id: generateId(),
-          role: 'assistant',
-          content: '',
-          timestamp: Date.now(),
-          agentCard: { type: 'plan_overview', overview: state.planOverview, accepted: false },
-        };
-        set((s) => ({
-          messages: [...s.messages, planMsg],
-          agentPhase: 'idle',
-          planOverview: null,
-          executionTasks: [],
-          isStreaming: false,
-        }));
-      } else {
-        set({ agentPhase: 'idle', planOverview: null, executionTasks: [], isStreaming: false });
-      }
-    } else if (action === 'modify') {
+    // The backend will emit plan_accepted/plan_rejected events which the
+    // handler will process to add the appropriate message and update state.
+    // For 'modify', just show planning state while the plan is being rebuilt.
+    if (action === 'modify') {
       set({ isStreaming: true, agentPhase: 'planning' });
     }
   },
@@ -285,44 +200,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     try {
-      const history = await fetchChatHistory(sessionId);
-      const messages: Message[] = history.map((m) => {
-        let content = m.content;
-        let agentCard: AgentCard | undefined;
-        let casesInfo: { id: number; name: string }[] | undefined;
+      // Start with empty messages — events are the sole source of truth
+      set({ messages: [], isStreaming: false, historyLoaded: false, ...RESET_STATE });
 
-        const cardParsed = parseAgentCard(content);
-        if (cardParsed) {
-          agentCard = cardParsed.card;
-          content = cardParsed.remainingContent;
-        }
-
-        if (m.role === 'user') {
-          const casesParsed = parseCasesMeta(content);
-          if (casesParsed) {
-            casesInfo = casesParsed.cases;
-            content = casesParsed.remainingContent;
-          }
-        }
-
-        return {
-          id: m.id,
-          role: m.role as 'user' | 'assistant',
-          content,
-          timestamp: new Date(m.created_at).getTime(),
-          agentCard,
-          cases: casesInfo,
-        };
-      });
-      set({ messages, isStreaming: false, historyLoaded: true, ...RESET_STATE });
-
-      // Attach handler and replay agent events via REST (not WS replay, since
-      // the socket may already be open from a previous visit to this project).
+      // Attach handler for both replay and live events
       const socket = getChatSocket(sessionId);
-      const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler), { replay: true });
+      const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
       attachHandler(sessionId, socket, handler);
 
-      // Fetch and replay current agent events from DB
+      // Replay all persisted events to reconstruct the full conversation
       try {
         const events = await fetchAgentEvents(sessionId);
         for (const evt of events) {
@@ -332,10 +218,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // Events endpoint may not exist yet or session has no events
       }
 
-      // Switch to live mode for new events from the running agent
-      setReplayMode(false);
+      set({ historyLoaded: true });
     } catch (err) {
       console.error('Failed to load chat history:', err);
+      set({ historyLoaded: true });
     }
   },
 

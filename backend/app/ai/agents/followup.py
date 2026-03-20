@@ -12,13 +12,12 @@ from app.ai.core.tools import FunctionTool, ToolExecutor
 from app.ai.core.messages import Message
 from app.ai.provider import complete_chat_with_tools
 from app.ai.prompts import render_followup
-from app.ai.helpers import CARD_PREFIX, encode_card
 from app.ai.tools.grep import grep
 from app.ai.tools.glob import glob
 from app.ai.tools.read_file import read_file_with_lines
 from app.ai.tools.write_file import write_file_with_diff
 from app.ai.tools.edit_file import edit_file_with_context
-from app.models.chat import get_messages, save_message
+from app.models.chat import get_messages
 from app.models.project import get_project_by_session
 from app.sandbox.filesystem import list_files, read_file
 
@@ -98,7 +97,7 @@ class FollowUpAgent(BaseAgent):
         messages = [
             Message(role=m.role, content=m.content)
             for m in history
-            if not m.content.startswith(CARD_PREFIX)
+            if m.role == "user" or (m.role == "assistant" and m.content.strip())
         ]
 
         system_prompt = render_followup(
@@ -110,15 +109,6 @@ class FollowUpAgent(BaseAgent):
         if answer:
             await self.emit({"type": "text", "content": answer})
 
-        card = encode_card({
-            "type": "followup_progress",
-            "steps": self._steps,
-            "answer": answer or None,
-            "filesChanged": self._files_changed,
-            "diffs": [{"path": d.path, "diff": d.diff} for d in self._diffs],
-        })
-        assistant_content = (answer + "\n" + card) if answer else card
-        await save_message(self.project_id, "assistant", assistant_content)
 
         if self._diffs:
             await self.emit({

@@ -7,14 +7,6 @@ type SetState = (
   partial: Partial<import('./chat').ChatState> | ((state: import('./chat').ChatState) => Partial<import('./chat').ChatState>),
 ) => void;
 
-// When true, event handler will update UI state but not add messages to chat
-// (messages are already in chat_messages DB, loaded by loadHistory)
-let _skipMessages = false;
-
-export function setReplayMode(replay: boolean) {
-  _skipMessages = replay;
-}
-
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -44,6 +36,50 @@ function handleError(msg: { message: string }, set: SetState, cleanup: () => voi
   cleanup();
 }
 
+function handleFixStep(msg: { step: string; status: string; message: string }, set: SetState) {
+  set((state) => {
+    const existingIdx = state.fixSteps.findIndex((s) => s.step === msg.step);
+    if (existingIdx >= 0) {
+      const updated = [...state.fixSteps];
+      updated[existingIdx] = {
+        id: updated[existingIdx].id,
+        step: msg.step,
+        status: msg.status,
+        message: msg.message,
+      };
+      return { fixSteps: updated };
+    }
+    return {
+      fixSteps: [
+        ...state.fixSteps,
+        { id: generateId(), step: msg.step, status: msg.status, message: msg.message },
+      ],
+    };
+  });
+}
+
+function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetState) {
+  const userMsg: Message = {
+    id: generateId(),
+    role: 'user',
+    content: msg.content || '',
+    timestamp: Date.now(),
+  };
+
+  if (msg.cases && msg.cases.length > 0) {
+    userMsg.cases = msg.cases;
+  }
+
+  if (msg.error_fix_request) {
+    userMsg.agentCard = {
+      type: 'error_fix_request',
+      ...msg.error_fix_request,
+    };
+  }
+
+  set((s) => ({ messages: [...s.messages, userMsg] }));
+}
+
 export function createFixErrorHandler(
   set: SetState,
   get: GetState,
@@ -56,25 +92,7 @@ export function createFixErrorHandler(
         break;
 
       case 'fix_step':
-        set((state) => {
-          const existingIdx = state.fixSteps.findIndex((s) => s.step === msg.step);
-          if (existingIdx >= 0) {
-            const updated = [...state.fixSteps];
-            updated[existingIdx] = {
-              id: updated[existingIdx].id,
-              step: msg.step,
-              status: msg.status,
-              message: msg.message,
-            };
-            return { fixSteps: updated };
-          }
-          return {
-            fixSteps: [
-              ...state.fixSteps,
-              { id: generateId(), step: msg.step, status: msg.status, message: msg.message },
-            ],
-          };
-        });
+        handleFixStep(msg, set);
         break;
 
       case 'text':
@@ -100,7 +118,7 @@ export function createFixErrorHandler(
             agentCard: { type: 'fix_progress', steps: [...state.fixSteps] },
           };
           set((s) => ({
-            messages: _skipMessages ? s.messages : [...s.messages, fixMessage],
+            messages: [...s.messages, fixMessage],
             currentAssistantMessage: '',
             actions: [],
             fixSteps: [],
@@ -127,9 +145,7 @@ export function createSendMessageHandler(
   set: SetState,
   get: GetState,
   cleanup: () => void,
-  options?: { replay?: boolean },
 ) {
-  _skipMessages = options?.replay ?? false;
   return (msg: WSMessage) => {
     switch (msg.type) {
       case 'phase':
@@ -146,6 +162,41 @@ export function createSendMessageHandler(
         set({ planOverview: msg.overview, isStreaming: false });
         break;
 
+      case 'plan_accepted': {
+        const acceptedMsg: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          agentCard: { type: 'plan_overview', overview: msg.overview, accepted: true },
+        };
+        set((s) => ({
+          messages: [...s.messages, acceptedMsg],
+          isStreaming: true,
+          agentPhase: 'planning',
+          planOverview: null,
+        }));
+        break;
+      }
+
+      case 'plan_rejected': {
+        const rejectedMsg: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          agentCard: { type: 'plan_overview', overview: msg.overview, accepted: false },
+        };
+        set((s) => ({
+          messages: [...s.messages, rejectedMsg],
+          agentPhase: 'idle',
+          planOverview: null,
+          executionTasks: [],
+          isStreaming: false,
+        }));
+        break;
+      }
+
       case 'task_list':
         set({ executionTasks: msg.tasks });
         break;
@@ -160,6 +211,10 @@ export function createSendMessageHandler(
 
       case 'followup_step':
         handleFollowUpStep(msg, set);
+        break;
+
+      case 'fix_step':
+        handleFixStep(msg, set);
         break;
 
       case 'followup_diffs':
@@ -189,6 +244,10 @@ export function createSendMessageHandler(
 
       case 'package_fetched':
         handlePackageFetched(msg, set);
+        break;
+
+      case 'user_message':
+        handleUserMessage(msg, set);
         break;
 
       case 'case_error':
@@ -227,7 +286,7 @@ function handlePhaseChange(
         ux: dp.ux === 'complete',
       },
     };
-    if (!_skipMessages) set((s) => ({ messages: [...s.messages, designMsg] }));
+    set((s) => ({ messages: [...s.messages, designMsg] }));
   }
 
   set({ agentPhase: msg.phase });
@@ -315,7 +374,7 @@ function handleCasesFetched(
       })),
     },
   };
-  if (!_skipMessages) set((s) => ({ messages: [...s.messages, casesMsg] }));
+  set((s) => ({ messages: [...s.messages, casesMsg] }));
 }
 
 function handlePackageFetched(
@@ -337,14 +396,22 @@ function handlePackageFetched(
       }],
     },
   };
-  if (!_skipMessages) set((s) => ({ messages: [...s.messages, packageMsg] }));
+  set((s) => ({ messages: [...s.messages, packageMsg] }));
 }
 
 function handleActionComplete(set: SetState, get: GetState, cleanup: () => void) {
   const state = get();
   const newMessages: Message[] = [];
 
-  if (state.followUpSteps.length > 0) {
+  if (state.fixSteps.length > 0) {
+    newMessages.push({
+      id: generateId(),
+      role: 'assistant',
+      content: state.currentAssistantMessage,
+      timestamp: Date.now(),
+      agentCard: { type: 'fix_progress', steps: [...state.fixSteps] },
+    });
+  } else if (state.followUpSteps.length > 0) {
     const filesChanged = state.actions
       .filter((a) => a.type === 'file' && a.path)
       .map((a) => a.path!);
@@ -398,13 +465,14 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
   }
 
   set((s) => ({
-    messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
+    messages: [...s.messages, ...newMessages],
     currentAssistantMessage: '',
     actions: [],
     isStreaming: false,
     agentPhase: 'idle',
     planOverview: null,
     executionTasks: [],
+    fixSteps: [],
     followUpSteps: [],
     followUpDiffs: [],
     projectSummary: null,

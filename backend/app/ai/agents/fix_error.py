@@ -10,10 +10,8 @@ from app.ai.core.messages import Message
 from app.ai.parser import ActionParser
 from app.ai.provider import stream_chat
 from app.ai.prompts import render_fix_error_direct, render_fix_errors
-from app.ai.helpers import encode_card
 from app.sandbox.filesystem import read_file, write_file, list_files
 from app.sandbox.manager import sandbox_manager
-from app.models.chat import save_message
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +28,6 @@ class FixErrorAgent(BaseAgent):
     ) -> None:
         await self.emit({"type": "phase", "phase": "fixing"})
         fix_steps: list[dict] = []
-        explanation_text = ""
 
         await self._send_step(fix_steps, "discover", "running", "Discovering files to fix...")
         file_contents = await self._discover_files(error_file)
@@ -74,7 +71,6 @@ class FixErrorAgent(BaseAgent):
         explanation = full_response[:cut].strip()
         if explanation:
             await self.emit({"type": "text", "content": explanation + "\n\n"})
-            explanation_text = explanation
 
         await self._send_step(fix_steps, "generate", "completed", f"Generated fix for {len(generated_files)} file(s)")
 
@@ -95,11 +91,6 @@ class FixErrorAgent(BaseAgent):
                 await self._send_step(fix_steps, "retry", "completed", "Auto-fix applied")
             else:
                 await self._send_step(fix_steps, "validate", "completed", "Fix validated successfully!")
-
-        if fix_steps:
-            card = encode_card({"type": "fix_progress", "steps": fix_steps})
-            content = f"{explanation_text}\n\n{card}" if explanation_text else card
-            await save_message(self.project_id, "assistant", content)
 
         await self.emit({"type": "action_complete"})
         await self.emit({"type": "phase", "phase": "idle"})

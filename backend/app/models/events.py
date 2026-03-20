@@ -66,7 +66,7 @@ async def init_events_table() -> None:
         await db.commit()
 
 
-async def emit_event(session_id: str, event: dict) -> None:
+async def emit_event(session_id: str, event: dict, *, notify: bool = True) -> None:
     event_type = event.get("type", "unknown")
     payload_json = json.dumps(event, separators=(",", ":"))
 
@@ -77,7 +77,8 @@ async def emit_event(session_id: str, event: dict) -> None:
         )
         await db.commit()
 
-    await _notify(session_id, event)
+    if notify:
+        await _notify(session_id, event)
 
 
 async def get_events(session_id: str, after_id: int = 0) -> list[AgentEvent]:
