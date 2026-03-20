@@ -20,7 +20,6 @@ from app.ai.provider import complete_chat, stream_chat
 from app.sandbox.nsjail import exec_in_sandbox
 from app.ai.task_tree import Task, WorkPlan
 from app.ai.prompts import (
-    CLASSIFY_PROMPT,
     ARCHITECTURE_PROMPT,
     UX_DESIGN_PROMPT,
     USER_PLAN_PROMPT,
@@ -32,6 +31,8 @@ from app.ai.prompts_legacy import get_system_prompt
 from app.models.chat import get_messages, save_message
 from app.models.project import get_project_by_session, update_project_summary
 from app.sandbox.filesystem import write_file, read_file, list_files
+from app.integrations.package_api import PackageApiClient, PackageApiUpstreamError
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,9 @@ class AgentOrchestrator:
         # Store trace_id and observation_id to maintain single trace across multiple method calls
         self._trace_id: str | None = None
         self._observation_id: str | None = None
+        # Case integration context (multiple cases)
+        self._case_contexts: list[dict] = []
+        self._case_ids: list[str] = []
 
     def _llm_metadata(self, generation_name: str) -> dict:
         """Build metadata for LiteLLM calls with trace context."""
@@ -81,10 +85,12 @@ class AgentOrchestrator:
         self,
         content: str,
         model: str | None = None,
+        case_ids: list[str] | None = None,
     ) -> None:
         """Process a new user message through the agent pipeline."""
         self.model = model
         self._user_content = content
+        self._case_ids = case_ids or []
 
         # Capture trace_id to maintain single trace across method calls
         self._trace_id = langfuse_context.get_current_trace_id()
@@ -105,10 +111,61 @@ class AgentOrchestrator:
         is_new = await self._classify(content)
 
         if not is_new:
-            await self._simple_flow(content)
+            from app.ai.followup_agent import FollowUpAgent
+
+            agent = FollowUpAgent(
+                session_id=self.session_id,
+                project_id=self.project_id,
+                ws_send=self.ws_send,
+                model=self.model,
+                trace_id=self._trace_id,
+            )
+            await agent.run(content)
             return
 
-        # 2. Design (parallel, internal)
+        # 2. Fetch case data if case_ids are provided
+        if self._case_ids:
+            await self.ws_send({"type": "phase", "phase": "fetching_cases"})
+            results = await asyncio.gather(
+                *[self._fetch_and_analyze_case(cid) for cid in self._case_ids]
+            )
+            self._case_contexts = [ctx for ctx in results if ctx is not None]
+
+            # Save to project
+            if self._case_contexts:
+                from app.models.project import update_project_cases
+                await update_project_cases(self.project_id, self._case_contexts)
+
+            # Send cases_fetched WS event with list of case summaries
+            if self._case_contexts:
+                await self.ws_send({
+                    "type": "cases_fetched",
+                    "cases": [
+                        {
+                            "package_id": ctx["package_id"],
+                            "package_name": ctx["package_name"],
+                            "data_schema": ctx.get("data_schema", ""),
+                            "relevant_fields": ctx.get("relevant_fields", ""),
+                        }
+                        for ctx in self._case_contexts
+                    ],
+                })
+
+                # Save cases fetched card to chat history
+                await save_message(self.project_id, "assistant", encode_card({
+                    "type": "cases_fetched",
+                    "cases": [
+                        {
+                            "packageId": ctx["package_id"],
+                            "packageName": ctx["package_name"],
+                            "dataSchema": ctx.get("data_schema", ""),
+                            "relevantFields": ctx.get("relevant_fields", ""),
+                        }
+                        for ctx in self._case_contexts
+                    ],
+                }))
+
+        # 3. Design (parallel, internal)
         await self.ws_send({"type": "phase", "phase": "designing"})
         self._architecture, self._ux_design = await asyncio.gather(
             self._design_architecture(content),
@@ -239,13 +296,13 @@ class AgentOrchestrator:
 
     @observe(name="classify-request", as_type="span")
     async def _classify(self, content: str) -> bool:
-        """Return True if this is a new project request, False for follow-up."""
+        """Return True if this is a new project request, False for follow-up.
+
+        Deterministic: if the project already has assistant messages, it's
+        always a follow-up.  Only the very first message is treated as new.
+        """
         history = await get_messages(self.project_id)
-        # Only count real assistant messages, not card metadata
-        assistant_msgs = [
-            m for m in history
-            if m.role == "assistant" and not m.content.startswith(CARD_PREFIX)
-        ]
+        assistant_msgs = [m for m in history if m.role == "assistant"]
         if len(assistant_msgs) == 0:
             logger.info("[agent] First message — classifying as new_project")
             langfuse_context.update_current_observation(
@@ -253,41 +310,132 @@ class AgentOrchestrator:
             )
             return True
 
-        # Include project summary for classifier context
-        classify_content = content
-        project = await get_project_by_session(self.session_id)
-        if project and project.summwary:
-            try:
-                summary_data = json.loads(project.summary)
-                classify_content = (
-                    f"[Existing project: {summary_data.get('summary', '')}]\n\n"
-                    f"User message: {content}"
-                )
-            except (json.JSONDecodeError, AttributeError):
-                pass
+        logger.info("[agent] Existing project — classifying as follow_up")
+        langfuse_context.update_current_observation(
+            metadata={"classification": "follow_up", "reason": "has_assistant_messages"}
+        )
+        return False
 
-        messages = [{"role": "user", "content": classify_content}]
+    async def _fetch_and_analyze_case(self, package_id: str) -> dict | None:
+        """Fetch package data and analyze it with AI.
+
+        Returns structured package context or None if fetch fails.
+        """
         try:
-            raw = await complete_chat(
-                messages,
-                CLASSIFY_PROMPT,
-                model=self.model,
-                metadata=self._llm_metadata("classify")
-            )
-            data = json.loads(raw.strip())
-            classification = data.get("classification", "follow_up")
-            logger.info("[agent] Classification: %s", classification)
-            is_new = classification == "new_project"
-            langfuse_context.update_current_observation(
-                metadata={"classification": classification, "is_new_project": is_new}
-            )
-            return is_new
-        except Exception:
-            logger.exception("[agent] Classification failed, defaulting to follow_up")
-            langfuse_context.update_current_observation(
-                metadata={"classification": "follow_up", "reason": "error_fallback"}
-            )
-            return False
+            # Initialize package API client
+            package_api = PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
+
+            logger.info("[agent] Fetching package data for ID: %s", package_id)
+
+            # Fetch package metadata and sample data
+            search_results = await package_api.search(package_id)
+            if not search_results:
+                logger.warning("[agent] No package found for ID: %s", package_id)
+                await self.ws_send({
+                    "type": "case_error",
+                    "message": f"Package {package_id} not found"
+                })
+                return None
+
+            package_metadata = search_results[0] if isinstance(search_results, list) else search_results
+            package_name = package_metadata.get("Name", f"Package {package_id}")
+
+            # Run package to get sample data
+            sample_data = await package_api.run_package(package_id, all_queries=True, body=None)
+
+            logger.info("[agent] Successfully fetched package data for: %s", package_name)
+
+            # Use AI to analyze the data structure in context of user's request
+            analysis_prompt = f"""Analyze this API package data in the context of the user's request.
+
+User wants to build: {self._user_content}
+
+Package: {package_name}
+Sample API Response:
+```json
+{json.dumps(sample_data, indent=2)[:2000]}
+```
+
+Analyze the data and identify what's relevant for the user's request.
+
+Respond with ONLY a JSON object:
+{{
+  "data_schema": "Brief description of the data structure (e.g., 'Array of sales records with date, amount, customer, product fields')",
+  "relevant_fields": "Which fields/properties are most important for what the user wants to build",
+  "data_characteristics": "Key properties: volume, data type (time-series/hierarchical/flat), update frequency, etc.",
+  "integration_notes": "Technical details: endpoint usage, parameters, response format, any transformations needed"
+}}"""
+
+            messages = [{"role": "user", "content": analysis_prompt}]
+            try:
+                raw = await complete_chat(
+                    messages,
+                    "You are a software architect analyzing API data for integration.",
+                    model=self.model,
+                    metadata=self._llm_metadata("package_analysis")
+                )
+                logger.info("[agent] Package analysis response: %s", raw[:500])
+
+                # Strip markdown code fences if present
+                cleaned = raw.strip()
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]  # Remove ```json
+                elif cleaned.startswith("```"):
+                    cleaned = cleaned[3:]  # Remove ```
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]  # Remove trailing ```
+                cleaned = cleaned.strip()
+
+                analysis = json.loads(cleaned)
+            except json.JSONDecodeError as e:
+                logger.warning("[agent] Package analysis JSON parse failed: %s. Response: %s", e, raw[:500] if 'raw' in locals() else 'N/A')
+                # Try to extract useful info from the raw data
+                data_preview = json.dumps(sample_data, indent=2)[:500]
+                analysis = {
+                    "data_schema": f"Package data structure with {len(sample_data) if isinstance(sample_data, list) else 'multiple'} records",
+                    "relevant_fields": "See raw data preview below",
+                    "data_characteristics": "Fetched successfully from package API",
+                    "integration_notes": f"Sample data preview: {data_preview}"
+                }
+            except Exception as e:
+                logger.exception("[agent] Package analysis failed with unexpected error")
+                # Provide basic fallback with actual data preview
+                data_preview = json.dumps(sample_data, indent=2)[:500] if sample_data else "No data available"
+                analysis = {
+                    "data_schema": f"Package contains {len(sample_data) if isinstance(sample_data, list) else 'structured'} data",
+                    "relevant_fields": "Analysis unavailable - see raw data",
+                    "data_characteristics": "Successfully fetched from API",
+                    "integration_notes": f"Data preview: {data_preview}"
+                }
+
+            # Build package context
+            package_context = {
+                "package_id": package_id,
+                "package_name": package_name,
+                "sample_data": sample_data,
+                "data_schema": analysis.get("data_schema", ""),
+                "relevant_fields": analysis.get("relevant_fields", ""),
+                "data_characteristics": analysis.get("data_characteristics", ""),
+                "integration_notes": analysis.get("integration_notes", "")
+            }
+
+            logger.info("[agent] Case context created for: %s", package_name)
+            return package_context
+
+        except PackageApiUpstreamError as e:
+            logger.warning("[agent] Package API error: %s", e)
+            await self.ws_send({
+                "type": "case_error",
+                "message": f"Failed to fetch package data: {e}"
+            })
+            return None
+        except Exception as e:
+            logger.exception("[agent] Unexpected error fetching package")
+            await self.ws_send({
+                "type": "case_error",
+                "message": "An unexpected error occurred while fetching package data"
+            })
+            return None
 
     # ------------------------------------------------------------------
     # Design phase (internal)
@@ -295,7 +443,39 @@ class AgentOrchestrator:
 
     @observe(name="design-architecture", as_type="span")
     async def _design_architecture(self, content: str) -> dict:
-        messages = [{"role": "user", "content": content}]
+        # Build user message with case contexts if available
+        user_message = content
+        if self._case_contexts:
+            case_sections = []
+            for pkg_ctx in self._case_contexts:
+                case_sections.append(f"""### Case: {pkg_ctx['package_name']} (ID: {pkg_ctx['package_id']})
+
+Data Schema: {pkg_ctx['data_schema']}
+Relevant Fields: {pkg_ctx['relevant_fields']}
+Data Characteristics: {pkg_ctx['data_characteristics']}
+
+Sample data:
+```json
+{json.dumps(pkg_ctx['sample_data'], indent=2)[:1000]}
+```
+
+Integration Notes: {pkg_ctx['integration_notes']}
+
+The generated code should call the package API endpoint at /api/package/{pkg_ctx['package_id']}/run""")
+
+            user_message = f"""{content}
+
+## Case Data Integration
+
+You are integrating data from the following cases:
+
+{chr(10).join(case_sections)}
+
+Your architecture MUST include components that fetch, display, and interact with this case data.
+Design components appropriate for the data characteristics and user's needs.
+"""
+
+        messages = [{"role": "user", "content": user_message}]
         try:
             raw = await complete_chat(
                 messages,
@@ -396,16 +576,48 @@ class AgentOrchestrator:
 
     async def _build_technical_plan(self) -> WorkPlan:
         """Build the detailed technical task plan from designs + user decisions."""
-        merge_input = json.dumps({
+        merge_data = {
             "user_request": self._user_content,
             "architecture": self._architecture,
             "ux_design": self._ux_design,
             "user_preferences": self._user_overview.get("decisions", []),
-        }, indent=2)
+        }
+
+        # Include case contexts if available
+        if self._case_contexts:
+            merge_data["case_integrations"] = [
+                {
+                    "package_id": ctx["package_id"],
+                    "package_name": ctx["package_name"],
+                    "data_schema": ctx["data_schema"],
+                    "relevant_fields": ctx["relevant_fields"],
+                    "data_characteristics": ctx["data_characteristics"],
+                    "integration_notes": ctx["integration_notes"],
+                }
+                for ctx in self._case_contexts
+            ]
+
+        merge_input = json.dumps(merge_data, indent=2)
+
+        # Build system prompt with case guidance if available
+        system_prompt = MERGE_PROMPT
+        if self._case_contexts:
+            system_prompt += """
+
+## Case Data Integration Tasks
+
+When case_integrations is present in the input, you MUST create tasks for each case:
+1. TypeScript interfaces for each case's data structure
+2. A custom hook (e.g., useCaseData) that fetches data from /api/package/{package_id}/run for each case
+3. Components that display and interact with the case data
+
+Ensure proper dependency ordering: types → hooks → components → App integration.
+"""
+
         messages = [{"role": "user", "content": merge_input}]
         raw = await complete_chat(
             messages,
-            MERGE_PROMPT,
+            system_prompt,
             model=self.model,
             metadata=self._llm_metadata("build_technical_plan")
         )
@@ -526,6 +738,7 @@ class AgentOrchestrator:
             ux_design=self._work_plan.ux_design,
             dependency_files=dependency_files or None,
             other_completed_files=other_completed_files or None,
+            case_contexts=self._case_contexts or None,
         )
 
         try:

@@ -1,22 +1,19 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
-import { ArrowUp, Loader2 } from 'lucide-react';
-import { searchPackages } from '../../services/api';
-import type { PackageSearchRecord } from '../../types';
+import { ArrowUp, Loader2, Database, X } from 'lucide-react';
+import { CaseSelector } from './CaseSelector';
 
 export function PromptInput() {
   const [value, setValue] = useState('');
-  const [packageQuery, setPackageQuery] = useState('');
-  const [packageResults, setPackageResults] = useState<Pick<PackageSearchRecord, 'Id' | 'Name'>[]>([]);
-  const [packageLoading, setPackageLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [showCaseSelector, setShowCaseSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
-  const selectedPackage = useChatStore((s) => s.selectedPackage);
-  const setSelectedPackage = useChatStore((s) => s.setSelectedPackage);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const agentPhase = useChatStore((s) => s.agentPhase);
+  const selectedCases = useChatStore((s) => s.selectedCases);
+  const removeCase = useChatStore((s) => s.removeCase);
   const sessionId = useSessionStore((s) => s.sessionId);
 
   const adjustHeight = useCallback(() => {
@@ -46,41 +43,6 @@ export function PromptInput() {
 
   const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'awaiting_approval' && agentPhase !== 'complete');
   const disabled = isBusy || !sessionId;
-
-  const trimmedPackageQuery = useMemo(() => packageQuery.trim(), [packageQuery]);
-
-  useEffect(() => {
-    if (!sessionId || disabled) {
-      setPackageResults([]);
-      setPackageLoading(false);
-      return;
-    }
-
-    if (!trimmedPackageQuery) {
-      setPackageResults([]);
-      setPackageLoading(false);
-      return;
-    }
-
-    const handle = window.setTimeout(async () => {
-      setPackageLoading(true);
-      try {
-        const results = await searchPackages(trimmedPackageQuery);
-        const simplified = Array.isArray(results)
-          ? results
-              .filter((r) => r && typeof r.Id === 'number' && typeof r.Name === 'string')
-              .map((r) => ({ Id: r.Id, Name: r.Name }))
-          : [];
-        setPackageResults(simplified);
-      } catch {
-        setPackageResults([]);
-      } finally {
-        setPackageLoading(false);
-      }
-    }, 250);
-
-    return () => window.clearTimeout(handle);
-  }, [sessionId, disabled, trimmedPackageQuery]);
   const canSend = !!value.trim() && !disabled;
 
   const placeholder = !sessionId
@@ -93,6 +55,7 @@ export function PromptInput() {
 
   const busyLabel =
     agentPhase === 'classifying' ? 'Analyzing' :
+    agentPhase === 'fetching_cases' ? 'Fetching case data' :
     agentPhase === 'designing' ? 'Designing' :
     agentPhase === 'planning' ? 'Planning' :
     agentPhase === 'executing' ? 'Building' :
@@ -105,107 +68,58 @@ export function PromptInput() {
       background: 'var(--surface)',
       flexShrink: 0,
     }}>
-      <div style={{ marginBottom: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Package</div>
-            <input
-              value={packageQuery}
-              onChange={(e) => {
-                setPackageQuery(e.target.value);
-                if (selectedPackage) setSelectedPackage(null);
-              }}
-              disabled={disabled}
-              placeholder="Type package id (e.g. 3, 4, 572903)…"
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: '10px',
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                color: 'var(--text)',
-                fontSize: '13px',
-                opacity: disabled ? 0.6 : 1,
-              }}
-            />
-          </div>
-          {selectedPackage && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedPackage(null);
-                setPackageQuery('');
-                setPackageResults([]);
-              }}
-              disabled={disabled}
-              style={{
-                padding: '8px 10px',
-                borderRadius: '999px',
-                border: '1px solid var(--border)',
-                background: 'rgba(76, 167, 255, 0.12)',
-                color: 'var(--text)',
-                fontSize: '12px',
-                cursor: disabled ? 'default' : 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-              title="Clear selected package"
-            >
-              {selectedPackage.Name} (#{selectedPackage.Id}) ×
-            </button>
-          )}
+      {/* Case selector - shown when toggled */}
+      {!isBusy && sessionId && showCaseSelector && (
+        <div style={{ marginBottom: '10px', position: 'relative' }}>
+          <CaseSelector isOpen={showCaseSelector} />
         </div>
-
-        {!disabled && !!trimmedPackageQuery && !selectedPackage && (
-          <div style={{
-            marginTop: '6px',
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            overflow: 'hidden',
-          }}>
-            {packageLoading && (
-              <div style={{ padding: '8px 10px', fontSize: '12px', color: 'var(--text-dim)' }}>
-                Searching…
-              </div>
-            )}
-            {!packageLoading && packageResults.length === 0 && (
-              <div style={{ padding: '8px 10px', fontSize: '12px', color: 'var(--text-dim)' }}>
-                No package found (will show [] like FLAPI).
-              </div>
-            )}
-            {!packageLoading && packageResults.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {packageResults.slice(0, 6).map((pkg) => (
-                  <button
-                    key={pkg.Id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedPackage(pkg);
-                      setPackageQuery(String(pkg.Id));
-                      setPackageResults([]);
-                    }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 10px',
-                      border: 'none',
-                      borderTop: '1px solid rgba(255,255,255,0.06)',
-                      background: 'transparent',
-                      color: 'var(--text)',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <div style={{ fontWeight: 600 }}>{pkg.Name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Id: {pkg.Id}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
+      )}
+      {/* Selected case badges (always visible when cases are selected) */}
+      {!showCaseSelector && selectedCases.length > 0 && (
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '6px',
+          marginBottom: '8px',
+        }}>
+          {selectedCases.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                borderRadius: '6px',
+                fontSize: '12px',
+              }}
+            >
+              <span style={{ fontWeight: 500 }}>{c.name}</span>
+              <button
+                onClick={() => removeCase(c.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '3px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-dim)',
+                  padding: 0,
+                }}
+                title="Remove case"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {isBusy && (
         <div style={{
           display: 'flex',
@@ -235,6 +149,52 @@ export function PromptInput() {
             : '0 1px 3px rgba(0,0,0,0.08)',
         }}
       >
+        {/* Case selector toggle icon */}
+        {!isBusy && sessionId && (
+          <button
+            onClick={() => setShowCaseSelector((v) => !v)}
+            style={{
+              position: 'relative',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              background: showCaseSelector
+                ? 'color-mix(in srgb, var(--accent) 15%, transparent)'
+                : 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: selectedCases.length > 0 ? 'var(--accent)' : 'var(--text-dim)',
+              flexShrink: 0,
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            title={showCaseSelector ? 'Hide case selector' : 'Attach cases'}
+          >
+            <Database size={16} />
+            {selectedCases.length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                width: '14px',
+                height: '14px',
+                borderRadius: '7px',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: '9px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+              }}>
+                {selectedCases.length}
+              </span>
+            )}
+          </button>
+        )}
         <textarea
           ref={textareaRef}
           value={value}

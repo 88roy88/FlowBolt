@@ -62,3 +62,12 @@ async def run_package(
     """Proxy 'run package' to FLAPI."""
     return await _run_package(package_id, allQueries=allQueries, body=body)
 
+
+# get route as well
+@router.get("/{package_id}/run")
+async def run_package_get(
+    package_id: str,
+    allQueries: bool | None = Query(default=None),
+):
+    """Proxy 'run package' to FLAPI."""
+    return await _run_package(package_id, allQueries=allQueries, body=None)

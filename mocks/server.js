@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorBody } from './errorBody.js';
-import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubEcommerceResults, stubHRResults, stubLogisticsResults, stubLibs, putRun, getRun } from './stubData.js';
+import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics ,stubHRResults,stubEcommerceResults,stubLogisticsResults} from './stubData.js';
 
 const app = express();
 app.use(cors());
@@ -26,9 +26,11 @@ const stubSearchResultsRaw = [
   { Id: 2, Logo: '', Name: 'User Analytics Package', Type: 'Package' },
   { Id: 3, Logo: '', Name: 'Intelligence Briefing', Type: 'Package' },
   { Id: 4, Logo: '', Name: 'People & Photos', Type: 'Package' },
-  { Id: 5, Logo: '', Name: 'E-commerce Analytics', Type: 'Package' },
-  { Id: 6, Logo: '', Name: 'HR & Workforce', Type: 'Package' },
-  { Id: 7, Logo: '', Name: 'Logistics & Shipping', Type: 'Package' },
+  { Id: 5, Logo: '', Name: 'Real-Time Server Dashboard', Type: 'Package' },
+  { Id: 6, Logo: '', Name: 'People Hebrew Names', Type: 'Package' },
+  { Id: 7, Logo: '', Name: 'E-commerce Analytics', Type: 'Package' },
+  { Id: 8, Logo: '', Name: 'HR & Workforce', Type: 'Package' },
+  { Id: 9, Logo: '', Name: 'Logistics & Shipping', Type: 'Package' },
   { Id: 99, Logo: '', Name: 'Internal Template', Type: 'Template' },
 ];
 const PACKAGE_TYPE = 'Package';
@@ -210,7 +212,12 @@ function buildPackageSearchRecordById(id) {
     4: { Id: 4, Name: 'People & Photos', ...base, Tags: JSON.stringify([{ value: 'אנשים', label: 'אנשים' }]) },
     5: { Id: 5, Name: 'E-commerce Analytics', ...base, Tags: JSON.stringify([{ value: 'אי-קומרס', label: 'אי-קומרס' }]) },
     6: { Id: 6, Name: 'HR & Workforce', ...base, Tags: JSON.stringify([{ value: 'משאבי אנוש', label: 'משאבי אנוש' }]) },
-    7: { Id: 7, Name: 'Logistics & Shipping', ...base, Tags: JSON.stringify([{ value: 'לוגיסטיקה', label: 'לוגיסטיקה' }]) },
+    5: { Id: 5, Name: 'Real-Time Server Dashboard', ...base, Tags: JSON.stringify([{ value: 'real-time', label: 'real-time' }, { value: 'monitoring', label: 'monitoring' }]) },
+    6: { Id: 6, Name: 'People Hebrew Names', ...base, Description: 'Hebrew names for people (same IDs as People & Photos)', Tags: JSON.stringify([{ value: 'אנשים', label: 'אנשים' }, { value: 'עברית', label: 'עברית' }]) },
+    7: { Id: 7, Name: 'E-commerce Analytics', ...base, Tags: JSON.stringify([{ value: 'אי-קומרס', label: 'אי-קומרס' }]) },
+    8: { Id: 8, Name: 'HR & Workforce', ...base, Tags: JSON.stringify([{ value: 'משאבי אנוש', label: 'משאבי אנוש' }]) },
+    9: { Id: 9, Name: 'Logistics & Shipping', ...base, Tags: JSON.stringify([{ value: 'לוגיסטיקה', label: 'לוגיסטיקה' }]) },
+  
     572903: { Id: 572903, Name: 'כרטסת - base', ...base },
   };
 
@@ -250,9 +257,11 @@ function getRunResults(packageId) {
   const id = String(packageId).trim();
   if (id === '3') return { results: { ...stubIntelligenceResults } };
   if (id === '4') return { results: { ...stubPeopleWithPhotosResults } };
-  if (id === '5') return { results: { ...stubEcommerceResults } };
-  if (id === '6') return { results: { ...stubHRResults } };
-  if (id === '7') return { results: { ...stubLogisticsResults } };
+  if (id === '5') return { results: getRealtimeMetrics() };
+  if (id === '6') return { results: { ...stubPeopleHebrewResults } };
+  if (id === '7') return { results: { ...stubEcommerceResults } };
+  if (id === '8') return { results: { ...stubHRResults } };
+  if (id === '9') return { results: { ...stubLogisticsResults } };
   return { results: { ...stubPackageResults } };
 }
 

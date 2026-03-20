@@ -80,14 +80,38 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
             if msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
+                case_ids: list[int] = data.get("caseIds") or []
                 logger.info("[chat] User message (%d chars): %.100s...", len(user_content), user_content)
 
-                # Save user message
-                await save_message(project.id, "user", user_content)
+                # Save user message with cases metadata if provided
+                if case_ids:
+                    # Fetch case names from the search API
+                    from app.api.package_api import _package_search
+                    case_names: list[str] = []
+                    for cid in case_ids:
+                        try:
+                            search_results = await _package_search(str(cid))
+                            name = search_results[0].get("Name", f"Case #{cid}") if search_results else f"Case #{cid}"
+                        except Exception:
+                            logger.warning("[chat] Failed to fetch case name for ID %s", cid)
+                            name = f"Case #{cid}"
+                        case_names.append(name)
+
+                    # Embed cases info as HTML comment
+                    cases_metadata = {
+                        "type": "cases_context",
+                        "caseIds": case_ids,
+                        "caseNames": case_names,
+                    }
+                    cases_comment = f"<!--cases-meta:{json.dumps(cases_metadata)}-->"
+                    message_with_metadata = f"{cases_comment}\n{user_content}"
+                    await save_message(project.id, "user", message_with_metadata)
+                else:
+                    await save_message(project.id, "user", user_content)
 
                 # Delegate to orchestrator
                 try:
-                    await orchestrator.handle_message(user_content, model=selected_model)
+                    await orchestrator.handle_message(user_content, model=selected_model, case_ids=[str(cid) for cid in case_ids] if case_ids else None)
                 except Exception:
                     logger.exception("[chat] Orchestrator error for session %s", session_id)
                     await websocket.send_json({"type": "error", "message": "AI processing failed"})

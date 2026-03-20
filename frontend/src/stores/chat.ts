@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary, FixStep } from '../types';
+import type { Message, Action, WSMessage, AIModel, AgentPhase, AgentCard, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useFilesStore } from './files';
 import { fetchModels, fetchDefaultModel, fetchChatHistory, updateProjectModel } from '../services/api';
-import type { PackageSearchRecord } from '../types';
 
 const CARD_PREFIX = '<!--agent-card:';
 const CARD_SUFFIX = '-->';
+const CASES_META_PREFIX = '<!--cases-meta:';
+const CASES_META_SUFFIX = '-->';
+const PACKAGE_META_PREFIX = '<!--package-meta:';
+const PACKAGE_META_SUFFIX = '-->';
 
 function parseAgentCard(content: string): { card: AgentCard; remainingContent: string } | undefined {
   const cardIdx = content.indexOf(CARD_PREFIX);
@@ -29,6 +32,43 @@ function parseAgentCard(content: string): { card: AgentCard; remainingContent: s
   }
 }
 
+function parseCasesMeta(content: string): { cases: { id: number; name: string }[]; remainingContent: string } | undefined {
+  // Try new cases-meta format first
+  const casesIdx = content.indexOf(CASES_META_PREFIX);
+  if (casesIdx !== -1) {
+    const endIdx = content.indexOf(CASES_META_SUFFIX, casesIdx);
+    if (endIdx !== -1) {
+      try {
+        const json = content.slice(casesIdx + CASES_META_PREFIX.length, endIdx);
+        const meta = JSON.parse(json) as { caseIds: number[]; caseNames: string[] };
+        const cases = meta.caseIds.map((id: number, i: number) => ({ id, name: meta.caseNames[i] || `Case #${id}` }));
+        const afterMeta = content.slice(endIdx + CASES_META_SUFFIX.length).trim();
+        return { cases, remainingContent: afterMeta };
+      } catch {
+        // fall through
+      }
+    }
+  }
+
+  // Backward compat: try old single-package format
+  const metaIdx = content.indexOf(PACKAGE_META_PREFIX);
+  if (metaIdx !== -1) {
+    const endIdx = content.indexOf(PACKAGE_META_SUFFIX, metaIdx);
+    if (endIdx !== -1) {
+      try {
+        const json = content.slice(metaIdx + PACKAGE_META_PREFIX.length, endIdx);
+        const meta = JSON.parse(json) as { packageId: number; packageName: string };
+        const afterMeta = content.slice(endIdx + PACKAGE_META_SUFFIX.length).trim();
+        return { cases: [{ id: meta.packageId, name: meta.packageName }], remainingContent: afterMeta };
+      } catch {
+        // fall through
+      }
+    }
+  }
+
+  return undefined;
+}
+
 interface ChatState {
   messages: Message[];
   isStreaming: boolean;
@@ -37,14 +77,17 @@ interface ChatState {
   error: string | null;
   models: AIModel[];
   selectedModel: string | null;
-  selectedPackage: Pick<PackageSearchRecord, 'Id' | 'Name'> | null;
   // Agent state
   agentPhase: AgentPhase;
   planOverview: PlanOverview | null;
   executionTasks: ExecutionTask[];
   fixSteps: FixStep[];
+  followUpSteps: FollowUpStep[];
+  followUpDiffs: FileDiff[];
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
+  // Case integration (multi-select)
+  selectedCases: { id: number; name: string }[];
   // Actions
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
@@ -55,7 +98,9 @@ interface ChatState {
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
   setSelectedModel: (model: string) => void;
-  setSelectedPackage: (pkg: Pick<PackageSearchRecord, 'Id' | 'Name'> | null) => void;
+  addCase: (pkg: { id: number; name: string }) => void;
+  removeCase: (id: number) => void;
+  clearCases: () => void;
   loadModels: () => Promise<void>;
 }
 
@@ -74,13 +119,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   models: [],
   selectedModel: null,
-  selectedPackage: null,
   agentPhase: 'idle',
   planOverview: null,
   executionTasks: [],
   fixSteps: [],
+  followUpSteps: [],
+  followUpDiffs: [],
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
+  selectedCases: [],
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const sessionId = useSessionStore.getState().sessionId;
@@ -243,11 +290,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const sessionId = useSessionStore.getState().sessionId;
     if (!sessionId) return;
 
+    const { selectedCases, selectedModel } = get();
+
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
       content,
       timestamp: Date.now(),
+      cases: selectedCases.length > 0 ? [...selectedCases] : undefined,
     };
 
     set((state) => ({
@@ -259,10 +309,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       agentPhase: 'idle',
       planOverview: null,
       executionTasks: [],
+      followUpSteps: [],
+      followUpDiffs: [],
       designProgress: { architecture: null, ux: null },
     }));
 
     const socket = getChatSocket(sessionId);
+    const assistantId = generateId();
 
     if (activeHandler && activeSessionId === sessionId) {
       socket.offMessage(activeHandler);
@@ -350,6 +403,44 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
           break;
         }
+        case 'followup_step': {
+          set((state) => {
+            if (msg.status === 'running') {
+              const stepId = generateId();
+              return {
+                followUpSteps: [
+                  ...state.followUpSteps,
+                  {
+                    id: stepId,
+                    tool: msg.tool as FollowUpStep['tool'],
+                    args: msg.args,
+                    status: 'running',
+                    iteration: msg.iteration,
+                  },
+                ],
+              };
+            } else {
+              // Update the last running step for this tool+iteration
+              const steps = [...state.followUpSteps];
+              const idx = steps.findLastIndex(
+                (s) => s.tool === msg.tool && s.iteration === msg.iteration && s.status === 'running'
+              );
+              if (idx >= 0) {
+                steps[idx] = {
+                  ...steps[idx],
+                  status: msg.status as FollowUpStep['status'],
+                  resultPreview: msg.result_preview,
+                };
+              }
+              return { followUpSteps: steps };
+            }
+          });
+          break;
+        }
+        case 'followup_diffs': {
+          set({ followUpDiffs: msg.diffs });
+          break;
+        }
         case 'text': {
           set((state) => ({
             currentAssistantMessage: state.currentAssistantMessage + msg.content,
@@ -379,6 +470,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }));
           break;
         }
+        case 'cases_fetched': {
+          // Create a message card for cases fetched
+          const casesMsg: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            agentCard: {
+              type: 'cases_fetched',
+              cases: msg.cases.map((c: { package_id: string; package_name: string; data_schema: string; relevant_fields?: string }) => ({
+                packageId: c.package_id,
+                packageName: c.package_name,
+                dataSchema: c.data_schema,
+                relevantFields: c.relevant_fields,
+              })),
+            },
+          };
+          set((s) => ({ messages: [...s.messages, casesMsg] }));
+          break;
+        }
+        case 'package_fetched': {
+          // Backward compat: treat as single-case fetch
+          const packageMsg: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            agentCard: {
+              type: 'cases_fetched',
+              cases: [{
+                packageId: msg.package_id,
+                packageName: msg.package_name,
+                dataSchema: msg.data_schema,
+                relevantFields: msg.relevant_fields,
+              }],
+            },
+          };
+          set((s) => ({ messages: [...s.messages, packageMsg] }));
+          break;
+        }
+        case 'case_error':
+        case 'package_error': {
+          // Case fetch failed - show error but don't block the flow
+          console.warn(`Case error: ${msg.message}`);
+          break;
+        }
         case 'error': {
           set({ error: msg.message, isStreaming: false, agentPhase: 'idle' });
           socket.offMessage(handler);
@@ -389,8 +526,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const state = get();
           const newMessages: Message[] = [];
 
-          // Save streaming text as a message (follow-up flow)
-          if (state.currentAssistantMessage) {
+          // Save follow-up progress card
+          if (state.followUpSteps.length > 0) {
+            const filesChanged = state.actions
+              .filter((a) => a.type === 'file' && a.path)
+              .map((a) => a.path!);
+            newMessages.push({
+              id: generateId(),
+              role: 'assistant',
+              content: state.currentAssistantMessage,
+              actions: state.actions.length > 0 ? [...state.actions] : undefined,
+              timestamp: Date.now(),
+              agentCard: {
+                type: 'followup_progress',
+                steps: [...state.followUpSteps],
+                answer: state.currentAssistantMessage || undefined,
+                filesChanged: filesChanged.length > 0 ? filesChanged : undefined,
+                diffs: state.followUpDiffs.length > 0 ? [...state.followUpDiffs] : undefined,
+              },
+            });
+          } else if (state.currentAssistantMessage) {
+            // Save streaming text as a message (follow-up flow)
             newMessages.push({
               id: generateId(),
               role: 'assistant',
@@ -423,6 +579,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             agentPhase: 'idle',
             planOverview: null,
             executionTasks: [],
+            followUpSteps: [],
+            followUpDiffs: [],
           }));
           socket.offMessage(handler);
           activeHandler = null;
@@ -436,11 +594,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     activeSessionId = sessionId;
     socket.onMessage(handler);
 
-    const { selectedModel } = get();
-    const msg: WSMessage = selectedModel
-      ? { type: 'message', content, model: selectedModel }
-      : { type: 'message', content };
+    const msg: WSMessage = {
+      type: 'message',
+      content,
+      ...(selectedModel && { model: selectedModel }),
+      ...(selectedCases.length > 0 && { caseIds: selectedCases.map((c) => c.id) }),
+    };
     socket.send(msg);
+
+    // Clear selected cases after sending
+    set({ selectedCases: [] });
   },
 
   respondToPlan(action: 'accept' | 'reject' | 'modify', feedback?: string) {
@@ -509,23 +672,43 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const history = await fetchChatHistory(sessionId);
       const messages: Message[] = history.map((m) => {
-        const parsed = parseAgentCard(m.content);
+        let content = m.content;
+        let agentCard: AgentCard | undefined;
+        let casesInfo: { id: number; name: string }[] | undefined;
+
+        // Parse agent card
+        const cardParsed = parseAgentCard(content);
+        if (cardParsed) {
+          agentCard = cardParsed.card;
+          content = cardParsed.remainingContent;
+        }
+
+        // Parse cases metadata (for user messages) — handles both old and new format
+        if (m.role === 'user') {
+          const casesParsed = parseCasesMeta(content);
+          if (casesParsed) {
+            casesInfo = casesParsed.cases;
+            content = casesParsed.remainingContent;
+          }
+        }
+
         return {
           id: m.id,
           role: m.role as 'user' | 'assistant',
-          content: parsed ? parsed.remainingContent : m.content,
+          content,
           timestamp: new Date(m.created_at).getTime(),
-          agentCard: parsed?.card,
+          agentCard,
+          cases: casesInfo,
         };
       });
-      set({ messages, currentAssistantMessage: '', actions: [], fixSteps: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
+      set({ messages, currentAssistantMessage: '', actions: [], fixSteps: [], followUpSteps: [], followUpDiffs: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
   },
 
   clearMessages() {
-    set({ messages: [], currentAssistantMessage: '', actions: [], fixSteps: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
+    set({ messages: [], currentAssistantMessage: '', actions: [], fixSteps: [], followUpSteps: [], followUpDiffs: [], error: null, agentPhase: 'idle', planOverview: null, executionTasks: [] });
   },
 
   clearError() {
@@ -547,10 +730,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  setSelectedPackage(pkg) {
-    set({ selectedPackage: pkg });
+  addCase(pkg: { id: number; name: string }) {
+    set((state) => {
+      if (state.selectedCases.some((c) => c.id === pkg.id)) return state;
+      return { selectedCases: [...state.selectedCases, pkg] };
+    });
   },
 
+  removeCase(id: number) {
+    set((state) => ({ selectedCases: state.selectedCases.filter((c) => c.id !== id) }));
+  },
+
+  clearCases() {
+    set({ selectedCases: [] });
+  },
 
   async loadModels() {
     try {

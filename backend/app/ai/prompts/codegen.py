@@ -11,6 +11,7 @@ def get_codegen_prompt(
     ux_design: dict,
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
+    case_contexts: list[dict] | None = None,
 ) -> str:
     """Build a focused code-generation prompt for a single task.
 
@@ -32,9 +33,47 @@ def get_codegen_prompt(
     other_completed_files:
         Dict of {path: content} for files from non-dependency tasks.
         Only export summaries are shown to save tokens.
+    case_contexts:
+        Optional list of case integration contexts if user selected cases.
     """
     completed_section = ""
     parts: list[str] = []
+
+    # Case context sections
+    package_section = ""
+    if case_contexts:
+        import json as json_module
+        case_parts = []
+        for ctx in case_contexts:
+            case_parts.append(f"""### Case: {ctx['package_name']} (ID: {ctx['package_id']})
+
+**Data Schema:** {ctx['data_schema']}
+**Relevant Fields:** {ctx['relevant_fields']}
+**Data Characteristics:** {ctx['data_characteristics']}
+
+Sample data structure:
+```json
+{json_module.dumps(ctx['sample_data'], indent=2)[:1000]}
+```
+
+**Integration Notes:** {ctx['integration_notes']}
+
+Fetch data from the endpoint: /api/package/{ctx['package_id']}/run""")
+
+        package_section = f"""
+
+## Case Data Integration
+
+You are integrating data from the following cases:
+
+{chr(10).join(case_parts)}
+
+When implementing components that use case data:
+- Use the fetch API or create a custom hook to handle the API calls
+- Include proper loading and error states
+- Focus on the relevant fields identified above for the user's use case
+- Transform the raw API response according to the data schema and characteristics described above
+"""
 
     # Full content for direct dependency files
     if dependency_files:
@@ -90,7 +129,7 @@ as part of a larger project.
 ```json
 {_compact_json(ux_design)}
 ```
-{completed_section}
+{package_section}{completed_section}
 
 ## Output Format
 
