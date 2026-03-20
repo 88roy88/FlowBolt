@@ -1,14 +1,13 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronUp, MessageSquare, Code2, Eye } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
+import { ChevronUp } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Resizer } from './Resizer';
 import { GlobalProgress } from './GlobalProgress';
 import { SettingsModal } from './SettingsModal';
-import { ChatPanel } from '../chat/ChatPanel';
-import { EditorPanel } from '../editor/EditorPanel';
+import { ClassicLayout } from './ClassicLayout';
+import { FlexibleLayout } from './FlexibleLayout';
 import { Terminal } from '../terminal/Terminal';
 import { ServerLog } from '../terminal/ServerLog';
-import { Preview } from '../preview/Preview';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
 import { PromptInput } from '../chat/PromptInput';
 import { useChatStore } from '../../stores/chat';
@@ -18,19 +17,9 @@ import { useFilesStore } from '../../stores/files';
 const SIDEBAR_WIDTH = 280;
 const BOTTOM_MIN = 120;
 const BOTTOM_MAX = 600;
-const MAIN_SPLIT_MIN = 0.2;
-const MAIN_SPLIT_MAX = 0.8;
 
 type BottomTab = 'terminal' | 'server';
-type RightTab = 'preview' | 'code';
-type PaneId = 'chat' | 'code' | 'preview';
 type LayoutMode = 'classic' | 'flexible';
-
-const PANE_CONFIG: Record<PaneId, { icon: typeof MessageSquare; label: string }> = {
-  chat: { icon: MessageSquare, label: 'Chat' },
-  code: { icon: Code2, label: 'Code' },
-  preview: { icon: Eye, label: 'Preview' },
-};
 
 function loadLayoutMode(): LayoutMode {
   try {
@@ -60,9 +49,8 @@ export function AppShell() {
   const [bottomTab, setBottomTab] = useState<BottomTab>('server');
   const [bottomHeight, setBottomHeight] = useState(250);
 
-  // Layout mode
+  // Layout + settings
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(loadLayoutMode);
-
   const [showSettings, setShowSettings] = useState(false);
 
   const switchLayout = (mode: LayoutMode) => {
@@ -70,81 +58,20 @@ export function AppShell() {
     try { localStorage.setItem('layout-mode', mode); } catch {}
   };
 
-  // Classic layout state
-  const [rightTab, setRightTab] = useState<RightTab>('preview');
-  const [mainSplit, setMainSplit] = useState(0.4);
-  const mainTopRef = useRef<HTMLDivElement>(null);
-
-  // Flexible layout state
-  const [visiblePanes, setVisiblePanes] = useState<Set<PaneId>>(new Set(['chat', 'preview']));
-  const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>({ chat: 50, code: 50, preview: 50 });
-  const panesContainerRef = useRef<HTMLDivElement>(null);
-
-  const togglePane = (pane: PaneId) => {
-    setVisiblePanes(prev => {
-      const next = new Set(prev);
-      if (next.has(pane)) {
-        if (next.size <= 1) return prev;
-        next.delete(pane);
-      } else {
-        next.add(pane);
-      }
-      const equal = 100 / next.size;
-      const newSizes = { ...paneSizes };
-      for (const id of next) newSizes[id] = equal;
-      setPaneSizes(newSizes);
-      return next;
-    });
-  };
-
-  const MIN_PANE_PCT = 20;
-
-  const handlePaneResize = useCallback((leftPane: PaneId, rightPane: PaneId, delta: number) => {
-    const container = panesContainerRef.current;
-    if (!container) return;
-    const totalWidth = container.getBoundingClientRect().width;
-    if (totalWidth <= 0) return;
-    const pctDelta = (delta / totalWidth) * 100;
-    setPaneSizes(prev => {
-      const sumBoth = prev[leftPane] + prev[rightPane];
-      let newLeft = prev[leftPane] + pctDelta;
-      let newRight = prev[rightPane] - pctDelta;
-      if (newLeft < MIN_PANE_PCT) { newLeft = MIN_PANE_PCT; newRight = sumBoth - MIN_PANE_PCT; }
-      if (newRight < MIN_PANE_PCT) { newRight = MIN_PANE_PCT; newLeft = sumBoth - MIN_PANE_PCT; }
-      return { ...prev, [leftPane]: newLeft, [rightPane]: newRight };
-    });
-  }, []);
-
   // Shared state
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
-  const agentPhase = useChatStore((s) => s.agentPhase);
+  const historyLoaded = useChatStore((s) => s.historyLoaded);
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
 
-  const historyLoaded = useChatStore((s) => s.historyLoaded);
   const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
-
-  useEffect(() => {
-    if (agentPhase === 'executing' || agentPhase === 'complete') {
-      if (layoutMode === 'classic') setRightTab('preview');
-      else setVisiblePanes(prev => new Set([...prev, 'preview']));
-    }
-  }, [agentPhase, layoutMode]);
 
   const handleBottomResize = useCallback((delta: number) => {
     setBottomHeight((h) => Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h - delta)));
   }, []);
 
-  const handleMainSplitResize = useCallback((delta: number) => {
-    const el = mainTopRef.current;
-    if (!el) return;
-    const width = el.getBoundingClientRect().width;
-    if (width <= 0) return;
-    setMainSplit((s) => Math.min(MAIN_SPLIT_MAX, Math.max(MAIN_SPLIT_MIN, s + delta / width)));
-  }, []);
-
-  // Shared helpers
+  // Project colors + initials for icon rail
   const PROJECT_COLORS = [
     'bg-[#89b4fa]/20 text-[#89b4fa]', 'bg-[#a6e3a1]/20 text-[#a6e3a1]',
     'bg-[#f9e2af]/20 text-[#f9e2af]', 'bg-[#cba6f7]/20 text-[#cba6f7]',
@@ -196,17 +123,6 @@ export function AppShell() {
     </div>
   );
 
-  const visiblePaneList = (['chat', 'code', 'preview'] as PaneId[]).filter(p => visiblePanes.has(p));
-
-  const renderPaneContent = (pane: PaneId) => {
-    switch (pane) {
-      case 'chat': return <ChatPanel />;
-      case 'code': return <EditorPanel />;
-      case 'preview': return <Preview />;
-    }
-  };
-
-  // Bottom drawer (shared between both layouts)
   const BottomDrawer = () => (
     <div className="border-t border-border bg-surface shrink-0">
       <button
@@ -316,88 +232,9 @@ export function AppShell() {
               ))}
             </div>
           </div>
-        ) : layoutMode === 'classic' ? (
-          /* ========== CLASSIC LAYOUT ========== */
-          <>
-            <div ref={mainTopRef} className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
-              {/* Chat (always visible) */}
-              <div style={{ flex: mainSplit, minWidth: 0 }} className="min-h-0 h-full overflow-hidden">
-                <ChatPanel />
-              </div>
-
-              <Resizer direction="horizontal" onDrag={handleMainSplitResize} />
-
-              {/* Right: Preview / Code tabs */}
-              <div style={{ flex: 1 - mainSplit, minWidth: 0 }} className="overflow-hidden flex flex-col">
-                <div className="flex items-center border-b border-border bg-surface shrink-0">
-                  {(['preview', 'code'] as RightTab[]).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setRightTab(tab)}
-                      className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors duration-150 capitalize ${
-                        rightTab === tab
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  {rightTab === 'preview' ? <Preview /> : <EditorPanel />}
-                </div>
-              </div>
-
-            </div>
-            <BottomDrawer />
-          </>
         ) : (
-          /* ========== FLEXIBLE LAYOUT ========== */
           <>
-            <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
-              <div ref={panesContainerRef} className="flex-1 min-w-0 flex flex-row overflow-hidden">
-                {visiblePaneList.map((pane, i) => (
-                  <div key={pane} className="contents">
-                    {i > 0 && (
-                      <Resizer
-                        direction="horizontal"
-                        onDrag={(delta) => handlePaneResize(visiblePaneList[i - 1], pane, delta)}
-                      />
-                    )}
-                    <div
-                      style={{ flexBasis: `${paneSizes[pane]}%`, flexGrow: 0, flexShrink: 0, minWidth: 0 }}
-                      className="overflow-hidden flex flex-col min-h-0 h-full"
-                    >
-                      <div className="flex-1 min-h-0 h-full overflow-hidden">
-                        {renderPaneContent(pane)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Floating pane toggles */}
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1.5 rounded-xl bg-surface/90 backdrop-blur-lg border border-border/60 shadow-xl opacity-60 hover:opacity-100 transition-opacity duration-200">
-                {(Object.entries(PANE_CONFIG) as [PaneId, typeof PANE_CONFIG[PaneId]][]).map(([id, { icon: Icon, label }]) => {
-                  const isActive = visiblePanes.has(id);
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => togglePane(id)}
-                      title={`${isActive ? 'Hide' : 'Show'} ${label}`}
-                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                        isActive
-                          ? 'text-primary bg-primary/15 shadow-sm'
-                          : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted/60'
-                      }`}
-                    >
-                      <Icon size={18} />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {layoutMode === 'classic' ? <ClassicLayout /> : <FlexibleLayout />}
             <BottomDrawer />
           </>
         )}

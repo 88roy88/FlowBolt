@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
-import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
+import { fetchModels, fetchDefaultModel, fetchChatHistory, fetchAgentEvents, updateProjectModel } from '../services/api';
 import { createFixErrorHandler, createSendMessageHandler } from './chatHandlers';
 
 export interface ChatState {
@@ -200,25 +200,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     try {
-      // Start with empty messages — events are the sole source of truth
-      set({ messages: [], isStreaming: false, historyLoaded: false, ...RESET_STATE });
+      // Load chat messages from DB (user messages + saved assistant messages)
+      const history = await fetchChatHistory(sessionId);
+      const messages: Message[] = history.map((m) => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: new Date(m.created_at).getTime(),
+      }));
+      set({ messages, isStreaming: false, historyLoaded: true, ...RESET_STATE });
 
-      // Attach handler for both replay and live events
+      // Attach handler and replay agent events — events are the source of truth
+      // for assistant messages (agents no longer save to chat_messages)
       const socket = getChatSocket(sessionId);
       const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
       attachHandler(sessionId, socket, handler);
 
-      // Replay all persisted events to reconstruct the full conversation
       try {
         const events = await fetchAgentEvents(sessionId);
         for (const evt of events) {
           handler(evt as import('../types').WSMessage);
         }
-      } catch {
-        // Events endpoint may not exist yet or session has no events
-      }
+      } catch {}
 
-      set({ historyLoaded: true });
+      // Sort messages by timestamp — user messages (from chat_messages) and
+      // assistant messages (from agent_events replay) need to be interleaved
+      set((s) => ({ messages: [...s.messages].sort((a, b) => a.timestamp - b.timestamp) }));
     } catch (err) {
       console.error('Failed to load chat history:', err);
       set({ historyLoaded: true });

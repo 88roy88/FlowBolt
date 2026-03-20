@@ -7,6 +7,12 @@ type SetState = (
   partial: Partial<import('./chat').ChatState> | ((state: import('./chat').ChatState) => Partial<import('./chat').ChatState>),
 ) => void;
 
+let _skipMessages = false;
+
+export function setReplayMode(replay: boolean) {
+  _skipMessages = replay;
+}
+
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -56,28 +62,6 @@ function handleFixStep(msg: { step: string; status: string; message: string }, s
       ],
     };
   });
-}
-
-function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetState) {
-  const userMsg: Message = {
-    id: generateId(),
-    role: 'user',
-    content: msg.content || '',
-    timestamp: Date.now(),
-  };
-
-  if (msg.cases && msg.cases.length > 0) {
-    userMsg.cases = msg.cases;
-  }
-
-  if (msg.error_fix_request) {
-    userMsg.agentCard = {
-      type: 'error_fix_request',
-      ...msg.error_fix_request,
-    };
-  }
-
-  set((s) => ({ messages: [...s.messages, userMsg] }));
 }
 
 export function createFixErrorHandler(
@@ -145,7 +129,9 @@ export function createSendMessageHandler(
   set: SetState,
   get: GetState,
   cleanup: () => void,
+  options?: { replay?: boolean },
 ) {
+  _skipMessages = options?.replay ?? false;
   return (msg: WSMessage) => {
     switch (msg.type) {
       case 'phase':
@@ -171,7 +157,7 @@ export function createSendMessageHandler(
           agentCard: { type: 'plan_overview', overview: msg.overview, accepted: true },
         };
         set((s) => ({
-          messages: [...s.messages, acceptedMsg],
+          messages: _skipMessages ? s.messages : [...s.messages, acceptedMsg],
           isStreaming: true,
           agentPhase: 'planning',
           planOverview: null,
@@ -188,7 +174,7 @@ export function createSendMessageHandler(
           agentCard: { type: 'plan_overview', overview: msg.overview, accepted: false },
         };
         set((s) => ({
-          messages: [...s.messages, rejectedMsg],
+          messages: _skipMessages ? s.messages : [...s.messages, rejectedMsg],
           agentPhase: 'idle',
           planOverview: null,
           executionTasks: [],
@@ -229,29 +215,11 @@ export function createSendMessageHandler(
         handleFileUpdate(msg, set);
         break;
 
-      case 'shell_output':
-        set((state) => ({
-          actions: [
-            ...state.actions,
-            { type: 'shell', command: msg.command, output: msg.output },
-          ],
-        }));
-        break;
-
       case 'cases_fetched':
         handleCasesFetched(msg, set);
         break;
 
-      case 'package_fetched':
-        handlePackageFetched(msg, set);
-        break;
-
-      case 'user_message':
-        handleUserMessage(msg, set);
-        break;
-
       case 'case_error':
-      case 'package_error':
         console.warn(`Case error: ${msg.message}`);
         break;
 
@@ -286,7 +254,7 @@ function handlePhaseChange(
         ux: dp.ux === 'complete',
       },
     };
-    set((s) => ({ messages: [...s.messages, designMsg] }));
+    if (!_skipMessages) set((s) => ({ messages: [...s.messages, designMsg] }));
   }
 
   set({ agentPhase: msg.phase });
@@ -374,29 +342,7 @@ function handleCasesFetched(
       })),
     },
   };
-  set((s) => ({ messages: [...s.messages, casesMsg] }));
-}
-
-function handlePackageFetched(
-  msg: { package_id: string; package_name: string; data_schema: string; relevant_fields?: string },
-  set: SetState,
-) {
-  const packageMsg: Message = {
-    id: generateId(),
-    role: 'assistant',
-    content: '',
-    timestamp: Date.now(),
-    agentCard: {
-      type: 'cases_fetched',
-      cases: [{
-        packageId: msg.package_id,
-        packageName: msg.package_name,
-        dataSchema: msg.data_schema,
-        relevantFields: msg.relevant_fields,
-      }],
-    },
-  };
-  set((s) => ({ messages: [...s.messages, packageMsg] }));
+  if (!_skipMessages) set((s) => ({ messages: [...s.messages, casesMsg] }));
 }
 
 function handleActionComplete(set: SetState, get: GetState, cleanup: () => void) {
@@ -465,7 +411,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
   }
 
   set((s) => ({
-    messages: [...s.messages, ...newMessages],
+    messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
     currentAssistantMessage: '',
     actions: [],
     isStreaming: false,

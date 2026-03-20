@@ -487,3 +487,63 @@ frontend may not handle receiving a batch of historical events correctly.
 - No duplicate UI state from replaying events that were already processed
 - Phase indicator shows correct state on reconnect
 - Task progress, file tree, and chat history are consistent after reconnect
+
+---
+
+## B15. Fix "Fix with AI" error detection and resolution
+
+The error capture and fix flow has several issues:
+
+**Error detection problems:**
+- `api/errors.py` watches `.dev-server.log` by appending — old errors from previous
+  builds persist in the log, so stale errors keep showing up as "new"
+- The dedup set helps but resets periodically, causing old errors to resurface
+- Should truncate/rotate the log on each dev server restart, or track a read offset
+
+**File detection problems:**
+- `FixErrorAgent._normalize_path` has fragile heuristics for extracting the file path
+  from error messages (rfind /src/, session_id stripping, etc.)
+- Runtime errors from the iframe often have wrong file paths (bundled paths, not source)
+- Stack traces from Vite point to transformed paths, not original source files
+- Sometimes the wrong file is read, so the AI tries to fix the wrong code
+
+**Fixes needed:**
+- Truncate `.dev-server.log` when dev server restarts (in `sandbox/base.py` `start_dev_server`)
+- Use source maps to map bundled paths back to source files
+- Improve path normalization — use the file tree to fuzzy-match error paths
+- Read all source files as context when the specific file can't be identified (already
+  has fallback logic, but it's buried in nested try/except)
+- Consider running `tsc --noEmit` for type errors instead of parsing build log output
+
+---
+
+## B16. Smarter FixErrorAgent — ReACT loop with tools
+
+Currently FixErrorAgent is a single-shot flow: discover files → generate fix → write →
+validate → maybe retry once. It doesn't explore the codebase, can't read related files,
+and guesses at the fix from limited context.
+
+**Make it a ReACT agent like FollowUpAgent:**
+- Give it the same tools: grep, glob, read_file, write_file, edit_file
+- Let it explore the codebase to understand the error context before fixing
+- It can read imports, check related files, understand the data flow
+- Use edit_file for targeted fixes instead of rewriting entire files
+- Run typecheck/build as a tool to validate fixes in the loop
+- Retry with more context if the first fix fails (read more files, try different approach)
+
+**New tools specific to fixing:**
+- `run_typecheck()` — run `tsc --noEmit`, return errors
+- `run_build()` — run `pnpm build`, return errors
+- Agent can iterate: fix → check → fix again until clean
+
+**Reuse from FollowUpAgent:**
+- Same ToolExecutor + FunctionTool setup
+- Same ReACT loop structure (_react_loop with max iterations)
+- Same WS step reporting (followup_step events)
+- Different system prompt focused on debugging/fixing
+
+**Expected improvement:**
+- Fixes multi-file issues (reads the importing file + the broken file)
+- Understands project structure before guessing at a fix
+- Can fix cascading errors (fix one → check → fix the next)
+- Higher fix success rate from better context
