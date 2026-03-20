@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorBody } from './errorBody.js';
-import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics ,stubHRResults,stubEcommerceResults,stubLogisticsResults} from './stubData.js';
+import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics, stubHRResults, stubEcommerceResults, stubLogisticsResults, stubPhoneDevicesResults, stubPhoneCallsResults, stubPhoneRepairsResults, stubPhoneMarketResults } from './stubData.js';
 
 const app = express();
 app.use(cors());
@@ -31,6 +31,10 @@ const stubSearchResultsRaw = [
   { Id: 7, Logo: '', Name: 'E-commerce Analytics', Type: 'Package' },
   { Id: 8, Logo: '', Name: 'HR & Workforce', Type: 'Package' },
   { Id: 9, Logo: '', Name: 'Logistics & Shipping', Type: 'Package' },
+  { Id: 10, Logo: '', Name: 'Phone Devices & Specs', Type: 'Package' },
+  { Id: 11, Logo: '', Name: 'Phone Call Records', Type: 'Package' },
+  { Id: 12, Logo: '', Name: 'Phone Repairs & Warranty', Type: 'Package' },
+  { Id: 13, Logo: '', Name: 'Phone Market Analytics', Type: 'Package' },
   { Id: 99, Logo: '', Name: 'Internal Template', Type: 'Template' },
 ];
 const PACKAGE_TYPE = 'Package';
@@ -210,14 +214,15 @@ function buildPackageSearchRecordById(id) {
     2: { Id: 2, Name: 'User Analytics Package', ...base },
     3: { Id: 3, Name: 'Intelligence Briefing', ...base, Tags: JSON.stringify([{ value: 'מודיעין', label: 'מודיעין' }]) },
     4: { Id: 4, Name: 'People & Photos', ...base, Tags: JSON.stringify([{ value: 'אנשים', label: 'אנשים' }]) },
-    5: { Id: 5, Name: 'E-commerce Analytics', ...base, Tags: JSON.stringify([{ value: 'אי-קומרס', label: 'אי-קומרס' }]) },
-    6: { Id: 6, Name: 'HR & Workforce', ...base, Tags: JSON.stringify([{ value: 'משאבי אנוש', label: 'משאבי אנוש' }]) },
     5: { Id: 5, Name: 'Real-Time Server Dashboard', ...base, Tags: JSON.stringify([{ value: 'real-time', label: 'real-time' }, { value: 'monitoring', label: 'monitoring' }]) },
     6: { Id: 6, Name: 'People Hebrew Names', ...base, Description: 'Hebrew names for people (same IDs as People & Photos)', Tags: JSON.stringify([{ value: 'אנשים', label: 'אנשים' }, { value: 'עברית', label: 'עברית' }]) },
     7: { Id: 7, Name: 'E-commerce Analytics', ...base, Tags: JSON.stringify([{ value: 'אי-קומרס', label: 'אי-קומרס' }]) },
     8: { Id: 8, Name: 'HR & Workforce', ...base, Tags: JSON.stringify([{ value: 'משאבי אנוש', label: 'משאבי אנוש' }]) },
     9: { Id: 9, Name: 'Logistics & Shipping', ...base, Tags: JSON.stringify([{ value: 'לוגיסטיקה', label: 'לוגיסטיקה' }]) },
-  
+    10: { Id: 10, Name: 'Phone Devices & Specs', ...base, Tags: JSON.stringify([{ value: 'טלפונים', label: 'טלפונים' }]) },
+    11: { Id: 11, Name: 'Phone Call Records', ...base, Tags: JSON.stringify([{ value: 'טלפונים', label: 'טלפונים' }, { value: 'שיחות', label: 'שיחות' }]) },
+    12: { Id: 12, Name: 'Phone Repairs & Warranty', ...base, Tags: JSON.stringify([{ value: 'טלפונים', label: 'טלפונים' }, { value: 'תיקונים', label: 'תיקונים' }]) },
+    13: { Id: 13, Name: 'Phone Market Analytics', ...base, Tags: JSON.stringify([{ value: 'טלפונים', label: 'טלפונים' }, { value: 'שוק', label: 'שוק' }]) },
     572903: { Id: 572903, Name: 'כרטסת - base', ...base },
   };
 
@@ -262,6 +267,10 @@ function getRunResults(packageId) {
   if (id === '7') return { results: { ...stubEcommerceResults } };
   if (id === '8') return { results: { ...stubHRResults } };
   if (id === '9') return { results: { ...stubLogisticsResults } };
+  if (id === '10') return { results: { ...stubPhoneDevicesResults } };
+  if (id === '11') return { results: { ...stubPhoneCallsResults } };
+  if (id === '12') return { results: { ...stubPhoneRepairsResults } };
+  if (id === '13') return { results: { ...stubPhoneMarketResults } };
   return { results: { ...stubPackageResults } };
 }
 

@@ -294,6 +294,193 @@ export function getRealtimeMetrics() {
   };
 }
 
+/** ── PHONE DOMAIN (packages 10–13) ──
+ *  Cross-package shared fields:
+ *    device_id, model_name, brand       → Devices (10), Repairs (12), Market (13)
+ *    phone_number, subscriber_name      → Devices/subscribers (10), Calls (11)
+ *    carrier                            → Calls/plans (11), Market/carrier_data (13)
+ *    category (Flagship/Standard/Budget) → all four packages
+ */
+
+/** Phone Devices package (10): devices, specs, subscribers, pricing.
+ *  Shared with 11 via phone_number/subscriber_name; with 12 & 13 via device_id/model_name/brand. */
+export const stubPhoneDevicesResults = {
+  devices_cube: [
+    { device_id: 'PH01', model_name: 'iPhone 16 Pro',       brand: 'Apple',   category: 'Flagship', release_date: '2024-09-20', os: 'iOS 18',     color: 'Natural Titanium', storage_gb: 256, ram_gb: 8,  weight_g: 199, screen_size: 6.3 },
+    { device_id: 'PH02', model_name: 'iPhone 16',           brand: 'Apple',   category: 'Standard', release_date: '2024-09-20', os: 'iOS 18',     color: 'Blue',             storage_gb: 128, ram_gb: 6,  weight_g: 170, screen_size: 6.1 },
+    { device_id: 'PH03', model_name: 'Galaxy S25 Ultra',    brand: 'Samsung', category: 'Flagship', release_date: '2025-01-22', os: 'Android 15', color: 'Titanium Black',   storage_gb: 512, ram_gb: 12, weight_g: 218, screen_size: 6.9 },
+    { device_id: 'PH04', model_name: 'Galaxy S25',          brand: 'Samsung', category: 'Standard', release_date: '2025-01-22', os: 'Android 15', color: 'Icy Blue',         storage_gb: 128, ram_gb: 8,  weight_g: 162, screen_size: 6.2 },
+    { device_id: 'PH05', model_name: 'Pixel 9 Pro',         brand: 'Google',  category: 'Flagship', release_date: '2024-08-22', os: 'Android 14', color: 'Obsidian',         storage_gb: 256, ram_gb: 16, weight_g: 199, screen_size: 6.3 },
+    { device_id: 'PH06', model_name: 'Pixel 9',             brand: 'Google',  category: 'Standard', release_date: '2024-08-22', os: 'Android 14', color: 'Wintergreen',      storage_gb: 128, ram_gb: 12, weight_g: 198, screen_size: 6.3 },
+    { device_id: 'PH07', model_name: 'OnePlus 13',          brand: 'OnePlus', category: 'Flagship', release_date: '2025-01-07', os: 'Android 15', color: 'Midnight Ocean',   storage_gb: 256, ram_gb: 12, weight_g: 210, screen_size: 6.82 },
+    { device_id: 'PH08', model_name: 'iPhone SE 4',         brand: 'Apple',   category: 'Budget',   release_date: '2025-03-01', os: 'iOS 18',     color: 'Starlight',        storage_gb: 128, ram_gb: 8,  weight_g: 163, screen_size: 6.1 },
+    { device_id: 'PH09', model_name: 'Galaxy A55',          brand: 'Samsung', category: 'Budget',   release_date: '2024-03-11', os: 'Android 14', color: 'Awesome Navy',     storage_gb: 128, ram_gb: 8,  weight_g: 213, screen_size: 6.6 },
+    { device_id: 'PH10', model_name: 'Xiaomi 14 Ultra',     brand: 'Xiaomi',  category: 'Flagship', release_date: '2024-02-22', os: 'Android 14', color: 'Black',            storage_gb: 512, ram_gb: 16, weight_g: 220, screen_size: 6.73 },
+  ],
+  specs_cube: [
+    { device_id: 'PH01', model_name: 'iPhone 16 Pro',       brand: 'Apple',   category: 'Flagship', chip: 'A18 Pro',            battery_mah: 3582, camera_mp: 48,  has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 27 },
+    { device_id: 'PH02', model_name: 'iPhone 16',           brand: 'Apple',   category: 'Standard', chip: 'A18',                battery_mah: 3561, camera_mp: 48,  has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 20 },
+    { device_id: 'PH03', model_name: 'Galaxy S25 Ultra',    brand: 'Samsung', category: 'Flagship', chip: 'Snapdragon 8 Elite', battery_mah: 5000, camera_mp: 200, has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 45 },
+    { device_id: 'PH04', model_name: 'Galaxy S25',          brand: 'Samsung', category: 'Standard', chip: 'Snapdragon 8 Elite', battery_mah: 4000, camera_mp: 50,  has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 25 },
+    { device_id: 'PH05', model_name: 'Pixel 9 Pro',         brand: 'Google',  category: 'Flagship', chip: 'Tensor G4',          battery_mah: 4700, camera_mp: 50,  has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 27 },
+    { device_id: 'PH06', model_name: 'Pixel 9',             brand: 'Google',  category: 'Standard', chip: 'Tensor G4',          battery_mah: 4700, camera_mp: 50,  has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 21 },
+    { device_id: 'PH07', model_name: 'OnePlus 13',          brand: 'OnePlus', category: 'Flagship', chip: 'Snapdragon 8 Elite', battery_mah: 6000, camera_mp: 50,  has_5g: true, water_resistance: 'IP69', wireless_charging: true,  fast_charge_w: 100 },
+    { device_id: 'PH08', model_name: 'iPhone SE 4',         brand: 'Apple',   category: 'Budget',   chip: 'A18',                battery_mah: 3279, camera_mp: 48,  has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 20 },
+    { device_id: 'PH09', model_name: 'Galaxy A55',          brand: 'Samsung', category: 'Budget',   chip: 'Exynos 1480',        battery_mah: 5000, camera_mp: 50,  has_5g: true, water_resistance: 'IP67', wireless_charging: false, fast_charge_w: 25 },
+    { device_id: 'PH10', model_name: 'Xiaomi 14 Ultra',     brand: 'Xiaomi',  category: 'Flagship', chip: 'Snapdragon 8 Gen 3', battery_mah: 5300, camera_mp: 50,  has_5g: true, water_resistance: 'IP68', wireless_charging: true,  fast_charge_w: 90 },
+  ],
+  subscribers_cube: [
+    { phone_number: '050-1234567', subscriber_name: 'Noa Levi',     device_id: 'PH01', model_name: 'iPhone 16 Pro',    brand: 'Apple',   category: 'Flagship', carrier: 'Cellcom',    activation_date: '2024-10-01' },
+    { phone_number: '052-9876543', subscriber_name: 'Yosef Katz',   device_id: 'PH03', model_name: 'Galaxy S25 Ultra', brand: 'Samsung', category: 'Flagship', carrier: 'Partner',    activation_date: '2025-01-25' },
+    { phone_number: '053-7771234', subscriber_name: 'Tal Golan',    device_id: 'PH05', model_name: 'Pixel 9 Pro',      brand: 'Google',  category: 'Flagship', carrier: 'Cellcom',    activation_date: '2024-09-01' },
+    { phone_number: '054-5551234', subscriber_name: 'Maya Cohen',   device_id: 'PH02', model_name: 'iPhone 16',        brand: 'Apple',   category: 'Standard', carrier: 'Hot Mobile', activation_date: '2024-10-15' },
+    { phone_number: '055-3338888', subscriber_name: 'Avi Peretz',   device_id: 'PH07', model_name: 'OnePlus 13',       brand: 'OnePlus', category: 'Flagship', carrier: 'Partner',    activation_date: '2025-01-10' },
+    { phone_number: '050-2225555', subscriber_name: 'Lior Ben-Ari', device_id: 'PH04', model_name: 'Galaxy S25',       brand: 'Samsung', category: 'Standard', carrier: 'Hot Mobile', activation_date: '2025-02-01' },
+    { phone_number: '052-4446666', subscriber_name: 'Dana Shapira', device_id: 'PH08', model_name: 'iPhone SE 4',      brand: 'Apple',   category: 'Budget',   carrier: 'Cellcom',    activation_date: '2025-03-05' },
+    { phone_number: '053-8889999', subscriber_name: 'Rotem Avivi',  device_id: 'PH09', model_name: 'Galaxy A55',       brand: 'Samsung', category: 'Budget',   carrier: 'Partner',    activation_date: '2024-04-01' },
+  ],
+  pricing_cube: [
+    { device_id: 'PH01', model_name: 'iPhone 16 Pro',    brand: 'Apple',   category: 'Flagship', base_price: 999,  current_price: 999,  discount_pct: 0,    in_stock: true,  retailer: 'iDigital' },
+    { device_id: 'PH01', model_name: 'iPhone 16 Pro',    brand: 'Apple',   category: 'Flagship', base_price: 999,  current_price: 969,  discount_pct: 3,    in_stock: true,  retailer: 'KSP' },
+    { device_id: 'PH02', model_name: 'iPhone 16',        brand: 'Apple',   category: 'Standard', base_price: 799,  current_price: 779,  discount_pct: 2.5,  in_stock: true,  retailer: 'iDigital' },
+    { device_id: 'PH03', model_name: 'Galaxy S25 Ultra', brand: 'Samsung', category: 'Flagship', base_price: 1299, current_price: 1199, discount_pct: 7.7,  in_stock: true,  retailer: 'KSP' },
+    { device_id: 'PH04', model_name: 'Galaxy S25',       brand: 'Samsung', category: 'Standard', base_price: 799,  current_price: 749,  discount_pct: 6.3,  in_stock: true,  retailer: 'Bug' },
+    { device_id: 'PH05', model_name: 'Pixel 9 Pro',      brand: 'Google',  category: 'Flagship', base_price: 999,  current_price: 899,  discount_pct: 10,   in_stock: false, retailer: 'KSP' },
+    { device_id: 'PH07', model_name: 'OnePlus 13',       brand: 'OnePlus', category: 'Flagship', base_price: 899,  current_price: 849,  discount_pct: 5.6,  in_stock: true,  retailer: 'KSP' },
+    { device_id: 'PH08', model_name: 'iPhone SE 4',      brand: 'Apple',   category: 'Budget',   base_price: 429,  current_price: 429,  discount_pct: 0,    in_stock: true,  retailer: 'iDigital' },
+    { device_id: 'PH09', model_name: 'Galaxy A55',       brand: 'Samsung', category: 'Budget',   base_price: 449,  current_price: 379,  discount_pct: 15.6, in_stock: true,  retailer: 'Bug' },
+    { device_id: 'PH10', model_name: 'Xiaomi 14 Ultra',  brand: 'Xiaomi',  category: 'Flagship', base_price: 1099, current_price: 999,  discount_pct: 9.1,  in_stock: false, retailer: 'KSP' },
+  ],
+};
+
+/** Phone Call Records package (11): calls, contacts, usage_summary, plans.
+ *  Shared with 10 via phone_number/subscriber_name/carrier; with 13 via carrier. */
+export const stubPhoneCallsResults = {
+  calls_cube: [
+    { id: 'CL001', phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    called_number: '052-9876543', direction: 'outgoing', duration_sec: 185, date: '2025-03-10', time: '08:32', type: 'voice', cost: 0 },
+    { id: 'CL002', phone_number: '052-9876543', subscriber_name: 'Yosef Katz', device_id: 'PH03', carrier: 'Partner',    called_number: '050-1234567', direction: 'incoming', duration_sec: 185, date: '2025-03-10', time: '08:32', type: 'voice', cost: 0 },
+    { id: 'CL003', phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    called_number: '054-5551234', direction: 'outgoing', duration_sec: 42,  date: '2025-03-10', time: '10:15', type: 'voice', cost: 0 },
+    { id: 'CL004', phone_number: '053-7771234', subscriber_name: 'Tal Golan',  device_id: 'PH05', carrier: 'Cellcom',    called_number: '1-800-123456', direction: 'outgoing', duration_sec: 320, date: '2025-03-10', time: '11:00', type: 'voice', cost: 0 },
+    { id: 'CL005', phone_number: '054-5551234', subscriber_name: 'Maya Cohen', device_id: 'PH02', carrier: 'Hot Mobile', called_number: '+44-20-1234',  direction: 'outgoing', duration_sec: 95,  date: '2025-03-11', time: '09:45', type: 'international', cost: 4.50 },
+    { id: 'CL006', phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    called_number: '052-9876543', direction: 'outgoing', duration_sec: 0,   date: '2025-03-11', time: '14:20', type: 'missed', cost: 0 },
+    { id: 'CL007', phone_number: '055-3338888', subscriber_name: 'Avi Peretz', device_id: 'PH07', carrier: 'Partner',    called_number: '050-1234567', direction: 'outgoing', duration_sec: 540, date: '2025-03-12', time: '16:00', type: 'voice', cost: 0 },
+    { id: 'CL008', phone_number: '052-9876543', subscriber_name: 'Yosef Katz', device_id: 'PH03', carrier: 'Partner',    called_number: '+1-212-5550123', direction: 'outgoing', duration_sec: 180, date: '2025-03-12', time: '20:00', type: 'international', cost: 6.00 },
+    { id: 'CL009', phone_number: '053-7771234', subscriber_name: 'Tal Golan',  device_id: 'PH05', carrier: 'Cellcom',    called_number: '054-5551234', direction: 'outgoing', duration_sec: 75,  date: '2025-03-13', time: '07:30', type: 'voice', cost: 0 },
+    { id: 'CL010', phone_number: '054-5551234', subscriber_name: 'Maya Cohen', device_id: 'PH02', carrier: 'Hot Mobile', called_number: '053-7771234', direction: 'incoming', duration_sec: 75,  date: '2025-03-13', time: '07:30', type: 'voice', cost: 0 },
+    { id: 'CL011', phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    called_number: '055-3338888', direction: 'incoming', duration_sec: 260, date: '2025-03-13', time: '12:00', type: 'voice', cost: 0 },
+    { id: 'CL012', phone_number: '055-3338888', subscriber_name: 'Avi Peretz', device_id: 'PH07', carrier: 'Partner',    called_number: '*100',        direction: 'outgoing', duration_sec: 120, date: '2025-03-14', time: '09:00', type: 'service', cost: 0 },
+  ],
+  contacts_cube: [
+    { phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    contact_name: 'Yosef Katz',  contact_number: '052-9876543', relationship: 'friend',   call_count: 28, last_call: '2025-03-11' },
+    { phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    contact_name: 'Maya Cohen',  contact_number: '054-5551234', relationship: 'colleague', call_count: 12, last_call: '2025-03-10' },
+    { phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    contact_name: 'Avi Peretz',  contact_number: '055-3338888', relationship: 'family',    call_count: 45, last_call: '2025-03-13' },
+    { phone_number: '052-9876543', subscriber_name: 'Yosef Katz', device_id: 'PH03', carrier: 'Partner',    contact_name: 'Noa Levi',    contact_number: '050-1234567', relationship: 'friend',   call_count: 28, last_call: '2025-03-10' },
+    { phone_number: '053-7771234', subscriber_name: 'Tal Golan',  device_id: 'PH05', carrier: 'Cellcom',    contact_name: 'Maya Cohen',  contact_number: '054-5551234', relationship: 'colleague', call_count: 15, last_call: '2025-03-13' },
+    { phone_number: '054-5551234', subscriber_name: 'Maya Cohen', device_id: 'PH02', carrier: 'Hot Mobile', contact_name: 'Tal Golan',   contact_number: '053-7771234', relationship: 'colleague', call_count: 15, last_call: '2025-03-13' },
+    { phone_number: '055-3338888', subscriber_name: 'Avi Peretz', device_id: 'PH07', carrier: 'Partner',    contact_name: 'Noa Levi',    contact_number: '050-1234567', relationship: 'family',    call_count: 45, last_call: '2025-03-13' },
+  ],
+  usage_summary_cube: [
+    { phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    month: '2025-03', voice_minutes: 320, sms_count: 85,  data_gb: 12.4, intl_minutes: 0,  total_cost: 59.90 },
+    { phone_number: '052-9876543', subscriber_name: 'Yosef Katz', device_id: 'PH03', carrier: 'Partner',    month: '2025-03', voice_minutes: 180, sms_count: 40,  data_gb: 8.2,  intl_minutes: 15, total_cost: 79.90 },
+    { phone_number: '053-7771234', subscriber_name: 'Tal Golan',  device_id: 'PH05', carrier: 'Cellcom',    month: '2025-03', voice_minutes: 450, sms_count: 120, data_gb: 18.7, intl_minutes: 0,  total_cost: 59.90 },
+    { phone_number: '054-5551234', subscriber_name: 'Maya Cohen', device_id: 'PH02', carrier: 'Hot Mobile', month: '2025-03', voice_minutes: 95,  sms_count: 200, data_gb: 25.3, intl_minutes: 8,  total_cost: 99.90 },
+    { phone_number: '055-3338888', subscriber_name: 'Avi Peretz', device_id: 'PH07', carrier: 'Partner',    month: '2025-03', voice_minutes: 600, sms_count: 30,  data_gb: 5.1,  intl_minutes: 0,  total_cost: 69.90 },
+    { phone_number: '050-1234567', subscriber_name: 'Noa Levi',   device_id: 'PH01', carrier: 'Cellcom',    month: '2025-02', voice_minutes: 290, sms_count: 78,  data_gb: 10.8, intl_minutes: 0,  total_cost: 59.90 },
+    { phone_number: '052-9876543', subscriber_name: 'Yosef Katz', device_id: 'PH03', carrier: 'Partner',    month: '2025-02', voice_minutes: 210, sms_count: 55,  data_gb: 9.5,  intl_minutes: 22, total_cost: 89.90 },
+  ],
+  plans_cube: [
+    { plan_id: 'PLN01', plan_name: 'Basic 60',     carrier: 'Cellcom',    monthly_cost: 59.90,  voice_minutes: 'unlimited', sms: 'unlimited', data_gb: 30,  intl_minutes: 0,  includes_5g: false },
+    { plan_id: 'PLN02', plan_name: 'Premium 80',    carrier: 'Partner',    monthly_cost: 79.90,  voice_minutes: 'unlimited', sms: 'unlimited', data_gb: 50,  intl_minutes: 30, includes_5g: true },
+    { plan_id: 'PLN03', plan_name: 'Unlimited Max', carrier: 'Hot Mobile', monthly_cost: 99.90,  voice_minutes: 'unlimited', sms: 'unlimited', data_gb: 100, intl_minutes: 60, includes_5g: true },
+  ],
+};
+
+/** Phone Repairs package (12): repair_tickets, parts, technicians, warranty.
+ *  Shared with 10 via device_id/model_name/brand; with 11 via subscriber_name/phone_number. */
+export const stubPhoneRepairsResults = {
+  repair_tickets_cube: [
+    { ticket_id: 'TK001', device_id: 'PH01', model_name: 'iPhone 16 Pro',    brand: 'Apple',   category: 'Flagship', phone_number: '050-1234567', subscriber_name: 'Noa Levi',     technician_id: 'T01', issue: 'Cracked screen',      status: 'completed',    created: '2025-02-10', completed: '2025-02-12', cost: 850 },
+    { ticket_id: 'TK002', device_id: 'PH03', model_name: 'Galaxy S25 Ultra', brand: 'Samsung', category: 'Flagship', phone_number: '052-9876543', subscriber_name: 'Yosef Katz',   technician_id: 'T02', issue: 'Battery replacement',  status: 'completed',    created: '2025-02-15', completed: '2025-02-16', cost: 350 },
+    { ticket_id: 'TK003', device_id: 'PH02', model_name: 'iPhone 16',        brand: 'Apple',   category: 'Standard', phone_number: '054-5551234', subscriber_name: 'Maya Cohen',   technician_id: 'T01', issue: 'Water damage',         status: 'in_progress',  created: '2025-03-01', completed: null, cost: null },
+    { ticket_id: 'TK004', device_id: 'PH05', model_name: 'Pixel 9 Pro',      brand: 'Google',  category: 'Flagship', phone_number: '053-7771234', subscriber_name: 'Tal Golan',    technician_id: 'T03', issue: 'Camera not focusing',  status: 'completed',    created: '2025-02-20', completed: '2025-02-22', cost: 420 },
+    { ticket_id: 'TK005', device_id: 'PH07', model_name: 'OnePlus 13',       brand: 'OnePlus', category: 'Flagship', phone_number: '055-3338888', subscriber_name: 'Avi Peretz',   technician_id: 'T02', issue: 'Charging port broken', status: 'waiting_parts', created: '2025-03-05', completed: null, cost: null },
+    { ticket_id: 'TK006', device_id: 'PH04', model_name: 'Galaxy S25',       brand: 'Samsung', category: 'Standard', phone_number: '050-2225555', subscriber_name: 'Lior Ben-Ari', technician_id: 'T01', issue: 'Speaker malfunction',  status: 'completed',    created: '2025-03-08', completed: '2025-03-10', cost: 280 },
+    { ticket_id: 'TK007', device_id: 'PH08', model_name: 'iPhone SE 4',      brand: 'Apple',   category: 'Budget',   phone_number: '052-4446666', subscriber_name: 'Dana Shapira', technician_id: 'T03', issue: 'Face ID not working',  status: 'in_progress',  created: '2025-03-12', completed: null, cost: null },
+    { ticket_id: 'TK008', device_id: 'PH09', model_name: 'Galaxy A55',       brand: 'Samsung', category: 'Budget',   phone_number: '053-8889999', subscriber_name: 'Rotem Avivi', technician_id: 'T02', issue: 'Screen flickering',    status: 'completed',    created: '2025-03-14', completed: '2025-03-15', cost: 550 },
+  ],
+  parts_cube: [
+    { part_id: 'PT01', device_id: 'PH01', model_name: 'iPhone 16 Pro',    brand: 'Apple',   category: 'Flagship', part_name: 'OLED Screen Assembly', category_part: 'Display', unit_cost: 320, stock: 15, supplier: 'Apple Parts IL',  lead_days: 3 },
+    { part_id: 'PT02', device_id: 'PH01', model_name: 'iPhone 16 Pro',    brand: 'Apple',   category: 'Flagship', part_name: 'Battery 3582mAh',      category_part: 'Battery', unit_cost: 95,  stock: 30, supplier: 'Apple Parts IL',  lead_days: 2 },
+    { part_id: 'PT03', device_id: 'PH03', model_name: 'Galaxy S25 Ultra', brand: 'Samsung', category: 'Flagship', part_name: 'Battery 5000mAh',      category_part: 'Battery', unit_cost: 85,  stock: 25, supplier: 'Samsung Service', lead_days: 2 },
+    { part_id: 'PT04', device_id: 'PH03', model_name: 'Galaxy S25 Ultra', brand: 'Samsung', category: 'Flagship', part_name: 'AMOLED Screen',        category_part: 'Display', unit_cost: 450, stock: 8,  supplier: 'Samsung Service', lead_days: 5 },
+    { part_id: 'PT05', device_id: 'PH05', model_name: 'Pixel 9 Pro',      brand: 'Google',  category: 'Flagship', part_name: 'Camera Module',        category_part: 'Camera',  unit_cost: 180, stock: 12, supplier: 'Global Parts Co', lead_days: 7 },
+    { part_id: 'PT06', device_id: 'PH07', model_name: 'OnePlus 13',       brand: 'OnePlus', category: 'Flagship', part_name: 'USB-C Port Assembly',  category_part: 'Port',    unit_cost: 45,  stock: 0,  supplier: 'Global Parts Co', lead_days: 10 },
+    { part_id: 'PT07', device_id: 'PH04', model_name: 'Galaxy S25',       brand: 'Samsung', category: 'Standard', part_name: 'Speaker Module',       category_part: 'Speaker', unit_cost: 55,  stock: 20, supplier: 'Samsung Service', lead_days: 3 },
+    { part_id: 'PT08', device_id: 'PH09', model_name: 'Galaxy A55',       brand: 'Samsung', category: 'Budget',   part_name: 'LCD Screen',           category_part: 'Display', unit_cost: 180, stock: 18, supplier: 'Samsung Service', lead_days: 4 },
+  ],
+  technicians_cube: [
+    { technician_id: 'T01', name: 'Dor Hadad',     specialization: 'Apple',   experience_years: 8,  certifications: 'Apple Certified',    tickets_completed: 342, avg_rating: 4.8, branch: 'Tel Aviv' },
+    { technician_id: 'T02', name: 'Yonatan Segal', specialization: 'Android', experience_years: 5,  certifications: 'Samsung Certified',  tickets_completed: 215, avg_rating: 4.6, branch: 'Haifa' },
+    { technician_id: 'T03', name: 'Miri Azulay',   specialization: 'All',     experience_years: 10, certifications: 'Apple + Samsung',     tickets_completed: 520, avg_rating: 4.9, branch: 'Tel Aviv' },
+  ],
+  warranty_cube: [
+    { device_id: 'PH01', model_name: 'iPhone 16 Pro',    brand: 'Apple',   category: 'Flagship', phone_number: '050-1234567', subscriber_name: 'Noa Levi',     warranty_type: 'AppleCare+',       start_date: '2024-09-20', end_date: '2026-09-20', covers_accidental: true,  claims_used: 1 },
+    { device_id: 'PH03', model_name: 'Galaxy S25 Ultra', brand: 'Samsung', category: 'Flagship', phone_number: '052-9876543', subscriber_name: 'Yosef Katz',   warranty_type: 'Samsung Care',     start_date: '2025-01-22', end_date: '2027-01-22', covers_accidental: true,  claims_used: 1 },
+    { device_id: 'PH02', model_name: 'iPhone 16',        brand: 'Apple',   category: 'Standard', phone_number: '054-5551234', subscriber_name: 'Maya Cohen',   warranty_type: 'Standard',         start_date: '2024-09-20', end_date: '2025-09-20', covers_accidental: false, claims_used: 0 },
+    { device_id: 'PH05', model_name: 'Pixel 9 Pro',      brand: 'Google',  category: 'Flagship', phone_number: '053-7771234', subscriber_name: 'Tal Golan',    warranty_type: 'Google Preferred', start_date: '2024-08-22', end_date: '2026-08-22', covers_accidental: true,  claims_used: 1 },
+    { device_id: 'PH07', model_name: 'OnePlus 13',       brand: 'OnePlus', category: 'Flagship', phone_number: '055-3338888', subscriber_name: 'Avi Peretz',   warranty_type: 'Standard',         start_date: '2025-01-07', end_date: '2026-01-07', covers_accidental: false, claims_used: 0 },
+    { device_id: 'PH04', model_name: 'Galaxy S25',       brand: 'Samsung', category: 'Standard', phone_number: '050-2225555', subscriber_name: 'Lior Ben-Ari', warranty_type: 'Samsung Care',     start_date: '2025-01-22', end_date: '2027-01-22', covers_accidental: true,  claims_used: 1 },
+  ],
+};
+
+/** Phone Market Analytics package (13): market_share, sales_trends, reviews_sentiment, carrier_data.
+ *  Shared with 10 via brand/model_name/category; with 11 via carrier. */
+export const stubPhoneMarketResults = {
+  market_share_cube: [
+    { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', units_sold: 52000, revenue_m: 51.9, market_share_pct: 35.2, yoy_growth: 4.1 },
+    { brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', units_sold: 38000, revenue_m: 39.5, market_share_pct: 25.7, yoy_growth: 8.3 },
+    { brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', units_sold: 12000, revenue_m: 11.9, market_share_pct: 8.1,  yoy_growth: 22.5 },
+    { brand: 'OnePlus', category: 'Flagship', quarter: 'Q1-2025', units_sold: 8500,  revenue_m: 7.6,  market_share_pct: 5.8,  yoy_growth: 15.0 },
+    { brand: 'Xiaomi',  category: 'Flagship', quarter: 'Q1-2025', units_sold: 15000, revenue_m: 13.5, market_share_pct: 10.2, yoy_growth: 12.8 },
+    { brand: 'Apple',   category: 'Budget',   quarter: 'Q1-2025', units_sold: 28000, revenue_m: 12.0, market_share_pct: 18.9, yoy_growth: -2.5 },
+    { brand: 'Samsung', category: 'Budget',   quarter: 'Q1-2025', units_sold: 45000, revenue_m: 17.1, market_share_pct: 30.5, yoy_growth: 6.7 },
+    { brand: 'Xiaomi',  category: 'Budget',   quarter: 'Q1-2025', units_sold: 35000, revenue_m: 10.5, market_share_pct: 23.7, yoy_growth: 18.2 },
+    { brand: 'Apple',   category: 'Flagship', quarter: 'Q4-2024', units_sold: 68000, revenue_m: 67.9, market_share_pct: 42.1, yoy_growth: 5.5 },
+    { brand: 'Samsung', category: 'Flagship', quarter: 'Q4-2024', units_sold: 30000, revenue_m: 31.2, market_share_pct: 18.6, yoy_growth: 3.2 },
+  ],
+  sales_trends_cube: [
+    { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', month: '2025-01', units: 15000, avg_price: 998,  returns: 120, return_rate: 0.8 },
+    { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', month: '2025-02', units: 18000, avg_price: 995,  returns: 95,  return_rate: 0.5 },
+    { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', month: '2025-03', units: 19000, avg_price: 990,  returns: 110, return_rate: 0.6 },
+    { brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', month: '2025-01', units: 14000, avg_price: 1050, returns: 180, return_rate: 1.3 },
+    { brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', month: '2025-02', units: 12000, avg_price: 1020, returns: 140, return_rate: 1.2 },
+    { brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', month: '2025-03', units: 12000, avg_price: 1010, returns: 130, return_rate: 1.1 },
+    { brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', month: '2025-01', units: 3500,  avg_price: 950,  returns: 30,  return_rate: 0.9 },
+    { brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', month: '2025-02', units: 4000,  avg_price: 920,  returns: 25,  return_rate: 0.6 },
+    { brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', month: '2025-03', units: 4500,  avg_price: 899,  returns: 28,  return_rate: 0.6 },
+  ],
+  reviews_sentiment_cube: [
+    { brand: 'Apple',   category: 'Flagship', model_name: 'iPhone 16 Pro',    device_id: 'PH01', quarter: 'Q1-2025', avg_rating: 4.6, reviews_total: 12500, positive_pct: 82, negative_pct: 8,  top_praise: 'Camera quality',  top_complaint: 'Price too high' },
+    { brand: 'Apple',   category: 'Standard', model_name: 'iPhone 16',        device_id: 'PH02', quarter: 'Q1-2025', avg_rating: 4.4, reviews_total: 9800,  positive_pct: 78, negative_pct: 10, top_praise: 'Performance',     top_complaint: 'No ProMotion' },
+    { brand: 'Samsung', category: 'Flagship', model_name: 'Galaxy S25 Ultra', device_id: 'PH03', quarter: 'Q1-2025', avg_rating: 4.5, reviews_total: 8200,  positive_pct: 80, negative_pct: 9,  top_praise: 'S Pen + AI',      top_complaint: 'Heavy weight' },
+    { brand: 'Samsung', category: 'Standard', model_name: 'Galaxy S25',       device_id: 'PH04', quarter: 'Q1-2025', avg_rating: 4.3, reviews_total: 6100,  positive_pct: 76, negative_pct: 11, top_praise: 'Compact size',    top_complaint: 'Battery life' },
+    { brand: 'Google',  category: 'Flagship', model_name: 'Pixel 9 Pro',      device_id: 'PH05', quarter: 'Q1-2025', avg_rating: 4.5, reviews_total: 4500,  positive_pct: 83, negative_pct: 7,  top_praise: 'AI features',     top_complaint: 'Availability' },
+    { brand: 'OnePlus', category: 'Flagship', model_name: 'OnePlus 13',       device_id: 'PH07', quarter: 'Q1-2025', avg_rating: 4.4, reviews_total: 3200,  positive_pct: 79, negative_pct: 9,  top_praise: 'Fast charging',   top_complaint: 'Software bugs' },
+    { brand: 'Xiaomi',  category: 'Flagship', model_name: 'Xiaomi 14 Ultra',  device_id: 'PH10', quarter: 'Q1-2025', avg_rating: 4.3, reviews_total: 2800,  positive_pct: 75, negative_pct: 12, top_praise: 'Leica camera',    top_complaint: 'MIUI ads' },
+    { brand: 'Apple',   category: 'Budget',   model_name: 'iPhone SE 4',      device_id: 'PH08', quarter: 'Q1-2025', avg_rating: 4.2, reviews_total: 5600,  positive_pct: 74, negative_pct: 13, top_praise: 'Value for money', top_complaint: 'No always-on display' },
+  ],
+  carrier_data_cube: [
+    { carrier: 'Cellcom',    brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', activations: 18000, avg_monthly_arpu: 89, churn_rate: 1.2, bundle_adoption: 45 },
+    { carrier: 'Partner',    brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', activations: 15000, avg_monthly_arpu: 95, churn_rate: 0.9, bundle_adoption: 52 },
+    { carrier: 'Hot Mobile', brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', activations: 12000, avg_monthly_arpu: 85, churn_rate: 1.5, bundle_adoption: 38 },
+    { carrier: 'Cellcom',    brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', activations: 14000, avg_monthly_arpu: 82, churn_rate: 1.4, bundle_adoption: 40 },
+    { carrier: 'Partner',    brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', activations: 11000, avg_monthly_arpu: 88, churn_rate: 1.1, bundle_adoption: 48 },
+    { carrier: 'Hot Mobile', brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', activations: 9000,  avg_monthly_arpu: 79, churn_rate: 1.8, bundle_adoption: 35 },
+    { carrier: 'Cellcom',    brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', activations: 4000,  avg_monthly_arpu: 92, churn_rate: 0.8, bundle_adoption: 55 },
+    { carrier: 'Partner',    brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', activations: 3500,  avg_monthly_arpu: 90, churn_rate: 0.7, bundle_adoption: 60 },
+  ],
+};
+
 /** Stub lib descriptors for GET /api/libs (server-spec §3.1). */
 export const stubLibs = [
   { id: 'lodash', name: 'Lodash', type: 'js', files: { js: 'lodash.js' } },
@@ -338,3 +525,5 @@ export const putRun = (runId, value) => {
  * @returns {{ htmlSnippet: string, librariesUsed: string[] } | undefined}
  */
 export const getRun = (runId) => runStore.get(runId);
+
+
