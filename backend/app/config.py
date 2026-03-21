@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     MAX_COMMAND_TIMEOUT: int = 60
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256
+    SANDBOX_DISABLE_CGROUPS: bool = False
     SANDBOX_MODE: str = "local"  # "local" or "namespaced"
 
     # External APIs

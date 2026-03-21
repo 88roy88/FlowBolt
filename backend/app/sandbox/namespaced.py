@@ -9,40 +9,83 @@ from app.config import settings
 from app.sandbox.base import Sandbox
 
 
+def _can_use_cgroupv2() -> bool:
+    """Check if we can write to cgroup v2 subtree_control (requires privileged or proper delegation)."""
+    try:
+        with open("/sys/fs/cgroup/cgroup.subtree_control", "w") as f:
+            f.write("+memory +pids")
+        return True
+    except OSError:
+        return False
+
+
+# Cache the cgroup check at module load — it won't change during runtime.
+_CGROUPV2_AVAILABLE = _can_use_cgroupv2() if not os.environ.get("AIB_SANDBOX_DISABLE_CGROUPS") else False
+
+
 def _build_nsjail_args(
     session_id: str,
     workspace_dir: str,
     port: int,
     command: str | None = None,
+    *,
+    time_limit: int | None = None,
 ) -> list[str]:
+    mem_limit = settings.SANDBOX_MEMORY_LIMIT_MB * 1024 * 1024
+    pid_limit = settings.SANDBOX_PID_LIMIT
+    if time_limit is None:
+        time_limit = settings.MAX_COMMAND_TIMEOUT
+
     args: list[str] = [
         settings.NSJAIL_BIN,
         "--mode", "o",
-        "--chroot", "/",
-        "--cwd", "/home/project",
+        # Explicit mounts (no --chroot) for user namespace compatibility
         "-R", "/usr",
+        "-R", "/usr/local",
         "-R", "/lib",
-        "-R", "/lib64",
+        *(["-R", "/lib64"] if os.path.exists("/lib64") else []),
         "-R", "/bin",
         "-R", "/sbin",
+        "-R", "/etc",
+        "--mount", "none:/tmp:tmpfs:rw",
+        "-R", "/dev",
         "-B", f"{workspace_dir}:/home/project",
-        "--cgroup_mem_max", str(settings.SANDBOX_MEMORY_LIMIT_MB * 1024 * 1024),
-        "--cgroup_pids_max", str(settings.SANDBOX_PID_LIMIT),
-        "--cgroup_mem_mount", "/sys/fs/cgroup/memory",
-        "--cgroup_pids_mount", "/sys/fs/cgroup/pids",
-        "--time_limit", str(settings.MAX_COMMAND_TIMEOUT),
-        "--log_fd", "2",
-        "--rlimit_as", "hard",
+        # pnpm/node need a writable home for cache and store
+        "--mount", "none:/home/appuser:tmpfs:rw",
+        "--cwd", "/home/project",
+        "--env", "HOME=/home/appuser",
+        "--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "--env", "TERM=xterm-256color",
+        "--env", "FORCE_COLOR=1",
+        "--time_limit", str(time_limit),
+        "--log", "/dev/null",
+        "--rlimit_as", "soft",
         "--rlimit_cpu", "hard",
-        "--rlimit_fsize", "hard",
-        "--rlimit_nofile", "hard",
+        "--rlimit_fsize", "soft",
+        "--rlimit_nofile", "soft",
         "--hostname", f"sandbox-{session_id[:8]}",
         "--disable_clone_newnet",
-        "--",
+        # Map UID/GID 1000 inside → 1000 outside so workspace files are writable
+        "--user", "1000:1000:1",
+        "--group", "1000:1000:1",
+        # /proc remount fails in Docker Desktop user namespaces; skip it.
+        # PID isolation still works via clone_newpid.
+        "--disable_proc",
     ]
 
+    if _CGROUPV2_AVAILABLE:
+        args.extend([
+            "--use_cgroupv2",
+            "--cgroup_mem_max", str(mem_limit),
+            "--cgroup_pids_max", str(pid_limit),
+        ])
+    else:
+        args.append("--disable_clone_newcgroup")
+
+    args.append("--")
+
     if command is None:
-        args.append("/bin/bash")
+        args.extend(["/bin/bash", "--rcfile", "/home/project/.bashrc"])
     else:
         args.extend(["/bin/bash", "-c", command])
 
@@ -75,6 +118,7 @@ class NamespacedSandbox(Sandbox):
             self.workspace_dir,
             self.port,
             command=f"pnpm dev --port {self.port} --host 0.0.0.0",
+            time_limit=0,
         )
 
         env = os.environ.copy()
@@ -91,7 +135,7 @@ class NamespacedSandbox(Sandbox):
     def _spawn_pty(self, master_fd: int, slave_fd: int, env: dict[str, str], bashrc_path: str) -> int:
         env["HOME"] = "/home/project"
 
-        cmd = _build_nsjail_args(self.session_id, self.workspace_dir, self.port, command=None)
+        cmd = _build_nsjail_args(self.session_id, self.workspace_dir, self.port, command=None, time_limit=0)
         proc = subprocess.Popen(
             cmd,
             stdin=slave_fd,

@@ -32,16 +32,15 @@ _BASHRC_CONTENT = (
     '\\[\\033[1;36m\\]❯\\[\\033[0m\\] "\n'
     "export CLICOLOR=1\n"
     "export LSCOLORS=GxFxCxDxBxegedabagaced\n"
-    "alias ls='ls --color=auto 2>/dev/null || ls -G'\n"
+    "alias ls='ls --color=auto'\n"
     "alias grep='grep --color=auto'\n"
 )
 
 
 def _ensure_bashrc(workspace_dir: str) -> str:
     path = os.path.join(workspace_dir, ".bashrc")
-    if not os.path.exists(path):
-        with open(path, "w") as f:
-            f.write(_BASHRC_CONTENT)
+    with open(path, "w") as f:
+        f.write(_BASHRC_CONTENT)
     return path
 
 
