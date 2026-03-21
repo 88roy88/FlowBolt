@@ -12,13 +12,25 @@ from app.sandbox.base import Sandbox, SandboxInfo
 logger = logging.getLogger(__name__)
 
 
+_VITE_CONFIG_TEMPLATE = """\
+import { defineConfig, loadEnv } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  return {
+    plugins: [react()],
+    base: env.VITE_BASE ?? '/api/preview/{{SESSION_ID}}/proxy/',
+  }
+})
+"""
+
+
 def stamp_vite_config(session_id: str, workspace_dir: str) -> None:
-    """Replace the ``{{SESSION_ID}}`` placeholder in the template's vite.config.ts."""
+    """Write the vite config with the session-specific base path."""
     path = os.path.join(workspace_dir, "vite.config.ts")
-    with open(path, "r", encoding="utf-8") as f:
-        content = f.read()
     with open(path, "w", encoding="utf-8") as f:
-        f.write(content.replace("{{SESSION_ID}}", session_id))
+        f.write(_VITE_CONFIG_TEMPLATE.replace("{{SESSION_ID}}", session_id))
 
 
 class SandboxManager:
@@ -29,6 +41,14 @@ class SandboxManager:
             range(settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END + 1)
         )
         self._lock = asyncio.Lock()
+        self._ensure_pnpm_store()
+
+    @staticmethod
+    def _ensure_pnpm_store() -> None:
+        try:
+            os.makedirs(settings.PNPM_STORE_DIR, exist_ok=True)
+        except OSError:
+            logger.warning("Could not create pnpm store dir: %s", settings.PNPM_STORE_DIR)
 
     def _create_sandbox_instance(self, info: SandboxInfo) -> Sandbox:
         # TODO: why the imports are here and not top level?
@@ -131,6 +151,8 @@ class SandboxManager:
             return
 
         for name in os.listdir(base):
+            if name.startswith("."):
+                continue
             workspace_dir = os.path.join(base, name)
             if not os.path.isdir(workspace_dir):
                 continue
