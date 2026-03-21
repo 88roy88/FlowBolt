@@ -31,12 +31,15 @@ class SandboxManager:
         self._lock = asyncio.Lock()
 
     def _create_sandbox_instance(self, info: SandboxInfo) -> Sandbox:
+        # TODO: why the imports are here and not top level?
         if settings.SANDBOX_MODE == "namespaced":
             from app.sandbox.namespaced import NamespacedSandbox
             return NamespacedSandbox(info)
-        else:
-            from app.sandbox.local import LocalSandbox
-            return LocalSandbox(info)
+        if os.name == "nt":
+            from app.sandbox.windows_local import WindowsLocalSandbox
+            return WindowsLocalSandbox(info)
+        from app.sandbox.local import LocalSandbox
+        return LocalSandbox(info)
 
     async def create_sandbox(self, session_id: str) -> Sandbox:
         async with self._lock:
@@ -120,7 +123,8 @@ class SandboxManager:
 
         Orphan directories (not in live_session_ids) are deleted.
         """
-        self._kill_stale_dev_servers()
+        if os.name != "nt":
+            self._kill_stale_dev_servers()
 
         base = settings.WORKSPACE_BASE_DIR
         if not os.path.isdir(base):

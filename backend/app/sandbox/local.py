@@ -1,22 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from collections.abc import AsyncIterator
 
-from app.sandbox.base import Sandbox
+import fcntl  # type: ignore[import-not-found]
 
-if os.name != "nt":
-    import fcntl  # type: ignore[import-not-found]
+from app.sandbox.base import Sandbox, _ensure_bashrc, _kill_process_tree
+from app.sandbox.pty import PtyHandle, _active_ptys
+
+logger = logging.getLogger(__name__)
 
 
 class LocalSandbox(Sandbox):
 
     async def exec(self, command: str) -> AsyncIterator[str]:
-        if os.name == "nt":
-            cmd = ["cmd", "/c", f"cd /d {self.workspace_dir} && {command}"]
-        else:
-            cmd = ["/bin/bash", "-c", f"cd {self.workspace_dir} && {command}"]
+        cmd = ["/bin/bash", "-c", f"cd {self.workspace_dir} && {command}"]
 
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -34,22 +34,17 @@ class LocalSandbox(Sandbox):
 
         await proc.wait()
 
-    async def _spawn_dev_server(self) -> asyncio.subprocess.Process:
+    async def start_dev_server(self) -> None:
+        await self.stop_dev_server()
+
+        log_path = os.path.join(self.workspace_dir, ".dev-server.log")
+        self._dev_log_file = open(log_path, "wb")  # noqa: SIM115
+
         env = os.environ.copy()
         env["FORCE_COLOR"] = "1"
 
-        if os.name == "nt":
-            dev_cmd = f"cd /d {self.workspace_dir} && pnpm dev --port {self.port} --host 0.0.0.0"
-            return await asyncio.create_subprocess_exec(
-                "cmd", "/c", dev_cmd,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=self._dev_log_file,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env,
-            )
-
         dev_cmd = f"pnpm dev --port {self.port} --host 0.0.0.0"
-        return await asyncio.create_subprocess_exec(
+        self._dev_process = await asyncio.create_subprocess_exec(
             "/bin/bash", "-c", f"cd {self.workspace_dir} && {dev_cmd}",
             stdin=asyncio.subprocess.DEVNULL,
             stdout=self._dev_log_file,
@@ -57,9 +52,21 @@ class LocalSandbox(Sandbox):
             env=env,
             start_new_session=True,
         )
+        logger.info(
+            "Dev server started for session %s on port %d (pid %s)",
+            self.session_id, self.port, self._dev_process.pid,
+        )
 
-    def _spawn_pty(self, master_fd: int, slave_fd: int, env: dict[str, str], bashrc_path: str) -> int:
+    def create_pty(self) -> PtyHandle:
+        master_fd, slave_fd = os.openpty()
+
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+        env["CLICOLOR"] = "1"
+        env["LSCOLORS"] = "GxFxCxDxBxegedabagaced"
         env["HOME"] = self.workspace_dir
+
+        bashrc_path = _ensure_bashrc(self.workspace_dir)
 
         pid = os.fork()
         if pid == 0:
@@ -74,4 +81,11 @@ class LocalSandbox(Sandbox):
             os.chdir(self.workspace_dir)
             os.execvpe("/bin/bash", ["/bin/bash", "--rcfile", bashrc_path], env)
 
-        return pid
+        os.close(slave_fd)
+
+        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=pid, session_id=self.session_id)
+        _active_ptys.add(handle)
+        return handle

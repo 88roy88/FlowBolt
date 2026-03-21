@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import subprocess
 from collections.abc import AsyncIterator
 
+import fcntl  # type: ignore[import-not-found]
+
 from app.config import settings
-from app.sandbox.base import Sandbox
+from app.sandbox.base import Sandbox, _ensure_bashrc
+from app.sandbox.pty import PtyHandle, _active_ptys
+
+logger = logging.getLogger(__name__)
 
 
 def _can_use_cgroupv2() -> bool:
-    """Check if we can write to cgroup v2 subtree_control (requires privileged or proper delegation)."""
     try:
         with open("/sys/fs/cgroup/cgroup.subtree_control", "w") as f:
             f.write("+memory +pids")
@@ -19,7 +24,6 @@ def _can_use_cgroupv2() -> bool:
         return False
 
 
-# Cache the cgroup check at module load — it won't change during runtime.
 _CGROUPV2_AVAILABLE = _can_use_cgroupv2() if not os.environ.get("AIB_SANDBOX_DISABLE_CGROUPS") else False
 
 
@@ -39,7 +43,6 @@ def _build_nsjail_args(
     args: list[str] = [
         settings.NSJAIL_BIN,
         "--mode", "o",
-        # Explicit mounts (no --chroot) for user namespace compatibility
         "-R", "/usr",
         "-R", "/usr/local",
         "-R", "/lib",
@@ -50,7 +53,6 @@ def _build_nsjail_args(
         "--mount", "none:/tmp:tmpfs:rw",
         "-R", "/dev",
         "-B", f"{workspace_dir}:/home/project",
-        # pnpm/node need a writable home for cache and store
         "--mount", "none:/home/appuser:tmpfs:rw",
         "--cwd", "/home/project",
         "--env", "HOME=/home/appuser",
@@ -65,11 +67,8 @@ def _build_nsjail_args(
         "--rlimit_nofile", "soft",
         "--hostname", f"sandbox-{session_id[:8]}",
         "--disable_clone_newnet",
-        # Map UID/GID 1000 inside → 1000 outside so workspace files are writable
         "--user", "1000:1000:1",
         "--group", "1000:1000:1",
-        # /proc remount fails in Docker Desktop user namespaces; skip it.
-        # PID isolation still works via clone_newpid.
         "--disable_proc",
     ]
 
@@ -112,11 +111,14 @@ class NamespacedSandbox(Sandbox):
 
         await proc.wait()
 
-    async def _spawn_dev_server(self) -> asyncio.subprocess.Process:
+    async def start_dev_server(self) -> None:
+        await self.stop_dev_server()
+
+        log_path = os.path.join(self.workspace_dir, ".dev-server.log")
+        self._dev_log_file = open(log_path, "wb")  # noqa: SIM115
+
         cmd = _build_nsjail_args(
-            self.session_id,
-            self.workspace_dir,
-            self.port,
+            self.session_id, self.workspace_dir, self.port,
             command=f"pnpm dev --port {self.port} --host 0.0.0.0",
             time_limit=0,
         )
@@ -124,16 +126,28 @@ class NamespacedSandbox(Sandbox):
         env = os.environ.copy()
         env["FORCE_COLOR"] = "1"
 
-        return await asyncio.create_subprocess_exec(
+        self._dev_process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=self._dev_log_file,
             stderr=asyncio.subprocess.STDOUT,
             env=env,
             start_new_session=True,
         )
+        logger.info(
+            "Dev server started for session %s on port %d (pid %s)",
+            self.session_id, self.port, self._dev_process.pid,
+        )
 
-    def _spawn_pty(self, master_fd: int, slave_fd: int, env: dict[str, str], bashrc_path: str) -> int:
+    def create_pty(self) -> PtyHandle:
+        master_fd, slave_fd = os.openpty()
+
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+        env["CLICOLOR"] = "1"
+        env["LSCOLORS"] = "GxFxCxDxBxegedabagaced"
         env["HOME"] = "/home/project"
+
+        _ensure_bashrc(self.workspace_dir)
 
         cmd = _build_nsjail_args(self.session_id, self.workspace_dir, self.port, command=None, time_limit=0)
         proc = subprocess.Popen(
@@ -144,4 +158,12 @@ class NamespacedSandbox(Sandbox):
             preexec_fn=os.setsid,
             env=env,
         )
-        return proc.pid
+
+        os.close(slave_fd)
+
+        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=proc.pid, session_id=self.session_id)
+        _active_ptys.add(handle)
+        return handle
