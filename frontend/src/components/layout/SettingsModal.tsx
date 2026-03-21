@@ -12,10 +12,9 @@ type SettingsModalProps = {
 export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsModalProps) {
   const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
 
-  const toggleTheme = () => {
-    const next = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
+  const setTheme = (theme: 'dark' | 'light') => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
   };
 
   return (
@@ -72,7 +71,7 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
             <label className="text-[13px] font-medium text-foreground">Theme</label>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => { document.documentElement.setAttribute('data-theme', 'dark'); localStorage.setItem('theme', 'dark'); }}
+                onClick={() => setTheme('dark')}
                 className={`flex items-center gap-2.5 p-3 rounded-lg border transition-all duration-150 ${
                   currentTheme === 'dark'
                     ? 'border-primary bg-primary/10 text-primary'
@@ -83,7 +82,7 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
                 <span className="text-[13px] font-medium">Dark</span>
               </button>
               <button
-                onClick={() => { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('theme', 'light'); }}
+                onClick={() => setTheme('light')}
                 className={`flex items-center gap-2.5 p-3 rounded-lg border transition-all duration-150 ${
                   currentTheme === 'light'
                     ? 'border-primary bg-primary/10 text-primary'

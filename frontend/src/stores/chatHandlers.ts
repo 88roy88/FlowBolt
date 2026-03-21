@@ -1,4 +1,4 @@
-import type { WSMessage, Message, FollowUpStep, FileDiff } from '../types';
+import type { WSMessage, Message, FollowUpStep } from '../types';
 import { useFilesStore } from './files';
 import { useSessionStore } from './session';
 
@@ -11,6 +11,16 @@ let _skipMessages = false;
 
 export function setReplayMode(replay: boolean) {
   _skipMessages = replay;
+}
+
+let _lastEventTs = 0;
+
+function getTimestamp(msg?: { _ts?: string }): number {
+  if (msg?._ts) {
+    _lastEventTs = new Date(msg._ts).getTime();
+    return _lastEventTs;
+  }
+  return _lastEventTs || Date.now();
 }
 
 function generateId(): string {
@@ -42,7 +52,7 @@ function handleError(msg: { message: string }, set: SetState, cleanup: () => voi
   cleanup();
 }
 
-function handleFixStep(msg: { step: string; status: string; message: string }, set: SetState) {
+function handleFixStep(msg: WSMessage & { type: 'fix_step' }, set: SetState) {
   set((state) => {
     const existingIdx = state.fixSteps.findIndex((s) => s.step === msg.step);
     if (existingIdx >= 0) {
@@ -64,12 +74,29 @@ function handleFixStep(msg: { step: string; status: string; message: string }, s
   });
 }
 
+function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetState) {
+  const userMsg: Message = {
+    id: generateId(),
+    role: 'user',
+    content: msg.content || '',
+    timestamp: getTimestamp(),
+  };
+  if (msg.cases && msg.cases.length > 0) {
+    userMsg.cases = msg.cases;
+  }
+  if (msg.error_fix_request) {
+    userMsg.agentCard = { type: 'error_fix_request', ...msg.error_fix_request };
+  }
+  set((s) => ({ messages: [...s.messages, userMsg] }));
+}
+
 export function createFixErrorHandler(
   set: SetState,
   get: GetState,
   cleanup: () => void,
 ) {
   return (msg: WSMessage) => {
+    getTimestamp(msg as { _ts?: string });
     switch (msg.type) {
       case 'phase':
         set({ agentPhase: msg.phase });
@@ -98,7 +125,7 @@ export function createFixErrorHandler(
             id: generateId(),
             role: 'assistant',
             content: state.currentAssistantMessage,
-            timestamp: Date.now(),
+            timestamp: getTimestamp(),
             agentCard: { type: 'fix_progress', steps: [...state.fixSteps] },
           };
           set((s) => ({
@@ -133,6 +160,7 @@ export function createSendMessageHandler(
 ) {
   _skipMessages = options?.replay ?? false;
   return (msg: WSMessage) => {
+    getTimestamp(msg as { _ts?: string });
     switch (msg.type) {
       case 'phase':
         handlePhaseChange(msg, set, get);
@@ -153,7 +181,7 @@ export function createSendMessageHandler(
           id: generateId(),
           role: 'assistant',
           content: '',
-          timestamp: Date.now(),
+          timestamp: getTimestamp(),
           agentCard: { type: 'plan_overview', overview: msg.overview, accepted: true },
         };
         set((s) => ({
@@ -170,7 +198,7 @@ export function createSendMessageHandler(
           id: generateId(),
           role: 'assistant',
           content: '',
-          timestamp: Date.now(),
+          timestamp: getTimestamp(),
           agentCard: { type: 'plan_overview', overview: msg.overview, accepted: false },
         };
         set((s) => ({
@@ -219,6 +247,10 @@ export function createSendMessageHandler(
         handleCasesFetched(msg, set);
         break;
 
+      case 'user_message':
+        handleUserMessage(msg, set);
+        break;
+
       case 'case_error':
         console.warn(`Case error: ${msg.message}`);
         break;
@@ -247,7 +279,7 @@ function handlePhaseChange(
       id: generateId(),
       role: 'assistant',
       content: '',
-      timestamp: Date.now(),
+      timestamp: getTimestamp(),
       agentCard: {
         type: 'design_complete',
         architecture: dp.architecture === 'complete',
@@ -331,7 +363,7 @@ function handleCasesFetched(
     id: generateId(),
     role: 'assistant',
     content: '',
-    timestamp: Date.now(),
+    timestamp: getTimestamp(),
     agentCard: {
       type: 'cases_fetched',
       cases: msg.cases.map((c) => ({
@@ -354,7 +386,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
       id: generateId(),
       role: 'assistant',
       content: state.currentAssistantMessage,
-      timestamp: Date.now(),
+      timestamp: getTimestamp(),
       agentCard: { type: 'fix_progress', steps: [...state.fixSteps] },
     });
   } else if (state.followUpSteps.length > 0) {
@@ -366,7 +398,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
       role: 'assistant',
       content: state.currentAssistantMessage,
       actions: state.actions.length > 0 ? [...state.actions] : undefined,
-      timestamp: Date.now(),
+      timestamp: getTimestamp(),
       agentCard: {
         type: 'followup_progress',
         steps: [...state.followUpSteps],
@@ -381,7 +413,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
       role: 'assistant',
       content: state.currentAssistantMessage,
       actions: state.actions.length > 0 ? [...state.actions] : undefined,
-      timestamp: Date.now(),
+      timestamp: getTimestamp(),
     });
   }
 
@@ -391,7 +423,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
       role: 'assistant',
       content: '',
       actions: state.actions.length > 0 ? [...state.actions] : undefined,
-      timestamp: Date.now(),
+      timestamp: getTimestamp(),
       agentCard: {
         type: 'task_progress',
         tasks: [...state.executionTasks],
@@ -405,7 +437,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
       id: generateId(),
       role: 'assistant',
       content: '',
-      timestamp: Date.now(),
+      timestamp: getTimestamp(),
       agentCard: { type: 'project_summary', summary: state.projectSummary },
     });
   }

@@ -47,7 +47,7 @@ async def chat_history(session_id: str):
 @router.get("/api/chat/{session_id}/events")
 async def chat_events(session_id: str):
     events = await get_events(session_id)
-    return [evt.payload for evt in events]
+    return [{**evt.payload, "_ts": evt.created_at} for evt in events]
 
 
 @router.websocket("/ws/chat/{session_id}")

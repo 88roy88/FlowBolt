@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState, useRef } from 'react';
-import { Sidebar } from './Sidebar';
 import { FlowLogo } from '../ui/flow-logo';
 
 const meta: Meta = {

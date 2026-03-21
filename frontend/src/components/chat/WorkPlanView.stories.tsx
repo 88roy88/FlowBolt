@@ -1,8 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { WorkPlanView } from './WorkPlanView';
 
-// Mock the store so respondToPlan doesn't crash
-import { useChatStore } from '../../stores/chat';
 
 const meta: Meta<typeof WorkPlanView> = {
   title: 'Chat/WorkPlanView',

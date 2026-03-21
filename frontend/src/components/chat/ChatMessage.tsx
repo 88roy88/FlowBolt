@@ -25,13 +25,6 @@ function AgentCardRenderer({ message }: { message: Message }) {
   switch (card.type) {
     case 'cases_fetched':
       return <CasesFetchedCard cases={card.cases} />;
-    case 'package_fetched':
-      return <CasesFetchedCard cases={[{
-        packageId: card.packageId,
-        packageName: card.packageName,
-        dataSchema: card.dataSchema,
-        relevantFields: card.relevantFields,
-      }]} />;
     case 'design_complete':
       return <DesignCompleteCard architecture={card.architecture} ux={card.ux} />;
     case 'plan_overview':
@@ -102,9 +95,6 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
       >
         {isUser && message.cases && message.cases.length > 0 && (
           <CaseBadges cases={message.cases} />
-        )}
-        {isUser && !message.cases && message.package && (
-          <CaseBadges cases={[{ id: message.package.id, name: message.package.name }]} />
         )}
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>

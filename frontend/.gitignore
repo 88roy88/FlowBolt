@@ -5,3 +5,4 @@ storybook-static/
 *.log
 *.tsbuildinfo
 .DS_Store
+tsconfig.app.tsbuildinfo

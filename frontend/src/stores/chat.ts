@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
-import { fetchModels, fetchDefaultModel, fetchChatHistory, fetchAgentEvents, updateProjectModel } from '../services/api';
+import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
 import { createFixErrorHandler, createSendMessageHandler } from './chatHandlers';
 
 export interface ChatState {
@@ -200,34 +200,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     try {
-      // Load chat messages from DB (user messages + saved assistant messages)
-      const history = await fetchChatHistory(sessionId);
-      const messages: Message[] = history.map((m) => ({
-        id: m.id,
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        timestamp: new Date(m.created_at).getTime(),
-      }));
-      set({ messages, isStreaming: false, historyLoaded: true, ...RESET_STATE });
+      // Reset state, then replay all events — events are the single source of truth
+      // for both user messages and assistant messages/cards
+      set({ messages: [], isStreaming: false, historyLoaded: false, ...RESET_STATE });
 
-      // Attach handler and replay agent events — events are the source of truth
-      // for assistant messages (agents no longer save to chat_messages)
       const socket = getChatSocket(sessionId);
       const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
       attachHandler(sessionId, socket, handler);
 
-      try {
-        const events = await fetchAgentEvents(sessionId);
-        for (const evt of events) {
-          handler(evt as import('../types').WSMessage);
-        }
-      } catch {}
+      const events = await fetchAgentEvents(sessionId);
+      for (const evt of events) {
+        handler(evt as import('../types').WSMessage);
+      }
 
-      // Sort messages by timestamp — user messages (from chat_messages) and
-      // assistant messages (from agent_events replay) need to be interleaved
-      set((s) => ({ messages: [...s.messages].sort((a, b) => a.timestamp - b.timestamp) }));
+      set({ historyLoaded: true });
     } catch (err) {
-      console.error('Failed to load chat history:', err);
+      console.error('Failed to load history:', err);
       set({ historyLoaded: true });
     }
   },

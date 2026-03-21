@@ -10,8 +10,6 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
   let closed = false;
   let retryDelay = 1000;
   const pendingQueue: ArrayBuffer[] = [];
-  let hasConnectedOnce = false;
-
   function flushQueue() {
     while (pendingQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
       socket.send(pendingQueue.shift()!);
@@ -25,7 +23,6 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
     socket = ws;
 
     ws.addEventListener('open', () => {
-      hasConnectedOnce = true;
       retryDelay = 1000;
       flushQueue();
     });
