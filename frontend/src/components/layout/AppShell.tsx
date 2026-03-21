@@ -6,6 +6,7 @@ import { GlobalProgress } from './GlobalProgress';
 import { SettingsModal } from './SettingsModal';
 import { ClassicLayout } from './ClassicLayout';
 import { FlexibleLayout } from './FlexibleLayout';
+import { MobileLayout } from './MobileLayout';
 import { Terminal } from '../terminal/Terminal';
 import { ServerLog } from '../terminal/ServerLog';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
@@ -13,6 +14,7 @@ import { PromptInput } from '../chat/PromptInput';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const SIDEBAR_WIDTH = 280;
 const BOTTOM_MIN = 120;
@@ -30,6 +32,9 @@ function loadLayoutMode(): LayoutMode {
 }
 
 export function AppShell() {
+  const isMobile = useIsMobile();
+
+  // All hooks must be called before any conditional returns
   // Sidebar
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarHover, setSidebarHover] = useState(false);
@@ -174,6 +179,8 @@ export function AppShell() {
       )}
     </div>
   );
+
+  if (isMobile) return <MobileLayout />;
 
   return (
     <div className="flex flex-row h-full w-full overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}>

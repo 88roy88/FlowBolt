@@ -164,16 +164,16 @@ export function PromptInput() {
           <ArrowUp size={16} strokeWidth={2.5} />
         </button>
       </div>
-      <div className="flex items-center justify-between mt-1.5 pt-1 px-1">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mt-1.5 pt-1 px-1 gap-2">
+        <div className="flex items-center gap-2 min-w-0 shrink-0">
           <ModelSelector />
           {selectedCases.length > 0 && (
-            <span className="text-[10px] text-muted-foreground/50">
+            <span className="text-[10px] text-muted-foreground/50 hidden sm:inline">
               {selectedCases.length} case{selectedCases.length > 1 ? 's' : ''} attached
             </span>
           )}
         </div>
-        <span className="text-[11px] text-muted-foreground/60">
+        <span className="text-[11px] text-muted-foreground/60 hidden md:inline shrink-0">
           <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Enter</kbd> send
           <span className="mx-1">·</span>
           <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Shift+Enter</kbd> new line

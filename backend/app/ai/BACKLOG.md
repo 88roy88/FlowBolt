@@ -155,12 +155,69 @@ to the frontend. Add endpoints for load balancers and k8s probes.
 
 ## B12. Test coverage
 
-Zero tests. Priority targets:
-- Agent flows (build / followup / fix error)
-- ActionParser unit tests
-- Sandbox filesystem security (path traversal)
-- Tool executor
-- Prompt template rendering
+Zero tests across the entire codebase. Need both backend (Python) and frontend (TypeScript) tests.
+
+### Backend (pytest)
+
+**Setup:**
+- Add `pytest`, `pytest-asyncio`, `pytest-cov` to dev dependencies
+- Create `backend/tests/` directory
+- Add `Makefile` target: `make test-backend`
+
+**Priority 1 — Unit tests (no external deps):**
+- `ActionParser` — test streaming XML parsing, edge cases (truncated, malformed, nested)
+- `core/tools.py` — FunctionTool schema generation, ToolExecutor dispatch, error handling
+- `core/flow.py` — step execution, routing, max-step guard
+- `core/messages.py` — Message creation, to_dict conversion
+- `helpers.py` — parse_json_response with markdown fences, malformed JSON
+- `prompts/` — Jinja template rendering with various inputs
+- `task_tree.py` — WorkPlan.execution_layers dependency resolution
+- `sandbox/filesystem.py` — path traversal prevention (_safe_path)
+- `sandbox/pty.py` — PtyHandle.read/write/kill (mock fd)
+- `state.py` — BuildState serialization
+
+**Priority 2 — Integration tests (mock LLM, real DB):**
+- `agents/build.py` — full pipeline with mocked LLM responses
+- `agents/followup.py` — ReACT loop with mocked tool results
+- `agents/fix_error.py` — discover → generate → validate flow
+- `models/events.py` — emit, get, clear, subscribe/notify
+- `models/project.py` — CRUD, migrations, cascade delete
+- `models/chat.py` — save/get messages
+- `api/chat.py` — WebSocket handler with mocked agents
+
+**Priority 3 — Sandbox tests (need filesystem):**
+- `sandbox/manager.py` — create/destroy lifecycle, port allocation
+- `sandbox/local.py` — exec, dev server start/stop
+- Template scaffolding (copytree + stamp_vite_config)
+
+### Frontend (vitest)
+
+**Setup:**
+- Add `vitest`, `@testing-library/react`, `@testing-library/jest-dom`
+- Add `vitest.config.ts`
+- Add `Makefile` target: `make test-frontend`
+
+**Priority 1 — Store tests:**
+- `stores/chat.ts` — sendMessage, loadHistory, event replay
+- `stores/chatHandlers.ts` — each event type handler
+- `stores/session.ts` — project CRUD, model persistence
+- `stores/files.ts` — file tree loading
+
+**Priority 2 — Component tests:**
+- `ChatMessage` — renders different card types correctly
+- `WorkPlanView` — accept/modify/reject actions
+- `TaskProgress` — progress bar, status icons
+- `ChatPanel` — phase indicator visibility logic
+- `ModelSelector` — dropdown open/close, selection
+
+**Priority 3 — Integration tests:**
+- WebSocket mock — test event flow from connect to UI update
+- Full flow — send message → see progress → see result
+
+### CI integration
+- Run tests in GitHub Actions (I6)
+- Require passing tests for PR merge
+- Coverage reporting (target: 60% backend, 40% frontend initially)
 
 ---
 
@@ -547,3 +604,373 @@ and guesses at the fix from limited context.
 - Understands project structure before guessing at a fix
 - Can fix cascading errors (fix one → check → fix the next)
 - Higher fix success rate from better context
+
+---
+
+## B17. Improve grep tool discoverability for FollowUp agent
+
+**Problem:** The FollowUp agent uses `glob` + `read_file` to search for text instead
+of using `grep`, which is much faster. The LLM doesn't understand that `grep` searches
+the entire codebase.
+
+**Root cause:**
+- Tool name is just `grep` — doesn't signal "codebase-wide search"
+- Tool description is a single line, no examples or usage guidance
+- The `path` parameter is confusing — LLM may think it means "file path" not "directory"
+- The followup system prompt (`followup.jinja2`) barely mentions grep
+
+**Changes needed:**
+- Rename tool to `grep_codebase` (or at minimum improve description)
+- Add rich docstring with examples: `"useState"`, `"import.*axios"`, `"className="`
+- Explain when to use grep vs glob vs read_file
+- Remove the `path` parameter (always search from root) or rename to `directory`
+- Update `followup.jinja2` prompt to guide tool selection:
+  - `grep` for searching text/patterns across the codebase
+  - `glob` only for discovering files by name/path
+  - `read_file` for reading specific files found via grep/glob
+
+**Reference:** See `primesrc/code-validation-service` `base_subagent.py` for a
+well-prompted `grep_codebase` tool with examples and clear Args documentation.
+
+---
+
+## A7. Multi-model strategy per phase
+
+Different agent phases have different requirements. Use the best model for each job
+instead of one model for everything.
+
+| Phase | Needs | Tier |
+|-------|-------|------|
+| Classify, Summary | Simple | Cheap/fast (Haiku) |
+| Architecture, UX, Planning | Strong reasoning | Smart (Opus/Sonnet) |
+| Codegen (per task) | Correct code, focused | Fast + good at code (Sonnet) |
+| Error fixing | Debugging reasoning | Smart (Sonnet/Opus) |
+| Follow-up (ReACT) | Balanced | Sonnet |
+
+**Implementation:**
+- Add `ModelConfig` with per-phase model overrides in settings
+- `BuildAgent` selects model per phase instead of using `self.model` everywhere
+- Default: use the user's selected model for everything (backward compat)
+- Advanced: settings UI to configure per-phase models
+- Cost savings: Haiku for classify/summary is ~10x cheaper than Opus
+
+---
+
+## F14. Browser notification on build complete
+
+When the user switches to another tab during a build, send a browser notification
+when the agent finishes.
+
+**Implementation:**
+- Request `Notification.permission` on first build start
+- On `action_complete` event: if `document.hidden`, fire `new Notification(...)`
+- Show project name + "Build complete" or "Error occurred"
+- Click notification → focus the tab
+- Respect user preference (add toggle in settings)
+
+---
+
+## F15. Console output capture from preview
+
+Capture `console.log`, `console.error`, `console.warn` from the preview iframe
+and display in a "Console" tab next to Terminal / Server Log.
+
+**How it works:**
+- We already inject an `__ERROR_REPORTER__` script into `index.html` (in the template)
+- Extend it to also intercept `console.log/warn/error/info` via monkey-patching
+- `postMessage` each log entry to the parent window (same as runtime errors)
+- Frontend listens for these messages and displays in a console panel
+
+**Injected script addition:**
+```js
+['log','warn','error','info'].forEach(level => {
+  const orig = console[level];
+  console[level] = function(...args) {
+    orig.apply(console, args);
+    window.parent.postMessage({
+      type: 'console',
+      level,
+      args: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)),
+    }, '*');
+  };
+});
+```
+
+**Frontend:**
+- New "Console" tab in the bottom drawer (alongside Terminal / Server Log)
+- Color-coded by level: log=default, warn=yellow, error=red, info=blue
+- Timestamp + level + message
+- Clear button
+- Filter by level
+- Useful for debugging case API calls, state issues, render problems
+
+---
+
+## F16. User authentication & project ownership
+
+Currently no auth — anyone with the URL can access any project.
+
+**Phase 1 — Basic auth:**
+- User registration + login (email/password or OAuth with GitHub/Google)
+- JWT or session-based auth
+- Projects belong to a user (add `user_id` column to projects table)
+- API endpoints check ownership before allowing access
+- WebSocket connections authenticated via token
+
+**Phase 2 — Project sharing:**
+- Share a project with another user (read-only or read-write)
+- Share via link (public preview URL, no login needed to view)
+- Project permissions: owner, editor, viewer
+- Shared projects appear in the sidebar with a badge
+
+**Phase 3 — Teams:**
+- Create teams/organizations
+- Team-level project visibility
+- Role-based access (admin, member)
+
+**Dependencies:** I7 (Postgres) makes user tables + relations cleaner.
+
+---
+
+## F17. Auto-save with status indicator
+
+**Problem:** Editor changes are saved via debounced timer. No visual feedback.
+If save fails, user doesn't know. Related to B10.
+
+**What to add:**
+- Save indicator in editor tab or status bar: "Saved" / "Saving..." / "Unsaved"
+- Save on Cmd+S (explicit save, not just debounce)
+- Save on tab switch / window blur
+- Save before agent runs (ensure AI sees latest edits)
+- Show error toast if save fails
+- Debounce reduced from 1000ms to 500ms for faster feedback
+
+---
+
+## F18. Deploy to S3 with proxied preview URL
+
+Export and deploy the built project to S3 for persistent hosting.
+
+**Phase 1 — S3 upload:**
+- Build the project (`VITE_BASE=/ pnpm build` — already works in export endpoint)
+- ZIP the `dist/` directory or produce a single minified HTML (already have both in `api/export.py`)
+- Upload to S3 bucket under a unique path: `s3://deployments/{project_id}/{timestamp}/`
+- Store deployment URL in the project record
+
+**Phase 2 — Proxied preview URL:**
+- Each deployment gets a nice URL: `https://preview.flow44.com/{project-slug}`
+- CloudFront or similar CDN proxies to the S3 path
+- Custom subdomains per project: `{project-slug}.flow44.app`
+- Deploy history — list past deployments, rollback to previous
+
+**Phase 3 — Custom domains:**
+- Users bring their own domain
+- CNAME setup instructions + SSL via ACM/Let's Encrypt
+
+**Backend:**
+- `POST /api/projects/{id}/deploy` — build + upload to S3 + return URL
+- `GET /api/projects/{id}/deployments` — list past deployments
+- Add `boto3` for S3 upload (already in dependencies for Bedrock)
+- Store deployment records in DB (url, timestamp, status)
+
+**Frontend:**
+- "Deploy" button in the sidebar or toolbar
+- Show deployment URL with copy button
+- Deployment history in project settings
+
+---
+
+## F19. Image upload + screenshot-to-code
+
+**Image upload (Phase 1):**
+- Users can upload images, icons, logos to the project
+- Drop zone in the editor panel or file tree
+- Files saved to `public/` in the sandbox
+- Backend: `POST /api/files/{session_id}/upload` — multipart form data
+
+**Screenshot of preview (Phase 2):**
+- "Screenshot" button on the preview pane
+- Capture the iframe content via `html2canvas` or `iframe.contentWindow` capture
+- Send screenshot to the AI as context: "Here's what the app looks like now, change X"
+- Attach as an image in the chat message
+
+**Screenshot/image to code (Phase 3):**
+- Paste or upload a design screenshot
+- Send to a vision model (Claude with vision, GPT-4V)
+- AI generates matching UI code from the image
+- "Make it look like this" workflow
+
+**Requirements:**
+- Vision-capable model (Claude Sonnet/Opus support images)
+- LiteLLM supports image content blocks in messages
+- Frontend: file input + drag-and-drop + clipboard paste handler
+
+---
+
+## F20. Screenshot preview and send to LLM
+
+"Screenshot" button on the preview pane that captures the current state of the
+preview and sends it to the AI as visual context.
+
+**How it works:**
+- Button in preview toolbar captures the iframe content
+- Use `html2canvas` on `iframe.contentDocument` or the native `iframe.contentWindow` screenshot API
+- Attach the image to the next chat message as visual context
+- User types "Make the header bigger" + the AI sees the screenshot → better results
+
+**Implementation:**
+- Frontend: capture iframe → convert to base64 PNG → store in chat store
+- When sending next message, include the image as a content block
+- LiteLLM supports image content blocks for vision-capable models (Claude Sonnet/Opus)
+- Show thumbnail of attached screenshot in the chat input area
+- "Remove screenshot" button to detach before sending
+
+**Also useful for:**
+- Bug reports: "See this screenshot, the layout is broken"
+- Design feedback: "Make it look more like this" (paste external screenshot)
+
+---
+
+## ~~F21. Template gallery~~ PARTIALLY DONE
+
+Template system exists (pnpm-project-template). Gallery UI for selecting
+templates on project creation is partially implemented.
+
+---
+
+## F22. Mobile layout — chat + preview only
+
+The builder UI only works on desktop. Add a simple mobile layout for
+chatting with the AI and viewing the preview. No code editor on mobile.
+
+**Scope:**
+- New `MobileLayout.tsx` — single pane, bottom tab bar: Chat / Preview
+- Chat is the default view
+- Preview as second tab
+- Sidebar as a slide-out drawer (hamburger button)
+- No Monaco editor, no file tree, no terminal on mobile
+- PromptInput adapts to mobile keyboard
+
+**Detection:**
+- `useMediaQuery('(max-width: 768px)')` or Tailwind `md:` breakpoint
+- AppShell renders `MobileLayout` below breakpoint, desktop layouts above
+
+**Effort:** ~half day. All components already work standalone.
+
+---
+
+## B18. Validate boltArtifact XML completeness
+
+The ActionParser accepts streaming XML and fires `on_file_action` when a
+`</boltAction>` close tag is found. But if the LLM response is truncated
+(hits max_tokens, network error, etc.), some `<boltAction>` tags may never
+close — resulting in silently dropped files.
+
+**What to validate:**
+- Every `<boltAction type="file">` that was opened must have a matching `</boltAction>`
+- If the response ends with unclosed actions, either:
+  - Retry the LLM call for the missing files
+  - Emit an error event so the user knows files were incomplete
+  - Write partial content with a warning comment at the top
+
+**Where:** `ActionParser.flush()` should check for unclosed state and report it.
+Currently `flush()` just emits remaining text buffer — it doesn't check if we're
+mid-action.
+
+**Also applies to:** `_fix_errors` and `FixErrorAgent` which both use ActionParser.
+
+---
+
+## F13. VS Code-like editor features
+
+The editor uses Monaco (same engine as VS Code). Many features are built-in and
+just need to be enabled or wired up. Others need a small backend endpoint.
+
+### High value, easy (Monaco built-in)
+
+**Find and replace in file (Cmd+H / Cmd+F):**
+- Monaco has this built-in. Just needs `editor.getAction('actions.find')` or
+  it may already work. Verify and ensure keyboard shortcuts aren't captured
+  by the browser/app shell.
+
+**Go to line (Ctrl+G):**
+- Built-in: `editor.getAction('editor.action.gotoLine')`
+
+**Multiple cursors (Cmd+D, Alt+Click):**
+- Built-in, enabled by default in Monaco.
+
+**Minimap:**
+- Built-in: `minimap: { enabled: true }` in editor options.
+- Currently might be disabled. Toggle in settings or enable by default.
+
+**Bracket matching, auto-close, auto-indent:**
+- Built-in. Verify our Monaco config enables these.
+
+### Medium effort
+
+**Quick file open (Cmd+P):**
+- Frontend-only. Fuzzy search over the file tree (already loaded in files store).
+- Build a command palette modal: input → fuzzy filter file list → arrow keys → Enter to open.
+- No backend needed.
+
+**Search across files (Cmd+Shift+F):**
+- Need a backend endpoint: `GET /api/files/{session_id}/search?q=...&regex=true&glob=*.tsx`
+- Use ripgrep in the sandbox (already have the `grep` tool in `ai/tools/grep.py`).
+- Frontend: search panel with results grouped by file, click-to-open-at-line.
+- Could reuse the `grep` tool function directly from a REST handler.
+
+**Breadcrumb navigation:**
+- Show `src / components / Header.tsx` above the editor, clickable segments.
+- Parse the file path from the active tab. Frontend-only.
+
+**Tab management:**
+- Close tab (X button, middle-click) — may already work in FileTabs component.
+- Reorder tabs by drag.
+- Right-click context menu: "Close", "Close others", "Close all".
+
+### Larger effort
+
+**Split editor / side-by-side:**
+- Monaco supports `DiffEditor` and multiple editor instances.
+- Need layout changes to host two editors in the code pane.
+- Useful for comparing files or viewing AI diffs.
+
+**File operations from file tree:**
+- New file / New folder — needs backend endpoint + file tree UI.
+- Rename (F2) — backend endpoint to rename + update file tree.
+- Delete — backend endpoint + confirm dialog.
+- Drag to move — backend rename + file tree drag support.
+
+**Diff view for AI changes:**
+- Monaco has `monaco.editor.createDiffEditor()` built-in.
+- Show before/after when AI modifies a file.
+- Ties into F2 (diff view backlog item).
+
+### Click-to-file from errors
+
+**Server log / terminal:**
+- Vite/TypeScript errors show file paths like `src/components/Header.tsx:42:15`
+- Parse these in the xterm output (regex for `src/...:\d+:\d+` patterns)
+- Render as clickable links in the terminal (xterm supports link handlers via `WebLinksAddon` or custom `registerLinkProvider`)
+- On click: open the file in the editor at that line/column
+
+**Preview iframe runtime errors:**
+- Runtime errors captured by the `__ERROR_REPORTER__` script include `file`, `line`, `column`
+- The error toast already shows these — make the file path clickable
+- On click: open file in editor at that line
+- Stack trace lines with file references should also be clickable
+
+**Implementation:**
+- Add a shared `openFileAtLine(path, line, column?)` function that:
+  1. Opens the file in EditorPanel (add to files store or via event)
+  2. Calls `editor.revealLineInCenter(line)` + `editor.setPosition({lineNumber, column})`
+- Terminal: use xterm's `registerLinkProvider` to detect file paths in output
+- Error toast: wrap file path in a clickable element
+- Server log: same link provider as terminal
+
+### Implementation notes
+- Most Monaco features are enabled via editor options or `editor.addAction()`.
+- Keyboard shortcuts need careful handling — Cmd+P and Cmd+Shift+F are browser
+  shortcuts that need `e.preventDefault()` to intercept.
+- The file tree is already in the Zustand `files` store — quick open just needs
+  a fuzzy filter (use `fzf-for-js` or simple substring match).
