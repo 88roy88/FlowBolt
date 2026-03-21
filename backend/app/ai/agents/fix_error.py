@@ -5,7 +5,7 @@ import uuid
 
 from langfuse.decorators import observe
 
-from app.ai.agents.base import BaseAgent
+from ._base import BaseAgent
 from app.ai.core.messages import Message
 from app.ai.parser import ActionParser
 from app.ai.provider import stream_chat
@@ -16,8 +16,11 @@ from app.sandbox.manager import sandbox_manager
 logger = logging.getLogger(__name__)
 
 
+# TODO: we will probably make this into a ReAct agent like the follow up one.
 class FixErrorAgent(BaseAgent):
 
+    # TODO: make run abstract in the base class so all agents will be the same.
+    # TODO: I like it that the run is the last function of the class and not the first :)
     @observe(name="fix-error-agent-run")
     async def run(
         self,
@@ -95,6 +98,7 @@ class FixErrorAgent(BaseAgent):
         await self.emit({"type": "action_complete"})
         await self.emit({"type": "phase", "phase": "idle"})
 
+    # TODO: this is probably redundant now. we can use the emit.
     async def _send_step(self, steps: list[dict], step: str, status: str, message: str) -> None:
         await self.emit({"type": "fix_step", "step": step, "status": status, "message": message})
         for s in steps:
@@ -104,6 +108,8 @@ class FixErrorAgent(BaseAgent):
                 return
         steps.append({"id": str(uuid.uuid4()), "step": step, "status": status, "message": message})
 
+    # TODO: add the some AI magic to this function if the file is not clear or need more?
+    # TODO: should ignore stuff from node_models? and stuff like that?
     async def _discover_files(self, error_file: str | None) -> dict[str, str]:
         files_to_read: list[str] = []
 
@@ -142,6 +148,8 @@ class FixErrorAgent(BaseAgent):
                         pass
         return file_contents
 
+    # TODO: we might want genral utils outside of the agent. also, me might want to move this to the sandbox manager.
+    # TODO: or even to the frontend
     def _normalize_path(self, path: str) -> str:
         if f"/{self.session_id}/" in path:
             idx = path.find(f"/{self.session_id}/")
@@ -157,6 +165,7 @@ class FixErrorAgent(BaseAgent):
                 path = "/src" + path
         return path
 
+    # TODO: seems like a repeating function? make common?
     async def _build(self) -> str:
         try:
             lines: list[str] = []

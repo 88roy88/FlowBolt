@@ -4,7 +4,7 @@ import difflib
 
 from app.sandbox.filesystem import read_file, write_file
 
-
+# TODO: maybe when switching to using git it will be easier to just use git diff for this instead of difflib.
 def _make_diff(path: str, old: str, new: str) -> str:
     old_lines = old.splitlines(keepends=True)
     new_lines = new.splitlines(keepends=True)

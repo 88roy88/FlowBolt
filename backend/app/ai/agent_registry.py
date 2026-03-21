@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.ai.agents.base import BaseAgent
+    from app.ai.agents._base import BaseAgent
 
 _running: dict[str, BaseAgent] = {}
 
@@ -18,3 +18,5 @@ def get(session_id: str) -> BaseAgent | None:
 
 def remove(session_id: str) -> None:
     _running.pop(session_id, None)
+
+# TODO: not sure im a fan of this global mutable state or the registry pattern in general.

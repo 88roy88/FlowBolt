@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.ai.task_tree import WorkPlan
 
-
+# TODO: what is this?
 class BuildState(BaseModel):
     session_id: str
     project_id: str

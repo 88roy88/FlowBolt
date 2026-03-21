@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# TODO: get rid of this when moving to structured output
 def parse_json_response(raw: str | None) -> dict:
     if raw is None:
         logger.error("[helpers] Received None response from LLM")

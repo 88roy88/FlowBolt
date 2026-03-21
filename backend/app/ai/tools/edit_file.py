@@ -20,6 +20,7 @@ async def edit_file_with_context(session_id: str, path: str, search: str, replac
         lines = current.splitlines()
         snippet = "\n".join(lines[:40])
         if len(lines) > 40:
+            # TODO: what?
             snippet += f"\n... ({len(lines)} lines total)"
         return (
             f"Error: search string not found in {path}. "

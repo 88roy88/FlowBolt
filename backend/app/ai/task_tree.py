@@ -1,10 +1,9 @@
-"""Data structures for the multi-phase agent work plan."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 
+# TODO: why dataclass instead of pydantic?
 @dataclass
 class Task:
     id: str
@@ -12,10 +11,13 @@ class Task:
     description: str
     files: list[str]
     depends_on: list[str] = field(default_factory=list)
+    # TODO: use literal
     status: str = "pending"  # pending | running | completed | failed
     error: str | None = None
 
 
+# TODO: why is this even dataclass?
+# TODO: is there a more elegant way to do this? also, move to utils
 @dataclass
 class WorkPlan:
     id: str
@@ -25,10 +27,6 @@ class WorkPlan:
     tasks: list[Task]
 
     def execution_layers(self) -> list[list[Task]]:
-        """Group tasks into dependency layers for parallel execution.
-
-        Tasks in the same layer have all dependencies satisfied by prior layers.
-        """
         completed_ids: set[str] = set()
         remaining = list(self.tasks)
         layers: list[list[Task]] = []
@@ -39,7 +37,6 @@ class WorkPlan:
                 if all(dep in completed_ids for dep in t.depends_on)
             ]
             if not layer:
-                # Circular dependency or unresolvable — just run everything left
                 layers.append(remaining)
                 break
             layers.append(layer)

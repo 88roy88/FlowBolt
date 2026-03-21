@@ -150,3 +150,5 @@ class ToolExecutor:
                 is_error=True,
             )
         return await t.execute(tool_use_id=tool_use_id, **kwargs)
+
+# TODO: bring the parallel tool execution from `/Users/roymezan/src/primesrc/code-validation-service/src/service/ai_logic`

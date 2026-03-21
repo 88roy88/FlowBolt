@@ -50,6 +50,7 @@ class Message(BaseModel):
 
     tool_call_id: str | None = None
 
+    # TODO: why not just model dump?
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"role": self.role}
         if isinstance(self.content, str):

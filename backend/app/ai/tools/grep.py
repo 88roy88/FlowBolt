@@ -22,6 +22,9 @@ async def grep(
     if not search_path.startswith(workspace):
         return "Error: Path traversal detected"
 
+    # TODO: add rg to the docker
+    # TODO: make number of context line and number of results configurable.
+    # TODO: add support to gitignore instead of the hardcoded skip list
     cmd = [
         "rg", "--no-heading", "--line-number", "--max-count", "50",
         "--glob", "!node_modules",

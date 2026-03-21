@@ -25,6 +25,9 @@ class _State(Enum):
     IN_ARTIFACT = auto()
     IN_ACTION_BODY = auto()
 
+# TODO: think about this:
+# A. I want to move to structured output anyway
+# B. This doesnt validate that the xml was closed and that we got the full file content.
 
 class ActionParser:
     """Feed-based streaming parser for flowArtifact XML.

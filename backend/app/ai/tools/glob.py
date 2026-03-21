@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 
+# TODO: add support to gitignore instead of the hardcoded skip list
 SKIP_DIRS = {"node_modules", ".git", "dist", ".next", ".cache", "__pycache__"}
 
 

@@ -9,9 +9,11 @@ from app.config import settings
 from app.ai.core.messages import Message
 
 
+# TODO: when will messages be dicts?
 def _to_dicts(messages: list[dict | Message]) -> list[dict]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]
 
+# TODO: move llmlite langfuse code here?
 
 async def complete_chat(
     messages: list[dict | Message],

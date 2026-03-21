@@ -7,7 +7,7 @@ import uuid
 from langfuse import Langfuse
 from langfuse.decorators import observe, langfuse_context
 
-from app.ai.agents.base import BaseAgent
+from ._base import BaseAgent
 from app.ai.core.messages import Message
 from app.ai.helpers import parse_json_response
 from app.ai.parser import ActionParser
@@ -33,6 +33,8 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+# TODO: maybe split this into two agents and get rid of the approval event stuff?
+# TODO: or think about how to add support for it in the Flow framework.
 class BuildAgent(BaseAgent):
 
     def __init__(self, **kwargs) -> None:

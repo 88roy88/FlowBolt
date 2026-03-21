@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from langfuse.decorators import observe, langfuse_context
 
-from app.ai.agents.base import BaseAgent
+from ._base import BaseAgent
 from app.ai.core.tools import FunctionTool, ToolExecutor
 from app.ai.core.messages import Message
 from app.ai.provider import complete_chat_with_tools
@@ -45,9 +45,24 @@ class FollowUpAgent(BaseAgent):
     def _build_tool_executor(self) -> ToolExecutor:
         sid = self.session_id
 
-        async def _grep(pattern: str, path: str = "/", file_pattern: str | None = None) -> str:
-            """Search for a pattern in the codebase using regex. Returns matching lines with file paths and line numbers."""
-            return await grep(sid, pattern, path, file_pattern)
+        # TODO: why we stopped supporting path?
+        # TODO: we might want a better prompt for the llm to understand how to use grep patterns.
+        # TODO: @roym: Think in general if there's a smart way to work with it like skills -
+        #               and load the full instructions on how to use only if chose it
+        async def _grep(pattern: str, file_pattern: str | None = None) -> str:
+            """Search the entire codebase for a text or regex pattern using grep.
+
+            Use this to find all occurrences of functions, classes, variables, imports, or any text pattern.
+            Much faster than reading files one by one — always prefer this over glob+read for searching code.
+
+            Args:
+                pattern: Text or regex pattern to search for (e.g., "useState", "import.*axios", "className=")
+                file_pattern: Optional file glob to narrow search (e.g., "*.tsx", "*.css")
+
+            Returns:
+                Matching lines with file paths and line numbers
+            """
+            return await grep(sid, pattern, "/", file_pattern)
 
         async def _glob(pattern: str) -> str:
             """Find files matching a glob pattern. Returns file paths."""
@@ -89,10 +104,12 @@ class FollowUpAgent(BaseAgent):
     @observe(name="followup-agent-run")
     async def run(self, content: str) -> None:
         langfuse_context.update_current_observation(tags=["follow-up-agent"])
+        # TODO: add metadata. like SID (also, we need to standardize session id and project id usage across the codebase).
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
 
+        # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
         history = await get_messages(self.project_id)
         messages = [
             Message(role=m.role, content=m.content)
@@ -116,9 +133,11 @@ class FollowUpAgent(BaseAgent):
                 "diffs": [{"path": d.path, "diff": d.diff} for d in self._diffs],
             })
 
+        # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
+    # TODO: We will want to have a smarted memory system in the future
     async def _build_context(self) -> dict:
         project = await get_project_by_session(self.session_id)
         summary = ""
@@ -141,6 +160,7 @@ class FollowUpAgent(BaseAgent):
 
         return {"summary": summary, "file_tree": file_tree}
 
+    # TODO: feels like a general utils that should go out.
     def _format_file_tree(self, entries, indent: int = 0) -> str:
         lines = []
         for entry in entries:
@@ -153,11 +173,14 @@ class FollowUpAgent(BaseAgent):
                 lines.append(f"{prefix}{entry.name}")
         return "\n".join(lines)
 
+    # TODO: switch here to use Flow? We can create a subclass of Flow ReActFlow if needed something specific for general ReAct Flows.
     async def _react_loop(self, messages: list[Message], system_prompt: str) -> str:
         working_messages: list[dict] = [m.to_dict() for m in messages]
         tool_schemas = self._executor.get_schemas()
         last_content = ""
 
+        # TODO: use my tricks of also sending warning messages when getting close or hitting max.
+        # TODO: use max tools instead of max iterations? or maybe a combination of both?
         for self._iteration in range(MAX_ITERATIONS):
             response = await complete_chat_with_tools(
                 messages=working_messages,
@@ -216,3 +239,6 @@ class FollowUpAgent(BaseAgent):
 
         logger.warning("[followup-agent] Hit max iterations (%d)", MAX_ITERATIONS)
         return last_content
+
+    # TODO: should we add a step to update the summary?
+    # TODO: think about cases where the follow up is a big request that requires maybe recall the build agent.

@@ -12,6 +12,7 @@ async def read_file_with_lines(session_id: str, path: str) -> str:
     lines = content.splitlines()
     if len(lines) > 500:
         numbered = [f"{i + 1:4d} | {line}" for i, line in enumerate(lines[:500])]
+        # TODO: if we truncate, we should add a parameter for start and end line.
         numbered.append(f"\n... (truncated at 500 lines, file has {len(lines)} total)")
         return "\n".join(numbered)
 

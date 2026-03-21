@@ -11,3 +11,6 @@ __all__ = [
     "write_file_with_diff",
     "edit_file_with_context",
 ]
+
+
+# TODO: maybe add the prompts to the tools here for DRY.
