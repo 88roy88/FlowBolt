@@ -974,3 +974,38 @@ just need to be enabled or wired up. Others need a small backend endpoint.
   shortcuts that need `e.preventDefault()` to intercept.
 - The file tree is already in the Zustand `files` store — quick open just needs
   a fuzzy filter (use `fzf-for-js` or simple substring match).
+
+---
+
+## I8. Workspace lifecycle — evict idle projects to save disk
+
+**Problem:** Each workspace keeps `node_modules` (~80MB) permanently. With many
+projects this adds up fast (13 projects = ~1GB just in node_modules).
+
+**Insight:** pnpm install with a shared content-addressable store takes <1s
+(`reused 132, downloaded 0`). Reinstalling is cheap. Keeping node_modules for
+idle projects is wasteful.
+
+**Design:**
+- Track last-active timestamp per sandbox (WebSocket connect, chat message, terminal use)
+- Keep only N sandboxes "hot" (dev server running, node_modules present). Default N=5.
+- When a sandbox goes idle beyond a threshold (e.g. 30 min with no connections):
+  1. Stop dev server
+  2. Delete `node_modules/` and `dist/`
+  3. Keep source files, package.json, pnpm-lock.yaml
+- When user switches back to an evicted project:
+  1. `pnpm install` (~1s from shared store)
+  2. Start dev server
+  3. Resume normally
+
+**Disk savings:** ~80MB per evicted project. With 50 projects and 5 hot, saves ~3.6GB.
+
+**Config:**
+- `AIB_MAX_HOT_SANDBOXES=5`
+- `AIB_SANDBOX_IDLE_TIMEOUT=1800` (seconds)
+
+**Files:**
+- `sandbox/manager.py` — LRU eviction logic, idle tracking
+- `sandbox/base.py` — `evict()` method (stop dev server, rm node_modules/dist)
+- `sandbox/base.py` — `rehydrate()` method (pnpm install, start dev server)
+- `api/chat.py` / `api/terminal.py` — touch last-active on connect
