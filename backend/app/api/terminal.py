@@ -24,11 +24,19 @@ async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
 
     pty: PtyHandle | None = None
     try:
-        pty = sandbox.create_pty()
+        pty = sandbox.get_or_create_pty()
     except Exception:
         logger.exception("Failed to create PTY for session %s", session_id)
         await websocket.close(code=1011, reason="Failed to create terminal")
         return
+
+    # Replay scrollback so the client sees recent terminal history.
+    scrollback = pty.get_scrollback()
+    if scrollback:
+        try:
+            await websocket.send_bytes(scrollback)
+        except Exception:
+            pass
 
     stop_event = asyncio.Event()
 
@@ -55,11 +63,10 @@ async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
     except Exception:
         logger.exception("Error in terminal WebSocket for session %s", session_id)
     finally:
+        # Detach only — do NOT kill the PTY. It stays alive for reconnection.
         stop_event.set()
         reader_task.cancel()
         try:
             await reader_task
         except asyncio.CancelledError:
             pass
-        if pty is not None:
-            sandbox.close_pty(pty)

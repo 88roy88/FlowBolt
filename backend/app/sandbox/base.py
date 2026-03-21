@@ -67,7 +67,7 @@ class Sandbox(ABC):
         self.info = info
         self._dev_process: asyncio.subprocess.Process | None = None
         self._dev_log_file: IO[bytes] | None = None
-        self._ptys: set[PtyHandle] = set()
+        self._pty: PtyHandle | None = None
 
     @property
     def session_id(self) -> str:
@@ -88,8 +88,7 @@ class Sandbox(ABC):
 
     async def destroy(self, *, delete_workspace: bool = True) -> None:
         await self.stop_dev_server()
-        for pty in list(self._ptys):
-            self.close_pty(pty)
+        self.kill_pty()
         if delete_workspace and os.path.isdir(self.workspace_dir):
             shutil.rmtree(self.workspace_dir, ignore_errors=True)
 
@@ -138,10 +137,17 @@ class Sandbox(ABC):
     @abstractmethod
     def _spawn_pty(self, master_fd: int, slave_fd: int, env: dict[str, str], bashrc_path: str) -> int: ...
 
-    def create_pty(self) -> PtyHandle:
+    def get_or_create_pty(self) -> PtyHandle:
+        """Return the persistent PTY, creating one if needed."""
+        if self._pty is not None and self._pty.alive():
+            return self._pty
+        # Previous PTY is dead — clean it up before making a new one.
+        self.kill_pty()
         if os.name == "nt":
-            return self._create_winpty()
-        return self._create_unix_pty()
+            self._pty = self._create_winpty()
+        else:
+            self._pty = self._create_unix_pty()
+        return self._pty
 
     def _create_unix_pty(self) -> PtyHandle:
         master_fd, slave_fd = os.openpty()
@@ -159,7 +165,6 @@ class Sandbox(ABC):
         fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
         handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=pid, session_id=self.session_id)
-        self._ptys.add(handle)
         _active_ptys.add(handle)
         return handle
 
@@ -170,14 +175,15 @@ class Sandbox(ABC):
         proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)
 
         handle = PtyHandle(pid=proc.pid, session_id=self.session_id, winpty_process=proc)
-        self._ptys.add(handle)
         _active_ptys.add(handle)
         return handle
 
-    def close_pty(self, pty: PtyHandle) -> None:
-        self._ptys.discard(pty)
-        _active_ptys.discard(pty)
-        pty.kill()
+    def kill_pty(self) -> None:
+        """Kill the persistent PTY (on sandbox destroy)."""
+        if self._pty is not None:
+            _active_ptys.discard(self._pty)
+            self._pty.kill()
+            self._pty = None
 
     # -- File I/O --
 
