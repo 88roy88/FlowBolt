@@ -5,9 +5,9 @@ import logging
 import os
 import subprocess
 from collections.abc import AsyncIterator
-from typing import Any
 
-from app.sandbox.base import Sandbox
+from app.sandbox.base import Sandbox, _ensure_bashrc
+from app.sandbox.pty import PtyHandle, _active_ptys
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class _PopenWrapper:
         return self._proc.returncode
 
     def kill(self) -> None:
-        self._proc.kill()
+        subprocess.run(["taskkill", "/PID", str(self._proc.pid), "/T", "/F"], check=False)
 
     async def wait(self) -> int:
         loop = asyncio.get_running_loop()
@@ -76,8 +76,24 @@ class WindowsLocalSandbox(Sandbox):
             self.session_id, self.port, proc.pid,
         )
 
-    async def _spawn_dev_server(self) -> Any:
-        raise NotImplementedError("WindowsLocalSandbox overrides start_dev_server directly")
+    async def stop_dev_server(self) -> None:
+        if self._dev_process is not None:
+            self._dev_process.kill()
+            await self._dev_process.wait()
+            self._dev_process = None
+        if self._dev_log_file is not None:
+            try:
+                self._dev_log_file.close()
+            except Exception:
+                pass
+            self._dev_log_file = None
 
-    def _spawn_pty(self, master_fd: int, slave_fd: int, env: dict[str, str], bashrc_path: str) -> int:
-        raise NotImplementedError("Unix PTY not available on Windows")
+    def create_pty(self) -> PtyHandle:
+        from winpty import PtyProcess as WinPtyProcess  # type: ignore[import-untyped]
+
+        _ensure_bashrc(self.workspace_dir)
+        proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)
+
+        handle = PtyHandle(pid=proc.pid, session_id=self.session_id, winpty_process=proc)
+        _active_ptys.add(handle)
+        return handle

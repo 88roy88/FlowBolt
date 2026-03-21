@@ -14,9 +14,6 @@ from app.sandbox.pty import PtyHandle, _active_ptys
 
 logger = logging.getLogger(__name__)
 
-if os.name != "nt":
-    import fcntl  # type: ignore[import-not-found]
-
 
 @dataclass
 class SandboxInfo:
@@ -39,12 +36,13 @@ _BASHRC_CONTENT = (
 
 def _ensure_bashrc(workspace_dir: str) -> str:
     path = os.path.join(workspace_dir, ".bashrc")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(_BASHRC_CONTENT)
     return path
 
 
 async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
+    """Kill a process and its entire group (Unix only)."""
     if proc.returncode is not None:
         return
     try:
@@ -100,23 +98,7 @@ class Sandbox(ABC):
     # -- Dev server --
 
     @abstractmethod
-    async def _spawn_dev_server(self) -> asyncio.subprocess.Process: ...
-
-    async def start_dev_server(self) -> None:
-        if os.name == "nt":
-            logger.info("Skipping dev server on Windows (session %s)", self.session_id)
-            return
-
-        await self.stop_dev_server()
-
-        log_path = os.path.join(self.workspace_dir, ".dev-server.log")
-        self._dev_log_file = open(log_path, "wb")  # noqa: SIM115
-
-        self._dev_process = await self._spawn_dev_server()
-        logger.info(
-            "Dev server started for session %s on port %d (pid %s)",
-            self.session_id, self.port, self._dev_process.pid,
-        )
+    async def start_dev_server(self) -> None: ...
 
     async def stop_dev_server(self) -> None:
         if self._dev_process is not None:
@@ -135,51 +117,16 @@ class Sandbox(ABC):
     # -- PTY --
 
     @abstractmethod
-    def _spawn_pty(self, master_fd: int, slave_fd: int, env: dict[str, str], bashrc_path: str) -> int: ...
+    def create_pty(self) -> PtyHandle: ...
 
     def get_or_create_pty(self) -> PtyHandle:
-        """Return the persistent PTY, creating one if needed."""
         if self._pty is not None and self._pty.alive():
             return self._pty
-        # Previous PTY is dead — clean it up before making a new one.
         self.kill_pty()
-        if os.name == "nt":
-            self._pty = self._create_winpty()
-        else:
-            self._pty = self._create_unix_pty()
+        self._pty = self.create_pty()
         return self._pty
 
-    def _create_unix_pty(self) -> PtyHandle:
-        master_fd, slave_fd = os.openpty()
-
-        env = os.environ.copy()
-        env["TERM"] = "xterm-256color"
-        env["CLICOLOR"] = "1"
-        env["LSCOLORS"] = "GxFxCxDxBxegedabagaced"
-
-        bashrc_path = _ensure_bashrc(self.workspace_dir)
-        pid = self._spawn_pty(master_fd, slave_fd, env, bashrc_path)
-        os.close(slave_fd)
-
-        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
-        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
-        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=pid, session_id=self.session_id)
-        _active_ptys.add(handle)
-        return handle
-
-    def _create_winpty(self) -> PtyHandle:
-        from winpty import PtyProcess as WinPtyProcess  # type: ignore[import-untyped]
-
-        _ensure_bashrc(self.workspace_dir)
-        proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)
-
-        handle = PtyHandle(pid=proc.pid, session_id=self.session_id, winpty_process=proc)
-        _active_ptys.add(handle)
-        return handle
-
     def kill_pty(self) -> None:
-        """Kill the persistent PTY (on sandbox destroy)."""
         if self._pty is not None:
             _active_ptys.discard(self._pty)
             self._pty.kill()
