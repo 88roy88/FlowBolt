@@ -4,7 +4,11 @@ import { useChatStore } from './stores/chat';
 import { useFilesStore } from './stores/files';
 import { useErrorStore } from './stores/errors';
 import { AppShell } from './components/layout/AppShell';
-import { ErrorToast, useErrorCapture } from './components/errors/ErrorToast';
+import { ErrorToast } from './components/errors/ErrorToast';
+import { useErrorCapture } from './hooks/useErrorCapture';
+import { pollFileTree } from './utils/pollFileTree';
+import { Loader2 } from 'lucide-react';
+import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
 
 function getSessionIdFromHash(): string | null {
@@ -119,28 +123,15 @@ export default function App() {
     if (session.currentProject) {
       window.location.hash = `#/project/${session.currentProject.session_id}`;
       loadHistory(session.currentProject.session_id);
-      // Poll for file tree until scaffold completes
       pollFileTree();
     }
   };
 
-  function pollFileTree() {
-    let attempts = 0;
-    const maxAttempts = 15;
-    const interval = setInterval(async () => {
-      attempts++;
-      await loadFileTree();
-      const tree = useFilesStore.getState().fileTree;
-      if (tree.length > 0 || attempts >= maxAttempts) {
-        clearInterval(interval);
-      }
-    }, 2000);
-  }
-
   if (loading || checkingBackend) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <p style={{ color: 'var(--text-dim)' }}>Loading...</p>
+      <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
+        <FlowBrand size="lg" />
+        <Loader2 size={20} className="animate-spin text-[#2bbcc4]" />
       </div>
     );
   }
@@ -155,7 +146,7 @@ export default function App() {
         height: '100%',
         gap: '16px',
       }}>
-        <h1 style={{ color: 'var(--accent)', fontSize: '24px' }}>AI Builder</h1>
+        <FlowBrand size="lg" />
         {!backendAvailable ? (
           <>
             <div style={{

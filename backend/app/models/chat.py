@@ -11,10 +11,12 @@ import aiosqlite
 from app.models.project import _get_db_path
 
 
+# TODO: why not pydantic?
 @dataclass
 class ChatMessage:
     id: str
     project_id: str
+    # TODO: use literal
     role: str  # "user" | "assistant"
     content: str
     created_at: str

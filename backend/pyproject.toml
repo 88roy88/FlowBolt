@@ -12,8 +12,10 @@ dependencies = [
     "websockets>=14.1",
     "python-multipart>=0.0.19",
     "httpx>=0.28.0",
+    "jinja2>=3.1.0",
     "langfuse==2.59.7",
     "boto3>=1.42.68",
+    "pywinpty>=2.0.0; sys_platform == 'win32'",
 ]
 
 [project.scripts]

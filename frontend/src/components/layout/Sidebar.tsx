@@ -1,21 +1,70 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Trash2, FolderKanban, PanelLeftClose, Info, X, Sparkles, FileText, Package } from 'lucide-react';
+import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil } from 'lucide-react';
+import { FlowBrand } from '../ui/flow-logo';
 import type { ProjectSummary } from '../../types';
+import { SummaryModal } from './SummaryModal';
+import { pollFileTree } from '../../utils/pollFileTree';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 
 type SidebarProps = {
   onCloseSidebar?: () => void;
+  isPinned?: boolean;
+  onPin?: () => void;
+  onOpenSettings?: () => void;
 };
 
-export function Sidebar({ onCloseSidebar }: SidebarProps) {
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject, isCreating } = useSessionStore();
+// Stable color per project based on name hash
+const PROJECT_COLORS = [
+  'bg-[#89b4fa]/20 text-[#89b4fa]',   // blue
+  'bg-[#a6e3a1]/20 text-[#a6e3a1]',   // green
+  'bg-[#f9e2af]/20 text-[#f9e2af]',   // yellow
+  'bg-[#cba6f7]/20 text-[#cba6f7]',   // purple
+  'bg-[#f38ba8]/20 text-[#f38ba8]',   // pink
+  'bg-[#94e2d5]/20 text-[#94e2d5]',   // teal
+  'bg-[#fab387]/20 text-[#fab387]',   // peach
+  'bg-[#74c7ec]/20 text-[#74c7ec]',   // sky
+];
+
+function getProjectColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
+}
+
+function getInitials(name: string) {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: SidebarProps) {
+  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null);
+        setPendingDeleteId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpenId]);
 
   const handleCreate = async () => {
     const name = newName.trim() || 'New Project';
@@ -23,21 +72,11 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
     setShowInput(false);
     await createProject(name);
     clearMessages();
-    // Update URL hash and load data for the new project
     const session = useSessionStore.getState();
     if (session.currentProject) {
       window.location.hash = `#/project/${session.currentProject.session_id}`;
       loadHistory(session.currentProject.session_id);
-      // Poll for scaffold to finish
-      let attempts = 0;
-      const interval = setInterval(async () => {
-        attempts++;
-        await loadFileTree();
-        const tree = useFilesStore.getState().fileTree;
-        if (tree.length > 0 || attempts >= 15) {
-          clearInterval(interval);
-        }
-      }, 2000);
+      pollFileTree();
     }
   };
 
@@ -49,8 +88,13 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
     loadHistory(project.session_id);
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const handleDelete = async (id: string) => {
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      return;
+    }
+    setPendingDeleteId(null);
+    setMenuOpenId(null);
     const wasSelected = currentProject?.id === id;
     await deleteProject(id);
     if (wasSelected) {
@@ -69,10 +113,24 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
     }
   };
 
-  const handleShowSummary = (e: React.MouseEvent, project: typeof projects[number]) => {
-    e.stopPropagation();
-    if (!project.summary) return;
+  const startRename = (project: typeof projects[number]) => {
+    setMenuOpenId(null);
+    setRenamingId(project.id);
+    setRenameValue(project.name);
+  };
 
+  const submitRename = async () => {
+    if (!renamingId || !renameValue.trim()) {
+      setRenamingId(null);
+      return;
+    }
+    await renameProject(renamingId, renameValue.trim());
+    setRenamingId(null);
+  };
+
+  const handleShowSummary = (project: typeof projects[number]) => {
+    setMenuOpenId(null);
+    if (!project.summary) return;
     try {
       const parsedSummary = JSON.parse(project.summary) as ProjectSummary;
       setSummaryModal({ projectName: project.name, summary: parsedSummary });
@@ -82,302 +140,162 @@ export function Sidebar({ onCloseSidebar }: SidebarProps) {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      padding: '12px',
-    }}>
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '12px',
-        }}
-      >
-        <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--accent)' }}>
-          AI Builder
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {onCloseSidebar && (
-            <button
-              type="button"
-              onClick={onCloseSidebar}
-              title="Hide projects panel"
-              style={{
-                padding: '4px',
-                borderRadius: '4px',
-                color: 'var(--text-dim)',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <PanelLeftClose size={16} />
-            </button>
+      <div className="flex items-center justify-between px-3 py-3">
+        <FlowBrand size="sm" />
+        <div className="flex items-center gap-0.5">
+          {onPin && !isPinned && (
+            <Button variant="ghost" size="icon-sm" onClick={onPin} title="Pin sidebar open">
+              <Pin size={14} />
+            </Button>
           )}
-          <button
-            onClick={() => setShowInput(true)}
-            disabled={isCreating}
-            style={{
-              padding: '4px',
-              borderRadius: '4px',
-              color: 'var(--text-dim)',
-              opacity: isCreating ? 0.4 : 1,
-              background: 'transparent',
-              border: 'none',
-              cursor: isCreating ? 'default' : 'pointer',
-            }}
-            title="New Project"
-          >
-            <Plus size={18} />
-          </button>
+          {isPinned && onCloseSidebar && (
+            <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title="Unpin sidebar">
+              <PinOff size={14} />
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* New project input */}
-      {showInput && (
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
-          <input
-            autoFocus
-            type="text"
-            placeholder="Project name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleCreate();
-              if (e.key === 'Escape') setShowInput(false);
-            }}
-            style={{
-              flex: 1,
-              padding: '6px 8px',
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              fontSize: '13px',
-            }}
-          />
-          <button
-            onClick={handleCreate}
-            style={{
-              padding: '6px 10px',
-              background: 'var(--accent)',
-              color: 'var(--bg)',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
+      {/* New project button */}
+      <div className="px-3 mb-2">
+        {showInput ? (
+          <div className="flex gap-1">
+            <Input
+              autoFocus
+              placeholder="Project name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreate();
+                if (e.key === 'Escape') setShowInput(false);
+              }}
+            />
+            <Button size="sm" onClick={handleCreate}>Add</Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowInput(true)}
+            disabled={isCreating}
+            className="w-full justify-start gap-2"
           >
-            Add
-          </button>
-        </div>
-      )}
+            <Plus size={14} />
+            New Project
+          </Button>
+        )}
+      </div>
 
       {/* Creating indicator */}
       {isCreating && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '10px 8px',
-          marginBottom: '8px',
-          borderRadius: '6px',
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-          fontSize: '13px',
-          color: 'var(--text-dim)',
-        }}>
-          <span style={{
-            display: 'inline-block',
-            width: '14px',
-            height: '14px',
-            border: '2px solid var(--border)',
-            borderTopColor: 'var(--accent)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            flexShrink: 0,
-          }} />
+        <div className="flex items-center gap-2 mx-3 px-2 py-2.5 mb-2 rounded-md bg-background border border-border text-[13px] text-muted-foreground">
+          <Loader2 size={14} className="shrink-0 animate-spin" />
           Scaffolding project...
         </div>
       )}
 
       {/* Project list */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {projects.map((project) => (
-          <div
-            key={project.id}
-            onClick={() => handleSelect(project)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              background: currentProject?.id === project.id ? 'var(--bg)' : 'transparent',
-              marginBottom: '2px',
-            }}
-          >
-            <FolderKanban size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-            <span style={{
-              flex: 1,
-              fontSize: '13px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {project.name}
-            </span>
-            {project.summary && (
-              <button
-                onClick={(e) => handleShowSummary(e, project)}
-                style={{
-                  padding: '2px',
-                  color: 'var(--text-dim)',
-                  opacity: 0.5,
-                  borderRadius: '4px',
-                }}
-                title="View project summary"
+      <div className="flex-1 overflow-auto px-2">
+        {projects.map((project) => {
+          const isActive = currentProject?.id === project.id;
+          const isMenuOpen = menuOpenId === project.id;
+          const colorClass = getProjectColor(project.name);
+          return (
+            <div key={project.id} className="relative">
+              <div
+                onClick={() => handleSelect(project)}
+                className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${
+                  isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
+                }`}
               >
-                <Info size={14} />
-              </button>
-            )}
-            <button
-              onClick={(e) => handleDelete(e, project.id)}
-              style={{
-                padding: '2px',
-                color: 'var(--text-dim)',
-                opacity: 0.5,
-                borderRadius: '4px',
-              }}
-              title="Delete project"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
+                <div className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${colorClass}`}>
+                  {getInitials(project.name)}
+                </div>
+                {renamingId === project.id ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') submitRename();
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                    onBlur={submitRename}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-[13px] bg-background border border-border rounded px-1.5 py-0.5"
+                  />
+                ) : (
+                  <span className="flex-1 text-[13px] truncate">{project.name}</span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpenId(isMenuOpen ? null : project.id);
+                    setPendingDeleteId(null);
+                  }}
+                  className="opacity-0 group-hover:opacity-40 hover:!opacity-100 shrink-0"
+                >
+                  <MoreHorizontal size={14} />
+                </Button>
+              </div>
+
+              {isMenuOpen && (
+                <div
+                  ref={menuRef}
+                  className="absolute right-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
+                >
+                  <button
+                    onClick={() => startRename(project)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <Pencil size={13} className="text-muted-foreground" />
+                    Rename
+                  </button>
+                  {project.summary && (
+                    <button
+                      onClick={() => handleShowSummary(project)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <Info size={13} className="text-muted-foreground" />
+                      Summary
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(project.id)}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
+                      pendingDeleteId === project.id
+                        ? 'text-destructive bg-destructive/10'
+                        : 'text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Trash2 size={13} className={pendingDeleteId === project.id ? 'text-destructive' : 'text-muted-foreground'} />
+                    {pendingDeleteId === project.id ? 'Confirm delete?' : 'Delete'}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Summary Modal */}
+      {/* Bottom: Settings */}
+      <div className="border-t border-border px-3 py-2">
+        <Button variant="ghost" size="sm" onClick={onOpenSettings} className="w-full justify-start gap-2 text-muted-foreground">
+          <Settings size={14} />
+          <span className="text-[13px]">Settings</span>
+        </Button>
+      </div>
+
       {summaryModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10000,
-          }}
-          onClick={() => setSummaryModal(null)}
-        >
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              padding: '20px',
-              maxWidth: '500px',
-              maxHeight: '80vh',
-              overflow: 'auto',
-              position: 'relative',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setSummaryModal(null)}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                padding: '4px',
-                color: 'var(--text-dim)',
-                borderRadius: '4px',
-              }}
-              title="Close"
-            >
-              <X size={18} />
-            </button>
-
-            <h3 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: 600, paddingRight: '24px' }}>
-              {summaryModal.projectName}
-            </h3>
-
-            <p style={{ marginBottom: '16px', lineHeight: '1.6', color: 'var(--text)' }}>
-              {summaryModal.summary.summary}
-            </p>
-
-            {summaryModal.summary.tech_stack && summaryModal.summary.tech_stack.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px' }}>
-                  Tech Stack
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {summaryModal.summary.tech_stack.map((tech, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '4px 10px',
-                        background: 'var(--bg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        color: 'var(--accent)',
-                      }}
-                    >
-                      <Package size={12} />
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {summaryModal.summary.features && summaryModal.summary.features.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px' }}>
-                  Features
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {summaryModal.summary.features.map((feature, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <Sparkles size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '2px' }} />
-                      <span style={{ fontSize: '13px', lineHeight: '1.5' }}>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {summaryModal.summary.file_overview && Object.keys(summaryModal.summary.file_overview).length > 0 && (
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px' }}>
-                  Key Files
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {Object.entries(summaryModal.summary.file_overview).map(([file, description]) => (
-                    <div key={file} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px' }}>
-                      <FileText size={13} style={{ color: 'var(--text-dim)', flexShrink: 0, marginTop: '2px' }} />
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{file}</strong>
-                        <span style={{ color: 'var(--text-dim)' }}> — {description}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <SummaryModal
+          projectName={summaryModal.projectName}
+          summary={summaryModal.summary}
+          onClose={() => setSummaryModal(null)}
+        />
       )}
     </div>
   );

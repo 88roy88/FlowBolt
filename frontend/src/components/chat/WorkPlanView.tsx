@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Check, X, Pencil, Sparkles, ArrowRight } from 'lucide-react';
 import type { PlanOverview } from '../../types';
 import { useChatStore } from '../../stores/chat';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+import { CardWrapper } from './cards/CardWrapper';
 
 interface WorkPlanViewProps {
   overview: PlanOverview;
@@ -23,47 +26,25 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
   };
 
   return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: '12px',
-      padding: '16px',
-      maxWidth: '100%',
-    }}>
+    <CardWrapper className="p-4">
       {/* Summary */}
-      <p style={{
-        fontSize: '14px',
-        lineHeight: '1.6',
-        marginBottom: '16px',
-        color: 'var(--text)',
-      }}>
-        {overview.summary}
-      </p>
+      <p className="text-sm leading-relaxed mb-4">{overview.summary}</p>
 
       {/* Features */}
       {overview.features && overview.features.length > 0 && (
-        <div style={{ marginBottom: '16px' }}>
-          <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-dim)' }}>
-            What you'll get
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="mb-4">
+          <h4 className="text-[13px] font-semibold text-muted-foreground mb-2">What you'll get</h4>
+          <div className="flex flex-col gap-1.5">
             {overview.features.map((feature, i) => (
               <div
                 key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '8px',
-                  padding: '8px 10px',
-                  background: 'var(--bg)',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                }}
+                className="flex items-start gap-2 p-2 bg-background rounded-lg text-[13px]"
+                style={{ animation: `staggerFadeIn 0.3s cubic-bezier(0.16,1,0.3,1) ${i * 60}ms both` }}
               >
-                <Sparkles size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '2px' }} />
+                <Sparkles size={14} className="text-primary shrink-0 mt-0.5" />
                 <div>
-                  <span style={{ fontWeight: 500 }}>{feature.title}</span>
-                  <span style={{ color: 'var(--text-dim)' }}> — {feature.description}</span>
+                  <span className="font-medium">{feature.title}</span>
+                  <span className="text-muted-foreground"> — {feature.description}</span>
                 </div>
               </div>
             ))}
@@ -73,37 +54,18 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
 
       {/* Decisions */}
       {overview.decisions && overview.decisions.length > 0 && (
-        <div style={{ marginBottom: '16px' }}>
-          <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-dim)' }}>
-            Key decisions
-          </h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="mb-4">
+          <h4 className="text-[13px] font-semibold text-muted-foreground mb-2">Key decisions</h4>
+          <div className="flex flex-col gap-2">
             {overview.decisions.map((decision) => (
-              <div
-                key={decision.id}
-                style={{
-                  padding: '10px 12px',
-                  background: 'var(--bg)',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                }}
-              >
-                <div style={{ fontWeight: 500, marginBottom: '4px' }}>
-                  {decision.title}
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--accent)',
-                  fontSize: '12px',
-                  marginBottom: '4px',
-                }}>
+              <div key={decision.id} className="p-2.5 bg-background rounded-lg text-[13px]">
+                <div className="font-medium mb-1">{decision.title}</div>
+                <div className="flex items-center gap-1.5 text-primary text-xs mb-1">
                   <ArrowRight size={12} />
                   {decision.chosen}
                 </div>
                 {decision.alternatives && decision.alternatives.length > 0 && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                  <div className="text-[11px] text-muted-foreground">
                     Other options: {decision.alternatives.join(', ')}
                   </div>
                 )}
@@ -115,87 +77,32 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
 
       {/* Modify feedback input */}
       {modifyMode && (
-        <div style={{ marginBottom: '12px' }}>
-          <textarea
+        <div className="mb-3">
+          <Textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             placeholder="What would you like to change? e.g. 'Use a dark theme instead' or 'I prefer local storage over a database'"
             autoFocus
-            style={{
-              width: '100%',
-              minHeight: '60px',
-              padding: '8px 10px',
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              fontSize: '13px',
-              resize: 'vertical',
-              color: 'var(--text)',
-            }}
+            className="bg-background"
           />
         </div>
       )}
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button
-          onClick={() => respondToPlan('accept')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            padding: '6px 14px',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: 500,
-            background: 'var(--success)',
-            color: '#fff',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
+      <div className="flex gap-2">
+        <Button variant="success" onClick={() => respondToPlan('accept')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Check size={14} />
           Looks good, build it
-        </button>
-        <button
-          onClick={handleModify}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            padding: '6px 14px',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: 500,
-            background: 'var(--warning, #e5a50a)',
-            color: '#fff',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
+        </Button>
+        <Button variant="warning" onClick={handleModify} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Pencil size={14} />
           {modifyMode ? 'Send feedback' : 'Change something'}
-        </button>
-        <button
-          onClick={() => respondToPlan('reject')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            padding: '6px 14px',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: 500,
-            background: 'transparent',
-            color: 'var(--text-dim)',
-            border: '1px solid var(--border)',
-            cursor: 'pointer',
-          }}
-        >
+        </Button>
+        <Button variant="outline" onClick={() => respondToPlan('reject')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <X size={14} />
           Start over
-        </button>
+        </Button>
       </div>
-    </div>
+    </CardWrapper>
   );
 }

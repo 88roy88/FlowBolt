@@ -3,6 +3,7 @@ import { useChatStore } from '../../stores/chat';
 import { searchPackages } from '../../services/api';
 import type { PackageSearchRecord } from '../../types';
 import { X, Search } from 'lucide-react';
+import { Badge } from '../ui/badge';
 
 interface CaseSelectorProps {
   isOpen: boolean;
@@ -21,11 +22,8 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setShowDropdown(false);
     };
-
     if (showDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -33,9 +31,7 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
   }, [showDropdown]);
 
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (isOpen && inputRef.current) inputRef.current.focus();
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -47,7 +43,6 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
       setShowDropdown(false);
       return;
     }
-
     setIsLoading(true);
     setShowDropdown(true);
     try {
@@ -71,119 +66,42 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
   const selectedIds = new Set(selectedCases.map((c) => c.id));
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative' }}>
+    <div ref={dropdownRef} className="relative">
       {/* Selected case badges */}
       {selectedCases.length > 0 && (
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '6px',
-          marginBottom: '8px',
-        }}>
+        <div className="flex flex-wrap gap-1.5 mb-2">
           {selectedCases.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '3px 8px',
-                background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-                borderRadius: '6px',
-                fontSize: '12px',
-              }}
-            >
-              <span style={{ fontWeight: 500 }}>{c.name}</span>
-              <button
-                onClick={() => removeCase(c.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '3px',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-dim)',
-                  padding: 0,
-                }}
-                title="Remove case"
-              >
+            <Badge key={c.id} variant="accent" className="gap-1">
+              <span className="font-medium">{c.name}</span>
+              <button onClick={() => removeCase(c.id)} className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20" title="Remove case">
                 <X size={12} />
               </button>
-            </div>
+            </Badge>
           ))}
         </div>
       )}
 
       {/* Search input */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '8px 12px',
-        background: 'var(--bg)',
-        border: `1px solid ${showDropdown ? 'var(--accent)' : 'var(--border)'}`,
-        borderRadius: '8px',
-        transition: 'border-color 0.15s',
-      }}>
-        <Search size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+      <div className={`flex items-center gap-2 px-3 py-2 bg-background border rounded-lg transition-colors ${showDropdown ? 'border-primary' : 'border-border'}`}>
+        <Search size={14} className="text-muted-foreground shrink-0" />
         <input
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
-          onFocus={() => {
-            if (results.length > 0) setShowDropdown(true);
-          }}
+          onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
           placeholder="Search cases (optional)"
-          style={{
-            flex: 1,
-            fontSize: '13px',
-            border: 'none',
-            background: 'transparent',
-            outline: 'none',
-            color: 'var(--text)',
-          }}
+          className="flex-1 text-[13px] bg-transparent"
         />
       </div>
 
       {/* Dropdown results */}
       {showDropdown && (
-        <div style={{
-          position: 'absolute',
-          bottom: 'calc(100% + 4px)',
-          left: 0,
-          right: 0,
-          maxHeight: '240px',
-          overflowY: 'auto',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 1000,
-        }}>
+        <div className="absolute bottom-full left-0 right-0 mb-1 max-h-60 overflow-y-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-md)] z-[1000]">
           {isLoading ? (
-            <div style={{
-              padding: '12px',
-              textAlign: 'center',
-              fontSize: '13px',
-              color: 'var(--text-dim)',
-            }}>
-              Searching...
-            </div>
+            <div className="p-3 text-center text-[13px] text-muted-foreground">Searching...</div>
           ) : results.length === 0 ? (
-            <div style={{
-              padding: '12px',
-              textAlign: 'center',
-              fontSize: '13px',
-              color: 'var(--text-dim)',
-            }}>
-              No cases found
-            </div>
+            <div className="p-3 text-center text-[13px] text-muted-foreground">No cases found</div>
           ) : (
             results.map((pkg) => {
               const alreadySelected = selectedIds.has(pkg.Id);
@@ -192,40 +110,16 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
                   key={pkg.Id}
                   onClick={() => !alreadySelected && handleSelect(pkg)}
                   disabled={alreadySelected}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: alreadySelected ? 'default' : 'pointer',
-                    transition: 'background 0.15s',
-                    borderBottom: '1px solid var(--border)',
-                    opacity: alreadySelected ? 0.5 : 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!alreadySelected) {
-                      e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 8%, transparent)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
+                  className={`w-full px-3 py-2.5 text-left border-b border-border transition-colors ${
+                    alreadySelected ? 'opacity-50 cursor-default' : 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--primary)_8%,transparent)]'
+                  }`}
                 >
-                  <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '2px' }}>
+                  <div className="text-[13px] font-medium mb-0.5">
                     {pkg.Name}
-                    {alreadySelected && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> (selected)</span>}
+                    {alreadySelected && <span className="text-muted-foreground font-normal"> (selected)</span>}
                   </div>
                   {pkg.Description && (
-                    <div style={{
-                      fontSize: '12px',
-                      color: 'var(--text-dim)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {pkg.Description}
-                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{pkg.Description}</div>
                   )}
                 </button>
               );

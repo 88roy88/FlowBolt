@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App</title>
+  <script id="__ERROR_REPORTER__">
+(function(){
+  function report(err){
+    if(!window.parent||window.parent===window)return;
+    window.parent.postMessage({
+      type:'runtime-error',
+      message:String(err.message||err),
+      file:err.filename||err.fileName||'',
+      line:err.lineno||err.lineNumber||0,
+      column:err.colno||err.columnNumber||0,
+      stack:err.error?err.error.stack||'':''
+    },'*');
+  }
+  window.addEventListener('error',function(e){report(e)});
+  window.addEventListener('unhandledrejection',function(e){
+    var r=e.reason||{};
+    report({message:r.message||String(r),stack:r.stack||''});
+  });
+})()
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
