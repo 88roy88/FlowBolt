@@ -54,19 +54,28 @@ async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
     session_registry.register(project.session_id, project.id, sandbox.info)
 
     async def _scaffold_and_start() -> None:
-        logger.info("[projects] Scaffolding project for session %s", project.session_id)
-        shutil.copytree(settings.TEMPLATE_DIR, sandbox.workspace_dir, dirs_exist_ok=True)
-        stamp_vite_config(project.session_id, sandbox.workspace_dir)
+        from flow44.models.events import emit_event  # noqa: PLC0415
 
         try:
-            async for line in sandbox.exec("pnpm install 2>&1"):
-                logger.info("[scaffold] %s", line.rstrip())
-        except Exception:
-            logger.exception("[projects] pnpm install failed for session %s", project.session_id)
-            return
+            logger.info("[projects] Scaffolding project for session %s", project.session_id)
+            shutil.copytree(settings.TEMPLATE_DIR, sandbox.workspace_dir, dirs_exist_ok=True)
+            stamp_vite_config(project.session_id, sandbox.workspace_dir)
 
-        logger.info("[projects] Starting dev server for session %s", project.session_id)
-        await sandbox.start_dev_server()
+            try:
+                async for line in sandbox.exec("pnpm install 2>&1"):
+                    logger.info("[scaffold] %s", line.rstrip())
+            except Exception:
+                logger.exception("[projects] pnpm install failed for session %s", project.session_id)
+                await emit_event(
+                    project.session_id, {"type": "error", "message": "Project setup failed (pnpm install)"}
+                )
+                return
+
+            logger.info("[projects] Starting dev server for session %s", project.session_id)
+            await sandbox.start_dev_server()
+        except Exception:
+            logger.exception("[projects] Scaffolding failed for session %s", project.session_id)
+            await emit_event(project.session_id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_scaffold_and_start())
     return asdict(project)

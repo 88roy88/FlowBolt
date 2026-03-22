@@ -198,6 +198,10 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901,
         logger.info("[chat] WebSocket disconnected for session %s", session_id)
     except Exception:
         logger.exception("[chat] Unhandled error in chat WebSocket for session %s", session_id)
+        try:
+            await websocket.send_json({"type": "error", "message": "Internal server error"})
+        except Exception:  # noqa: S110 — WS may already be closed
+            pass
     finally:
         forward_task.cancel()
         try:
