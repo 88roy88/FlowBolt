@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _is_new_project(project_id: str) -> bool:
-    history = await get_messages(project_id)
-    user_count = sum(1 for m in history if m.role == "user")
-    return user_count <= 1
+async def _is_new_project(session_id: str) -> bool:
+    """A project is 'new' if no build has completed yet (no action_complete event)."""
+    events = await get_events(session_id)
+    return not any(e.payload.get("type") == "action_complete" for e in events)
 
 
 async def _run_agent_safe(session_id: str, coro) -> None:
@@ -111,7 +111,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                     ]
                 await emit_event(session_id, user_event, notify=False)
 
-                is_new = await _is_new_project(project.id)
+                is_new = await _is_new_project(session_id)
 
                 if is_new:
                     agent = BuildAgent(

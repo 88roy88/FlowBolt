@@ -240,7 +240,7 @@ class BuildAgent(BaseAgent):
                     f"### Case: {ctx['package_name']} (ID: {ctx['package_id']})\n"
                     f"Data Schema: {ctx['data_schema']}\nRelevant Fields: {ctx['relevant_fields']}\n"
                     f"Sample data:\n```json\n{json.dumps(ctx['sample_data'], indent=2)[:1000]}\n```\n"
-                    f"Endpoint: /api/package/{ctx['package_id']}/run"
+                    f"Endpoint: `${{API_BASE}}/api/package/{ctx['package_id']}/run` (import API_BASE from src/config.ts)"
                 )
             user_message += "\n\n## Case Data Integration\n\n" + "\n\n".join(sections) + \
                 "\n\nYour architecture MUST include components that fetch, display, and interact with this case data."

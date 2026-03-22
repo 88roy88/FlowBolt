@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import io
 import logging
 import os
@@ -11,6 +12,7 @@ import zipfile
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
+from app.config import settings
 from app.models.project import get_project_by_session
 from app.sandbox.manager import sandbox_manager
 
@@ -67,11 +69,25 @@ async def export_html(session_id: str):
 
     workspace_dir = sandbox.workspace_dir
 
-    # Build with base=/ so assets use relative paths (not the preview proxy path)
-    build_output_lines: list[str] = []
-    async for line in sandbox.exec("VITE_BASE=/ pnpm build"):
-        build_output_lines.append(line)
-    build_output = "".join(build_output_lines)
+    # Write a temporary .env.production.local so vite picks up overrides
+    # during the build. This is cross-platform (no shell env prefix needed).
+    # VITE_BASE=/ overrides the proxy base path so assets use root-relative URLs.
+    # VITE_API_BASE sets the backend URL for runtime fetch() calls.
+    api_base = settings.EXPORT_API_BASE_URL
+    env_file = os.path.join(workspace_dir, ".env.production.local")
+    try:
+        with open(env_file, "w", encoding="utf-8") as f:
+            f.write(f"VITE_BASE=/\nVITE_API_BASE={api_base}\n")
+
+        build_output_lines: list[str] = []
+        async for line in sandbox.exec("pnpm build"):
+            build_output_lines.append(line)
+        build_output = "".join(build_output_lines)
+    finally:
+        try:
+            os.remove(env_file)
+        except OSError:
+            pass
 
     dist_dir = os.path.join(workspace_dir, "dist")
     index_path = os.path.join(dist_dir, "index.html")
@@ -85,34 +101,29 @@ async def export_html(session_id: str):
     with open(index_path, "r", encoding="utf-8", errors="replace") as f:
         html = f.read()
 
-    # Inline CSS: <link rel="stylesheet" href="...">
+    # --- Inline CSS ---
     def inline_css(match: re.Match) -> str:
         href = match.group(1)
         css_path = _resolve_asset_path(dist_dir, href)
         if css_path and os.path.isfile(css_path):
             try:
                 with open(css_path, "r", encoding="utf-8", errors="replace") as cf:
-                    css_content = cf.read()
-                return f"<style>{css_content}</style>"
+                    return f"<style>{cf.read()}</style>"
             except OSError:
                 pass
         return match.group(0)
 
+    # Handle both orderings: rel before href, and href before rel
     html = re.sub(
-        r'<link\s+[^>]*rel=["\']stylesheet["\']\s+[^>]*href=["\']([^"\']+)["\'][^>]*/?>',
-        inline_css,
-        html,
-        flags=re.IGNORECASE,
+        r'<link\s[^>]*?href=["\']([^"\']+)["\'][^>]*?rel=["\']stylesheet["\'][^>]*/?>',
+        inline_css, html, flags=re.IGNORECASE,
     )
-    # Also handle href before rel
     html = re.sub(
-        r'<link\s+[^>]*href=["\']([^"\']+)["\'][^>]*rel=["\']stylesheet["\'][^>]*/?>',
-        inline_css,
-        html,
-        flags=re.IGNORECASE,
+        r'<link\s[^>]*?rel=["\']stylesheet["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
+        inline_css, html, flags=re.IGNORECASE,
     )
 
-    # Inline JS: <script src="...">
+    # --- Inline JS ---
     def inline_js(match: re.Match) -> str:
         src = match.group(1)
         js_path = _resolve_asset_path(dist_dir, src)
@@ -120,7 +131,6 @@ async def export_html(session_id: str):
             try:
                 with open(js_path, "r", encoding="utf-8", errors="replace") as jf:
                     js_content = jf.read()
-                # Preserve type attribute if present (e.g. type="module")
                 type_match = re.search(r'type=["\']([^"\']+)["\']', match.group(0))
                 type_attr = f' type="{type_match.group(1)}"' if type_match else ""
                 return f"<script{type_attr}>{js_content}</script>"
@@ -129,10 +139,17 @@ async def export_html(session_id: str):
         return match.group(0)
 
     html = re.sub(
-        r'<script\s+[^>]*src=["\']([^"\']+)["\'][^>]*>\s*</script>',
-        inline_js,
-        html,
-        flags=re.IGNORECASE,
+        r'<script\s[^>]*?src=["\']([^"\']+)["\'][^>]*?>\s*</script>',
+        inline_js, html, flags=re.IGNORECASE,
+    )
+
+    # --- Inline favicon as data URI ---
+    html = _inline_favicon(html, dist_dir, workspace_dir)
+
+    # --- Strip the error reporter script (only useful inside the builder iframe) ---
+    html = re.sub(
+        r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*',
+        '', html, flags=re.DOTALL | re.IGNORECASE,
     )
 
     project = await get_project_by_session(session_id)
@@ -148,10 +165,36 @@ async def export_html(session_id: str):
 
 def _resolve_asset_path(dist_dir: str, href: str) -> str | None:
     """Resolve an asset href (possibly relative or absolute) to a filesystem path."""
-    # Strip leading slash for absolute paths
     cleaned = href.lstrip("/")
     candidate = os.path.join(dist_dir, cleaned)
-    # Prevent directory traversal
     if not os.path.realpath(candidate).startswith(os.path.realpath(dist_dir)):
         return None
     return candidate
+
+
+def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
+    """Replace favicon <link> with an inline data URI."""
+    def replace_favicon(match: re.Match) -> str:
+        href = match.group(1)
+        # Try dist first, then workspace root (dev favicons live in public/)
+        for base in (dist_dir, os.path.join(workspace_dir, "public"), workspace_dir):
+            path = os.path.join(base, href.lstrip("/"))
+            if os.path.isfile(path):
+                try:
+                    with open(path, "rb") as f:
+                        data = f.read()
+                    if path.endswith(".svg"):
+                        b64 = base64.b64encode(data).decode()
+                        return f'<link rel="icon" href="data:image/svg+xml;base64,{b64}">'
+                    ext = os.path.splitext(path)[1].lstrip(".")
+                    mime = {"png": "image/png", "ico": "image/x-icon", "jpg": "image/jpeg"}.get(ext, "image/png")
+                    b64 = base64.b64encode(data).decode()
+                    return f'<link rel="icon" href="data:{mime};base64,{b64}">'
+                except OSError:
+                    pass
+        return match.group(0)
+
+    return re.sub(
+        r'<link\s[^>]*?rel=["\'](?:icon|shortcut icon)["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
+        replace_favicon, html, flags=re.IGNORECASE,
+    )
