@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useErrorStore } from '../stores/errors';
+import { useConsoleStore } from '../stores/console';
 import { useSessionStore } from '../stores/session';
 import { createErrorSocket } from '../services/websocket';
 
@@ -30,22 +31,27 @@ export function useErrorCapture() {
     };
   }, [projectId, pushError, clearErrors]);
 
-  // Runtime errors from preview iframe via postMessage
+  // Runtime errors + console logs from preview iframe via postMessage
+  const pushConsole = useConsoleStore((s) => s.push);
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      if (!event.data || event.data.type !== 'runtime-error') return;
-      const d = event.data;
-      pushError({
-        source: 'runtime',
-        message: d.message ?? 'Unknown runtime error',
-        file: d.file || undefined,
-        line: d.line || undefined,
-        column: d.column || undefined,
-        stack: d.stack || undefined,
-      });
+      if (!event.data) return;
+      if (event.data.type === 'runtime-error') {
+        const d = event.data;
+        pushError({
+          source: 'runtime',
+          message: d.message ?? 'Unknown runtime error',
+          file: d.file || undefined,
+          line: d.line || undefined,
+          column: d.column || undefined,
+          stack: d.stack || undefined,
+        });
+      } else if (event.data.type === 'console') {
+        pushConsole(event.data.level, event.data.args ?? [], event.data.file, event.data.line, event.data.column);
+      }
     }
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [pushError]);
+  }, [pushError, pushConsole]);
 }

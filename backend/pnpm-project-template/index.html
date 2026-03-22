@@ -23,6 +23,35 @@
     var r=e.reason||{};
     report({message:r.message||String(r),stack:r.stack||''});
   });
+  // a script to capture console.logs
+  function parseCaller(){
+    try{
+      var s=(new Error()).stack||'';
+      var lines=s.split('\n');
+      for(var i=3;i<lines.length;i++){
+        if(lines[i].indexOf('node_modules')!==-1)continue;
+        var m=lines[i].match(/\/src\/(.+?)(?:\?[^:]*)?:(\d+):(\d+)/);
+        if(m)return{file:'src/'+m[1]};
+      }
+    }catch(e){}
+    return null;
+  }
+  ['log','warn','error','info'].forEach(function(level){
+    var orig=console[level];
+    console[level]=function(){
+      orig.apply(console,arguments);
+      if(!window.parent||window.parent===window)return;
+      var args=[];
+      for(var i=0;i<arguments.length;i++){
+        try{args.push(typeof arguments[i]==='object'?JSON.stringify(arguments[i]):String(arguments[i]))}
+        catch(e){args.push('[unserializable]')}
+      }
+      var caller=parseCaller();
+      var msg={type:'console',level:level,args:args};
+      if(caller)msg.file=caller.file;
+      window.parent.postMessage(msg,'*');
+    };
+  });
 })()
 </script>
 </head>

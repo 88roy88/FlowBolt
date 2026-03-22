@@ -9,6 +9,7 @@ interface FilesState {
   activeFilePath: string | null;
   pendingRevealLine: number | null;
   pendingRevealColumn: number | null;
+  revealVersion: number;
   loadFileTree: () => Promise<void>;
   openFile: (path: string, line?: number, column?: number) => Promise<void>;
   closeFile: (path: string) => void;
@@ -49,6 +50,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   activeFilePath: null,
   pendingRevealLine: null,
   pendingRevealColumn: null,
+  revealVersion: 0,
   saveVersion: 0,
 
   async loadFileTree() {
@@ -74,7 +76,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   async openFile(path: string, line?: number, column?: number) {
     const state = get();
     if (state.openFiles.has(path)) {
-      set({ activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null });
+      set((s) => ({ activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null, revealVersion: s.revealVersion + 1 }));
       return;
     }
     const projectId = useSessionStore.getState().projectId;
@@ -84,7 +86,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       set((s) => {
         const next = new Map(s.openFiles);
         next.set(path, content);
-        return { openFiles: next, activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null };
+        return { openFiles: next, activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null, revealVersion: s.revealVersion + 1 };
       });
       saveEditorTabs([...get().openFiles.keys()], path);
     } catch (err) {
@@ -146,6 +148,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   },
 
   reset() {
-    set({ fileTree: [], openFiles: new Map(), activeFilePath: null, pendingRevealLine: null, pendingRevealColumn: null });
+    set({ fileTree: [], openFiles: new Map(), activeFilePath: null, pendingRevealLine: null, pendingRevealColumn: null, revealVersion: 0 });
   },
 }));

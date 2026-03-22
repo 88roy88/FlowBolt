@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
+import { useConsoleStore } from '../../stores/console';
 import { RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -29,11 +30,13 @@ export function Preview() {
   useEffect(() => {
     if (saveVersion === saveVersionRef.current) return;
     saveVersionRef.current = saveVersion;
-    const timer = setTimeout(() => setRefreshKey((k) => k + 1), 800);
+    const timer = setTimeout(() => { clearConsole(); setRefreshKey((k) => k + 1); }, 800);
     return () => clearTimeout(timer);
   }, [saveVersion]);
 
+  const clearConsole = useConsoleStore((s) => s.clear);
   const handleRefresh = () => {
+    clearConsole();
     setRefreshKey((k) => k + 1);
   };
 
