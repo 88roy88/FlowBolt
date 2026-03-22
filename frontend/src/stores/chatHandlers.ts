@@ -1,6 +1,7 @@
 import type { WSMessage, Message, FollowUpStep } from '../types';
 import { useFilesStore } from './files';
 import { useSessionStore } from './session';
+import { requestPermissionIfNeeded, notifyBuildComplete } from '../utils/notifications';
 
 type GetState = () => import('./chat').ChatState;
 type SetState = (
@@ -49,6 +50,9 @@ function handleText(msg: { content: string }, set: SetState) {
 
 function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
   set({ error: msg.message, isStreaming: false, agentPhase: 'idle' });
+  if (!_skipMessages) {
+    notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
+  }
   cleanup();
 }
 
@@ -144,8 +148,12 @@ export function createFixErrorHandler(
             agentPhase: 'idle',
           });
         }
+        if (!_skipMessages) {
+          notifyBuildComplete(useSessionStore.getState().currentProject?.name);
+        }
         cleanup();
         useFilesStore.getState().loadFileTree();
+        useFilesStore.getState().refreshOpenFiles();
         break;
       }
     }
@@ -292,6 +300,7 @@ function handlePhaseChange(
   set({ agentPhase: msg.phase });
   if (msg.phase === 'executing') {
     set({ isStreaming: true });
+    requestPermissionIfNeeded();
   }
 }
 
@@ -455,6 +464,10 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     followUpDiffs: [],
     projectSummary: null,
   }));
+  if (!_skipMessages) {
+    notifyBuildComplete(useSessionStore.getState().currentProject?.name);
+  }
   cleanup();
   useFilesStore.getState().loadFileTree();
+  useFilesStore.getState().refreshOpenFiles();
 }

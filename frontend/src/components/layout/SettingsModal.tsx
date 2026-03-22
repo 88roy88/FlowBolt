@@ -1,5 +1,7 @@
-import { X, LayoutPanelLeft, Columns3, Moon, Sun } from 'lucide-react';
+import { useState } from 'react';
+import { X, LayoutPanelLeft, Columns3, Moon, Sun, Bell } from 'lucide-react';
 import { Button } from '../ui/button';
+import { isNotifyEnabled, setNotifyEnabled, requestPermissionIfNeeded } from '../../utils/notifications';
 
 export type LayoutMode = 'classic' | 'flexible';
 
@@ -11,6 +13,7 @@ type SettingsModalProps = {
 
 export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsModalProps) {
   const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const [notifyOn, setNotifyOn] = useState(isNotifyEnabled);
 
   const setTheme = (theme: 'dark' | 'light') => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -93,6 +96,29 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
                 <span className="text-[13px] font-medium">Light</span>
               </button>
             </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="space-y-2.5">
+            <label className="text-[13px] font-medium text-foreground">Notifications</label>
+            <button
+              onClick={() => {
+                const next = !notifyOn;
+                setNotifyEnabled(next);
+                setNotifyOn(next);
+                if (next) requestPermissionIfNeeded();
+              }}
+              className={`flex items-center gap-2.5 p-3 rounded-lg border transition-all duration-150 w-full ${
+                notifyOn
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:border-primary/30 hover:bg-muted/30 text-muted-foreground'
+              }`}
+            >
+              <Bell size={18} />
+              <span className="text-[13px] font-medium">
+                {notifyOn ? 'Build alerts on' : 'Build alerts off'}
+              </span>
+            </button>
           </div>
         </div>
       </div>
