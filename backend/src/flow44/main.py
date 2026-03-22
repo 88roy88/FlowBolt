@@ -22,6 +22,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: initialise DB on startup, clean up sandboxes on shutdown."""
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from flow44.models.project import list_projects  # noqa: PLC0415
 
     live_projects = await list_projects()
+
     live_project_ids = {p.id for p in live_projects}
     await sandbox_manager.restore_existing_workspaces(live_project_ids)
     logger.info("Sandbox restoration complete.")
