@@ -129,7 +129,7 @@ export interface FollowUpStep {
 }
 
 export type WSMessage =
-  | { type: 'message'; content: string; model?: string; caseIds?: number[] }
+  | { type: 'message'; content: string; model?: string; caseIds?: number[]; packageApiAuthorization?: string }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }

@@ -146,6 +146,18 @@ const applyInjectionFlows = (rawHtml) => {
   return { htmlSnippet: withData, librariesUsed };
 };
 
+/** FLAPI expects a non-empty Authorization header; empty or missing => 401 (mock parity). */
+const assertPackageApiAuthorized = (req, res) => {
+  const raw = req.headers.authorization;
+  if (typeof raw !== 'string' || !raw.trim()) {
+    res
+      .status(401)
+      .json(errorBody('unauthorized', 'Authorization header is required'));
+    return false;
+  }
+  return true;
+};
+
 const buildMockModelPromptText = (body) => {
   const userPrompt =
     typeof body?.userPrompt === 'string' ? body.userPrompt.trim() : '';
@@ -234,11 +246,13 @@ function handlePackageSearchByPartialOrId(partialOrId) {
 }
 
 app.get('/package/v1/search/:partial', (req, res) => {
+  if (!assertPackageApiAuthorized(req, res)) return;
   const { status, body } = handlePackageSearchByPartialOrId(req.params.partial);
   res.status(status).json(body);
 });
 
 app.get('/api/flapi/packages/search', (req, res) => {
+  if (!assertPackageApiAuthorized(req, res)) return;
   const query = typeof req.query.q === 'string' ? req.query.q : '';
   const { status, body } = handlePackageSearchByPartialOrId(query);
   res.status(status).json(body);
@@ -254,6 +268,7 @@ function getRunResults(packageId) {
 }
 
 app.post('/package/:packageId', (req, res) => {
+  if (!assertPackageApiAuthorized(req, res)) return;
   const { packageId } = req.params;
   if (!packageId?.trim()) {
     return res.status(400).json(errorBody('invalid_package_id', 'packageId is required'));
@@ -262,6 +277,7 @@ app.post('/package/:packageId', (req, res) => {
 });
 
 app.post('/package/v3/:packageId', (req, res) => {
+  if (!assertPackageApiAuthorized(req, res)) return;
   const { packageId } = req.params;
   if (!packageId?.trim()) {
     return res.status(400).json(errorBody('invalid_package_id', 'packageId is required'));
@@ -270,6 +286,7 @@ app.post('/package/v3/:packageId', (req, res) => {
 });
 
 app.post('/api/flapi/packages/:packageId/run', (req, res) => {
+  if (!assertPackageApiAuthorized(req, res)) return;
   const { packageId } = req.params;
   if (!packageId?.trim()) {
     return res
@@ -280,6 +297,7 @@ app.post('/api/flapi/packages/:packageId/run', (req, res) => {
 });
 
 app.post('/api/flapi/package/v3/:packageId', (req, res) => {
+  if (!assertPackageApiAuthorized(req, res)) return;
   const { packageId } = req.params;
   if (!packageId?.trim()) {
     return res.status(400).json(errorBody('invalid_package_id', 'packageId is required'));

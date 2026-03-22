@@ -45,11 +45,19 @@ class BuildAgent(BaseAgent):
         self._approval_event = asyncio.Event()
         self._approval_action: str = "reject"
         self._approval_feedback: str | None = None
+        self._package_api_authorization: str | None = None
 
     # -- Entry point --
 
     @observe(name="build-agent-run")
-    async def run(self, content: str, case_ids: list[str] | None = None) -> None:
+    async def run(
+        self,
+        content: str,
+        case_ids: list[str] | None = None,
+        *,
+        package_api_authorization: str | None = None,
+    ) -> None:
+        self._package_api_authorization = package_api_authorization
         self._state.user_content = content
         self._state.case_ids = case_ids or []
         self._trace_id = langfuse_context.get_current_trace_id()
@@ -173,7 +181,10 @@ class BuildAgent(BaseAgent):
 
     async def _fetch_and_analyze_case(self, package_id: str) -> dict | None:
         try:
-            package_api = PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
+            package_api = PackageApiClient(
+                base_url=settings.PACKAGE_API_BASE_URL,
+                authorization=self._package_api_authorization,
+            )
             search_results = await package_api.search(package_id)
             if not search_results:
                 await self.emit({"type": "case_error", "message": f"Package {package_id} not found"})

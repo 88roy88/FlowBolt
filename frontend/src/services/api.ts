@@ -1,4 +1,5 @@
 import type { FileEntry, Project, AIModel, PackageSearchRecord } from '../types';
+import { readPackageApiAuthorization } from './packageApiAuth';
 
 const BASE = '/api';
 
@@ -90,7 +91,16 @@ export async function fetchDefaultModel(): Promise<string> {
 }
 
 export async function searchPackages(queryOrId: string): Promise<PackageSearchRecord[]> {
-  return request<PackageSearchRecord[]>(`/package/search/${encodeURIComponent(queryOrId)}`);
+  const headers: Record<string, string> = {};
+  const auth = readPackageApiAuthorization();
+  if (auth) headers.Authorization = auth;
+  const res = await fetch(`${BASE}/package/search/${encodeURIComponent(queryOrId)}`, { headers });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  if (!text) return [] as PackageSearchRecord[];
+  return JSON.parse(text) as PackageSearchRecord[];
 }
 
 export function downloadZip(sessionId: string): void {

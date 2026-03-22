@@ -83,6 +83,12 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 selected_model: str | None = data.get("model")
                 case_ids: list[int] = data.get("caseIds") or []
 
+                raw_pkg_auth = data.get("packageApiAuthorization")
+                if isinstance(raw_pkg_auth, str):
+                    package_api_authorization: str | None = raw_pkg_auth.strip() or None
+                else:
+                    package_api_authorization = None
+
                 # Save user message (for LLM context in followup agent)
                 await save_message(project.id, "user", user_content)
 
@@ -90,10 +96,11 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 user_event: dict = {"type": "user_message", "content": user_content}
                 if case_ids:
                     from app.api.package_api import _package_search
+
                     case_names: list[str] = []
                     for cid in case_ids:
                         try:
-                            results = await _package_search(str(cid))
+                            results = await _package_search(str(cid), authorization=package_api_authorization)
                             name = results[0].get("Name", f"Case #{cid}") if results else f"Case #{cid}"
                         except Exception:
                             name = f"Case #{cid}"
@@ -114,7 +121,11 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                     register(session_id, agent)
                     asyncio.create_task(_run_agent_safe(
                         session_id,
-                        agent.run(user_content, case_ids=[str(cid) for cid in case_ids] if case_ids else None),
+                        agent.run(
+                            user_content,
+                            case_ids=[str(cid) for cid in case_ids] if case_ids else None,
+                            package_api_authorization=package_api_authorization,
+                        ),
                     ))
                 else:
                     agent = FollowUpAgent(
