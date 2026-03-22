@@ -62,30 +62,3 @@ def deploy_react_app(zip_file, session_id):
             minetype = mimetypes.guess_type(name)[0] or 'application/octet-stream'
             s3.put_object(Bucket=BUCKET_NAME, Key=key, Body=z.read(name), ContentType=minetype, ACL='public-read')
     return f"{ENDPOINT_URL}/{BUCKET_NAME}/{session_id}/dist/index.html"
-
-
-def get_zip_from_path(file_path):
-    with open(file_path, 'rb') as f:
-        zip_buffer = io.BytesIO(f.read())
-    return zip_buffer
-
-
-def clear_bucket():
-    s3 = connect_to_s3()
-    try:
-        content = s3.list_objects_v2(Bucket=BUCKET_NAME).get('Contents', [])
-        if content:
-            s3.delete_objects(
-                Bucket=BUCKET_NAME,
-                Delete={'Objects': [{'Key': obj['Key']} for obj in content], 'Quiet': True}
-            )
-    except ClientError:
-        pass
-
-
-# if __name__ == "__main__":
-    # setup_bucket(BUCKET_NAME)
-    # clear_bucket()
-    # zip_file = get_zip_from_path("./integrations/testbundle.zip")
-    # url = deploy_react_app(zip_file, "test-session2")
-    # print(f"App deployed at: {url}")
