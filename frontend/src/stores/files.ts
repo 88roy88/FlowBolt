@@ -15,8 +15,31 @@ interface FilesState {
   setActiveFile: (path: string) => void;
   updateFileContent: (path: string, content: string) => void;
   saveFile: (path: string) => Promise<void>;
+  /** Incremented on every file save — used to trigger preview refresh. */
+  saveVersion: number;
   clearPendingReveal: () => void;
   reset: () => void;
+}
+
+function storageKey(sessionId: string) { return `editor-tabs:${sessionId}`; }
+
+function saveEditorTabs(openPaths: string[], activePath: string | null) {
+  const sessionId = useSessionStore.getState().sessionId;
+  if (!sessionId) return;
+  try {
+    localStorage.setItem(storageKey(sessionId), JSON.stringify({ openPaths, activePath }));
+  } catch {}
+}
+
+function loadEditorTabs(sessionId: string): { openPaths: string[]; activePath: string | null } | null {
+  try {
+    const raw = localStorage.getItem(storageKey(sessionId));
+    if (raw) {
+      const { openPaths, activePath } = JSON.parse(raw);
+      if (Array.isArray(openPaths)) return { openPaths, activePath };
+    }
+  } catch {}
+  return null;
 }
 
 export const useFilesStore = create<FilesState>((set, get) => ({
@@ -25,12 +48,26 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   activeFilePath: null,
   pendingRevealLine: null,
   pendingRevealColumn: null,
+  saveVersion: 0,
 
   async loadFileTree() {
     const sessionId = useSessionStore.getState().sessionId;
     if (!sessionId) return;
     const tree = await api.fetchFileTree(sessionId);
-    set({ fileTree: tree });
+    set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
+
+    // Restore previously open tabs if none are open yet
+    if (get().openFiles.size === 0) {
+      const saved = loadEditorTabs(sessionId);
+      if (saved) {
+        for (const path of saved.openPaths) {
+          await get().openFile(path);
+        }
+        if (saved.activePath && get().openFiles.has(saved.activePath)) {
+          set({ activeFilePath: saved.activePath });
+        }
+      }
+    }
   },
 
   async openFile(path: string, line?: number, column?: number) {
@@ -48,6 +85,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
         next.set(path, content);
         return { openFiles: next, activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null };
       });
+      saveEditorTabs([...get().openFiles.keys()], path);
     } catch (err) {
       console.error('Failed to open file:', path, err);
     }
@@ -64,10 +102,12 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       }
       return { openFiles: next, activeFilePath: activePath };
     });
+    saveEditorTabs([...get().openFiles.keys()], get().activeFilePath);
   },
 
   setActiveFile(path: string) {
     set({ activeFilePath: path });
+    saveEditorTabs([...get().openFiles.keys()], path);
   },
 
   updateFileContent(path: string, content: string) {
@@ -84,6 +124,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     const content = get().openFiles.get(path);
     if (content !== undefined) {
       await api.saveFileContent(sessionId, path, content);
+      set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
   },
 

@@ -1,0 +1,134 @@
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "tests",
+    "alembic",
+    "client",
+    "src/alembic",
+    "src/client",
+    "*.ipynb",
+    "*/_preprocess/"
+]
+
+fix = true
+
+line-length = 120
+indent-width = 4
+
+# Assume Python 3.13
+target-version = "py313"
+
+[lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = [
+    "F", # Flake8 (Pyflakes)
+    "S", # Flake8-bandit
+    "B", # Flake8-bugbear
+    "BLE", # Flake8-blind-except
+    "A", # Flake8-builtins
+    "C4", # Flake8-comprehensions
+    "FA", # Flake8-future-annotations
+    "G", # Flake8-logging-format
+    "RSE", # Flake8-raise
+    "SIM", # Flake8-simplify
+
+    "W", # pycodestyle
+    "E", # pycodestyle
+
+    "PL", # pylint
+
+
+    "ASYNC", # async-check
+    "C", # complexity
+    "I", # isort
+    "FLY", # flynt
+    "C90", # mccabe complexity
+    "N", # pep8-naming
+    "PERF", # perflint
+    "PGH", # pygrep-hooks
+    "UP", # pyupgrade
+    "TRY", # tryceratops
+]
+
+ignore = [
+    "B008", # bugbear: Do not perform function calls in argument defaults -- not using due to fastapi Depends()
+    "B009", # bugbear: Do not call getattr with a constant attribute value
+    "B010", # bugbear: Do not call setattr with a constant attribute value
+    "B019", # bugbear: Do not use functools.lru_cache
+    "N818", # Exception name should be named with an Error suffix
+    "S104", # Possible binding to all interfaces
+    "A003", # Class attribute `id` is shadowing a Python builtin
+    "TRY003", # Avoid specifying long messages outside the exception class
+    "TRY300", # Consider moving this statement to an else block
+    "TRY301", # Abstract raise to an inner function
+    "UP007", # allow using Optional[] in type annotations
+    "SIM105", # Simplifiable statement: `try`-`except`-`pass`
+
+    # TODO: TO Remove:
+    "UP046", # uses `Generic` subclass instead of type parameters
+    "UP047", # Generic function should use type parameters
+    "BLE001", # Do not catch blind exception: `Exception`
+    "PLR2004", # Magic value used in comparison
+    "S603", # `subprocess` call: check for execution of untrusted input
+    "TRY400", # Use `logging.exception` instead of `logging.error`
+    "PERF401", # Manual list comprehension — prefer explicit loops for readability
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.pylint]
+max-args = 7
+
+[lint.pep8-naming]
+# Allow Pydantic's `@validator` decorator to trigger class method treatment.
+classmethod-decorators = [
+    "classmethod",
+    "pydantic.validator", "pydantic.model_validator", "pydantic.root_validator", "pydantic.field_validator",
+    "classproperty",
+]
+
+[format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+
+[lint.per-file-ignores]
+"tests/*" = ["S101"]
+"*/test_*.py" = ["S101"]
+"*_test.py" = ["S101"]
