@@ -17,6 +17,7 @@ interface FilesState {
   saveFile: (path: string) => Promise<void>;
   /** Incremented on every file save — used to trigger preview refresh. */
   saveVersion: number;
+  refreshOpenFiles: () => Promise<void>;
   clearPendingReveal: () => void;
   reset: () => void;
 }
@@ -116,6 +117,18 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       next.set(path, content);
       return { openFiles: next };
     });
+  },
+
+  async refreshOpenFiles() {
+    const sessionId = useSessionStore.getState().sessionId;
+    if (!sessionId) return;
+    const openFiles = get().openFiles;
+    for (const path of openFiles.keys()) {
+      try {
+        const content = await api.fetchFileContent(sessionId, path);
+        get().updateFileContent(path, content);
+      } catch {}
+    }
   },
 
   async saveFile(path: string) {
