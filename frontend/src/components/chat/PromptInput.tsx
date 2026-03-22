@@ -148,12 +148,14 @@ export function PromptInput() {
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
+          data-testid="chat-input"
           className="flex-1 resize-none text-[15px] leading-normal max-h-[200px] py-1 bg-transparent disabled:opacity-50"
         />
 
         <button
           onClick={handleSubmit}
           disabled={!canSend}
+          data-testid="send-button"
           className={`w-[34px] h-[34px] flex items-center justify-center rounded-xl shrink-0 transition-all duration-150 ${
             canSend
               ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'

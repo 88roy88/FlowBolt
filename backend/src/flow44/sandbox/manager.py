@@ -12,25 +12,14 @@ from flow44.sandbox.base import Sandbox, SandboxInfo
 logger = logging.getLogger(__name__)
 
 
-_VITE_CONFIG_TEMPLATE = """\
-import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  return {
-    plugins: [react()],
-    base: env.VITE_BASE ?? '/api/preview/{{SESSION_ID}}/proxy/',
-  }
-})
-"""
-
-
 def stamp_vite_config(session_id: str, workspace_dir: str) -> None:
-    """Write the vite config with the session-specific base path."""
-    path = os.path.join(workspace_dir, "vite.config.ts")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(_VITE_CONFIG_TEMPLATE.replace("{{SESSION_ID}}", session_id))
+    """Read vite.config.ts from the template and replace the session placeholder."""
+    template_path = os.path.join(settings.TEMPLATE_DIR, "vite.config.ts")
+    with open(template_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    dest_path = os.path.join(workspace_dir, "vite.config.ts")
+    with open(dest_path, "w", encoding="utf-8") as f:
+        f.write(content.replace("{{SESSION_ID}}", session_id))
 
 
 class SandboxManager:
