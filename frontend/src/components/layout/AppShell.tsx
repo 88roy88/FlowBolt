@@ -130,9 +130,12 @@ export function AppShell() {
 
   const BottomDrawer = () => (
     <div className="border-t border-border bg-surface shrink-0">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setBottomOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setBottomOpen((v) => !v); }}
+        className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer"
       >
         <ChevronUp size={14} className={`transition-transform duration-200 ${!bottomOpen ? '' : 'rotate-180'}`} />
         <span className="font-medium">{bottomTab === 'server' ? 'Server Log' : 'Terminal'}</span>
@@ -151,7 +154,7 @@ export function AppShell() {
             ))}
           </div>
         )}
-      </button>
+      </div>
       {bottomOpen && (
         <>
           <div className="flex items-center border-t border-border shrink-0">

@@ -19,10 +19,31 @@ const PANE_CONFIG: Record<PaneId, { icon: typeof MessageSquare; label: string }>
 };
 
 const MIN_PANE_PCT = 20;
+const STORAGE_KEY = 'flexible-layout';
+
+function loadLayout(): { visible: PaneId[]; sizes: Record<PaneId, number> } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const { visible, sizes } = JSON.parse(raw);
+      if (Array.isArray(visible) && visible.length > 0) {
+        return { visible, sizes: { chat: 50, code: 50, preview: 50, ...sizes } };
+      }
+    }
+  } catch {}
+  return { visible: ['chat', 'preview'], sizes: { chat: 50, code: 50, preview: 50 } };
+}
+
+function saveLayout(visible: Set<PaneId>, sizes: Record<PaneId, number>) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ visible: [...visible], sizes }));
+  } catch {}
+}
 
 export function FlexibleLayout() {
-  const [visiblePanes, setVisiblePanes] = useState<Set<PaneId>>(new Set(['chat', 'preview']));
-  const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>({ chat: 50, code: 50, preview: 50 });
+  const [initial] = useState(loadLayout);
+  const [visiblePanes, setVisiblePanes] = useState<Set<PaneId>>(new Set(initial.visible));
+  const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>(initial.sizes);
   const panesContainerRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -62,6 +83,7 @@ export function FlexibleLayout() {
       const newSizes = { ...paneSizes };
       for (const id of next) newSizes[id] = equal;
       setPaneSizes(newSizes);
+      saveLayout(next, newSizes);
       return next;
     });
   };
@@ -78,9 +100,11 @@ export function FlexibleLayout() {
       let newRight = prev[rightPane] - pctDelta;
       if (newLeft < MIN_PANE_PCT) { newLeft = MIN_PANE_PCT; newRight = sumBoth - MIN_PANE_PCT; }
       if (newRight < MIN_PANE_PCT) { newRight = MIN_PANE_PCT; newLeft = sumBoth - MIN_PANE_PCT; }
-      return { ...prev, [leftPane]: newLeft, [rightPane]: newRight };
+      const updated = { ...prev, [leftPane]: newLeft, [rightPane]: newRight };
+      saveLayout(visiblePanes, updated);
+      return updated;
     });
-  }, []);
+  }, [visiblePanes]);
 
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
