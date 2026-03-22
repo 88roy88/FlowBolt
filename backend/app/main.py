@@ -14,7 +14,7 @@ import os
 import litellm
 from langfuse import Langfuse
 
-from app.api import chat, errors, export, files, models, package_api, preview, projects, server_log, terminal
+from app.api import chat, errors, export, files, models, package_api, preview, projects, publish, server_log, terminal
 from app.config import settings
 from app.models.project import init_db
 from app.models.events import init_events_table
@@ -82,6 +82,7 @@ app.include_router(files.router)
 app.include_router(preview.router)
 app.include_router(models.router)
 app.include_router(export.router)
+app.include_router(publish.router)
 app.include_router(package_api.router)
 
 # WebSocket routers

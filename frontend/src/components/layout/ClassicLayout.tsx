@@ -1,9 +1,12 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import { Globe, Loader2 } from 'lucide-react';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
+import { useSessionStore } from '../../stores/session';
+import { publishToS3 } from '../../services/api';
 
 type RightTab = 'preview' | 'code';
 
@@ -15,6 +18,21 @@ export function ClassicLayout() {
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
+  const sessionId = useSessionStore((s) => s.sessionId);
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handlePublish = useCallback(async () => {
+    if (!sessionId || isPublishing) return;
+    setIsPublishing(true);
+    try {
+      const result = await publishToS3(sessionId);
+      window.open(result.url, '_blank');
+    } catch (err) {
+      alert(`Publish failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [sessionId, isPublishing]);
 
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
@@ -53,6 +71,22 @@ export function ClassicLayout() {
               {tab}
             </button>
           ))}
+
+          <div className="ml-auto pr-2">
+            <button
+              title="Publish to S3"
+              disabled={!sessionId || isPublishing}
+              onClick={handlePublish}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 ${
+                sessionId && !isPublishing
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-sm'
+                  : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
+              }`}
+            >
+              {isPublishing ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
+              {isPublishing ? 'Publishing...' : 'Publish'}
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-hidden">
           {rightTab === 'preview' ? <Preview /> : <EditorPanel />}

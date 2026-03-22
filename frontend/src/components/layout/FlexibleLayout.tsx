@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { MessageSquare, Code2, Eye } from 'lucide-react';
+import { MessageSquare, Code2, Eye, Globe, Loader2 } from 'lucide-react';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
+import { useSessionStore } from '../../stores/session';
+import { publishToS3 } from '../../services/api';
 
 type PaneId = 'chat' | 'code' | 'preview';
 
@@ -21,6 +23,21 @@ export function FlexibleLayout() {
   const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>({ chat: 50, code: 50, preview: 50 });
   const panesContainerRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
+  const sessionId = useSessionStore((s) => s.sessionId);
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handlePublish = useCallback(async () => {
+    if (!sessionId || isPublishing) return;
+    setIsPublishing(true);
+    try {
+      const result = await publishToS3(sessionId);
+      window.open(result.url, '_blank');
+    } catch (err) {
+      alert(`Publish failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [sessionId, isPublishing]);
 
   const togglePane = (pane: PaneId) => {
     setVisiblePanes(prev => {
@@ -112,6 +129,21 @@ export function FlexibleLayout() {
             </button>
           );
         })}
+
+        <div className="w-9 h-px bg-border/40 my-1 mx-auto" />
+
+        <button
+          title="Publish to S3"
+          disabled={!sessionId || isPublishing}
+          onClick={handlePublish}
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 ${
+            sessionId && !isPublishing
+              ? 'text-primary bg-primary/10 hover:bg-primary hover:text-primary-foreground shadow-sm cursor-pointer'
+              : 'text-muted-foreground/30 bg-muted/20 cursor-not-allowed'
+          }`}
+        >
+          {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
+        </button>
       </div>
     </div>
   );

@@ -101,6 +101,12 @@ export function downloadSingleHtml(sessionId: string): void {
   window.open(`${BASE}/export/${sessionId}/html`, '_blank');
 }
 
+export async function publishToS3(sessionId: string): Promise<{ url: string; project_name: string }> {
+  return request<{ url: string; project_name: string }>(`/export/${sessionId}/publish`, {
+    method: 'POST',
+  });
+}
+
 export async function checkBackendHealth(): Promise<boolean> {
   try {
     await request<Project[]>('/projects');
