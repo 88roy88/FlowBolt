@@ -6,12 +6,14 @@ import io
 import logging
 import os
 import zipfile
+import asyncio
 
 from fastapi import APIRouter, HTTPException
 
+from app.api.export import build_single_html
 from app.config import settings
-from app.integrations.s3 import deploy_react_app, setup_bucket, BUCKET_NAME
-from app.models.project import get_project_by_session
+from app.integrations.s3 import deploy_single_html, setup_bucket, BUCKET_NAME
+from app.models.project import get_project_by_session, update_project_published_url_by_session
 from app.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -34,48 +36,29 @@ async def publish_to_s3(session_id: str):
     except Exception as exc:
         logger.warning("Bucket setup issue (may already exist): %s", exc)
 
-    # Ensure the built React app knows the absolute URL for the API
-    # so it does not send requests to relative paths on the static host.
-    api_base = settings.EXPORT_API_BASE_URL or "http://localhost:8000"
-    await sandbox.write_file(".env.production.local", f"VITE_API_BASE={api_base}\n")
+    # Build a single HTML string containing the entire app with inline assets
+    html_content = await build_single_html(session_id)
 
-    # Build the project
-    build_output_lines: list[str] = []
-    async for line in sandbox.exec("npx vite build --base ./ 2>&1"):
-        build_output_lines.append(line)
-    build_output = "".join(build_output_lines)
-
-    dist_dir = os.path.join(workspace_dir, "dist")
-    if not os.path.isdir(dist_dir):
-        raise HTTPException(
-            status_code=500,
-            detail=f"Build failed or dist/ directory not found.\n\n{build_output}",
-        )
-
-    # Create an in-memory ZIP of the dist/ folder
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _dirs, files in os.walk(dist_dir):
-            for filename in files:
-                abs_path = os.path.join(root, filename)
-                arc_name = os.path.join("dist", os.path.relpath(abs_path, dist_dir))
-                try:
-                    zf.write(abs_path, arc_name)
-                except (PermissionError, OSError) as exc:
-                    logger.warning("Skipping file %s: %s", arc_name, exc)
-
-    zip_buffer.seek(0)
-
-    # Deploy to S3
+    # Deploy the single HTML to S3 securely without blocking the event loop
     try:
-        url = deploy_react_app(zip_buffer, session_id)
+        loop = asyncio.get_running_loop()
+        s3_url = await loop.run_in_executor(None, deploy_single_html, html_content, session_id)
     except Exception as exc:
         logger.exception("S3 deployment failed for session %s", session_id)
         raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}")
 
+    # Save the published URL in our database
+    await update_project_published_url_by_session(session_id, s3_url)
+
+    # Instead of returning the raw S3 url, we return the proxy url to the frontend
+    # Since the frontend accesses the app from the same origin, we can construct
+    # the backend URL from settings.
+    base_url = settings.EXPORT_API_BASE_URL or "http://localhost:8000"
+    proxy_url = f"{base_url}/api/export/{session_id}/published"
+
     project = await get_project_by_session(session_id)
     project_name = project.name if project else session_id
 
-    logger.info("Published project '%s' (session %s) to %s", project_name, session_id, url)
+    logger.info("Published project '%s' (session %s) to %s (proxy: %s)", project_name, session_id, s3_url, proxy_url)
 
-    return {"url": url, "project_name": project_name}
+    return {"url": proxy_url, "project_name": project_name}

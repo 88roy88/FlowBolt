@@ -8,9 +8,10 @@ import logging
 import os
 import re
 import zipfile
+import httpx
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse
 
 from app.config import settings
 from app.models.project import get_project_by_session
@@ -60,9 +61,8 @@ async def export_zip(session_id: str):
     )
 
 
-@router.get("/html")
-async def export_html(session_id: str):
-    """Build the project and return a single self-contained HTML file."""
+async def build_single_html(session_id: str) -> str:
+    """Build the project and return a single self-contained HTML string."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
         raise HTTPException(status_code=404, detail=f"No sandbox found for session {session_id}")
@@ -73,7 +73,7 @@ async def export_html(session_id: str):
     # during the build. This is cross-platform (no shell env prefix needed).
     # VITE_BASE=/ overrides the proxy base path so assets use root-relative URLs.
     # VITE_API_BASE sets the backend URL for runtime fetch() calls.
-    api_base = settings.EXPORT_API_BASE_URL
+    api_base = settings.EXPORT_API_BASE_URL or "http://localhost:8000"
     env_file = os.path.join(workspace_dir, ".env.production.local")
     try:
         with open(env_file, "w", encoding="utf-8") as f:
@@ -152,6 +152,14 @@ async def export_html(session_id: str):
         '', html, flags=re.DOTALL | re.IGNORECASE,
     )
 
+    return html
+
+
+@router.get("/html")
+async def export_html(session_id: str):
+    """Build the project and return a single self-contained HTML file."""
+    html = await build_single_html(session_id)
+
     project = await get_project_by_session(session_id)
     project_name = project.name if project else session_id
     safe_name = re.sub(r"[^\w\-. ]", "_", project_name)
@@ -198,3 +206,20 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
         r'<link\s[^>]*?rel=["\'](?:icon|shortcut icon)["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
         replace_favicon, html, flags=re.IGNORECASE,
     )
+
+
+@router.get("/published", response_class=HTMLResponse)
+async def proxy_published_app(session_id: str):
+    """Proxy route to fetch and serve the published HTML from S3."""
+    project = await get_project_by_session(session_id)
+    if not project or not project.published_url:
+        raise HTTPException(status_code=404, detail="Published app not found or not published yet.")
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(project.published_url, timeout=15.0)
+            resp.raise_for_status()
+            return HTMLResponse(content=resp.text)
+        except Exception as exc:
+            logger.exception("Failed to fetch published app for session %s from %s", session_id, project.published_url)
+            raise HTTPException(status_code=502, detail="Error fetching published app from S3.")

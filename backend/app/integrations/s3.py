@@ -62,3 +62,17 @@ def deploy_react_app(zip_file, session_id):
             minetype = mimetypes.guess_type(name)[0] or 'application/octet-stream'
             s3.put_object(Bucket=BUCKET_NAME, Key=key, Body=z.read(name), ContentType=minetype, ACL='public-read')
     return f"{ENDPOINT_URL}/{BUCKET_NAME}/{session_id}/dist/index.html"
+
+
+def deploy_single_html(html_content: str, session_id: str) -> str:
+    """Deploy a single HTML string to S3 and return the public URL."""
+    s3 = connect_to_s3()
+    key = f"published/{session_id}.html"
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=key,
+        Body=html_content.encode("utf-8"),
+        ContentType="text/html",
+        ACL="public-read"
+    )
+    return f"{ENDPOINT_URL}/{BUCKET_NAME}/{key}"

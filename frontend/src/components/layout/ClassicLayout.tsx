@@ -7,6 +7,8 @@ import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { publishToS3 } from '../../services/api';
+import { PublishModal } from '../ui/PublishModal';
+import { ExternalLink } from 'lucide-react';
 
 type RightTab = 'preview' | 'code';
 
@@ -19,16 +21,24 @@ export function ClassicLayout() {
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
   const sessionId = useSessionStore((s) => s.sessionId);
+  const currentProject = useSessionStore((s) => s.currentProject);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
+  
+  const isPublished = !!currentProject?.published_url;
 
   const handlePublish = useCallback(async () => {
     if (!sessionId || isPublishing) return;
     setIsPublishing(true);
     try {
       const result = await publishToS3(sessionId);
-      window.open(result.url, '_blank');
+      const current = useSessionStore.getState().currentProject;
+      if (current) {
+        useSessionStore.getState().setProjectPublishedUrl(current.id, result.url);
+      }
+      setPublishModalState({ open: true, url: result.url });
     } catch (err) {
-      alert(`Publish failed: ${err instanceof Error ? err.message : err}`);
+      setPublishModalState({ open: true, error: err instanceof Error ? err.message : String(err) });
     } finally {
       setIsPublishing(false);
     }
@@ -72,10 +82,22 @@ export function ClassicLayout() {
             </button>
           ))}
 
-          <div className="ml-auto pr-2">
+          <div className="ml-auto pr-2 flex items-center gap-2">
+            {isPublished && sessionId && (
+              <a
+                href={`/api/export/${sessionId}/published`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 text-primary border border-primary/20 hover:bg-primary/10 shadow-sm"
+                title="View Published App"
+              >
+                <ExternalLink size={13} />
+                View Live
+              </a>
+            )}
             <button
-              title="Publish to S3"
-              disabled={!sessionId || isPublishing}
+          title={isPublished ? "Republish" : "Publish to S3"}
+          disabled={!sessionId || isPublishing}
               onClick={handlePublish}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 ${
                 sessionId && !isPublishing
@@ -84,7 +106,7 @@ export function ClassicLayout() {
               }`}
             >
               {isPublishing ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
-              {isPublishing ? 'Publishing...' : 'Publish'}
+              {isPublishing ? 'Publishing...' : isPublished ? 'Republish' : 'Publish'}
             </button>
           </div>
         </div>
@@ -92,6 +114,13 @@ export function ClassicLayout() {
           {rightTab === 'preview' ? <Preview /> : <EditorPanel />}
         </div>
       </div>
+      
+      <PublishModal 
+        open={publishModalState.open} 
+        onOpenChange={(open) => setPublishModalState(s => ({ ...s, open }))}
+        url={publishModalState.url}
+        errorMessage={publishModalState.error}
+      />
     </div>
   );
 }

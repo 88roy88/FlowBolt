@@ -35,6 +35,7 @@ class Project:
     package_id: str = ""
     package_context: str = ""
     cases: str = "[]"
+    published_url: str = ""
 
 
 async def init_db() -> None:
@@ -161,6 +162,16 @@ async def update_project_summary(project_id: str, summary: str) -> None:
         await db.execute(
             "UPDATE projects SET summary = ?, updated_at = ? WHERE id = ?",
             (summary, datetime.now(timezone.utc).isoformat(), project_id),
+        )
+        await db.commit()
+
+
+async def update_project_published_url_by_session(session_id: str, url: str) -> None:
+    """Update the published_url field for a project using its session_id."""
+    async with aiosqlite.connect(_get_db_path()) as db:
+        await db.execute(
+            "UPDATE projects SET published_url = ?, updated_at = ? WHERE session_id = ?",
+            (url, datetime.now(timezone.utc).isoformat(), session_id),
         )
         await db.commit()
 
