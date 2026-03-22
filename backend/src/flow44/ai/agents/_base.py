@@ -4,7 +4,7 @@ from typing import Any
 
 from langfuse.decorators import langfuse_context
 
-from flow44.models.events import emit_event
+from flow44.db.events import emit_event
 
 
 class BaseAgent:

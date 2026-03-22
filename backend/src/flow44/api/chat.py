@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -12,9 +11,9 @@ from flow44.ai.agent_registry import get as get_agent
 from flow44.ai.agent_registry import register
 from flow44.ai.agent_registry import remove as remove_agent
 from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
-from flow44.models.chat import get_messages, save_message
-from flow44.models.events import emit_event, get_events, subscribe, unsubscribe
-from flow44.models.project import get_project
+from flow44.db.chat import get_messages, save_message
+from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
+from flow44.db.project import get_project
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ async def chat_history(project_id: str) -> list[dict[str, Any]]:
     if project is None:
         raise HTTPException(status_code=404, detail="Unknown project")
     messages = await get_messages(project_id)
-    return [asdict(m) for m in messages]
+    return [m.model_dump() for m in messages]
 
 
 @router.get("/api/chat/{project_id}/events")

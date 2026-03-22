@@ -28,7 +28,7 @@ from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.config import settings
 from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
-from flow44.models.project import update_project_summary
+from flow44.db.project import update_project_summary
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
 
@@ -73,7 +73,7 @@ class BuildAgent(BaseAgent):
             self._state.data_source_contexts = [ctx for ctx in results if ctx is not None]
 
             if self._state.data_source_contexts:
-                from flow44.models.project import update_project_data_sources  # noqa: PLC0415
+                from flow44.db.project import update_project_data_sources  # noqa: PLC0415
 
                 await update_project_data_sources(self.project_id, self._state.data_source_contexts)
 

@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
 from flow44.config import settings
-from flow44.models.project import get_project
+from flow44.db.project import get_project
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)

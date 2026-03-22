@@ -5,14 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import shutil
-from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from flow44.config import settings
-from flow44.models.project import (
+from flow44.db.project import (
     create_project,
     delete_project,
     get_project,
@@ -20,7 +19,7 @@ from flow44.models.project import (
     rename_project,
     update_project_model,
 )
-from flow44.models.session import project_registry
+from flow44.db.session import project_registry
 from flow44.sandbox.manager import sandbox_manager, stamp_vite_config
 
 logger = logging.getLogger(__name__)
@@ -43,7 +42,7 @@ class UpdateProjectModelRequest(BaseModel):
 @router.get("")
 async def list_all_projects() -> list[dict[str, Any]]:
     projects = await list_projects()
-    return [asdict(p) for p in projects]
+    return [p.model_dump() for p in projects]
 
 
 @router.post("", status_code=201)
@@ -54,7 +53,7 @@ async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
     project_registry.register(project.id, sandbox.info)
 
     async def _scaffold_and_start() -> None:
-        from flow44.models.events import emit_event  # noqa: PLC0415
+        from flow44.db.events import emit_event  # noqa: PLC0415
 
         try:
             logger.info("[projects] Scaffolding project for session %s", project.id)
@@ -76,7 +75,7 @@ async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_scaffold_and_start())
-    return asdict(project)
+    return p.model_dump(roject)
 
 
 @router.patch("/{project_id}/name", status_code=200)

@@ -1,0 +1,6 @@
+[run]
+source = flow44
+
+[report]
+show_missing = true
+fail_under = 10

@@ -16,6 +16,7 @@ dependencies = [
     "langfuse==2.59.7",
     "boto3>=1.42.68",
     "pywinpty>=2.0.0; sys_platform == 'win32'",
+    "sqlmodel>=0.0.37",
 ]
 
 [dependency-groups]
@@ -57,10 +58,5 @@ mypy-all = "task mypy src/"
 lint = "bash -c 'task mypy \"$@\" && task ruff \"$@\"' --"
 lint-all = "task lint src/"
 
-tests = "pytest tests -n auto --cov=flow44 --cov-report=term-missing --cov-fail-under=10"
+tests = "pytest"
 tests-all = "task tests"
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
-addopts = "-v"

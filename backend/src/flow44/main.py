@@ -14,8 +14,7 @@ from langfuse import Langfuse
 
 from flow44.api import chat, errors, export, files, flapi_api, models, preview, projects, server_log, terminal
 from flow44.config import settings
-from flow44.models.events import init_events_table
-from flow44.models.project import init_db
+from flow44.db.database import init_db
 from flow44.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -44,11 +43,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Initialising database...")
     await init_db()
-    await init_events_table()
     logger.info("Database ready.")
 
     logger.info("Restoring existing sandbox workspaces...")
-    from flow44.models.project import list_projects  # noqa: PLC0415
+    from flow44.db.project import list_projects  # noqa: PLC0415
 
     live_projects = await list_projects()
 

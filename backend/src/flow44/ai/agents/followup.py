@@ -17,8 +17,8 @@ from flow44.ai.tools.glob import glob
 from flow44.ai.tools.grep import grep
 from flow44.ai.tools.read_file import read_file_with_lines
 from flow44.ai.tools.write_file import write_file_with_diff
-from flow44.models.chat import get_messages
-from flow44.models.project import get_project
+from flow44.db.chat import get_messages
+from flow44.db.project import get_project
 from flow44.sandbox.filesystem import list_files, read_file
 
 from ._base import BaseAgent
