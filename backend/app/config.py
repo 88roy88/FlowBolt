@@ -24,11 +24,14 @@ class Settings(BaseSettings):
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256
     SANDBOX_DISABLE_CGROUPS: bool = False
+    PNPM_STORE_DIR: str = "/var/lib/ai-builder/workspaces/.pnpm-store"
     SANDBOX_MODE: str = "local"  # "local" or "namespaced"
 
     # External APIs
     # Package API (FLAPI) base URL. In dev you can point to the local mock (default).
     PACKAGE_API_BASE_URL: str = "http://localhost:4000"
+    # Public base URL of this backend, used in HTML exports so API calls work standalone.
+    EXPORT_API_BASE_URL: str = ""
 
     # Langfuse (optional — set public/secret key to enable)
     LANGFUSE_PUBLIC_KEY: str = ""
