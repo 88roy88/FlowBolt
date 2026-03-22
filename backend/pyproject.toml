@@ -57,5 +57,10 @@ mypy-all = "task mypy src/"
 lint = "bash -c 'task mypy \"$@\" && task ruff \"$@\"' --"
 lint-all = "task lint src/"
 
-tests = "pytest tests"
+tests = "pytest tests -n auto --cov=flow44 --cov-report=term-missing --cov-fail-under=10"
 tests-all = "task tests"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v"
