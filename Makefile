@@ -10,7 +10,7 @@ dev-frontend:
 	cd frontend && pnpm dev
 
 dev-mocks:
-	cd mocks && npm install && node server.js
+	cd mocks && pnpm install && pnpm dev
 
 # Install dependencies
 install:
