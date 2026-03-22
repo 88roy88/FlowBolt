@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend
+    uses: ./.github/workflows/backend.yaml
+
+# TODO:
+#  frontend:
+#    name: Frontend
+#    uses: ./.github/workflows/dashboard-pipeline.yaml

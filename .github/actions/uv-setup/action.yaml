@@ -4,19 +4,18 @@ inputs:
   working-directory:
     required: false
     description: "directory to run uv sync"
-    default: "."
+    default: "backend"
 
 description: |
-  This action installs python and uv and then installs dependencies from a uv.lock file.
+  Installs Python, uv, and project dependencies.
 
 runs:
   using: "composite"
   steps:
     - name: setup python
       uses: actions/setup-python@v5
-      id: setup-python
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: "3.12"
 
     - name: install uv
       uses: astral-sh/setup-uv@v6
@@ -24,12 +23,10 @@ runs:
         enable-cache: true
         prune-cache: false
         cache-dependency-glob: |
-          cache.txt
+          ${{ inputs.working-directory }}/uv.lock
+          ${{ inputs.working-directory }}/pyproject.toml
 
     - name: install python packages
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: |
-        uv python pin ${{ env.PYTHON_VERSION }}
-        uv sync
-        
+      run: uv sync

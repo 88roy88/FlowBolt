@@ -56,9 +56,6 @@ warn_untyped_fields = true
 
 ###### MISSING IMPORTS  #####
 [[tool.mypy.overrides]]
-module = [
-    "langfuse.*",
-    "pypdfium2.*",
-]
+module = []
 ignore_missing_imports = true
 ##############################
