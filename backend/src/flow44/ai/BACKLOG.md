@@ -145,14 +145,14 @@ wasteful and could exhaust resources. Introduce a shared connection or pool.
 
 ---
 
-## B9. Preview iframe security
+## ~~B9. Preview iframe security~~ DONE
 
 No `sandbox` attribute on the preview iframe — AI-generated code runs with full
 browser privileges. Add `sandbox="allow-scripts allow-same-origin"` + CSP headers.
 
 ---
 
-## B10. Editor save reliability
+## ~~B10. Editor save reliability~~ DONE
 
 - Save debounce can lose edits if component unmounts mid-timer
 - No UI feedback when save fails
@@ -560,7 +560,7 @@ Alternatives: `@hey-api/openapi-ts` (generates client, pair with react-query man
 
 ---
 
-## B14. Frontend reconnect handling
+## ~~B14. Frontend reconnect handling~~ DONE
 
 Part of B0 that needs verification. Backend replays events on WS connect, but
 frontend may not handle receiving a batch of historical events correctly.
@@ -682,7 +682,7 @@ instead of one model for everything.
 
 ---
 
-## F14. Browser notification on build complete
+## ~~F14. Browser notification on build complete~~ DONE
 
 When the user switches to another tab during a build, send a browser notification
 when the agent finishes.
@@ -696,7 +696,7 @@ when the agent finishes.
 
 ---
 
-## F15. Console output capture from preview
+## ~~F15. Console output capture from preview~~ DONE
 
 Capture `console.log`, `console.error`, `console.warn` from the preview iframe
 and display in a "Console" tab next to Terminal / Server Log.
