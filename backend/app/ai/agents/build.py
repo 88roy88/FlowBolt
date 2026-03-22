@@ -37,30 +37,30 @@ logger = logging.getLogger(__name__)
 # TODO: or think about how to add support for it in the Flow framework.
 class BuildAgent(BaseAgent):
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self,
+        *,
+        package_api_authorization: str | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
         self._observation_id: str | None = None
-        # Pause/resume for plan approval
         self._approval_event = asyncio.Event()
         self._approval_action: str = "reject"
         self._approval_feedback: str | None = None
-        self._package_api_authorization: str | None = None
-
-    # -- Entry point --
+        self._package_api_authorization = package_api_authorization
 
     @observe(name="build-agent-run")
     async def run(
         self,
         content: str,
         case_ids: list[str] | None = None,
-        *,
-        package_api_authorization: str | None = None,
     ) -> None:
-        self._package_api_authorization = package_api_authorization
         self._state.user_content = content
         self._state.case_ids = case_ids or []
         self._trace_id = langfuse_context.get_current_trace_id()
+
 
         langfuse_context.update_current_trace(
             session_id=self.session_id,

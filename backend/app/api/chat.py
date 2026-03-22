@@ -115,8 +115,10 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
 
                 if is_new:
                     agent = BuildAgent(
-                        session_id=session_id, project_id=project.id,
+                        session_id=session_id,
+                        project_id=project.id,
                         model=selected_model,
+                        package_api_authorization=package_api_authorization,
                     )
                     register(session_id, agent)
                     asyncio.create_task(_run_agent_safe(
@@ -124,7 +126,6 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                         agent.run(
                             user_content,
                             case_ids=[str(cid) for cid in case_ids] if case_ids else None,
-                            package_api_authorization=package_api_authorization,
                         ),
                     ))
                 else:
