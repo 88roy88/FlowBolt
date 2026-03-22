@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from langfuse.decorators import observe, langfuse_context
+from langfuse.decorators import langfuse_context, observe
 
 from flow44.sandbox.manager import sandbox_manager
 
@@ -26,7 +26,7 @@ def _resolve_safe(session_id: str, relative_path: str) -> tuple[str, str]:
 
 async def read_file(session_id: str, path: str) -> str:
     full, _ = _resolve_safe(session_id, path)
-    with open(full, "r", encoding="utf-8") as fh:
+    with open(full, encoding="utf-8") as fh:
         return fh.read()
 
 
@@ -36,14 +36,12 @@ async def write_file(session_id: str, path: str, content: str) -> None:
     os.makedirs(os.path.dirname(full), exist_ok=True)
     with open(full, "w", encoding="utf-8") as fh:
         fh.write(content)
-    langfuse_context.update_current_observation(
-        metadata={"file_path": path, "content_length": len(content)}
-    )
+    langfuse_context.update_current_observation(metadata={"file_path": path, "content_length": len(content)})
 
 
 async def edit_file(session_id: str, path: str, search: str, replace: str) -> None:
     full, _ = _resolve_safe(session_id, path)
-    with open(full, "r", encoding="utf-8") as fh:
+    with open(full, encoding="utf-8") as fh:
         content = fh.read()
     if search not in content:
         raise ValueError(f"Search string not found in {path}")

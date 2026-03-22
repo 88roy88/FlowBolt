@@ -98,7 +98,7 @@ async def export_html(session_id: str):
             detail=f"Build failed or dist/index.html not found.\n\n{build_output}",
         )
 
-    with open(index_path, "r", encoding="utf-8", errors="replace") as f:
+    with open(index_path, encoding="utf-8", errors="replace") as f:
         html = f.read()
 
     # --- Inline CSS ---
@@ -107,7 +107,7 @@ async def export_html(session_id: str):
         css_path = _resolve_asset_path(dist_dir, href)
         if css_path and os.path.isfile(css_path):
             try:
-                with open(css_path, "r", encoding="utf-8", errors="replace") as cf:
+                with open(css_path, encoding="utf-8", errors="replace") as cf:
                     return f"<style>{cf.read()}</style>"
             except OSError:
                 pass
@@ -116,11 +116,15 @@ async def export_html(session_id: str):
     # Handle both orderings: rel before href, and href before rel
     html = re.sub(
         r'<link\s[^>]*?href=["\']([^"\']+)["\'][^>]*?rel=["\']stylesheet["\'][^>]*/?>',
-        inline_css, html, flags=re.IGNORECASE,
+        inline_css,
+        html,
+        flags=re.IGNORECASE,
     )
     html = re.sub(
         r'<link\s[^>]*?rel=["\']stylesheet["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
-        inline_css, html, flags=re.IGNORECASE,
+        inline_css,
+        html,
+        flags=re.IGNORECASE,
     )
 
     # --- Inline JS ---
@@ -129,7 +133,7 @@ async def export_html(session_id: str):
         js_path = _resolve_asset_path(dist_dir, src)
         if js_path and os.path.isfile(js_path):
             try:
-                with open(js_path, "r", encoding="utf-8", errors="replace") as jf:
+                with open(js_path, encoding="utf-8", errors="replace") as jf:
                     js_content = jf.read()
                 type_match = re.search(r'type=["\']([^"\']+)["\']', match.group(0))
                 type_attr = f' type="{type_match.group(1)}"' if type_match else ""
@@ -140,7 +144,9 @@ async def export_html(session_id: str):
 
     html = re.sub(
         r'<script\s[^>]*?src=["\']([^"\']+)["\'][^>]*?>\s*</script>',
-        inline_js, html, flags=re.IGNORECASE,
+        inline_js,
+        html,
+        flags=re.IGNORECASE,
     )
 
     # --- Inline favicon as data URI ---
@@ -149,7 +155,9 @@ async def export_html(session_id: str):
     # --- Strip the error reporter script (only useful inside the builder iframe) ---
     html = re.sub(
         r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*',
-        '', html, flags=re.DOTALL | re.IGNORECASE,
+        "",
+        html,
+        flags=re.DOTALL | re.IGNORECASE,
     )
 
     project = await get_project_by_session(session_id)
@@ -174,6 +182,7 @@ def _resolve_asset_path(dist_dir: str, href: str) -> str | None:
 
 def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
     """Replace favicon <link> with an inline data URI."""
+
     def replace_favicon(match: re.Match) -> str:
         href = match.group(1)
         # Try dist first, then workspace root (dev favicons live in public/)
@@ -196,5 +205,7 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
 
     return re.sub(
         r'<link\s[^>]*?rel=["\'](?:icon|shortcut icon)["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
-        replace_favicon, html, flags=re.IGNORECASE,
+        replace_favicon,
+        html,
+        flags=re.IGNORECASE,
     )

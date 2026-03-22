@@ -25,9 +25,11 @@ class _State(Enum):
     IN_ARTIFACT = auto()
     IN_ACTION_BODY = auto()
 
+
 # TODO: think about this:
 # A. I want to move to structured output anyway
 # B. This doesnt validate that the xml was closed and that we got the full file content.
+
 
 class ActionParser:
     """Feed-based streaming parser for flowArtifact XML.
@@ -82,7 +84,7 @@ class ActionParser:
                     m = self._ARTIFACT_OPEN.match(self._buffer, idx)
                     if m is None:
                         return
-                    self._buffer = self._buffer[m.end():]
+                    self._buffer = self._buffer[m.end() :]
                     self._state = _State.IN_ARTIFACT
 
             elif self._state is _State.IN_ARTIFACT:
@@ -90,7 +92,7 @@ class ActionParser:
                 close_idx = self._buffer.find(self._ARTIFACT_CLOSE)
 
                 if close_idx != -1 and (action_idx == -1 or close_idx < action_idx):
-                    self._buffer = self._buffer[close_idx + len(self._ARTIFACT_CLOSE):]
+                    self._buffer = self._buffer[close_idx + len(self._ARTIFACT_CLOSE) :]
                     self._state = _State.TEXT
                     continue
 
@@ -105,7 +107,7 @@ class ActionParser:
                     return
                 self._action_file_path = m.group("path") or ""
                 self._action_body = ""
-                self._buffer = self._buffer[m.end():]
+                self._buffer = self._buffer[m.end() :]
                 self._state = _State.IN_ACTION_BODY
 
             elif self._state is _State.IN_ACTION_BODY:
@@ -118,7 +120,7 @@ class ActionParser:
                     return
 
                 self._action_body += self._buffer[:close_idx]
-                self._buffer = self._buffer[close_idx + len(self._ACTION_CLOSE):]
+                self._buffer = self._buffer[close_idx + len(self._ACTION_CLOSE) :]
 
                 self.on_file_action(self._action_file_path, self._action_body.strip())
 

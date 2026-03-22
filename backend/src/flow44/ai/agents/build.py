@@ -4,31 +4,33 @@ import asyncio
 import json
 import logging
 import uuid
-from langfuse import Langfuse
-from langfuse.decorators import observe, langfuse_context
 
-from ._base import BaseAgent
+from langfuse import Langfuse
+from langfuse.decorators import langfuse_context, observe
+
 from flow44.ai.core.messages import Message
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
-from flow44.ai.provider import complete_chat, stream_chat
 from flow44.ai.prompts import (
     ARCHITECTURE_PROMPT,
-    UX_DESIGN_PROMPT,
-    USER_PLAN_PROMPT,
     SUMMARY_PROMPT,
-    render_merge,
-    render_user_plan,
+    USER_PLAN_PROMPT,
+    UX_DESIGN_PROMPT,
     render_codegen,
     render_fix_errors,
+    render_merge,
+    render_user_plan,
 )
+from flow44.ai.provider import complete_chat, stream_chat
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
+from flow44.config import settings
 from flow44.integrations.package_api import PackageApiClient, PackageApiUpstreamError
 from flow44.models.project import update_project_summary
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
-from flow44.config import settings
+
+from ._base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,6 @@ logger = logging.getLogger(__name__)
 # TODO: maybe split this into two agents and get rid of the approval event stuff?
 # TODO: or think about how to add support for it in the Flow framework.
 class BuildAgent(BaseAgent):
-
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
@@ -64,27 +65,28 @@ class BuildAgent(BaseAgent):
         # Fetch case data
         if self._state.case_ids:
             await self.emit({"type": "phase", "phase": "fetching_cases"})
-            results = await asyncio.gather(
-                *[self._fetch_and_analyze_case(cid) for cid in self._state.case_ids]
-            )
+            results = await asyncio.gather(*[self._fetch_and_analyze_case(cid) for cid in self._state.case_ids])
             self._state.case_contexts = [ctx for ctx in results if ctx is not None]
 
             if self._state.case_contexts:
                 from flow44.models.project import update_project_cases
+
                 await update_project_cases(self.project_id, self._state.case_contexts)
 
-                await self.emit({
-                    "type": "cases_fetched",
-                    "cases": [
-                        {
-                            "package_id": ctx["package_id"],
-                            "package_name": ctx["package_name"],
-                            "data_schema": ctx.get("data_schema", ""),
-                            "relevant_fields": ctx.get("relevant_fields", ""),
-                        }
-                        for ctx in self._state.case_contexts
-                    ],
-                })
+                await self.emit(
+                    {
+                        "type": "cases_fetched",
+                        "cases": [
+                            {
+                                "package_id": ctx["package_id"],
+                                "package_name": ctx["package_name"],
+                                "data_schema": ctx.get("data_schema", ""),
+                                "relevant_fields": ctx.get("relevant_fields", ""),
+                            }
+                            for ctx in self._state.case_contexts
+                        ],
+                    }
+                )
 
         # Design (parallel)
         await self.emit({"type": "phase", "phase": "designing"})
@@ -139,14 +141,17 @@ class BuildAgent(BaseAgent):
         self._state.work_plan = await self._build_technical_plan()
         span_plan.end()
 
-        await self.emit({
-            "type": "task_list",
-            "tasks": [{"id": t.id, "title": t.title, "status": t.status} for t in self._state.work_plan.tasks],
-        })
+        await self.emit(
+            {
+                "type": "task_list",
+                "tasks": [{"id": t.id, "title": t.title, "status": t.status} for t in self._state.work_plan.tasks],
+            }
+        )
 
         # Execute
         span_exec = langfuse_client.span(
-            trace_id=self._trace_id, name="execute-plan",
+            trace_id=self._trace_id,
+            name="execute-plan",
             metadata={
                 "total_tasks": len(self._state.work_plan.tasks),
                 "execution_layers": len(self._state.work_plan.execution_layers()),
@@ -231,11 +236,19 @@ class BuildAgent(BaseAgent):
                     f"Sample data:\n```json\n{json.dumps(ctx['sample_data'], indent=2)[:1000]}\n```\n"
                     f"Endpoint: `${{API_BASE}}/api/package/{ctx['package_id']}/run` (import API_BASE from src/config.ts)"
                 )
-            user_message += "\n\n## Case Data Integration\n\n" + "\n\n".join(sections) + \
-                "\n\nYour architecture MUST include components that fetch, display, and interact with this case data."
+            user_message += (
+                "\n\n## Case Data Integration\n\n"
+                + "\n\n".join(sections)
+                + "\n\nYour architecture MUST include components that fetch, display, and interact with this case data."
+            )
 
         try:
-            raw = await complete_chat([Message.user(user_message)], ARCHITECTURE_PROMPT, model=self.model, metadata=self._llm_metadata("design_architecture"))
+            raw = await complete_chat(
+                [Message.user(user_message)],
+                ARCHITECTURE_PROMPT,
+                model=self.model,
+                metadata=self._llm_metadata("design_architecture"),
+            )
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "complete"})
             return parse_json_response(raw)
         except Exception:
@@ -246,7 +259,12 @@ class BuildAgent(BaseAgent):
     @observe(name="design-ux")
     async def _design_ux(self) -> dict:
         try:
-            raw = await complete_chat([Message.user(self._state.user_content)], UX_DESIGN_PROMPT, model=self.model, metadata=self._llm_metadata("design_ux"))
+            raw = await complete_chat(
+                [Message.user(self._state.user_content)],
+                UX_DESIGN_PROMPT,
+                model=self.model,
+                metadata=self._llm_metadata("design_ux"),
+            )
             await self.emit({"type": "design_progress", "stream": "ux", "content": "complete"})
             return parse_json_response(raw)
         except Exception:
@@ -256,13 +274,39 @@ class BuildAgent(BaseAgent):
 
     @observe(name="build-user-overview")
     async def _build_user_overview(self) -> dict:
-        plan_input = json.dumps({"user_request": self._state.user_content, "architecture": self._state.architecture, "ux_design": self._state.ux_design}, indent=2)
-        raw = await complete_chat([Message.user(plan_input)], USER_PLAN_PROMPT, model=self.model, metadata=self._llm_metadata("build_user_overview"))
+        plan_input = json.dumps(
+            {
+                "user_request": self._state.user_content,
+                "architecture": self._state.architecture,
+                "ux_design": self._state.ux_design,
+            },
+            indent=2,
+        )
+        raw = await complete_chat(
+            [Message.user(plan_input)],
+            USER_PLAN_PROMPT,
+            model=self.model,
+            metadata=self._llm_metadata("build_user_overview"),
+        )
         return parse_json_response(raw)
 
     async def _rebuild_overview_with_feedback(self, feedback: str) -> dict:
-        plan_input = json.dumps({"user_request": self._state.user_content, "architecture": self._state.architecture, "ux_design": self._state.ux_design, "previous_overview": self._state.user_overview, "user_feedback": feedback}, indent=2)
-        raw = await complete_chat([Message.user(plan_input)], render_user_plan(has_feedback=True), model=self.model, metadata=self._llm_metadata("rebuild_overview_with_feedback"))
+        plan_input = json.dumps(
+            {
+                "user_request": self._state.user_content,
+                "architecture": self._state.architecture,
+                "ux_design": self._state.ux_design,
+                "previous_overview": self._state.user_overview,
+                "user_feedback": feedback,
+            },
+            indent=2,
+        )
+        raw = await complete_chat(
+            [Message.user(plan_input)],
+            render_user_plan(has_feedback=True),
+            model=self.model,
+            metadata=self._llm_metadata("rebuild_overview_with_feedback"),
+        )
         return parse_json_response(raw)
 
     # -- Planning --
@@ -277,11 +321,26 @@ class BuildAgent(BaseAgent):
         }
         if self._state.case_contexts:
             merge_data["case_integrations"] = [
-                {k: ctx[k] for k in ("package_id", "package_name", "data_schema", "relevant_fields", "data_characteristics", "integration_notes")}
+                {
+                    k: ctx[k]
+                    for k in (
+                        "package_id",
+                        "package_name",
+                        "data_schema",
+                        "relevant_fields",
+                        "data_characteristics",
+                        "integration_notes",
+                    )
+                }
                 for ctx in self._state.case_contexts
             ]
 
-        raw = await complete_chat([Message.user(json.dumps(merge_data, indent=2))], render_merge(has_cases=bool(self._state.case_contexts)), model=self.model, metadata=self._llm_metadata("build_technical_plan"))
+        raw = await complete_chat(
+            [Message.user(json.dumps(merge_data, indent=2))],
+            render_merge(has_cases=bool(self._state.case_contexts)),
+            model=self.model,
+            metadata=self._llm_metadata("build_technical_plan"),
+        )
         plan_data = parse_json_response(raw)
 
         tasks = [
@@ -317,7 +376,8 @@ class BuildAgent(BaseAgent):
             await asyncio.gather(*[self._execute_task_with_span(t, langfuse_client) for t in layer])
 
         typecheck_errors, build_errors = await asyncio.gather(
-            self._typecheck(), self._build(),
+            self._typecheck(),
+            self._build(),
         )
 
         all_errors = []
@@ -330,7 +390,8 @@ class BuildAgent(BaseAgent):
 
     async def _execute_task_with_span(self, task: Task, langfuse_client: Langfuse) -> None:
         span = langfuse_client.span(
-            trace_id=self._trace_id, parent_observation_id=self._observation_id,
+            trace_id=self._trace_id,
+            parent_observation_id=self._observation_id,
             name=f"execute-task-{task.id}",
             metadata={"task_id": task.id, "task_title": task.title, "expected_files": len(task.files)},
         )
@@ -367,7 +428,12 @@ class BuildAgent(BaseAgent):
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
-            async for chunk in stream_chat([Message.user("Generate the code.")], prompt, model=self.model, metadata=self._llm_metadata(f"execute_task_{task.id}")):
+            async for chunk in stream_chat(
+                [Message.user("Generate the code.")],
+                prompt,
+                model=self.model,
+                metadata=self._llm_metadata(f"execute_task_{task.id}"),
+            ):
                 parser.feed(chunk)
             parser.flush()
 
@@ -416,7 +482,12 @@ class BuildAgent(BaseAgent):
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
-            async for chunk in stream_chat([Message.user("Fix the TypeScript errors.")], prompt, model=self.model, metadata=self._llm_metadata("fix_errors")):
+            async for chunk in stream_chat(
+                [Message.user("Fix the TypeScript errors.")],
+                prompt,
+                model=self.model,
+                metadata=self._llm_metadata("fix_errors"),
+            ):
                 parser.feed(chunk)
             parser.flush()
 
@@ -431,8 +502,20 @@ class BuildAgent(BaseAgent):
 
     async def _generate_summary(self) -> None:
         try:
-            summary_input = json.dumps({"user_request": self._state.user_content, "architecture": self._state.architecture, "files_created": list(self._state.completed_files.keys())}, indent=2)
-            raw = await complete_chat([Message.user(summary_input)], SUMMARY_PROMPT, model=self.model, metadata=self._llm_metadata("generate_summary"))
+            summary_input = json.dumps(
+                {
+                    "user_request": self._state.user_content,
+                    "architecture": self._state.architecture,
+                    "files_created": list(self._state.completed_files.keys()),
+                },
+                indent=2,
+            )
+            raw = await complete_chat(
+                [Message.user(summary_input)],
+                SUMMARY_PROMPT,
+                model=self.model,
+                metadata=self._llm_metadata("generate_summary"),
+            )
             summary_data = parse_json_response(raw)
             if summary_data:
                 await update_project_summary(self.project_id, json.dumps(summary_data, ensure_ascii=False))

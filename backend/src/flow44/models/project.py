@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import aiosqlite
 
@@ -112,8 +112,8 @@ async def create_project(name: str) -> Project:
         id=str(uuid.uuid4()),
         name=name,
         session_id=str(uuid.uuid4()),
-        created_at=datetime.now(timezone.utc).isoformat(),
-        updated_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
+        updated_at=datetime.now(UTC).isoformat(),
     )
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
@@ -160,7 +160,7 @@ async def update_project_summary(project_id: str, summary: str) -> None:
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
             "UPDATE projects SET summary = ?, updated_at = ? WHERE id = ?",
-            (summary, datetime.now(timezone.utc).isoformat(), project_id),
+            (summary, datetime.now(UTC).isoformat(), project_id),
         )
         await db.commit()
 
@@ -170,7 +170,7 @@ async def rename_project(project_id: str, name: str) -> None:
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
             "UPDATE projects SET name = ?, updated_at = ? WHERE id = ?",
-            (name, datetime.now(timezone.utc).isoformat(), project_id),
+            (name, datetime.now(UTC).isoformat(), project_id),
         )
         await db.commit()
 
@@ -180,7 +180,7 @@ async def update_project_model(project_id: str, model: str) -> None:
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
             "UPDATE projects SET selected_model = ?, updated_at = ? WHERE id = ?",
-            (model, datetime.now(timezone.utc).isoformat(), project_id),
+            (model, datetime.now(UTC).isoformat(), project_id),
         )
         await db.commit()
 
@@ -190,7 +190,7 @@ async def update_project_package(project_id: str, package_id: str, package_conte
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
             "UPDATE projects SET package_id = ?, package_context = ?, updated_at = ? WHERE id = ?",
-            (package_id, package_context, datetime.now(timezone.utc).isoformat(), project_id),
+            (package_id, package_context, datetime.now(UTC).isoformat(), project_id),
         )
         await db.commit()
 
@@ -200,7 +200,7 @@ async def update_project_cases(project_id: str, cases: list[dict]) -> None:
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
             "UPDATE projects SET cases = ?, updated_at = ? WHERE id = ?",
-            (json.dumps(cases), datetime.now(timezone.utc).isoformat(), project_id),
+            (json.dumps(cases), datetime.now(UTC).isoformat(), project_id),
         )
         await db.commit()
 
@@ -209,7 +209,9 @@ async def get_project_cases(project_id: str) -> list[dict]:
     """Read the cases column, falling back to old package_id/package_context for backward compat."""
     async with aiosqlite.connect(_get_db_path()) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT cases, package_id, package_context FROM projects WHERE id = ?", (project_id,)) as cur:
+        async with db.execute(
+            "SELECT cases, package_id, package_context FROM projects WHERE id = ?", (project_id,)
+        ) as cur:
             row = await cur.fetchone()
             if row is None:
                 return []

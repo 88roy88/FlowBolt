@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl  # type: ignore[import-not-found]
 import logging
 import os
 from collections.abc import AsyncIterator
 
-import fcntl  # type: ignore[import-not-found]
-
-from flow44.sandbox.base import Sandbox, _ensure_bashrc, _kill_process_tree
+from flow44.sandbox.base import Sandbox, _ensure_bashrc
 from flow44.sandbox.pty import PtyHandle, _active_ptys
 
 logger = logging.getLogger(__name__)
 
 
 class LocalSandbox(Sandbox):
-
     async def exec(self, command: str) -> AsyncIterator[str]:
         cmd = ["/bin/bash", "-c", f"cd {self.workspace_dir} && {command}"]
 
@@ -45,7 +43,9 @@ class LocalSandbox(Sandbox):
 
         dev_cmd = f"pnpm dev --port {self.port} --host 0.0.0.0"
         self._dev_process = await asyncio.create_subprocess_exec(
-            "/bin/bash", "-c", f"cd {self.workspace_dir} && {dev_cmd}",
+            "/bin/bash",
+            "-c",
+            f"cd {self.workspace_dir} && {dev_cmd}",
             stdin=asyncio.subprocess.DEVNULL,
             stdout=self._dev_log_file,
             stderr=asyncio.subprocess.STDOUT,
@@ -54,7 +54,9 @@ class LocalSandbox(Sandbox):
         )
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
-            self.session_id, self.port, self._dev_process.pid,
+            self.session_id,
+            self.port,
+            self._dev_process.pid,
         )
 
     def create_pty(self) -> PtyHandle:

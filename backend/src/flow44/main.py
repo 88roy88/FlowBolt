@@ -3,21 +3,19 @@
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import litellm
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from langfuse import Langfuse
 
 from flow44.api import chat, errors, export, files, models, package_api, preview, projects, server_log, terminal
 from flow44.config import settings
-from flow44.models.project import init_db
 from flow44.models.events import init_events_table
+from flow44.models.project import init_db
 from flow44.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -50,6 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Restoring existing sandbox workspaces...")
     from flow44.models.project import list_projects
+
     live_projects = await list_projects()
     live_session_ids = {p.session_id for p in live_projects}
     await sandbox_manager.restore_existing_workspaces(live_session_ids)

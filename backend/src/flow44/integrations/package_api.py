@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from urllib.parse import quote
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -65,4 +65,3 @@ class PackageApiClient:
         if resp.status_code >= 400:
             raise PackageApiUpstreamError(f"Package API error ({resp.status_code})")
         return resp.json()
-

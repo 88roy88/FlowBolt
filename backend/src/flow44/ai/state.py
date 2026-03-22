@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from flow44.ai.task_tree import WorkPlan
 
+
 # TODO: what is this?
 class BuildState(BaseModel):
     session_id: str

@@ -11,7 +11,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from flow44.config import settings
-from flow44.models.project import create_project, delete_project, get_project, list_projects, rename_project, update_project_model
+from flow44.models.project import (
+    create_project,
+    delete_project,
+    get_project,
+    list_projects,
+    rename_project,
+    update_project_model,
+)
 from flow44.models.session import session_registry
 from flow44.sandbox.manager import sandbox_manager, stamp_vite_config
 

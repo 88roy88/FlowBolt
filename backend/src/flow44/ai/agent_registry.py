@@ -19,4 +19,5 @@ def get(session_id: str) -> BaseAgent | None:
 def remove(session_id: str) -> None:
     _running.pop(session_id, None)
 
+
 # TODO: not sure im a fan of this global mutable state or the registry pattern in general.

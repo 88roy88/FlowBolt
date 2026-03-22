@@ -33,6 +33,7 @@ async def get_preview_port(session_id: str):
 # Proxy endpoint
 # ---------------------------------------------------------------------------
 
+
 @router.api_route(
     "/{session_id}/proxy/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
@@ -95,6 +96,7 @@ async def proxy_to_sandbox(session_id: str, path: str, request: Request):
 # ---------------------------------------------------------------------------
 # WebSocket proxy for Vite HMR
 # ---------------------------------------------------------------------------
+
 
 @router.websocket("/{session_id}/proxy")
 async def proxy_ws(websocket: WebSocket, session_id: str):

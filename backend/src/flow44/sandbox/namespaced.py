@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl  # type: ignore[import-not-found]
 import logging
 import os
 import subprocess
 from collections.abc import AsyncIterator
-
-import fcntl  # type: ignore[import-not-found]
 
 from flow44.config import settings
 from flow44.sandbox.base import Sandbox, _ensure_bashrc
@@ -42,43 +41,73 @@ def _build_nsjail_args(
 
     args: list[str] = [
         settings.NSJAIL_BIN,
-        "--mode", "o",
-        "-R", "/usr",
-        "-R", "/usr/local",
-        "-R", "/lib",
+        "--mode",
+        "o",
+        "-R",
+        "/usr",
+        "-R",
+        "/usr/local",
+        "-R",
+        "/lib",
         *(["-R", "/lib64"] if os.path.exists("/lib64") else []),
-        "-R", "/bin",
-        "-R", "/sbin",
-        "-R", "/etc",
-        "--mount", "none:/tmp:tmpfs:rw",
-        "-R", "/dev",
-        "-B", f"{workspace_dir}:/home/project",
-        "-B", f"{settings.PNPM_STORE_DIR}:/pnpm-store",
-        "--mount", "none:/home/appuser:tmpfs:rw",
-        "--cwd", "/home/project",
-        "--env", "HOME=/home/appuser",
-        "--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        "--env", "TERM=xterm-256color",
-        "--env", "FORCE_COLOR=1",
-        "--time_limit", str(time_limit),
-        "--log", os.path.join(workspace_dir, ".nsjail.log"),
-        "--rlimit_as", "soft",
-        "--rlimit_cpu", "hard",
-        "--rlimit_fsize", "soft",
-        "--rlimit_nofile", "soft",
-        "--hostname", f"sandbox-{session_id[:8]}",
+        "-R",
+        "/bin",
+        "-R",
+        "/sbin",
+        "-R",
+        "/etc",
+        "--mount",
+        "none:/tmp:tmpfs:rw",
+        "-R",
+        "/dev",
+        "-B",
+        f"{workspace_dir}:/home/project",
+        "-B",
+        f"{settings.PNPM_STORE_DIR}:/pnpm-store",
+        "--mount",
+        "none:/home/appuser:tmpfs:rw",
+        "--cwd",
+        "/home/project",
+        "--env",
+        "HOME=/home/appuser",
+        "--env",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "--env",
+        "TERM=xterm-256color",
+        "--env",
+        "FORCE_COLOR=1",
+        "--time_limit",
+        str(time_limit),
+        "--log",
+        os.path.join(workspace_dir, ".nsjail.log"),
+        "--rlimit_as",
+        "soft",
+        "--rlimit_cpu",
+        "hard",
+        "--rlimit_fsize",
+        "soft",
+        "--rlimit_nofile",
+        "soft",
+        "--hostname",
+        f"sandbox-{session_id[:8]}",
         "--disable_clone_newnet",
-        "--user", "1000:1000:1",
-        "--group", "1000:1000:1",
+        "--user",
+        "1000:1000:1",
+        "--group",
+        "1000:1000:1",
         "--disable_proc",
     ]
 
     if _CGROUPV2_AVAILABLE:
-        args.extend([
-            "--use_cgroupv2",
-            "--cgroup_mem_max", str(mem_limit),
-            "--cgroup_pids_max", str(pid_limit),
-        ])
+        args.extend(
+            [
+                "--use_cgroupv2",
+                "--cgroup_mem_max",
+                str(mem_limit),
+                "--cgroup_pids_max",
+                str(pid_limit),
+            ]
+        )
     else:
         args.append("--disable_clone_newcgroup")
 
@@ -93,7 +122,6 @@ def _build_nsjail_args(
 
 
 class NamespacedSandbox(Sandbox):
-
     async def exec(self, command: str) -> AsyncIterator[str]:
         cmd = _build_nsjail_args(self.session_id, self.workspace_dir, self.port, command=command)
         proc = await asyncio.create_subprocess_exec(
@@ -119,7 +147,9 @@ class NamespacedSandbox(Sandbox):
         self._dev_log_file = open(log_path, "wb")  # noqa: SIM115
 
         cmd = _build_nsjail_args(
-            self.session_id, self.workspace_dir, self.port,
+            self.session_id,
+            self.workspace_dir,
+            self.port,
             command=f"pnpm dev --port {self.port} --host 0.0.0.0",
             time_limit=0,
         )
@@ -136,7 +166,9 @@ class NamespacedSandbox(Sandbox):
         )
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
-            self.session_id, self.port, self._dev_process.pid,
+            self.session_id,
+            self.port,
+            self._dev_process.pid,
         )
 
     def create_pty(self) -> PtyHandle:

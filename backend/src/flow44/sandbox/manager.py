@@ -34,7 +34,6 @@ def stamp_vite_config(session_id: str, workspace_dir: str) -> None:
 
 
 class SandboxManager:
-
     def __init__(self) -> None:
         self._sandboxes: dict[str, Sandbox] = {}
         self._available_ports: set[int] = set(
@@ -54,11 +53,14 @@ class SandboxManager:
         # TODO: why the imports are here and not top level?
         if settings.SANDBOX_MODE == "namespaced":
             from flow44.sandbox.namespaced import NamespacedSandbox
+
             return NamespacedSandbox(info)
         if os.name == "nt":
             from flow44.sandbox.windows_local import WindowsLocalSandbox
+
             return WindowsLocalSandbox(info)
         from flow44.sandbox.local import LocalSandbox
+
         return LocalSandbox(info)
 
     async def create_sandbox(self, session_id: str) -> Sandbox:
@@ -105,7 +107,9 @@ class SandboxManager:
         try:
             result = _sp.run(
                 ["pgrep", "-f", "pnpm dev --port"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode != 0:
                 return
@@ -114,7 +118,9 @@ class SandboxManager:
                 try:
                     cmdline = _sp.run(
                         ["ps", "-p", str(pid), "-o", "args="],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     ).stdout.strip()
                 except Exception:
                     continue

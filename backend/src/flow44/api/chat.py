@@ -3,15 +3,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from flow44.ai.agents import BuildAgent, FollowUpAgent, FixErrorAgent
-from flow44.ai.agent_registry import register, get as get_agent, remove as remove_agent
+from flow44.ai.agent_registry import get as get_agent
+from flow44.ai.agent_registry import register
+from flow44.ai.agent_registry import remove as remove_agent
+from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
 from flow44.models.chat import get_messages, save_message
-from flow44.models.events import subscribe, unsubscribe, get_events, emit_event
+from flow44.models.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.models.project import get_project_by_session
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 user_event: dict = {"type": "user_message", "content": user_content}
                 if case_ids:
                     from flow44.api.package_api import _package_search
+
                     case_names: list[str] = []
                     for cid in case_ids:
                         try:
@@ -98,27 +100,28 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                         except Exception:
                             name = f"Case #{cid}"
                         case_names.append(name)
-                    user_event["cases"] = [
-                        {"id": cid, "name": cname}
-                        for cid, cname in zip(case_ids, case_names)
-                    ]
+                    user_event["cases"] = [{"id": cid, "name": cname} for cid, cname in zip(case_ids, case_names)]
                 await emit_event(session_id, user_event, notify=False)
 
                 is_new = await _is_new_project(session_id)
 
                 if is_new:
                     agent = BuildAgent(
-                        session_id=session_id, project_id=project.id,
+                        session_id=session_id,
+                        project_id=project.id,
                         model=selected_model,
                     )
                     register(session_id, agent)
-                    asyncio.create_task(_run_agent_safe(
-                        session_id,
-                        agent.run(user_content, case_ids=[str(cid) for cid in case_ids] if case_ids else None),
-                    ))
+                    asyncio.create_task(
+                        _run_agent_safe(
+                            session_id,
+                            agent.run(user_content, case_ids=[str(cid) for cid in case_ids] if case_ids else None),
+                        )
+                    )
                 else:
                     agent = FollowUpAgent(
-                        session_id=session_id, project_id=project.id,
+                        session_id=session_id,
+                        project_id=project.id,
                         model=selected_model,
                     )
                     register(session_id, agent)
@@ -148,26 +151,38 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 await save_message(project.id, "user", error_desc)
 
                 # Emit user_message event (for frontend history reconstruction)
-                await emit_event(session_id, {
-                    "type": "user_message",
-                    "content": "",
-                    "error_fix_request": {
-                        "errorMessage": error_message,
-                        "errorFile": error_file,
-                        "errorLine": error_line,
-                        "errorStack": error_stack,
+                await emit_event(
+                    session_id,
+                    {
+                        "type": "user_message",
+                        "content": "",
+                        "error_fix_request": {
+                            "errorMessage": error_message,
+                            "errorFile": error_file,
+                            "errorLine": error_line,
+                            "errorStack": error_stack,
+                        },
                     },
-                }, notify=False)
+                    notify=False,
+                )
 
                 agent = FixErrorAgent(
-                    session_id=session_id, project_id=project.id,
+                    session_id=session_id,
+                    project_id=project.id,
                     model=selected_model,
                 )
                 register(session_id, agent)
-                asyncio.create_task(_run_agent_safe(
-                    session_id,
-                    agent.run(error_message=error_message, error_file=error_file, error_line=error_line, error_stack=error_stack),
-                ))
+                asyncio.create_task(
+                    _run_agent_safe(
+                        session_id,
+                        agent.run(
+                            error_message=error_message,
+                            error_file=error_file,
+                            error_line=error_line,
+                            error_stack=error_stack,
+                        ),
+                    )
+                )
 
     forward_task = asyncio.create_task(_forward_events())
 

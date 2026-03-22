@@ -1,7 +1,7 @@
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.build import BuildAgent
-from flow44.ai.agents.followup import FollowUpAgent
 from flow44.ai.agents.fix_error import FixErrorAgent
+from flow44.ai.agents.followup import FollowUpAgent
 
 __all__ = ["BaseAgent", "BuildAgent", "FollowUpAgent", "FixErrorAgent"]
 

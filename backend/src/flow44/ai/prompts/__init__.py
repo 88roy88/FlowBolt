@@ -10,6 +10,7 @@ from jinja2 import Environment, FileSystemLoader
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(loader=FileSystemLoader(str(_templates_dir)), trim_blocks=True, lstrip_blocks=True)
 
+
 def render(template_name: str, **kwargs: Any) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
@@ -57,10 +58,12 @@ def render_codegen(
     if case_contexts:
         prepared_cases = []
         for ctx in case_contexts:
-            prepared_cases.append({
-                **ctx,
-                "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000],
-            })
+            prepared_cases.append(
+                {
+                    **ctx,
+                    "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000],
+                }
+            )
 
     other_exports = None
     if other_completed_files:

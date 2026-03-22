@@ -26,11 +26,19 @@ async def grep(
     # TODO: make number of context line and number of results configurable.
     # TODO: add support to gitignore instead of the hardcoded skip list
     cmd = [
-        "rg", "--no-heading", "--line-number", "--max-count", "50",
-        "--glob", "!node_modules",
-        "--glob", "!.git",
-        "--glob", "!dist",
-        "--glob", "!.next",
+        "rg",
+        "--no-heading",
+        "--line-number",
+        "--max-count",
+        "50",
+        "--glob",
+        "!node_modules",
+        "--glob",
+        "!.git",
+        "--glob",
+        "!dist",
+        "--glob",
+        "!.next",
     ]
     if file_pattern:
         cmd.extend(["--glob", file_pattern])
@@ -48,13 +56,13 @@ async def grep(
         lines = []
         for line in output.splitlines()[:50]:
             if line.startswith(workspace):
-                line = line[len(workspace):]
+                line = line[len(workspace) :]
             lines.append(line)
 
         if not lines:
             return "No matches found."
         return "\n".join(lines)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return "Error: grep timed out"
     except FileNotFoundError:
         return "Error: ripgrep (rg) not available"

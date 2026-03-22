@@ -2,6 +2,7 @@
 
 import uvicorn
 
+
 def main_dev():
     """Run the server with auto-reload for development."""
     uvicorn.run(

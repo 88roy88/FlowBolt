@@ -118,7 +118,9 @@ def _fetch_ollama_models() -> list[dict[str, str]]:
             )
         return models
     except Exception:
-        logger.warning("Failed to list Ollama models (is Ollama running at %s?)", settings.OLLAMA_BASE_URL, exc_info=True)
+        logger.warning(
+            "Failed to list Ollama models (is Ollama running at %s?)", settings.OLLAMA_BASE_URL, exc_info=True
+        )
         return []
 
 

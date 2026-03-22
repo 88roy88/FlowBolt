@@ -32,10 +32,7 @@ class WorkPlan:
         layers: list[list[Task]] = []
 
         while remaining:
-            layer = [
-                t for t in remaining
-                if all(dep in completed_ids for dep in t.depends_on)
-            ]
+            layer = [t for t in remaining if all(dep in completed_ids for dep in t.depends_on)]
             if not layer:
                 layers.append(remaining)
                 break

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from flow44.sandbox.base import SandboxInfo
 
@@ -15,7 +15,7 @@ class SessionInfo:
     session_id: str
     project_id: str
     sandbox_info: SandboxInfo
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class SessionRegistry:

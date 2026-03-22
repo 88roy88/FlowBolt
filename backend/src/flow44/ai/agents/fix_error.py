@@ -5,20 +5,20 @@ import uuid
 
 from langfuse.decorators import observe
 
-from ._base import BaseAgent
 from flow44.ai.core.messages import Message
 from flow44.ai.parser import ActionParser
-from flow44.ai.provider import stream_chat
 from flow44.ai.prompts import render_fix_error_direct, render_fix_errors
-from flow44.sandbox.filesystem import read_file, write_file, list_files
+from flow44.ai.provider import stream_chat
+from flow44.sandbox.filesystem import list_files, read_file, write_file
 from flow44.sandbox.manager import sandbox_manager
+
+from ._base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: we will probably make this into a ReAct agent like the follow up one.
 class FixErrorAgent(BaseAgent):
-
     # TODO: make run abstract in the base class so all agents will be the same.
     # TODO: I like it that the run is the last function of the class and not the first :)
     @observe(name="fix-error-agent-run")
@@ -56,8 +56,10 @@ class FixErrorAgent(BaseAgent):
 
         try:
             async for chunk in stream_chat(
-                [Message.user("Fix the error.")], prompt,
-                model=self.model, metadata=self._llm_metadata("fix_error_direct"),
+                [Message.user("Fix the error.")],
+                prompt,
+                model=self.model,
+                metadata=self._llm_metadata("fix_error_direct"),
             ):
                 full_text.append(chunk)
                 parser.feed(chunk)
@@ -153,12 +155,12 @@ class FixErrorAgent(BaseAgent):
     def _normalize_path(self, path: str) -> str:
         if f"/{self.session_id}/" in path:
             idx = path.find(f"/{self.session_id}/")
-            path = path[idx + len(self.session_id) + 2:]
+            path = path[idx + len(self.session_id) + 2 :]
             if not path.startswith("/"):
                 path = "/" + path
         elif not path.startswith("/src/"):
             if "/src/" in path:
-                path = path[path.rfind("/src/"):]
+                path = path[path.rfind("/src/") :]
             elif not path.startswith("/"):
                 path = "/src/" + path
             else:
@@ -183,8 +185,10 @@ class FixErrorAgent(BaseAgent):
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
         try:
             async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")], prompt,
-                model=self.model, metadata=self._llm_metadata("fix_error_retry"),
+                [Message.user("Fix the TypeScript errors.")],
+                prompt,
+                model=self.model,
+                metadata=self._llm_metadata("fix_error_retry"),
             ):
                 parser.feed(chunk)
             parser.flush()

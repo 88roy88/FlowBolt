@@ -6,7 +6,6 @@ from flow44.models.events import emit_event
 
 
 class BaseAgent:
-
     def __init__(
         self,
         session_id: str,

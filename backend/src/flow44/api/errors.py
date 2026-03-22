@@ -27,14 +27,10 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 _VITE_ERROR_START = re.compile(r"\[vite\].*(?:error|ERROR)|ERROR\s+")
 
 # TypeScript-style error:  src/App.tsx(12,5): error TS2304: ...
-_TS_ERROR = re.compile(
-    r"(?P<file>[^\s(]+)\((?P<line>\d+),(?P<col>\d+)\):\s*error\s+\w+:\s*(?P<msg>.+)"
-)
+_TS_ERROR = re.compile(r"(?P<file>[^\s(]+)\((?P<line>\d+),(?P<col>\d+)\):\s*error\s+\w+:\s*(?P<msg>.+)")
 
 # Vite / esbuild / SWC style:  /path/to/file.tsx:12:5
-_FILE_LINE_COL = re.compile(
-    r"(?P<file>/[^\s:]+\.\w+):(?P<line>\d+):(?P<col>\d+)"
-)
+_FILE_LINE_COL = re.compile(r"(?P<file>/[^\s:]+\.\w+):(?P<line>\d+):(?P<col>\d+)")
 
 # Generic "error" or "Error" on a line (fallback)
 _GENERIC_ERROR = re.compile(r"(?:error|Error|ERROR)[:\s]")
@@ -106,7 +102,7 @@ async def errors_ws(websocket: WebSocket, session_id: str) -> None:
                 return
             await asyncio.sleep(0.5)
 
-        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
             buffer = ""
             while not stop.is_set():
                 data = f.read(8192)
@@ -117,8 +113,10 @@ async def errors_ws(websocket: WebSocket, session_id: str) -> None:
                         line, buffer = buffer.split("\n", 1)
                         # Strip ANSI codes for pattern matching
                         clean = _ANSI_RE.sub("", line)
-                        if _VITE_ERROR_START.search(clean) or _TS_ERROR.search(clean) or (
-                            _GENERIC_ERROR.search(clean) and _FILE_LINE_COL.search(clean)
+                        if (
+                            _VITE_ERROR_START.search(clean)
+                            or _TS_ERROR.search(clean)
+                            or (_GENERIC_ERROR.search(clean) and _FILE_LINE_COL.search(clean))
                         ):
                             # Collect a few more lines for context
                             await asyncio.sleep(0.1)

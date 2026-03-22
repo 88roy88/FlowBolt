@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Callable, Sequence
 from functools import wraps
 from typing import Any, TypeVar, get_type_hints, overload
 
@@ -150,5 +150,6 @@ class ToolExecutor:
                 is_error=True,
             )
         return await t.execute(tool_use_id=tool_use_id, **kwargs)
+
 
 # TODO: bring the parallel tool execution from `/Users/roymezan/src/primesrc/code-validation-service/src/service/ai_logic`

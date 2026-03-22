@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from flow44.sandbox.filesystem import edit_file, read_file
 from flow44.ai.tools.write_file import _make_diff
+from flow44.sandbox.filesystem import edit_file, read_file
 
 
 async def edit_file_with_context(session_id: str, path: str, search: str, replace: str) -> tuple[str, str]:

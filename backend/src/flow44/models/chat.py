@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import aiosqlite
 
@@ -29,7 +29,7 @@ async def save_message(project_id: str, role: str, content: str) -> ChatMessage:
         project_id=project_id,
         role=role,
         content=content,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(

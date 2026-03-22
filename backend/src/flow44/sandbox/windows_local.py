@@ -35,17 +35,19 @@ class _PopenWrapper:
 
 
 class WindowsLocalSandbox(Sandbox):
-
     async def exec(self, command: str) -> AsyncIterator[str]:
         loop = asyncio.get_running_loop()
         cmd = f"cd /d {self.workspace_dir} && {command}"
 
-        result = await loop.run_in_executor(None, lambda: subprocess.run(
-            ["cmd", "/c", cmd],
-            capture_output=True,
-            text=True,
-            cwd=self.workspace_dir,
-        ))
+        result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["cmd", "/c", cmd],
+                capture_output=True,
+                text=True,
+                cwd=self.workspace_dir,
+            ),
+        )
 
         for line in result.stdout.splitlines():
             yield line + "\n"
@@ -73,7 +75,9 @@ class WindowsLocalSandbox(Sandbox):
         self._dev_process = _PopenWrapper(proc)  # type: ignore[assignment]
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
-            self.session_id, self.port, proc.pid,
+            self.session_id,
+            self.port,
+            proc.pid,
         )
 
     async def stop_dev_server(self) -> None:

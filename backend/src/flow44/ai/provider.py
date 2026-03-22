@@ -5,15 +5,17 @@ from typing import Any
 
 import litellm
 
-from flow44.config import settings
 from flow44.ai.core.messages import Message
+from flow44.config import settings
 
 
 # TODO: when will messages be dicts?
 def _to_dicts(messages: list[dict | Message]) -> list[dict]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]
 
+
 # TODO: move llmlite langfuse code here?
+
 
 async def complete_chat(
     messages: list[dict | Message],

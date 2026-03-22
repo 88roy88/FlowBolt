@@ -5,21 +5,22 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from langfuse.decorators import observe, langfuse_context
+from langfuse.decorators import langfuse_context, observe
 
-from ._base import BaseAgent
-from flow44.ai.core.tools import FunctionTool, ToolExecutor
 from flow44.ai.core.messages import Message
-from flow44.ai.provider import complete_chat_with_tools
+from flow44.ai.core.tools import FunctionTool, ToolExecutor
 from flow44.ai.prompts import render_followup
-from flow44.ai.tools.grep import grep
+from flow44.ai.provider import complete_chat_with_tools
+from flow44.ai.tools.edit_file import edit_file_with_context
 from flow44.ai.tools.glob import glob
+from flow44.ai.tools.grep import grep
 from flow44.ai.tools.read_file import read_file_with_lines
 from flow44.ai.tools.write_file import write_file_with_diff
-from flow44.ai.tools.edit_file import edit_file_with_context
 from flow44.models.chat import get_messages
 from flow44.models.project import get_project_by_session
 from flow44.sandbox.filesystem import list_files, read_file
+
+from ._base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,6 @@ class FileDiff:
 
 
 class FollowUpAgent(BaseAgent):
-
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._steps: list[dict] = []
@@ -93,13 +93,15 @@ class FollowUpAgent(BaseAgent):
                 self._files_changed.append(path)
             return status
 
-        return ToolExecutor([
-            FunctionTool(_grep, name="grep"),
-            FunctionTool(_glob, name="glob"),
-            FunctionTool(_read_file, name="read_file"),
-            FunctionTool(_write_file, name="write_file"),
-            FunctionTool(_edit_file, name="edit_file"),
-        ])
+        return ToolExecutor(
+            [
+                FunctionTool(_grep, name="grep"),
+                FunctionTool(_glob, name="glob"),
+                FunctionTool(_read_file, name="read_file"),
+                FunctionTool(_write_file, name="write_file"),
+                FunctionTool(_edit_file, name="edit_file"),
+            ]
+        )
 
     @observe(name="followup-agent-run")
     async def run(self, content: str) -> None:
@@ -126,12 +128,13 @@ class FollowUpAgent(BaseAgent):
         if answer:
             await self.emit({"type": "text", "content": answer})
 
-
         if self._diffs:
-            await self.emit({
-                "type": "followup_diffs",
-                "diffs": [{"path": d.path, "diff": d.diff} for d in self._diffs],
-            })
+            await self.emit(
+                {
+                    "type": "followup_diffs",
+                    "diffs": [{"path": d.path, "diff": d.diff} for d in self._diffs],
+                }
+            )
 
         # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})
@@ -222,20 +225,24 @@ class FollowUpAgent(BaseAgent):
                 step_data["result_preview"] = preview
                 await self.emit({"type": "followup_step", **step_data})
 
-                self._steps.append({
-                    "id": str(uuid.uuid4()),
-                    "tool": tool_name,
-                    "args": {k: v for k, v in args.items() if k != "content"},
-                    "status": "completed",
-                    "resultPreview": preview,
-                    "iteration": self._iteration,
-                })
+                self._steps.append(
+                    {
+                        "id": str(uuid.uuid4()),
+                        "tool": tool_name,
+                        "args": {k: v for k, v in args.items() if k != "content"},
+                        "status": "completed",
+                        "resultPreview": preview,
+                        "iteration": self._iteration,
+                    }
+                )
 
-                working_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": result_str,
-                })
+                working_messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": result_str,
+                    }
+                )
 
         logger.warning("[followup-agent] Hit max iterations (%d)", MAX_ITERATIONS)
         return last_content
