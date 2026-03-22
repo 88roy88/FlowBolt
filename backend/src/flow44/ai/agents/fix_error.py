@@ -92,7 +92,7 @@ class FixErrorAgent(BaseAgent):
             if errors:
                 await self._send_step(fix_steps, "validate", "failed", "Validation found issues")
                 await self._send_step(fix_steps, "retry", "running", "Attempting auto-fix...")
-                await self._retry_fix(errors, {p: c for p, c in generated_files})
+                await self._retry_fix(errors, dict(generated_files))
                 await self._send_step(fix_steps, "retry", "completed", "Auto-fix applied")
             else:
                 await self._send_step(fix_steps, "validate", "completed", "Fix validated successfully!")
@@ -144,10 +144,10 @@ class FixErrorAgent(BaseAgent):
                                         try:
                                             file_contents[child.path] = await read_file(self.session_id, child.path)
                                         except Exception:
-                                            pass
+                                            logger.debug("Could not read fallback file %s", child.path)
                                 break
                     except Exception:
-                        pass
+                        logger.debug("Fallback file tree listing failed")
         return file_contents
 
     # TODO: we might want genral utils outside of the agent. also, me might want to move this to the sandbox manager.

@@ -78,7 +78,7 @@ async def proxy_to_sandbox(session_id: str, path: str, request: Request):
         )
     except Exception:
         logger.exception("Preview proxy error for session %s", session_id)
-        raise HTTPException(status_code=502, detail="Preview proxy error")
+        raise HTTPException(status_code=502, detail="Preview proxy error") from None
 
     # Forward response headers
     response_headers = dict(resp.headers)
@@ -131,7 +131,7 @@ async def proxy_ws(websocket: WebSocket, session_id: str):
                     async for msg in upstream:
                         await websocket.send_text(msg)
                 except Exception:
-                    pass
+                    logger.debug("HMR upstream→client relay ended")
 
             await asyncio.gather(client_to_upstream(), upstream_to_client())
     except Exception:
@@ -140,4 +140,4 @@ async def proxy_ws(websocket: WebSocket, session_id: str):
         try:
             await websocket.close()
         except Exception:
-            pass
+            logger.debug("HMR WebSocket close failed")

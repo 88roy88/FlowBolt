@@ -58,9 +58,9 @@ async def server_log_ws(websocket: WebSocket, session_id: str) -> None:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        pass
+        pass  # noqa: S110 — expected on client disconnect
     except Exception:
-        pass
+        logger.debug("Server log WebSocket error for session %s", session_id)
     finally:
         stop.set()
         tail_task.cancel()

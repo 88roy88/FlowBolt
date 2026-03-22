@@ -37,6 +37,7 @@ class Project:
     cases: str = "[]"
 
 
+# TODO: use Alembic, move to PG and SQLModel.
 async def init_db() -> None:
     """Create tables if they do not already exist."""
     async with aiosqlite.connect(_get_db_path()) as db:
@@ -70,40 +71,40 @@ async def init_db() -> None:
         try:
             await db.execute("ALTER TABLE projects ADD COLUMN summary TEXT DEFAULT ''")
             await db.commit()
-        except Exception:
-            pass  # Column already exists
+        except Exception:  # noqa: S110 — column already exists
+            pass
 
     # Migration-safe: add selected_model column if it doesn't exist
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
             await db.execute("ALTER TABLE projects ADD COLUMN selected_model TEXT DEFAULT ''")
             await db.commit()
-        except Exception:
-            pass  # Column already exists
+        except Exception:  # noqa: S110 — column already exists
+            pass
 
     # Migration-safe: add package_id column if it doesn't exist
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
             await db.execute("ALTER TABLE projects ADD COLUMN package_id TEXT DEFAULT ''")
             await db.commit()
-        except Exception:
-            pass  # Column already exists
+        except Exception:  # noqa: S110 — column already exists
+            pass
 
     # Migration-safe: add package_context column if it doesn't exist
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
             await db.execute("ALTER TABLE projects ADD COLUMN package_context TEXT DEFAULT ''")
             await db.commit()
-        except Exception:
-            pass  # Column already exists
+        except Exception:  # noqa: S110 — column already exists
+            pass
 
     # Migration-safe: add cases column if it doesn't exist
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
             await db.execute("ALTER TABLE projects ADD COLUMN cases TEXT DEFAULT '[]'")
             await db.commit()
-        except Exception:
-            pass  # Column already exists
+        except Exception:  # noqa: S110 — column already exists
+            pass
 
 
 async def create_project(name: str) -> Project:

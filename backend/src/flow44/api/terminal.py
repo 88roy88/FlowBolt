@@ -36,7 +36,7 @@ async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
         try:
             await websocket.send_bytes(scrollback)
         except Exception:
-            pass
+            logger.debug("Failed to send scrollback for session %s", session_id)
 
     stop_event = asyncio.Event()
 

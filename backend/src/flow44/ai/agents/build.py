@@ -12,10 +12,10 @@ from flow44.ai.core.messages import Message
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
 from flow44.ai.prompts import (
-    ARCHITECTURE_PROMPT,
     SUMMARY_PROMPT,
     USER_PLAN_PROMPT,
     UX_DESIGN_PROMPT,
+    render_architecture,
     render_codegen,
     render_fix_errors,
     render_merge,
@@ -208,7 +208,10 @@ class BuildAgent(BaseAgent):
             except Exception:
                 logger.exception("[build] Package analysis failed")
                 analysis = {
-                    "data_schema": f"Package data with {len(sample_data) if isinstance(sample_data, list) else 'structured'} records",
+                    "data_schema": (
+                        f"Package data with "
+                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"
+                    ),
                     "relevant_fields": "See raw data",
                     "data_characteristics": "Fetched from API",
                     "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
@@ -226,26 +229,11 @@ class BuildAgent(BaseAgent):
 
     @observe(name="design-architecture")
     async def _design_architecture(self) -> dict:
-        user_message = self._state.user_content
-        if self._state.case_contexts:
-            sections = []
-            for ctx in self._state.case_contexts:
-                sections.append(
-                    f"### Case: {ctx['package_name']} (ID: {ctx['package_id']})\n"
-                    f"Data Schema: {ctx['data_schema']}\nRelevant Fields: {ctx['relevant_fields']}\n"
-                    f"Sample data:\n```json\n{json.dumps(ctx['sample_data'], indent=2)[:1000]}\n```\n"
-                    f"Endpoint: `${{API_BASE}}/api/package/{ctx['package_id']}/run` (import API_BASE from src/config.ts)"
-                )
-            user_message += (
-                "\n\n## Case Data Integration\n\n"
-                + "\n\n".join(sections)
-                + "\n\nYour architecture MUST include components that fetch, display, and interact with this case data."
-            )
-
+        prompt = render_architecture(case_contexts=self._state.case_contexts or None)
         try:
             raw = await complete_chat(
-                [Message.user(user_message)],
-                ARCHITECTURE_PROMPT,
+                [Message.user(self._state.user_content)],
+                prompt,
                 model=self.model,
                 metadata=self._llm_metadata("design_architecture"),
             )

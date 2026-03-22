@@ -41,7 +41,7 @@ async def package_search(query_or_id: str) -> list[Any]:
 
 async def _run_package(
     package_id: str,
-    allQueries: bool | None,
+    allQueries: bool | None,  # noqa: N803 — matches API query parameter name
     body: Any | None,
 ):
     if not package_id.strip():
@@ -56,7 +56,7 @@ async def _run_package(
 @router.post("/{package_id}/run")
 async def run_package(
     package_id: str,
-    allQueries: bool | None = Query(default=None),
+    allQueries: bool | None = Query(default=None),  # noqa: N803
     body: Any | None = Body(default=None),
 ):
     """Proxy 'run package' to FLAPI."""
@@ -67,7 +67,7 @@ async def run_package(
 @router.get("/{package_id}/run")
 async def run_package_get(
     package_id: str,
-    allQueries: bool | None = Query(default=None),
+    allQueries: bool | None = Query(default=None),  # noqa: N803
 ):
     """Proxy 'run package' to FLAPI."""
     return await _run_package(package_id, allQueries=allQueries, body=None)

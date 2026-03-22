@@ -107,7 +107,7 @@ class Sandbox(ABC):
             try:
                 self._dev_log_file.close()
             except Exception:
-                pass
+                logger.debug("Failed to close dev log file", exc_info=True)
             self._dev_log_file = None
 
     def dev_server_running(self) -> bool:

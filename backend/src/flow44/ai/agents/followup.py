@@ -106,7 +106,8 @@ class FollowUpAgent(BaseAgent):
     @observe(name="followup-agent-run")
     async def run(self, content: str) -> None:
         langfuse_context.update_current_observation(tags=["follow-up-agent"])
-        # TODO: add metadata. like SID (also, we need to standardize session id and project id usage across the codebase).
+        # TODO: add metadata. like SID  # noqa: E501
+        # (also, we need to standardize session id and project id usage across the codebase).
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
@@ -176,7 +177,8 @@ class FollowUpAgent(BaseAgent):
                 lines.append(f"{prefix}{entry.name}")
         return "\n".join(lines)
 
-    # TODO: switch here to use Flow? We can create a subclass of Flow ReActFlow if needed something specific for general ReAct Flows.
+    # TODO: switch here to use Flow? We can create a subclass of Flow ReActFlow  # noqa: E501
+    # if needed something specific for general ReAct Flows.
     async def _react_loop(self, messages: list[Message], system_prompt: str) -> str:
         working_messages: list[dict] = [m.to_dict() for m in messages]
         tool_schemas = self._executor.get_schemas()

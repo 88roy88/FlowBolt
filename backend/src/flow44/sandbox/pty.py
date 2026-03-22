@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import atexit
+import logging
 import os
 import signal
 from collections import deque
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 # 64 KiB scrollback so reconnecting clients see recent output.
 SCROLLBACK_SIZE = 65536
@@ -75,7 +78,7 @@ class PtyHandle:
                 if self.winpty_process.isalive():
                     self.winpty_process.close(force=True)
             except Exception:
-                pass
+                logger.debug("Failed to close winpty process", exc_info=True)
             return
         try:
             os.close(self.read_fd)

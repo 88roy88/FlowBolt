@@ -54,10 +54,9 @@ async def grep(
         output = stdout.decode("utf-8", errors="replace")
 
         lines = []
-        for line in output.splitlines()[:50]:
-            if line.startswith(workspace):
-                line = line[len(workspace) :]
-            lines.append(line)
+        for raw_line in output.splitlines()[:50]:
+            cleaned = raw_line[len(workspace):] if raw_line.startswith(workspace) else raw_line
+            lines.append(cleaned)
 
         if not lines:
             return "No matches found."

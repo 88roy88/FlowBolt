@@ -162,9 +162,9 @@ async def errors_ws(websocket: WebSocket, session_id: str) -> None:
             except (json.JSONDecodeError, TypeError):
                 pass
     except WebSocketDisconnect:
-        pass
+        pass  # noqa: S110 — expected on client disconnect
     except Exception:
-        pass
+        logger.debug("Error WebSocket failed for session %s", session_id)
     finally:
         stop.set()
         watch_task.cancel()

@@ -26,3 +26,19 @@ Rules:
 - All file paths are relative to the project root (e.g. src/App.tsx)
 - Include only the files that need to be created or modified
 - **CRITICAL**: ONLY use the pre-installed packages (react, react-dom, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss). Do NOT suggest adding other packages or dependencies. All functionality must be implemented using built-in browser APIs and these pre-configured packages only.
+{% if case_contexts %}
+
+The user's request includes data from the following cases. Your architecture MUST include
+components that fetch, display, and interact with this case data.
+
+{% for ctx in case_contexts %}
+### Case: {{ ctx.package_name }} (ID: {{ ctx.package_id }})
+Data Schema: {{ ctx.data_schema }}
+Relevant Fields: {{ ctx.relevant_fields }}
+Sample data:
+```json
+{{ ctx.sample_data_json }}
+```
+Endpoint: `${API_BASE}/api/package/{{ ctx.package_id }}/run` (import API_BASE from src/config.ts)
+{% endfor %}
+{% endif %}

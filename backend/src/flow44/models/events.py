@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -9,9 +10,6 @@ import aiosqlite
 from flow44.models.project import _get_db_path
 
 logger = logging.getLogger(__name__)
-
-# In-process notification channels (session_id → list of queues)
-import asyncio
 
 _channels: dict[str, list[asyncio.Queue]] = {}
 

@@ -71,7 +71,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 event = await queue.get()
                 await websocket.send_json(event)
         except Exception:
-            pass
+            logger.debug("Event forwarding stopped for session %s", session_id)
 
     async def _receive_actions() -> None:
         while True:
@@ -100,7 +100,10 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                         except Exception:
                             name = f"Case #{cid}"
                         case_names.append(name)
-                    user_event["cases"] = [{"id": cid, "name": cname} for cid, cname in zip(case_ids, case_names)]
+                    user_event["cases"] = [
+                        {"id": cid, "name": cname}
+                        for cid, cname in zip(case_ids, case_names, strict=True)
+                    ]
                 await emit_event(session_id, user_event, notify=False)
 
                 is_new = await _is_new_project(session_id)

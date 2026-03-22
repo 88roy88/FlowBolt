@@ -8,7 +8,9 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 _templates_dir = Path(__file__).parent / "templates"
-_env = Environment(loader=FileSystemLoader(str(_templates_dir)), trim_blocks=True, lstrip_blocks=True)
+_env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
+    loader=FileSystemLoader(str(_templates_dir)), trim_blocks=True, lstrip_blocks=True
+)
 
 
 def render(template_name: str, **kwargs: Any) -> str:
@@ -19,8 +21,14 @@ def render_classify() -> str:
     return render("classify.jinja2")
 
 
-def render_architecture() -> str:
-    return render("architecture.jinja2")
+def render_architecture(*, case_contexts: list[dict] | None = None) -> str:
+    prepared = None
+    if case_contexts:
+        prepared = [
+            {**ctx, "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000]}
+            for ctx in case_contexts
+        ]
+    return render("architecture.jinja2", case_contexts=prepared)
 
 
 def render_ux_design() -> str:
