@@ -59,9 +59,6 @@ async def init_events_table() -> None:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        await db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_events_project ON agent_events(project_id, id)
-        """)
         await db.commit()
 
     # Migration: rename session_id → project_id in existing DBs
@@ -71,6 +68,13 @@ async def init_events_table() -> None:
             await db.commit()
         except Exception:  # noqa: S110 — column already named project_id or doesn't exist
             pass
+
+    # Create index after migration so column name is resolved
+    async with aiosqlite.connect(_get_db_path()) as db:
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_events_project ON agent_events(project_id, id)
+        """)
+        await db.commit()
 
 
 async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:

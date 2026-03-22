@@ -907,6 +907,20 @@ mid-action.
 
 ---
 
+## B19. Improve read_file tool — reject directories
+
+The LLM sometimes calls `read_file` with a directory path (e.g., `src/`), which
+produces `[Errno 21] Is a directory`. The tool should detect this and return a
+helpful message like "This is a directory, not a file. Use the glob or
+list_files tool to see its contents." instead of a raw OS error.
+
+Also consider improving the tool's system prompt / description to clarify it
+only accepts file paths, not directories.
+
+**Where:** `ai/tools/read_file.py` — add `os.path.isdir()` check before reading.
+
+---
+
 ## F13. VS Code-like editor features
 
 The editor uses Monaco (same engine as VS Code). Many features are built-in and
@@ -1035,3 +1049,25 @@ idle projects is wasteful.
 - `sandbox/base.py` — `evict()` method (stop dev server, rm node_modules/dist)
 - `sandbox/base.py` — `rehydrate()` method (pnpm install, start dev server)
 - `api/chat.py` / `api/terminal.py` — touch last-active on connect
+
+---
+
+## B19. Vite HMR WebSocket fails through preview proxy
+
+Preview iframe shows `[vite] failed to connect to websocket` because the HMR WebSocket
+can't connect through the reverse proxy path (`/api/preview/{id}/proxy/`).
+
+Need to configure Vite's `server.hmr` in the sandbox template to use the correct
+WebSocket URL through the proxy, or disable HMR in the preview iframe.
+
+See: https://vite.dev/config/server-options.html#server-hmr
+
+---
+
+## B20. False-positive build errors from npm notices
+
+The `npm notice` output (e.g. "New major version of npm available!") gets captured as
+a build error by the error detection system and triggers the "Fix with AI" flow.
+
+The error parser in `api/errors.py` should filter out npm notices and other non-error
+stderr output (npm writes notices to stderr).
