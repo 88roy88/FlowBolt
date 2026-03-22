@@ -31,7 +31,8 @@ class PackageApiClient:
     async def search(self, query_or_id: str) -> list[Any]:
         safe = quote(str(query_or_id), safe="")
         url = self._url(f"/package/v1/search/{safe}")
-        return await self._get_json(url)
+        result: list[Any] = await self._get_json(url)
+        return result
 
     async def run_package(self, package_id: str, *, all_queries: bool | None, body: Any | None) -> dict[str, Any]:
         params: dict[str, Any] = {}
@@ -40,7 +41,8 @@ class PackageApiClient:
             params["allQueries"] = "true" if all_queries else "false"
         safe = quote(str(package_id), safe="")
         url = self._url(f"/package/v3/{safe}")
-        return await self._post_json(url, params=params, json=body)
+        result: dict[str, Any] = await self._post_json(url, params=params, json=body)
+        return result
 
     async def _get_json(self, url: str) -> Any:
         async with httpx.AsyncClient(timeout=self.timeout_s) as client:

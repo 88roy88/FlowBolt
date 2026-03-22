@@ -24,14 +24,14 @@ EXCLUDED_DIRS = {"node_modules", ".git", "dist", ".cache"}
 
 
 @router.get("/zip")
-async def export_zip(session_id: str):
+async def export_zip(session_id: str) -> Response:
     """Download the entire project workspace as a ZIP file."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
         raise HTTPException(status_code=404, detail=f"No sandbox found for session {session_id}")
 
     workspace_dir = sandbox.workspace_dir
-    if not os.path.isdir(workspace_dir):
+    if not os.path.isdir(workspace_dir):  # noqa: ASYNC240
         raise HTTPException(status_code=404, detail="Workspace directory not found")
 
     project = await get_project_by_session(session_id)
@@ -44,7 +44,7 @@ async def export_zip(session_id: str):
             dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
             for filename in files:
                 abs_path = os.path.join(root, filename)
-                arc_name = os.path.relpath(abs_path, workspace_dir)
+                arc_name = os.path.relpath(abs_path, workspace_dir)  # noqa: ASYNC240
                 try:
                     zf.write(abs_path, arc_name)
                 except (PermissionError, OSError) as exc:
@@ -61,7 +61,7 @@ async def export_zip(session_id: str):
 
 
 @router.get("/html")
-async def export_html(session_id: str):
+async def export_html(session_id: str) -> Response:  # noqa: C901, PLR0915
     """Build the project and return a single self-contained HTML file."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
@@ -76,7 +76,7 @@ async def export_html(session_id: str):
     api_base = settings.EXPORT_API_BASE_URL
     env_file = os.path.join(workspace_dir, ".env.production.local")
     try:
-        with open(env_file, "w", encoding="utf-8") as f:
+        with open(env_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             f.write(f"VITE_BASE=/\nVITE_API_BASE={api_base}\n")
 
         build_output_lines: list[str] = []
@@ -92,17 +92,17 @@ async def export_html(session_id: str):
     dist_dir = os.path.join(workspace_dir, "dist")
     index_path = os.path.join(dist_dir, "index.html")
 
-    if not os.path.isfile(index_path):
+    if not os.path.isfile(index_path):  # noqa: ASYNC240
         raise HTTPException(
             status_code=500,
             detail=f"Build failed or dist/index.html not found.\n\n{build_output}",
         )
 
-    with open(index_path, encoding="utf-8", errors="replace") as f:
+    with open(index_path, encoding="utf-8", errors="replace") as f:  # noqa: ASYNC230
         html = f.read()
 
     # --- Inline CSS ---
-    def inline_css(match: re.Match) -> str:
+    def inline_css(match: re.Match[str]) -> str:
         href = match.group(1)
         css_path = _resolve_asset_path(dist_dir, href)
         if css_path and os.path.isfile(css_path):
@@ -128,7 +128,7 @@ async def export_html(session_id: str):
     )
 
     # --- Inline JS ---
-    def inline_js(match: re.Match) -> str:
+    def inline_js(match: re.Match[str]) -> str:
         src = match.group(1)
         js_path = _resolve_asset_path(dist_dir, src)
         if js_path and os.path.isfile(js_path):
@@ -183,7 +183,7 @@ def _resolve_asset_path(dist_dir: str, href: str) -> str | None:
 def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
     """Replace favicon <link> with an inline data URI."""
 
-    def replace_favicon(match: re.Match) -> str:
+    def replace_favicon(match: re.Match[str]) -> str:
         href = match.group(1)
         # Try dist first, then workspace root (dev favicons live in public/)
         for base in (dist_dir, os.path.join(workspace_dir, "public"), workspace_dir):

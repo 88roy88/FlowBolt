@@ -26,7 +26,7 @@ def _resolve_safe(session_id: str, relative_path: str) -> tuple[str, str]:
 
 async def read_file(session_id: str, path: str) -> str:
     full, _ = _resolve_safe(session_id, path)
-    with open(full, encoding="utf-8") as fh:
+    with open(full, encoding="utf-8") as fh:  # noqa: ASYNC230
         return fh.read()
 
 
@@ -34,25 +34,25 @@ async def read_file(session_id: str, path: str) -> str:
 async def write_file(session_id: str, path: str, content: str) -> None:
     full, _ = _resolve_safe(session_id, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
-    with open(full, "w", encoding="utf-8") as fh:
+    with open(full, "w", encoding="utf-8") as fh:  # noqa: ASYNC230
         fh.write(content)
     langfuse_context.update_current_observation(metadata={"file_path": path, "content_length": len(content)})
 
 
 async def edit_file(session_id: str, path: str, search: str, replace: str) -> None:
     full, _ = _resolve_safe(session_id, path)
-    with open(full, encoding="utf-8") as fh:
+    with open(full, encoding="utf-8") as fh:  # noqa: ASYNC230
         content = fh.read()
     if search not in content:
         raise ValueError(f"Search string not found in {path}")
     content = content.replace(search, replace, 1)
-    with open(full, "w", encoding="utf-8") as fh:
+    with open(full, "w", encoding="utf-8") as fh:  # noqa: ASYNC230
         fh.write(content)
 
 
 async def delete_file(session_id: str, path: str) -> None:
     full, _ = _resolve_safe(session_id, path)
-    if os.path.isdir(full):
+    if os.path.isdir(full):  # noqa: ASYNC240
         os.rmdir(full)
     else:
         os.remove(full)
@@ -63,7 +63,7 @@ SKIP_DIRS = {"node_modules", ".git", ".next", "dist", ".cache", "__pycache__", "
 
 async def list_files(session_id: str, path: str = "/") -> list[FileEntry]:
     full, workspace = _resolve_safe(session_id, path)
-    if not os.path.isdir(full):
+    if not os.path.isdir(full):  # noqa: ASYNC240
         raise NotADirectoryError(f"{path} is not a directory")
 
     def _build_tree(dir_path: str) -> list[FileEntry]:

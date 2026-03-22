@@ -100,7 +100,7 @@ async def proxy_to_sandbox(session_id: str, path: str, request: Request) -> Resp
 
 @router.websocket("/{session_id}/proxy/")
 @router.websocket("/{session_id}/proxy")
-async def proxy_ws(websocket: WebSocket, session_id: str) -> None:
+async def proxy_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901
     """Proxy WebSocket connections for Vite HMR."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
@@ -109,9 +109,9 @@ async def proxy_ws(websocket: WebSocket, session_id: str) -> None:
 
     await websocket.accept()
 
-    import asyncio
+    import asyncio  # noqa: PLC0415
 
-    import websockets
+    import websockets  # noqa: PLC0415
 
     proxy_prefix = f"/api/preview/{session_id}/proxy"
     query = websocket.scope.get("query_string", b"").decode()

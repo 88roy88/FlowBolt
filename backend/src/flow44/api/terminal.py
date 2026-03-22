@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 @router.websocket("/ws/terminal/{session_id}")
-async def terminal_ws(websocket: WebSocket, session_id: str) -> None:
+async def terminal_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901
     await websocket.accept()
 
     sandbox = sandbox_manager.get_sandbox(session_id)

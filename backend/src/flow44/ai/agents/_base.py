@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from langfuse.decorators import langfuse_context
 
 from flow44.models.events import emit_event
@@ -18,10 +20,10 @@ class BaseAgent:
         self.model = model
         self._trace_id = trace_id
 
-    async def emit(self, event: dict) -> None:
+    async def emit(self, event: dict[str, Any]) -> None:
         await emit_event(self.session_id, event)
 
-    def _llm_metadata(self, generation_name: str) -> dict:
+    def _llm_metadata(self, generation_name: str) -> dict[str, Any]:
         trace_id = self._trace_id or langfuse_context.get_current_trace_id()
         observation_id = langfuse_context.get_current_observation_id()
         return {

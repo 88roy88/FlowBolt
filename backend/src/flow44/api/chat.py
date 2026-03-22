@@ -53,7 +53,7 @@ async def chat_events(session_id: str) -> list[dict[str, Any]]:
 
 
 @router.websocket("/ws/chat/{session_id}")
-async def chat_ws(websocket: WebSocket, session_id: str) -> None:
+async def chat_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901, PLR0915
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", session_id)
 
@@ -74,7 +74,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
         except Exception:
             logger.debug("Event forwarding stopped for session %s", session_id)
 
-    async def _receive_actions() -> None:
+    async def _receive_actions() -> None:  # noqa: C901, PLR0915
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
@@ -91,7 +91,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 # Emit user_message event (for frontend history reconstruction)
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                 if case_ids:
-                    from flow44.api.package_api import _package_search
+                    from flow44.api.package_api import _package_search  # noqa: PLC0415
 
                     case_names: list[str] = []
                     for cid in case_ids:

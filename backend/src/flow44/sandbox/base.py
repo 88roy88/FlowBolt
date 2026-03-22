@@ -86,7 +86,7 @@ class Sandbox(ABC):
     async def destroy(self, *, delete_workspace: bool = True) -> None:
         await self.stop_dev_server()
         self.kill_pty()
-        if delete_workspace and os.path.isdir(self.workspace_dir):
+        if delete_workspace and os.path.isdir(self.workspace_dir):  # noqa: ASYNC240
             shutil.rmtree(self.workspace_dir, ignore_errors=True)
 
     # -- Command execution --
@@ -135,13 +135,13 @@ class Sandbox(ABC):
 
     async def read_file(self, path: str) -> str:
         full = self._safe_path(path)
-        with open(full, encoding="utf-8") as f:
+        with open(full, encoding="utf-8") as f:  # noqa: ASYNC230
             return f.read()
 
     async def write_file(self, path: str, content: str) -> None:
         full = self._safe_path(path)
         os.makedirs(os.path.dirname(full), exist_ok=True)
-        with open(full, "w", encoding="utf-8") as f:
+        with open(full, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             f.write(content)
 
     def _safe_path(self, relative_path: str) -> str:

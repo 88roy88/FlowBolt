@@ -113,7 +113,7 @@ class FixErrorAgent(BaseAgent):
 
     # TODO: add the some AI magic to this function if the file is not clear or need more?
     # TODO: should ignore stuff from node_models? and stuff like that?
-    async def _discover_files(self, error_file: str | None) -> dict[str, str]:
+    async def _discover_files(self, error_file: str | None) -> dict[str, str]:  # noqa: C901, PLR0912
         files_to_read: list[str] = []
 
         if error_file:

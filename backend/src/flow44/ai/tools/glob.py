@@ -8,16 +8,16 @@ SKIP_DIRS = {"node_modules", ".git", "dist", ".next", ".cache", "__pycache__"}
 
 
 async def glob(session_id: str, pattern: str) -> str:
-    from flow44.sandbox.manager import sandbox_manager
+    from flow44.sandbox.manager import sandbox_manager  # noqa: PLC0415
 
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
         return "Error: No sandbox found"
 
-    workspace = Path(os.path.realpath(sandbox.workspace_dir))
+    workspace = Path(os.path.realpath(sandbox.workspace_dir))  # noqa: ASYNC240
 
     results = []
-    for p in workspace.glob(pattern):
+    for p in workspace.glob(pattern):  # noqa: ASYNC240
         if any(part in SKIP_DIRS for part in p.parts):
             continue
         rel = "/" + str(p.relative_to(workspace))

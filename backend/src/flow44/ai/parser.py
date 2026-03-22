@@ -68,7 +68,7 @@ class ActionParser:
     )
     _ACTION_CLOSE = "</flowAction>"
 
-    def _process(self) -> None:
+    def _process(self) -> None:  # noqa: C901, PLR0912
         while self._buffer:
             if self._state is _State.TEXT:
                 idx = self._buffer.find("<flowArtifact")

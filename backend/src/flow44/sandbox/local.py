@@ -36,7 +36,7 @@ class LocalSandbox(Sandbox):
         await self.stop_dev_server()
 
         log_path = os.path.join(self.workspace_dir, ".dev-server.log")
-        self._dev_log_file = open(log_path, "wb")  # noqa: SIM115
+        self._dev_log_file = open(log_path, "wb")  # noqa: ASYNC230, SIM115
 
         env = os.environ.copy()
         env["FORCE_COLOR"] = "1"
@@ -81,7 +81,7 @@ class LocalSandbox(Sandbox):
             if slave_fd > 2:
                 os.close(slave_fd)
             os.chdir(self.workspace_dir)
-            os.execvpe("/bin/bash", ["/bin/bash", "--rcfile", bashrc_path], env)
+            os.execvpe("/bin/bash", ["/bin/bash", "--rcfile", bashrc_path], env)  # noqa: S606
 
         os.close(slave_fd)
 

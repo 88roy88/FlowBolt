@@ -95,6 +95,20 @@ One LLM call per file in parallel instead of one call per task via bolt XML.
 - `models/project.py` — replace 6 repetitive ALTER TABLE blocks with migration helper
 - `sandbox/filesystem.py` — use `run_in_executor` for async file I/O
 
+### Ruff noqa cleanup (74 suppressed warnings to resolve properly)
+
+These are currently suppressed with `# noqa` but should be fixed:
+
+- **ASYNC230/240/220 (29)** — blocking file I/O in async functions. Use `aiofiles` or
+  `asyncio.run_in_executor`. Affects: filesystem.py, sandbox/base.py, sandbox/local.py,
+  export.py, errors.py, server_log.py, tools/glob.py, tools/grep.py
+- **PLC0415 (13)** — imports inside functions. Review which are for circular import
+  avoidance (keep) vs lazy habit (move to top)
+- **C901/PLR0912/PLR0915 (19)** — complex functions. Candidates for extraction:
+  chat_ws, errors_ws, export_html, _discover_files, _kill_stale_dev_servers
+- **PLW0603 (1)** — global DB path in models/project.py. Use proper singleton or DI
+- **PLR0913 (1)** — too many args in render_codegen. Consider a params dataclass
+
 ---
 
 ## ~~B4. Frontend refactor~~ DONE

@@ -51,7 +51,7 @@ def render_followup(*, project_summary: str, file_tree: str) -> str:
     return render("followup.jinja2", project_summary=project_summary, file_tree=file_tree)
 
 
-def render_codegen(
+def render_codegen(  # noqa: PLR0913
     *,
     task_title: str,
     task_description: str,

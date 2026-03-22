@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Database ready.")
 
     logger.info("Restoring existing sandbox workspaces...")
-    from flow44.models.project import list_projects
+    from flow44.models.project import list_projects  # noqa: PLC0415
 
     live_projects = await list_projects()
     live_session_ids = {p.session_id for p in live_projects}

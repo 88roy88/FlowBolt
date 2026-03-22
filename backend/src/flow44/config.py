@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
-_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_WORKSPACE = str(_BACKEND_ROOT / "data" / "workspaces")
 _DEFAULT_TEMPLATE = str(_BACKEND_ROOT / "pnpm-project-template")
 

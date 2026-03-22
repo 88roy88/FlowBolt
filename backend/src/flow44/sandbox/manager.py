@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def stamp_vite_config(session_id: str, workspace_dir: str) -> None:
     """Read vite.config.ts from the template and replace the session placeholder."""
     template_path = os.path.join(settings.TEMPLATE_DIR, "vite.config.ts")
-    with open(template_path, "r", encoding="utf-8") as f:
+    with open(template_path, encoding="utf-8") as f:
         content = f.read()
     dest_path = os.path.join(workspace_dir, "vite.config.ts")
     with open(dest_path, "w", encoding="utf-8") as f:
@@ -41,14 +41,14 @@ class SandboxManager:
     def _create_sandbox_instance(self, info: SandboxInfo) -> Sandbox:
         # TODO: why the imports are here and not top level?
         if settings.SANDBOX_MODE == "namespaced":
-            from flow44.sandbox.namespaced import NamespacedSandbox
+            from flow44.sandbox.namespaced import NamespacedSandbox  # noqa: PLC0415
 
             return NamespacedSandbox(info)
         if os.name == "nt":
-            from flow44.sandbox.windows_local import WindowsLocalSandbox
+            from flow44.sandbox.windows_local import WindowsLocalSandbox  # noqa: PLC0415
 
             return WindowsLocalSandbox(info)
-        from flow44.sandbox.local import LocalSandbox
+        from flow44.sandbox.local import LocalSandbox  # noqa: PLC0415
 
         return LocalSandbox(info)
 
@@ -87,15 +87,15 @@ class SandboxManager:
         return self._sandboxes.get(session_id)
 
     @staticmethod
-    def _kill_stale_dev_servers() -> None:
+    def _kill_stale_dev_servers() -> None:  # noqa: C901
         """Find orphan pnpm dev processes in our port range and kill them."""
-        import subprocess as _sp
+        import subprocess as _sp  # noqa: PLC0415
 
         port_start = settings.SANDBOX_PORT_RANGE_START
         port_end = settings.SANDBOX_PORT_RANGE_END
         try:
-            result = _sp.run(
-                ["pgrep", "-f", "pnpm dev --port"],
+            result = _sp.run(  # noqa: PLW1510
+                ["pgrep", "-f", "pnpm dev --port"],  # noqa: S607
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -105,13 +105,13 @@ class SandboxManager:
             for pid_str in result.stdout.strip().splitlines():
                 pid = int(pid_str.strip())
                 try:
-                    cmdline = _sp.run(
-                        ["ps", "-p", str(pid), "-o", "args="],
+                    cmdline = _sp.run(  # noqa: PLW1510
+                        ["ps", "-p", str(pid), "-o", "args="],  # noqa: S607
                         capture_output=True,
                         text=True,
                         timeout=5,
                     ).stdout.strip()
-                except Exception:
+                except Exception:  # noqa: S112
                     continue
                 for part in cmdline.split():
                     try:
@@ -133,7 +133,7 @@ class SandboxManager:
         except Exception:
             logger.debug("Failed to clean stale dev servers", exc_info=True)
 
-    async def restore_existing_workspaces(self, live_session_ids: set[str]) -> None:
+    async def restore_existing_workspaces(self, live_session_ids: set[str]) -> None:  # noqa: C901
         """Re-register sandboxes for workspaces that survived a restart.
 
         Orphan directories (not in live_session_ids) are deleted.
@@ -142,14 +142,14 @@ class SandboxManager:
             self._kill_stale_dev_servers()
 
         base = settings.WORKSPACE_BASE_DIR
-        if not os.path.isdir(base):
+        if not os.path.isdir(base):  # noqa: ASYNC240
             return
 
         for name in os.listdir(base):
             if name.startswith("."):
                 continue
             workspace_dir = os.path.join(base, name)
-            if not os.path.isdir(workspace_dir):
+            if not os.path.isdir(workspace_dir):  # noqa: ASYNC240
                 continue
             if name in self._sandboxes:
                 continue
@@ -172,7 +172,7 @@ class SandboxManager:
 
         # Rewrite vite config (session-specific base path) and restart dev servers
         for name, sandbox in self._sandboxes.items():
-            if os.path.isfile(os.path.join(sandbox.workspace_dir, "package.json")):
+            if os.path.isfile(os.path.join(sandbox.workspace_dir, "package.json")):  # noqa: ASYNC240
                 stamp_vite_config(name, sandbox.workspace_dir)
                 asyncio.create_task(sandbox.start_dev_server())
 

@@ -16,7 +16,7 @@ _DB_PATH: str = ""
 
 
 def _get_db_path() -> str:
-    global _DB_PATH
+    global _DB_PATH  # noqa: PLW0603
     if not _DB_PATH:
         url = settings.DATABASE_URL
         # Strip the "sqlite:///" prefix

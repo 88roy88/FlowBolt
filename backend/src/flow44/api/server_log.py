@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.websocket("/ws/server-log/{session_id}")
-async def server_log_ws(websocket: WebSocket, session_id: str) -> None:
+async def server_log_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901
     """Stream ``.dev-server.log`` to the client.
 
     Reads the file in binary mode so ANSI color codes are preserved.
@@ -35,12 +35,12 @@ async def server_log_ws(websocket: WebSocket, session_id: str) -> None:
 
     async def _tail() -> None:
         """Read existing content then poll for new data."""
-        while not os.path.exists(log_path):
+        while not os.path.exists(log_path):  # noqa: ASYNC240
             if stop.is_set():
                 return
             await asyncio.sleep(0.5)
 
-        with open(log_path, "rb") as f:
+        with open(log_path, "rb") as f:  # noqa: ASYNC230
             while not stop.is_set():
                 data = f.read(8192)
                 if data:

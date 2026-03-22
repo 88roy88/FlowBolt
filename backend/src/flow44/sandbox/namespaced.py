@@ -144,7 +144,7 @@ class NamespacedSandbox(Sandbox):
         await self.stop_dev_server()
 
         log_path = os.path.join(self.workspace_dir, ".dev-server.log")
-        self._dev_log_file = open(log_path, "wb")  # noqa: SIM115
+        self._dev_log_file = open(log_path, "wb")  # noqa: ASYNC230, SIM115
 
         cmd = _build_nsjail_args(
             self.session_id,
@@ -188,7 +188,7 @@ class NamespacedSandbox(Sandbox):
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
-            preexec_fn=os.setsid,
+            preexec_fn=os.setsid,  # noqa: PLW1509
             env=env,
         )
 

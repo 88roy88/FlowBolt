@@ -71,7 +71,7 @@ class BuildAgent(BaseAgent):
             self._state.case_contexts = [ctx for ctx in results if ctx is not None]
 
             if self._state.case_contexts:
-                from flow44.models.project import update_project_cases
+                from flow44.models.project import update_project_cases  # noqa: PLC0415
 
                 await update_project_cases(self.project_id, self._state.case_contexts)
 

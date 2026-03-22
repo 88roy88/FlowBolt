@@ -77,7 +77,7 @@ def _parse_error_block(block: str) -> dict[str, Any] | None:
 
 
 @router.websocket("/ws/errors/{session_id}")
-async def errors_ws(websocket: WebSocket, session_id: str) -> None:
+async def errors_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901, PLR0915
     """Watch ``.dev-server.log`` for error patterns and send structured events.
 
     Sends JSON messages::
@@ -96,14 +96,14 @@ async def errors_ws(websocket: WebSocket, session_id: str) -> None:
     stop = asyncio.Event()
     sent_errors: set[str] = set()  # dedup by message+file
 
-    async def _watch() -> None:
+    async def _watch() -> None:  # noqa: C901, PLR0912
         # Wait for the log file to appear
-        while not os.path.exists(log_path):
+        while not os.path.exists(log_path):  # noqa: ASYNC240
             if stop.is_set():
                 return
             await asyncio.sleep(0.5)
 
-        with open(log_path, encoding="utf-8", errors="replace") as f:
+        with open(log_path, encoding="utf-8", errors="replace") as f:  # noqa: ASYNC230
             buffer = ""
             while not stop.is_set():
                 data = f.read(8192)

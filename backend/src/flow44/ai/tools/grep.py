@@ -10,14 +10,14 @@ async def grep(
     path: str = "/",
     file_pattern: str | None = None,
 ) -> str:
-    from flow44.sandbox.manager import sandbox_manager
+    from flow44.sandbox.manager import sandbox_manager  # noqa: PLC0415
 
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
         return "Error: No sandbox found"
 
-    workspace = os.path.realpath(sandbox.workspace_dir)
-    search_path = os.path.realpath(os.path.join(workspace, path.lstrip("/")))
+    workspace = os.path.realpath(sandbox.workspace_dir)  # noqa: ASYNC240
+    search_path = os.path.realpath(os.path.join(workspace, path.lstrip("/")))  # noqa: ASYNC240
 
     if not search_path.startswith(workspace):
         return "Error: Path traversal detected"

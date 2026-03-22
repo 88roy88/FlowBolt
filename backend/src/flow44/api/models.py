@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from fastapi import APIRouter
@@ -22,7 +22,7 @@ _CACHE_TTL = 60  # seconds
 
 
 def _cache_valid() -> bool:
-    return (time.monotonic() - _cache["ts"]) < _CACHE_TTL
+    return bool((time.monotonic() - _cache["ts"]) < _CACHE_TTL)
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ def _friendly_name(model_id: str) -> str:
 def _fetch_bedrock_models() -> list[dict[str, str]]:
     """Query AWS Bedrock for available Anthropic cross-region inference profiles."""
     try:
-        import boto3  # noqa: F811
+        import boto3  # noqa: F811, PLC0415
     except ImportError:
         logger.warning("boto3 is not installed; skipping Bedrock model discovery")
         return []
@@ -167,14 +167,14 @@ def _refresh_models() -> list[dict[str, str]]:
 
 
 @router.get("/api/models")
-async def list_models() -> list[dict]:
+async def list_models() -> list[dict[str, str]]:
     """Return the list of available AI models (cached for 60 s)."""
     if _cache_valid():
-        return _cache["models"]
+        return cast(list[dict[str, str]], _cache["models"])
     return _refresh_models()
 
 
 @router.get("/api/models/default")
-async def default_model() -> dict:
+async def default_model() -> dict[str, str]:
     """Return the default model from settings."""
     return {"model": settings.AI_MODEL}
