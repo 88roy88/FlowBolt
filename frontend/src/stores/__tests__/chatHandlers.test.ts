@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSendMessageHandler, createFixErrorHandler, setReplayMode } from '../chatHandlers';
 import type { ChatState } from '../chat';
-import type { WSMessage } from '../../types';
+import type { WSMessage, PlanOverview, ProjectSummary } from '../../types';
 
 // Mock external stores — we don't want real file fetches or session lookups
 vi.mock('../files', () => ({
@@ -31,16 +31,28 @@ vi.mock('../session', () => ({
   },
 }));
 
-// ---------- Test harness ----------
+// ---------- Test helpers ----------
+
+const MOCK_PLAN_OVERVIEW: PlanOverview = {
+  summary: 'A todo app',
+  features: [{ title: 'Add todos', description: 'User can add items' }],
+  decisions: [{ id: 'd1', title: 'State management', chosen: 'useState', alternatives: ['useReducer'] }],
+};
+
+const MOCK_PROJECT_SUMMARY: ProjectSummary = {
+  summary: 'A todo app with add/remove',
+  tech_stack: ['React', 'TypeScript'],
+  features: ['Add todos', 'Remove todos'],
+  file_overview: { 'src/App.tsx': 'Main component' },
+};
 
 const INITIAL_STATE: ChatState = {
   messages: [],
   isStreaming: false,
-  historyLoaded: true,
   currentAssistantMessage: '',
   actions: [],
   agentPhase: 'idle',
-  designProgress: {},
+  designProgress: { architecture: null, ux: null },
   planOverview: null,
   executionTasks: [],
   error: null,
@@ -48,15 +60,23 @@ const INITIAL_STATE: ChatState = {
   followUpSteps: [],
   followUpDiffs: [],
   projectSummary: null,
-  // These are functions on the real store — we don't need them for handler tests
-  sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
-  fixError: vi.fn() as unknown as ChatState['fixError'],
-  loadHistory: vi.fn() as unknown as ChatState['loadHistory'],
-  loadModels: vi.fn() as unknown as ChatState['loadModels'],
-  setStreaming: vi.fn() as unknown as ChatState['setStreaming'],
-  availableModels: [],
+  models: [],
   selectedModel: null,
+  selectedCases: [],
+  historyLoaded: true,
+  sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
+  sendFixError: vi.fn() as unknown as ChatState['sendFixError'],
+  respondToPlan: vi.fn() as unknown as ChatState['respondToPlan'],
+  addMessage: vi.fn() as unknown as ChatState['addMessage'],
+  loadHistory: vi.fn() as unknown as ChatState['loadHistory'],
+  clearMessages: vi.fn() as unknown as ChatState['clearMessages'],
+  clearError: vi.fn() as unknown as ChatState['clearError'],
+  setStreaming: vi.fn() as unknown as ChatState['setStreaming'],
   setSelectedModel: vi.fn() as unknown as ChatState['setSelectedModel'],
+  addCase: vi.fn() as unknown as ChatState['addCase'],
+  removeCase: vi.fn() as unknown as ChatState['removeCase'],
+  clearCases: vi.fn() as unknown as ChatState['clearCases'],
+  loadModels: vi.fn() as unknown as ChatState['loadModels'],
 };
 
 /** Create a state container that behaves like Zustand's set/get. */
@@ -70,14 +90,9 @@ function createTestStore(initial: ChatState = { ...INITIAL_STATE }) {
   return { set, get, state: () => state };
 }
 
-/** Feed a sequence of events through a handler, with optional _ts timestamps. */
-function feedEvents(
-  handler: (msg: WSMessage) => void,
-  events: (WSMessage & { _ts?: string })[],
-) {
-  for (const event of events) {
-    handler(event as WSMessage);
-  }
+/** Cast to WSMessage without TS complaining about partial shapes. */
+function msg(data: Record<string, unknown>): WSMessage {
+  return data as unknown as WSMessage;
 }
 
 // ---------- Tests ----------
@@ -85,7 +100,7 @@ function feedEvents(
 describe('createSendMessageHandler — build flow', () => {
   let store: ReturnType<typeof createTestStore>;
   let handler: (msg: WSMessage) => void;
-  let cleanup: ReturnType<typeof vi.fn>;
+  let cleanup: () => void;
 
   beforeEach(() => {
     store = createTestStore();
@@ -96,81 +111,74 @@ describe('createSendMessageHandler — build flow', () => {
 
   it('full build flow produces correct messages and state', () => {
     // 1. User message arrives (from replay)
-    handler({ type: 'user_message', content: 'Build a todo app' } as WSMessage);
+    handler(msg({ type: 'user_message', content: 'Build a todo app' }));
     expect(store.state().messages).toHaveLength(1);
     expect(store.state().messages[0].role).toBe('user');
     expect(store.state().messages[0].content).toBe('Build a todo app');
 
     // 2. Design phase
-    handler({ type: 'phase', phase: 'designing' } as WSMessage);
+    handler(msg({ type: 'phase', phase: 'designing' }));
     expect(store.state().agentPhase).toBe('designing');
 
-    handler({ type: 'design_progress', stream: 'architecture', content: 'complete' } as WSMessage);
-    handler({ type: 'design_progress', stream: 'ux', content: 'complete' } as WSMessage);
+    handler(msg({ type: 'design_progress', stream: 'architecture', content: 'complete' }));
+    handler(msg({ type: 'design_progress', stream: 'ux', content: 'complete' }));
     expect(store.state().designProgress).toEqual({ architecture: 'complete', ux: 'complete' });
 
     // 3. Phase → planning (should create design_complete card)
-    handler({ type: 'phase', phase: 'planning' } as WSMessage);
+    handler(msg({ type: 'phase', phase: 'planning' }));
     expect(store.state().agentPhase).toBe('planning');
-    expect(store.state().messages).toHaveLength(2); // user + design_complete
+    expect(store.state().messages).toHaveLength(2);
     expect(store.state().messages[1].agentCard?.type).toBe('design_complete');
 
     // 4. Plan overview
-    const overview = {
-      summary: 'A todo app',
-      tasks: [{ id: 't1', title: 'Types', files: ['src/types.ts'], depends_on: [] }],
-    };
-    handler({ type: 'plan_overview', overview } as WSMessage);
-    expect(store.state().planOverview).toEqual(overview);
-    expect(store.state().isStreaming).toBe(false); // waiting for approval
+    handler(msg({ type: 'plan_overview', overview: MOCK_PLAN_OVERVIEW }));
+    expect(store.state().planOverview).toEqual(MOCK_PLAN_OVERVIEW);
+    expect(store.state().isStreaming).toBe(false);
 
     // 5. Plan accepted
-    handler({ type: 'plan_accepted', overview } as WSMessage);
-    expect(store.state().planOverview).toBeNull(); // cleared after acceptance
-    expect(store.state().messages).toHaveLength(3); // + plan accepted card
+    handler(msg({ type: 'plan_accepted', overview: MOCK_PLAN_OVERVIEW }));
+    expect(store.state().planOverview).toBeNull();
+    expect(store.state().messages).toHaveLength(3);
     expect(store.state().messages[2].agentCard?.type).toBe('plan_overview');
 
     // 6. Execution
-    handler({ type: 'phase', phase: 'executing' } as WSMessage);
+    handler(msg({ type: 'phase', phase: 'executing' }));
     expect(store.state().isStreaming).toBe(true);
 
-    handler({ type: 'task_list', tasks: [{ id: 't1', title: 'Types', status: 'pending' }] } as WSMessage);
+    handler(msg({ type: 'task_list', tasks: [{ id: 't1', title: 'Types', status: 'pending' }] }));
     expect(store.state().executionTasks).toHaveLength(1);
 
-    handler({ type: 'task_update', taskId: 't1', status: 'running' } as WSMessage);
+    handler(msg({ type: 'task_update', taskId: 't1', status: 'running' }));
     expect(store.state().executionTasks[0].status).toBe('running');
 
-    handler({ type: 'task_update', taskId: 't1', status: 'completed' } as WSMessage);
+    handler(msg({ type: 'task_update', taskId: 't1', status: 'completed' }));
     expect(store.state().executionTasks[0].status).toBe('completed');
 
     // 7. Completion
-    handler({ type: 'action_complete' } as WSMessage);
+    handler(msg({ type: 'action_complete' }));
     expect(store.state().agentPhase).toBe('idle');
     expect(store.state().isStreaming).toBe(false);
-    expect(store.state().executionTasks).toHaveLength(0); // cleared
+    expect(store.state().executionTasks).toHaveLength(0);
     expect(cleanup).toHaveBeenCalledOnce();
 
-    // Should have task_progress card in messages
     const taskProgressMsg = store.state().messages.find(m => m.agentCard?.type === 'task_progress');
     expect(taskProgressMsg).toBeDefined();
   });
 
   it('streaming text accumulates and finalizes on action_complete', () => {
-    handler({ type: 'text', content: 'Hello ' } as WSMessage);
-    handler({ type: 'text', content: 'world' } as WSMessage);
+    handler(msg({ type: 'text', content: 'Hello ' }));
+    handler(msg({ type: 'text', content: 'world' }));
     expect(store.state().currentAssistantMessage).toBe('Hello world');
 
-    handler({ type: 'action_complete' } as WSMessage);
-    expect(store.state().currentAssistantMessage).toBe(''); // cleared
-    // Should have created a message with the accumulated text
-    const msg = store.state().messages.find(m => m.role === 'assistant' && m.content === 'Hello world');
-    expect(msg).toBeDefined();
+    handler(msg({ type: 'action_complete' }));
+    expect(store.state().currentAssistantMessage).toBe('');
+    const result = store.state().messages.find(m => m.role === 'assistant' && m.content === 'Hello world');
+    expect(result).toBeDefined();
   });
 
   it('plan_rejected resets state to idle', () => {
-    handler({ type: 'phase', phase: 'planning' } as WSMessage);
-    const overview = { summary: 'Bad plan', tasks: [] };
-    handler({ type: 'plan_rejected', overview } as WSMessage);
+    handler(msg({ type: 'phase', phase: 'planning' }));
+    handler(msg({ type: 'plan_rejected', overview: MOCK_PLAN_OVERVIEW }));
 
     expect(store.state().agentPhase).toBe('idle');
     expect(store.state().isStreaming).toBe(false);
@@ -179,8 +187,8 @@ describe('createSendMessageHandler — build flow', () => {
   });
 
   it('error event sets error and cleans up', () => {
-    handler({ type: 'phase', phase: 'executing' } as WSMessage);
-    handler({ type: 'error', message: 'LLM failed' } as WSMessage);
+    handler(msg({ type: 'phase', phase: 'executing' }));
+    handler(msg({ type: 'error', message: 'LLM failed' }));
 
     expect(store.state().error).toBe('LLM failed');
     expect(store.state().isStreaming).toBe(false);
@@ -189,7 +197,7 @@ describe('createSendMessageHandler — build flow', () => {
   });
 
   it('cases_fetched creates a card with package data', () => {
-    handler({
+    handler(msg({
       type: 'cases_fetched',
       cases: [{
         package_id: '42',
@@ -197,29 +205,30 @@ describe('createSendMessageHandler — build flow', () => {
         data_schema: '{ revenue: number }',
         relevant_fields: 'revenue, date',
       }],
-    } as WSMessage);
+    }));
 
-    const msg = store.state().messages.find(m => m.agentCard?.type === 'cases_fetched');
-    expect(msg).toBeDefined();
-    expect(msg!.agentCard!.cases).toHaveLength(1);
-    expect(msg!.agentCard!.cases[0].packageName).toBe('Sales Data');
+    const found = store.state().messages.find(m => m.agentCard?.type === 'cases_fetched');
+    expect(found).toBeDefined();
+    const card = found!.agentCard as { type: 'cases_fetched'; cases: { packageName: string }[] };
+    expect(card.cases).toHaveLength(1);
+    expect(card.cases[0].packageName).toBe('Sales Data');
   });
 
   it('user_message with cases attaches them', () => {
-    handler({
+    handler(msg({
       type: 'user_message',
       content: 'Show me the data',
       cases: [{ id: 1, name: 'Sales' }],
-    } as WSMessage);
+    }));
 
-    const msg = store.state().messages[0];
-    expect(msg.role).toBe('user');
-    expect(msg.cases).toEqual([{ id: 1, name: 'Sales' }]);
+    const result = store.state().messages[0];
+    expect(result.role).toBe('user');
+    expect(result.cases).toEqual([{ id: 1, name: 'Sales' }]);
   });
 
   it('unknown event type does not crash', () => {
     expect(() => {
-      handler({ type: 'totally_unknown_event' } as unknown as WSMessage);
+      handler(msg({ type: 'totally_unknown_event' }));
     }).not.toThrow();
   });
 });
@@ -231,42 +240,37 @@ describe('createSendMessageHandler — followup flow', () => {
   beforeEach(() => {
     store = createTestStore();
     setReplayMode(false);
-    handler = createSendMessageHandler(store.set, store.get, vi.fn());
+    handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void);
   });
 
   it('followup steps track running → completed', () => {
-    handler({
-      type: 'followup_step',
-      tool: 'grep',
-      args: { pattern: 'useState' },
-      status: 'running',
-      iteration: 1,
-    } as WSMessage);
+    handler(msg({
+      type: 'followup_step', tool: 'grep',
+      args: { pattern: 'useState' }, status: 'running', iteration: 1,
+    }));
     expect(store.state().followUpSteps).toHaveLength(1);
     expect(store.state().followUpSteps[0].status).toBe('running');
 
-    handler({
-      type: 'followup_step',
-      tool: 'grep',
-      args: { pattern: 'useState' },
-      status: 'completed',
-      result_preview: '3 matches found',
-      iteration: 1,
-    } as WSMessage);
+    handler(msg({
+      type: 'followup_step', tool: 'grep',
+      args: { pattern: 'useState' }, status: 'completed',
+      result_preview: '3 matches found', iteration: 1,
+    }));
     expect(store.state().followUpSteps[0].status).toBe('completed');
     expect(store.state().followUpSteps[0].resultPreview).toBe('3 matches found');
   });
 
   it('action_complete with followup steps creates followup_progress card', () => {
-    handler({ type: 'followup_step', tool: 'read_file', args: {}, status: 'running', iteration: 1 } as WSMessage);
-    handler({ type: 'followup_step', tool: 'read_file', args: {}, status: 'completed', iteration: 1 } as WSMessage);
-    handler({ type: 'text', content: 'I found the issue.' } as WSMessage);
-    handler({ type: 'action_complete' } as WSMessage);
+    handler(msg({ type: 'followup_step', tool: 'read_file', args: {}, status: 'running', iteration: 1 }));
+    handler(msg({ type: 'followup_step', tool: 'read_file', args: {}, status: 'completed', iteration: 1 }));
+    handler(msg({ type: 'text', content: 'I found the issue.' }));
+    handler(msg({ type: 'action_complete' }));
 
-    const msg = store.state().messages.find(m => m.agentCard?.type === 'followup_progress');
-    expect(msg).toBeDefined();
-    expect(msg!.agentCard!.steps).toHaveLength(1);
-    expect(msg!.agentCard!.answer).toBe('I found the issue.');
+    const found = store.state().messages.find(m => m.agentCard?.type === 'followup_progress');
+    expect(found).toBeDefined();
+    const card = found!.agentCard as { type: 'followup_progress'; steps: unknown[]; answer?: string };
+    expect(card.steps).toHaveLength(1);
+    expect(card.answer).toBe('I found the issue.');
   });
 });
 
@@ -276,44 +280,31 @@ describe('createSendMessageHandler — replay mode', () => {
 
   beforeEach(() => {
     store = createTestStore();
-    handler = createSendMessageHandler(store.set, store.get, vi.fn(), { replay: true });
+    handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void, { replay: true });
   });
 
   it('uses _ts timestamps instead of Date.now()', () => {
-    handler({
-      type: 'user_message',
-      content: 'Hello',
-      _ts: '2026-01-15T10:30:00.000Z',
-    } as WSMessage);
-
+    handler(msg({ type: 'user_message', content: 'Hello', _ts: '2026-01-15T10:30:00.000Z' }));
     expect(store.state().messages[0].timestamp).toBe(new Date('2026-01-15T10:30:00.000Z').getTime());
   });
 
   it('replay mode skips adding cards to messages', () => {
-    handler({ type: 'phase', phase: 'designing', _ts: '2026-01-15T10:30:00Z' } as WSMessage);
-    handler({ type: 'design_progress', stream: 'architecture', content: 'complete' } as WSMessage);
-    handler({ type: 'design_progress', stream: 'ux', content: 'complete' } as WSMessage);
-    handler({ type: 'phase', phase: 'planning' } as WSMessage);
+    handler(msg({ type: 'phase', phase: 'designing', _ts: '2026-01-15T10:30:00Z' }));
+    handler(msg({ type: 'design_progress', stream: 'architecture', content: 'complete' }));
+    handler(msg({ type: 'design_progress', stream: 'ux', content: 'complete' }));
+    handler(msg({ type: 'phase', phase: 'planning' }));
 
-    // In replay mode, design_complete card should NOT be added
     const designCard = store.state().messages.find(m => m.agentCard?.type === 'design_complete');
     expect(designCard).toBeUndefined();
-
-    // But phase should still update
     expect(store.state().agentPhase).toBe('planning');
   });
 
   it('action_complete in replay does not add messages', () => {
-    handler({ type: 'text', content: 'Done!' } as WSMessage);
-    handler({
-      type: 'action_complete',
-      _ts: '2026-01-15T10:31:00Z',
-    } as WSMessage);
+    handler(msg({ type: 'text', content: 'Done!' }));
+    handler(msg({ type: 'action_complete', _ts: '2026-01-15T10:31:00Z' }));
 
-    // State should be cleared
     expect(store.state().currentAssistantMessage).toBe('');
     expect(store.state().agentPhase).toBe('idle');
-    // But no message should be added in replay mode
     expect(store.state().messages).toHaveLength(0);
   });
 });
@@ -321,7 +312,7 @@ describe('createSendMessageHandler — replay mode', () => {
 describe('createFixErrorHandler', () => {
   let store: ReturnType<typeof createTestStore>;
   let handler: (msg: WSMessage) => void;
-  let cleanup: ReturnType<typeof vi.fn>;
+  let cleanup: () => void;
 
   beforeEach(() => {
     store = createTestStore();
@@ -331,41 +322,42 @@ describe('createFixErrorHandler', () => {
   });
 
   it('tracks fix steps and creates fix_progress card on complete', () => {
-    handler({ type: 'phase', phase: 'fixing' } as WSMessage);
+    handler(msg({ type: 'phase', phase: 'fixing' }));
     expect(store.state().agentPhase).toBe('fixing');
 
-    handler({ type: 'fix_step', step: 'discover', status: 'running', message: 'Finding files...' } as WSMessage);
+    handler(msg({ type: 'fix_step', step: 'discover', status: 'running', message: 'Finding files...' }));
     expect(store.state().fixSteps).toHaveLength(1);
     expect(store.state().fixSteps[0].status).toBe('running');
 
-    handler({ type: 'fix_step', step: 'discover', status: 'completed', message: 'Found 2 files' } as WSMessage);
-    expect(store.state().fixSteps).toHaveLength(1); // updated, not duplicated
+    handler(msg({ type: 'fix_step', step: 'discover', status: 'completed', message: 'Found 2 files' }));
+    expect(store.state().fixSteps).toHaveLength(1);
     expect(store.state().fixSteps[0].status).toBe('completed');
 
-    handler({ type: 'fix_step', step: 'generate', status: 'running', message: 'Generating fix...' } as WSMessage);
+    handler(msg({ type: 'fix_step', step: 'generate', status: 'running', message: 'Generating fix...' }));
     expect(store.state().fixSteps).toHaveLength(2);
 
-    handler({ type: 'fix_step', step: 'generate', status: 'completed', message: 'Fix applied' } as WSMessage);
+    handler(msg({ type: 'fix_step', step: 'generate', status: 'completed', message: 'Fix applied' }));
 
-    handler({ type: 'action_complete' } as WSMessage);
+    handler(msg({ type: 'action_complete' }));
     expect(store.state().agentPhase).toBe('idle');
-    expect(store.state().fixSteps).toHaveLength(0); // cleared
+    expect(store.state().fixSteps).toHaveLength(0);
 
-    const msg = store.state().messages.find(m => m.agentCard?.type === 'fix_progress');
-    expect(msg).toBeDefined();
-    expect(msg!.agentCard!.steps).toHaveLength(2);
+    const found = store.state().messages.find(m => m.agentCard?.type === 'fix_progress');
+    expect(found).toBeDefined();
+    const card = found!.agentCard as { type: 'fix_progress'; steps: unknown[] };
+    expect(card.steps).toHaveLength(2);
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
   it('fix error handler processes file updates', () => {
-    handler({ type: 'file', path: 'src/App.tsx', content: 'fixed code' } as WSMessage);
+    handler(msg({ type: 'file', path: 'src/App.tsx', content: 'fixed code' }));
     expect(store.state().actions).toHaveLength(1);
     expect(store.state().actions[0].path).toBe('src/App.tsx');
   });
 
   it('action_complete without fix steps still cleans up', () => {
-    handler({ type: 'text', content: 'No issues found' } as WSMessage);
-    handler({ type: 'action_complete' } as WSMessage);
+    handler(msg({ type: 'text', content: 'No issues found' }));
+    handler(msg({ type: 'action_complete' }));
 
     expect(store.state().agentPhase).toBe('idle');
     expect(store.state().currentAssistantMessage).toBe('');
@@ -377,20 +369,17 @@ describe('project summary handling', () => {
   it('project_summary is included in action_complete messages', () => {
     const store = createTestStore();
     setReplayMode(false);
-    const handler = createSendMessageHandler(store.set, store.get, vi.fn());
+    const handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void);
 
-    handler({
-      type: 'project_summary',
-      summary: { name: 'Todo App', description: 'A simple todo', techStack: ['React', 'TypeScript'] },
-    } as WSMessage);
+    handler(msg({ type: 'project_summary', summary: MOCK_PROJECT_SUMMARY }));
     expect(store.state().projectSummary).toBeDefined();
 
-    handler({ type: 'action_complete' } as WSMessage);
+    handler(msg({ type: 'action_complete' }));
 
-    const summaryMsg = store.state().messages.find(m => m.agentCard?.type === 'project_summary');
-    expect(summaryMsg).toBeDefined();
-    expect(summaryMsg!.agentCard!.summary.name).toBe('Todo App');
-    // Summary should be cleared after action_complete
+    const found = store.state().messages.find(m => m.agentCard?.type === 'project_summary');
+    expect(found).toBeDefined();
+    const card = found!.agentCard as { type: 'project_summary'; summary: ProjectSummary };
+    expect(card.summary.summary).toBe('A todo app with add/remove');
     expect(store.state().projectSummary).toBeNull();
   });
 });
