@@ -1,0 +1,131 @@
+# Self-hosted Langfuse v3 for local development.
+# Usage: docker compose -f mocks/langfuse/docker-compose.yaml up -d
+# UI: http://localhost:3001
+
+services:
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    restart: unless-stopped
+    depends_on:
+      langfuse-db:    { condition: service_healthy }
+      clickhouse:     { condition: service_healthy }
+      redis:          { condition: service_healthy }
+      minio:          { condition: service_healthy }
+    environment: &lf-env
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      SALT: local-dev-salt
+      ENCRYPTION_KEY: c0743fd065aeea84ec110acce9f1c7315dd7ce45b6051b16d1f11ef11bad2d59
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "true"
+
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_AUTH: langfuse-redis-secret
+      REDIS_TLS_ENABLED: "false"
+    networks: [langfuse]
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    restart: unless-stopped
+    depends_on:
+      langfuse-db:    { condition: service_healthy }
+      clickhouse:     { condition: service_healthy }
+      redis:          { condition: service_healthy }
+      minio:          { condition: service_healthy }
+    environment:
+      <<: *lf-env
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: local-dev-secret
+    ports:
+      - "3001:3000"
+    networks: [langfuse]
+
+  langfuse-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [langfuse]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    user: "101:101"
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    networks: [langfuse]
+
+  redis:
+    image: redis:7.2
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "langfuse-redis-secret"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "langfuse-redis-secret", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    networks: [langfuse]
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    volumes:
+      - minio_data:/data
+    networks: [langfuse]
+
+networks:
+  langfuse:
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  clickhouse_logs:
+  minio_data:

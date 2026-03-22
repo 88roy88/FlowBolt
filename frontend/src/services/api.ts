@@ -53,6 +53,13 @@ export async function deleteProject(id: string): Promise<void> {
   await request(`/projects/${id}`, { method: 'DELETE' });
 }
 
+export async function renameProject(projectId: string, name: string): Promise<void> {
+  await request(`/projects/${projectId}/name`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
 export async function updateProjectModel(projectId: string, model: string): Promise<void> {
   await request(`/projects/${projectId}/model`, {
     method: 'PATCH',
@@ -67,6 +74,10 @@ export async function fetchPreviewPort(sessionId: string): Promise<number> {
 
 export async function fetchChatHistory(sessionId: string): Promise<{ id: string; role: string; content: string; created_at: string }[]> {
   return request(`/chat/${sessionId}/history`);
+}
+
+export async function fetchAgentEvents(sessionId: string): Promise<Record<string, unknown>[]> {
+  return request(`/chat/${sessionId}/events`);
 }
 
 export async function fetchModels(): Promise<AIModel[]> {

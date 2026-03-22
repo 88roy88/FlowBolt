@@ -17,8 +17,8 @@ from langfuse import Langfuse
 from app.api import chat, errors, export, files, models, package_api, preview, projects, server_log, terminal
 from app.config import settings
 from app.models.project import init_db
+from app.models.events import init_events_table
 from app.sandbox.manager import sandbox_manager
-from app.sandbox.pty import cleanup_all_ptys
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -45,15 +45,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Initialising database...")
     await init_db()
+    await init_events_table()
     logger.info("Database ready.")
 
     logger.info("Restoring existing sandbox workspaces...")
-    await sandbox_manager.restore_existing_workspaces()
+    from app.models.project import list_projects
+    live_projects = await list_projects()
+    live_session_ids = {p.session_id for p in live_projects}
+    await sandbox_manager.restore_existing_workspaces(live_session_ids)
     logger.info("Sandbox restoration complete.")
 
     yield
-    logger.info("Shutting down — killing PTY processes...")
-    cleanup_all_ptys()
     logger.info("Shutting down — destroying all sandboxes...")
     await sandbox_manager.destroy_all()
     logger.info("Shutdown complete.")
@@ -87,4 +89,3 @@ app.include_router(chat.router)
 app.include_router(terminal.router)
 app.include_router(server_log.router)
 app.include_router(errors.router)
-

@@ -1,36 +1,30 @@
-"""AI provider using LiteLLM for multi-provider model access."""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Any
 
 import litellm
 
 from app.config import settings
+from app.ai.core.messages import Message
 
+
+# TODO: when will messages be dicts?
+def _to_dicts(messages: list[dict | Message]) -> list[dict]:
+    return [m.to_dict() if isinstance(m, Message) else m for m in messages]
+
+# TODO: move llmlite langfuse code here?
 
 async def complete_chat(
-    messages: list[dict],
+    messages: list[dict | Message],
     system_prompt: str,
     model: str | None = None,
     metadata: dict | None = None,
 ) -> str:
-    """Non-streaming completion for classification, planning, merging.
-
-    Parameters
-    ----------
-    messages:
-        Conversation history as a list of ``{"role": ..., "content": ...}`` dicts.
-    system_prompt:
-        Prepended as a ``system`` message at the start of the conversation.
-    model:
-        LiteLLM model identifier.  Falls back to ``settings.AI_MODEL``.
-    """
     resolved_model = model or settings.AI_MODEL
-
-    full_messages: list[dict] = [
+    full_messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
-        *messages,
+        *_to_dicts(messages),
     ]
 
     response = await litellm.acompletion(
@@ -47,25 +41,20 @@ async def complete_chat(
 
 
 async def complete_chat_with_tools(
-    messages: list[dict],
+    messages: list[dict | Message],
     system_prompt: str,
     tools: list[dict],
     model: str | None = None,
     metadata: dict | None = None,
     tool_choice: str = "auto",
 ):
-    """Non-streaming completion with tool/function calling support.
-
-    Returns the full response object so the caller can inspect ``tool_calls``.
-    """
     resolved_model = model or settings.AI_MODEL
-
-    full_messages: list[dict] = [
+    full_messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
-        *messages,
+        *_to_dicts(messages),
     ]
 
-    response = await litellm.acompletion(
+    return await litellm.acompletion(
         model=resolved_model,
         messages=full_messages,
         tools=tools,
@@ -74,31 +63,17 @@ async def complete_chat_with_tools(
         metadata=metadata or {},
     )
 
-    return response
-
 
 async def stream_chat(
-    messages: list[dict],
+    messages: list[dict | Message],
     system_prompt: str,
     model: str | None = None,
     metadata: dict | None = None,
 ) -> AsyncIterator[str]:
-    """Stream an AI chat completion, yielding content deltas.
-
-    Parameters
-    ----------
-    messages:
-        Conversation history as a list of ``{"role": ..., "content": ...}`` dicts.
-    system_prompt:
-        Prepended as a ``system`` message at the start of the conversation.
-    model:
-        LiteLLM model identifier.  Falls back to ``settings.AI_MODEL``.
-    """
     resolved_model = model or settings.AI_MODEL
-
-    full_messages: list[dict] = [
+    full_messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
-        *messages,
+        *_to_dicts(messages),
     ]
 
     response = await litellm.acompletion(

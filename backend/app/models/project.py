@@ -165,6 +165,16 @@ async def update_project_summary(project_id: str, summary: str) -> None:
         await db.commit()
 
 
+async def rename_project(project_id: str, name: str) -> None:
+    """Update the name of a project."""
+    async with aiosqlite.connect(_get_db_path()) as db:
+        await db.execute(
+            "UPDATE projects SET name = ?, updated_at = ? WHERE id = ?",
+            (name, datetime.now(timezone.utc).isoformat(), project_id),
+        )
+        await db.commit()
+
+
 async def update_project_model(project_id: str, model: str) -> None:
     """Update the selected_model field for a project."""
     async with aiosqlite.connect(_get_db_path()) as db:

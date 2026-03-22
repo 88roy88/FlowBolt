@@ -4,24 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import shutil
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.models.project import create_project, delete_project, get_project, list_projects, update_project_model
+from app.config import settings
+from app.models.project import create_project, delete_project, get_project, list_projects, rename_project, update_project_model
 from app.models.session import session_registry
-from app.sandbox.manager import (
-    inject_error_reporter,
-    inject_tailwind_directives,
-    patch_tsconfig,
-    sandbox_manager,
-    write_postcss_config,
-    write_tailwind_config,
-    write_vite_config,
-)
-from app.sandbox.nsjail import exec_in_sandbox
-from app.sandbox.pty import cleanup_session_ptys
+from app.sandbox.manager import sandbox_manager, stamp_vite_config
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +21,10 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 class CreateProjectRequest(BaseModel):
+    name: str
+
+
+class RenameProjectRequest(BaseModel):
     name: str
 
 
@@ -49,56 +45,49 @@ async def create_new_project(body: CreateProjectRequest):
     project = await create_project(body.name)
 
     # Create sandbox for this project
-    sandbox_info = await sandbox_manager.create_sandbox(project.session_id)
+    sandbox = await sandbox_manager.create_sandbox(project.session_id)
 
     # Register session
-    session_registry.register(project.session_id, project.id, sandbox_info)
+    session_registry.register(project.session_id, project.id, sandbox.info)
 
     # Scaffold + start dev server in the background (don't block response)
     async def _scaffold_and_start():
-        logger.info("[projects] Scaffolding React project with Tailwind CSS for session %s", project.session_id)
+        logger.info("[projects] Scaffolding project for session %s", project.session_id)
 
-        # Step 1: Create Vite project and install base dependencies
+        # Step 1: Copy template into workspace
+        shutil.copytree(settings.TEMPLATE_DIR, sandbox.workspace_dir, dirs_exist_ok=True)
+
+        # Step 2: Stamp session ID into vite config
+        stamp_vite_config(project.session_id, sandbox.workspace_dir)
+
+        # Step 3: Install dependencies (lockfile is already in the template)
         try:
-            async for line in exec_in_sandbox(
-                project.session_id,
-                "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm create vite . --template react-ts -- --yes 2>&1 && "
-                "pnpm install 2>&1",
-            ):
+            async for line in sandbox.exec("pnpm install 2>&1"):
                 logger.info("[scaffold] %s", line.rstrip())
         except Exception:
-            logger.exception("[projects] Scaffold failed for session %s", project.session_id)
+            logger.exception("[projects] pnpm install failed for session %s", project.session_id)
             return
 
-        # Step 2: Install Tailwind CSS
-        logger.info("[projects] Installing Tailwind CSS for session %s", project.session_id)
-        try:
-            async for line in exec_in_sandbox(
-                project.session_id,
-                "pnpm add -D tailwindcss@^3 postcss autoprefixer 2>&1",
-            ):
-                logger.info("[tailwind] %s", line.rstrip())
-        except Exception:
-            logger.exception("[projects] Tailwind install failed for session %s", project.session_id)
-            return
-
-        # Step 3: Write all config files (AFTER Tailwind is installed)
-        sandbox = sandbox_manager.get_sandbox(project.session_id)
-        if sandbox:
-            write_vite_config(project.session_id)
-            patch_tsconfig(sandbox.workspace_dir)
-            inject_error_reporter(sandbox.workspace_dir)
-            write_tailwind_config(sandbox.workspace_dir)
-            write_postcss_config(sandbox.workspace_dir)
-            inject_tailwind_directives(sandbox.workspace_dir)
-
-        # Step 4: Start dev server (AFTER everything is configured)
+        # Step 4: Start dev server
         logger.info("[projects] Starting dev server for session %s", project.session_id)
-        await sandbox_manager.start_dev_server(project.session_id)
+        await sandbox.start_dev_server()
 
     asyncio.create_task(_scaffold_and_start())
 
     return asdict(project)
+
+
+@router.patch("/{project_id}/name", status_code=200)
+async def rename_existing_project(project_id: str, body: RenameProjectRequest):
+    """Rename a project."""
+    project = await get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+
+    await rename_project(project_id, body.name.strip())
+    return {"success": True}
 
 
 @router.patch("/{project_id}/model", status_code=200)
@@ -119,10 +108,7 @@ async def delete_existing_project(project_id: str):
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Kill any active PTY processes for this session before destroying the sandbox
-    cleanup_session_ptys(project.session_id)
-
-    # Destroy sandbox and delete workspace files
+    # Destroy sandbox (kills dev server + PTYs + deletes workspace)
     await sandbox_manager.destroy_sandbox(project.session_id, delete_workspace=True)
     session_registry.remove(project.session_id)
 

@@ -38,3 +38,16 @@ uv.lock
 
 # Docker
 docker-compose.override.yml
+
+# Claude Code
+.claude/
+
+# Scratch / review notes
+CODE_REVIEW*.md
+
+# Test harnesses
+nsjail-repro/
+
+# Misc artifacts
+*.zip
+frontend/img.png

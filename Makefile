@@ -1,7 +1,7 @@
-.PHONY: dev dev-backend dev-frontend dev-mocks build run run-all clean install
+.PHONY: dev dev-backend dev-frontend dev-mocks build run install
 
 # Development — run backend and frontend separately
-dev: dev-backend dev-frontend
+dev: dev-backend dev-frontend dev-mocks
 
 dev-backend:
 	cd backend && uv run dev
@@ -10,16 +10,12 @@ dev-frontend:
 	cd frontend && pnpm dev
 
 dev-mocks:
-	cd mocks && pnpm install && pnpm dev
+	cd mocks && npm install && pnpm dev
 
 # Install dependencies
 install:
 	cd frontend && pnpm install
 	cd backend && uv sync
-
-# Build frontend for production
-build-frontend:
-	cd frontend && pnpm build
 
 # Build Docker image
 build:
@@ -29,18 +25,6 @@ build:
 run:
 	docker compose up -d
 
-run-all:
-	docker compose up -d --build
-
 # Stop containers
 stop:
 	docker compose down
-
-# Clean up workspaces and data
-clean:
-	docker compose down -v
-	rm -rf backend/data
-
-# Logs
-logs:
-	docker compose logs -f app

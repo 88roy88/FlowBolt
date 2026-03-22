@@ -13,7 +13,6 @@ from fastapi.responses import Response
 
 from app.models.project import get_project_by_session
 from app.sandbox.manager import sandbox_manager
-from app.sandbox.nsjail import exec_in_sandbox
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +67,9 @@ async def export_html(session_id: str):
 
     workspace_dir = sandbox.workspace_dir
 
-    # Run the build command and collect output
+    # Build with base=/ so assets use relative paths (not the preview proxy path)
     build_output_lines: list[str] = []
-    async for line in exec_in_sandbox(session_id, "pnpm build"):
+    async for line in sandbox.exec("VITE_BASE=/ pnpm build"):
         build_output_lines.append(line)
     build_output = "".join(build_output_lines)
 
