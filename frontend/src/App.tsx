@@ -112,6 +112,19 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [projects, currentProject, selectProject]);
 
+  // Auto-recover state when network comes back online
+  useEffect(() => {
+    function handleOnline() {
+      const sessionId = useSessionStore.getState().sessionId;
+      if (sessionId) {
+        loadHistory(sessionId);
+        loadFileTree();
+      }
+    }
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loadHistory, loadFileTree]);
+
   const handleCreate = async () => {
     const name = newProjectName.trim() || 'My Project';
     await createProject(name);
