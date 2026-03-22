@@ -115,9 +115,9 @@ export default function App() {
   // Auto-recover state when network comes back online
   useEffect(() => {
     function handleOnline() {
-      const sessionId = useSessionStore.getState().sessionId;
-      if (sessionId) {
-        loadHistory(sessionId);
+      const projectId = useSessionStore.getState().projectId;
+      if (projectId) {
+        loadHistory(projectId);
         loadFileTree();
       }
     }

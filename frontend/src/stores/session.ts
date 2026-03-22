@@ -7,7 +7,7 @@ import { useChatStore } from './chat';
 interface SessionState {
   currentProject: Project | null;
   projects: Project[];
-  sessionId: string | null;
+  projectId: string | null;
   isCreating: boolean;
   setCurrentProject: (project: Project) => void;
   loadProjects: () => Promise<void>;
@@ -20,11 +20,11 @@ interface SessionState {
 export const useSessionStore = create<SessionState>((set, get) => ({
   currentProject: null,
   projects: [],
-  sessionId: null,
+  projectId: null,
   isCreating: false,
 
   setCurrentProject(project: Project) {
-    set({ currentProject: project, sessionId: project.id });
+    set({ currentProject: project, projectId: project.id });
     // Restore the selected model for this project
     if (project.selected_model) {
       useChatStore.setState({ selectedModel: project.selected_model });
@@ -44,7 +44,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const project = await api.createProject(name);
       const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
-      set({ projects, currentProject: project, sessionId: project.id });
+      set({ projects, currentProject: project, projectId: project.id });
     } finally {
       set({ isCreating: false });
     }
@@ -63,7 +63,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({
         projects,
         currentProject: next,
-        sessionId: next?.id ?? null,
+        projectId: next?.id ?? null,
       });
     } else {
       set({ projects });

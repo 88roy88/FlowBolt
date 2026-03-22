@@ -27,7 +27,7 @@ export interface ChatState {
   respondToPlan: (action: 'accept' | 'reject' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
-  loadHistory: (sessionId: string) => Promise<void>;
+  loadHistory: (projectId: string) => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
@@ -43,18 +43,18 @@ function generateId(): string {
 }
 
 let activeHandler: ((msg: WSMessage) => void) | null = null;
-let activeSessionId: string | null = null;
+let activeProjectId: string | null = null;
 
 function attachHandler(
-  sessionId: string,
+  projectId: string,
   socket: ReturnType<typeof getChatSocket>,
   handler: (msg: WSMessage) => void,
 ) {
-  if (activeHandler && activeSessionId === sessionId) {
+  if (activeHandler && activeProjectId === projectId) {
     socket.offMessage(activeHandler);
   }
   activeHandler = handler;
-  activeSessionId = sessionId;
+  activeProjectId = projectId;
   socket.onMessage(handler);
 }
 
@@ -95,8 +95,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedDataSources: [],
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
-    const sessionId = useSessionStore.getState().sessionId;
-    if (!sessionId) return;
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
 
     const userMessage: Message = {
       id: generateId(),
@@ -112,9 +112,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ...RESET_STATE,
     }));
 
-    const socket = getChatSocket(sessionId);
+    const socket = getChatSocket(projectId);
     const handler = createFixErrorHandler(set, get, () => detachHandler(socket, handler));
-    attachHandler(sessionId, socket, handler);
+    attachHandler(projectId, socket, handler);
 
     const selectedModel = get().selectedModel;
     socket.send({
@@ -133,8 +133,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage(content: string) {
-    const sessionId = useSessionStore.getState().sessionId;
-    if (!sessionId) return;
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
 
     const { selectedDataSources, selectedModel } = get();
 
@@ -153,9 +153,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       designProgress: { architecture: null, ux: null },
     }));
 
-    const socket = getChatSocket(sessionId);
+    const socket = getChatSocket(projectId);
     const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
-    attachHandler(sessionId, socket, handler);
+    attachHandler(projectId, socket, handler);
 
     socket.send({
       type: 'message',
@@ -174,10 +174,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   respondToPlan(action: 'accept' | 'reject' | 'modify', feedback?: string) {
-    const sessionId = useSessionStore.getState().sessionId;
-    if (!sessionId) return;
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
 
-    const socket = getChatSocket(sessionId);
+    const socket = getChatSocket(projectId);
     socket.send({ type: 'plan_response', action, feedback });
 
     // The backend will emit plan_accepted/plan_rejected events which the
@@ -192,10 +192,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({ messages: [...state.messages, message] }));
   },
 
-  async loadHistory(sessionId: string) {
+  async loadHistory(projectId: string) {
     // Detach any existing handler from the previous session
-    if (activeHandler && activeSessionId && activeSessionId !== sessionId) {
-      const oldSocket = getChatSocket(activeSessionId);
+    if (activeHandler && activeProjectId && activeProjectId !== projectId) {
+      const oldSocket = getChatSocket(activeProjectId);
       detachHandler(oldSocket, activeHandler);
     }
 
@@ -204,11 +204,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // for both user messages and assistant messages/cards
       set({ messages: [], isStreaming: false, historyLoaded: false, ...RESET_STATE });
 
-      const socket = getChatSocket(sessionId);
+      const socket = getChatSocket(projectId);
       const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
-      attachHandler(sessionId, socket, handler);
+      attachHandler(projectId, socket, handler);
 
-      const events = await fetchAgentEvents(sessionId);
+      const events = await fetchAgentEvents(projectId);
       for (const evt of events) {
         handler(evt as import('../types').WSMessage);
       }

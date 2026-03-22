@@ -4,16 +4,16 @@ import { useSessionStore } from '../stores/session';
 import { createErrorSocket } from '../services/websocket';
 
 export function useErrorCapture() {
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
   const pushError = useErrorStore((s) => s.pushError);
   const clearErrors = useErrorStore((s) => s.clearErrors);
 
   // Build errors via WebSocket
   useEffect(() => {
-    if (!sessionId) return;
+    if (!projectId) return;
     clearErrors();
 
-    const socket = createErrorSocket(sessionId, (data: unknown) => {
+    const socket = createErrorSocket(projectId, (data: unknown) => {
       const d = data as { message?: string; file?: string; line?: number; column?: number; stack?: string };
       pushError({
         source: 'build',
@@ -28,7 +28,7 @@ export function useErrorCapture() {
     return () => {
       socket.close();
     };
-  }, [sessionId, pushError, clearErrors]);
+  }, [projectId, pushError, clearErrors]);
 
   // Runtime errors from preview iframe via postMessage
   useEffect(() => {

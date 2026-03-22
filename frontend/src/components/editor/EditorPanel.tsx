@@ -14,7 +14,7 @@ const FILE_TREE_MAX = 400;
 
 export function EditorPanel() {
   const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree, pendingRevealLine, pendingRevealColumn, clearPendingReveal } = useFilesStore();
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
@@ -25,10 +25,10 @@ export function EditorPanel() {
   }, []);
 
   useEffect(() => {
-    if (sessionId) {
+    if (projectId) {
       loadFileTree();
     }
-  }, [sessionId, loadFileTree]);
+  }, [projectId, loadFileTree]);
 
   // Sync Monaco theme with app light/dark theme
   useEffect(() => {
@@ -97,10 +97,10 @@ export function EditorPanel() {
           <div className="flex gap-1">
             <button
               title="Export ZIP"
-              disabled={!sessionId}
-              onClick={() => sessionId && downloadZip(sessionId)}
+              disabled={!projectId}
+              onClick={() => projectId && downloadZip(projectId)}
               className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
-                sessionId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+                projectId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
               }`}
             >
               <Download size={13} />
@@ -108,10 +108,10 @@ export function EditorPanel() {
 
             <button
               title="Export HTML"
-              disabled={!sessionId}
-              onClick={() => sessionId && downloadSingleHtml(sessionId)}
+              disabled={!projectId}
+              onClick={() => projectId && downloadSingleHtml(projectId)}
               className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
-                sessionId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+                projectId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
               }`}
             >
               <FileCode size={13} />
@@ -170,7 +170,7 @@ export function EditorPanel() {
               fontSize: '14px',
             }}
           >
-            {sessionId ? 'Select a file to edit' : 'No project selected'}
+            {projectId ? 'Select a file to edit' : 'No project selected'}
           </div>
         )}
       </div>

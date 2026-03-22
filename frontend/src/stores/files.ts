@@ -22,19 +22,19 @@ interface FilesState {
   reset: () => void;
 }
 
-function storageKey(sessionId: string) { return `editor-tabs:${sessionId}`; }
+function storageKey(projectId: string) { return `editor-tabs:${projectId}`; }
 
 function saveEditorTabs(openPaths: string[], activePath: string | null) {
-  const sessionId = useSessionStore.getState().sessionId;
-  if (!sessionId) return;
+  const projectId = useSessionStore.getState().projectId;
+  if (!projectId) return;
   try {
-    localStorage.setItem(storageKey(sessionId), JSON.stringify({ openPaths, activePath }));
+    localStorage.setItem(storageKey(projectId), JSON.stringify({ openPaths, activePath }));
   } catch {}
 }
 
-function loadEditorTabs(sessionId: string): { openPaths: string[]; activePath: string | null } | null {
+function loadEditorTabs(projectId: string): { openPaths: string[]; activePath: string | null } | null {
   try {
-    const raw = localStorage.getItem(storageKey(sessionId));
+    const raw = localStorage.getItem(storageKey(projectId));
     if (raw) {
       const { openPaths, activePath } = JSON.parse(raw);
       if (Array.isArray(openPaths)) return { openPaths, activePath };
@@ -52,14 +52,14 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   saveVersion: 0,
 
   async loadFileTree() {
-    const sessionId = useSessionStore.getState().sessionId;
-    if (!sessionId) return;
-    const tree = await api.fetchFileTree(sessionId);
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+    const tree = await api.fetchFileTree(projectId);
     set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
 
     // Restore previously open tabs if none are open yet
     if (get().openFiles.size === 0) {
-      const saved = loadEditorTabs(sessionId);
+      const saved = loadEditorTabs(projectId);
       if (saved) {
         for (const path of saved.openPaths) {
           await get().openFile(path);
@@ -77,10 +77,10 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       set({ activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null });
       return;
     }
-    const sessionId = useSessionStore.getState().sessionId;
-    if (!sessionId) return;
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
     try {
-      const content = await api.fetchFileContent(sessionId, path);
+      const content = await api.fetchFileContent(projectId, path);
       set((s) => {
         const next = new Map(s.openFiles);
         next.set(path, content);
@@ -120,23 +120,23 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   },
 
   async refreshOpenFiles() {
-    const sessionId = useSessionStore.getState().sessionId;
-    if (!sessionId) return;
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
     const openFiles = get().openFiles;
     for (const path of openFiles.keys()) {
       try {
-        const content = await api.fetchFileContent(sessionId, path);
+        const content = await api.fetchFileContent(projectId, path);
         get().updateFileContent(path, content);
       } catch {}
     }
   },
 
   async saveFile(path: string) {
-    const sessionId = useSessionStore.getState().sessionId;
-    if (!sessionId) return;
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
     const content = get().openFiles.get(path);
     if (content !== undefined) {
-      await api.saveFileContent(sessionId, path, content);
+      await api.saveFileContent(projectId, path, content);
       set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
   },

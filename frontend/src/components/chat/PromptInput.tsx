@@ -16,7 +16,7 @@ export function PromptInput() {
   const agentPhase = useChatStore((s) => s.agentPhase);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -28,7 +28,7 @@ export function PromptInput() {
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming || !sessionId) return;
+    if (!trimmed || isStreaming || !projectId) return;
     sendMessage(trimmed);
     setValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -42,7 +42,7 @@ export function PromptInput() {
   };
 
   const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'awaiting_approval' && agentPhase !== 'complete');
-  const disabled = isBusy || !sessionId;
+  const disabled = isBusy || !projectId;
   const canSend = !!value.trim() && !disabled;
 
   // Global keyboard shortcut: Cmd+K or / to focus
@@ -61,7 +61,7 @@ export function PromptInput() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const placeholder = !sessionId
+  const placeholder = !projectId
     ? 'Select a project first'
     : agentPhase === 'awaiting_approval'
       ? 'Review the plan above, then accept, modify, or reject'
@@ -80,7 +80,7 @@ export function PromptInput() {
   return (
     <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
       {/* Data source selector */}
-      {!isBusy && sessionId && showDsSelector && (
+      {!isBusy && projectId && showDsSelector && (
         <div className="mb-2.5 relative">
           <DataSourceSelector isOpen={showDsSelector} />
         </div>
@@ -121,7 +121,7 @@ export function PromptInput() {
         }`}
       >
         {/* Data source selector toggle */}
-        {!isBusy && sessionId && (
+        {!isBusy && projectId && (
           <button
             onClick={() => setShowDsSelector((v) => !v)}
             className={`relative w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-colors ${
