@@ -108,6 +108,14 @@ async def init_db() -> None:
         except Exception:  # noqa: S110 — column already exists
             pass
 
+    # Migration-safe: add published_url column if it doesn't exist
+    async with aiosqlite.connect(_get_db_path()) as db:
+        try:
+            await db.execute("ALTER TABLE projects ADD COLUMN published_url TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:  # noqa: S110 — column already exists
+            pass
+
 
 async def create_project(name: str) -> Project:
     """Insert a new project and return it."""
@@ -173,7 +181,7 @@ async def update_project_published_url_by_session(session_id: str, url: str) -> 
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
             "UPDATE projects SET published_url = ?, updated_at = ? WHERE session_id = ?",
-            (url, datetime.now(timezone.utc).isoformat(), session_id),
+            (url, datetime.now(UTC).isoformat(), session_id),
         )
         await db.commit()
 
