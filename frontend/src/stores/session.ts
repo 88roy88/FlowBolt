@@ -43,7 +43,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isCreating: true });
     try {
       const project = await api.createProject(name);
-      const projects = [project, ...get().projects];
+      const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
       set({ projects, currentProject: project, sessionId: project.session_id });
     } finally {
       set({ isCreating: false });

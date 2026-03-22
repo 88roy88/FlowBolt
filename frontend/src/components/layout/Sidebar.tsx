@@ -206,6 +206,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
             <div key={project.id} className="relative">
               <div
                 onClick={() => handleSelect(project)}
+                data-testid={`project-item-${project.id}`}
                 className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${
                   isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
                 }`}

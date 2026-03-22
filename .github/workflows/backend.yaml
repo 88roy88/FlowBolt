@@ -1,0 +1,32 @@
+name: Backend CI
+
+on:
+  workflow_call:
+
+jobs:
+  ruff:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/uv-setup
+      - run: uv run task ruff-dry-all
+        working-directory: backend
+
+  mypy:
+    name: Type check (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/uv-setup
+      - run: uv run task mypy-all
+        working-directory: backend
+
+  tests:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/uv-setup
+      - run: uv run task tests
+        working-directory: backend

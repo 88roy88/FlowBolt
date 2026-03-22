@@ -1,0 +1,32 @@
+name: uv setup
+
+inputs:
+  working-directory:
+    required: false
+    description: "directory to run uv sync"
+    default: "backend"
+
+description: |
+  Installs Python, uv, and project dependencies.
+
+runs:
+  using: "composite"
+  steps:
+    - name: setup python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        prune-cache: false
+        cache-dependency-glob: |
+          ${{ inputs.working-directory }}/uv.lock
+          ${{ inputs.working-directory }}/pyproject.toml
+
+    - name: install python packages
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: uv sync
