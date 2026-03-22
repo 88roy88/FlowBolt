@@ -9,6 +9,7 @@ import zipfile
 
 from fastapi import APIRouter, HTTPException
 
+from app.config import settings
 from app.integrations.s3 import deploy_react_app, setup_bucket, BUCKET_NAME
 from app.models.project import get_project_by_session
 from app.sandbox.manager import sandbox_manager
@@ -32,6 +33,11 @@ async def publish_to_s3(session_id: str):
         setup_bucket(BUCKET_NAME)
     except Exception as exc:
         logger.warning("Bucket setup issue (may already exist): %s", exc)
+
+    # Ensure the built React app knows the absolute URL for the API
+    # so it does not send requests to relative paths on the static host.
+    api_base = settings.EXPORT_API_BASE_URL or "http://localhost:8000"
+    await sandbox.write_file(".env.production.local", f"VITE_API_BASE={api_base}\n")
 
     # Build the project
     build_output_lines: list[str] = []
