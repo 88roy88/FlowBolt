@@ -5,14 +5,14 @@ import os
 
 
 async def grep(
-    session_id: str,
+    project_id: str,
     pattern: str,
     path: str = "/",
     file_pattern: str | None = None,
 ) -> str:
     from flow44.sandbox.manager import sandbox_manager  # noqa: PLC0415
 
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         return "Error: No sandbox found"
 

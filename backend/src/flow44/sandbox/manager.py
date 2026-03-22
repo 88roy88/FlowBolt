@@ -12,14 +12,14 @@ from flow44.sandbox.base import Sandbox, SandboxInfo
 logger = logging.getLogger(__name__)
 
 
-def stamp_vite_config(session_id: str, workspace_dir: str) -> None:
+def stamp_vite_config(project_id: str, workspace_dir: str) -> None:
     """Read vite.config.ts from the template and replace the session placeholder."""
     template_path = os.path.join(settings.TEMPLATE_DIR, "vite.config.ts")
     with open(template_path, encoding="utf-8") as f:
         content = f.read()
     dest_path = os.path.join(workspace_dir, "vite.config.ts")
     with open(dest_path, "w", encoding="utf-8") as f:
-        f.write(content.replace("{{SESSION_ID}}", session_id))
+        f.write(content.replace("{{SESSION_ID}}", project_id))
 
 
 class SandboxManager:
@@ -52,28 +52,28 @@ class SandboxManager:
 
         return LocalSandbox(info)
 
-    async def create_sandbox(self, session_id: str) -> Sandbox:
+    async def create_sandbox(self, project_id: str) -> Sandbox:
         async with self._lock:
-            if session_id in self._sandboxes:
-                return self._sandboxes[session_id]
+            if project_id in self._sandboxes:
+                return self._sandboxes[project_id]
 
             if not self._available_ports:
                 raise RuntimeError("No available ports in the sandbox pool")
 
             port = self._available_ports.pop()
 
-        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, session_id)
-        info = SandboxInfo(session_id=session_id, workspace_dir=workspace_dir, port=port)
+        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+        info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
 
         sandbox = self._create_sandbox_instance(info)
         await sandbox.start()
 
-        self._sandboxes[session_id] = sandbox
+        self._sandboxes[project_id] = sandbox
         return sandbox
 
-    async def destroy_sandbox(self, session_id: str, *, delete_workspace: bool = True) -> None:
+    async def destroy_sandbox(self, project_id: str, *, delete_workspace: bool = True) -> None:
         async with self._lock:
-            sandbox = self._sandboxes.pop(session_id, None)
+            sandbox = self._sandboxes.pop(project_id, None)
 
         if sandbox is None:
             return
@@ -83,8 +83,8 @@ class SandboxManager:
         async with self._lock:
             self._available_ports.add(sandbox.port)
 
-    def get_sandbox(self, session_id: str) -> Sandbox | None:
-        return self._sandboxes.get(session_id)
+    def get_sandbox(self, project_id: str) -> Sandbox | None:
+        return self._sandboxes.get(project_id)
 
     @staticmethod
     def _kill_stale_dev_servers() -> None:  # noqa: C901
@@ -133,10 +133,10 @@ class SandboxManager:
         except Exception:
             logger.debug("Failed to clean stale dev servers", exc_info=True)
 
-    async def restore_existing_workspaces(self, live_session_ids: set[str]) -> None:  # noqa: C901
+    async def restore_existing_workspaces(self, live_project_ids: set[str]) -> None:  # noqa: C901
         """Re-register sandboxes for workspaces that survived a restart.
 
-        Orphan directories (not in live_session_ids) are deleted.
+        Orphan directories (not in live_project_ids) are deleted.
         """
         if os.name != "nt":
             self._kill_stale_dev_servers()
@@ -154,7 +154,7 @@ class SandboxManager:
             if name in self._sandboxes:
                 continue
 
-            if name not in live_session_ids:
+            if name not in live_project_ids:
                 logger.info("Removing orphan workspace %s", name)
                 shutil.rmtree(workspace_dir, ignore_errors=True)
                 continue
@@ -165,7 +165,7 @@ class SandboxManager:
                     continue
                 port = self._available_ports.pop()
 
-            info = SandboxInfo(session_id=name, workspace_dir=workspace_dir, port=port)
+            info = SandboxInfo(project_id=name, workspace_dir=workspace_dir, port=port)
             sandbox = self._create_sandbox_instance(info)
             self._sandboxes[name] = sandbox
             logger.info("Restored sandbox for session %s (port %d)", name, port)
@@ -177,8 +177,8 @@ class SandboxManager:
                 asyncio.create_task(sandbox.start_dev_server())
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:
-        session_ids = list(self._sandboxes.keys())
-        for sid in session_ids:
+        project_ids = list(self._sandboxes.keys())
+        for sid in project_ids:
             await self.destroy_sandbox(sid, delete_workspace=delete_workspaces)
 
 

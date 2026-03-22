@@ -8,16 +8,16 @@ if TYPE_CHECKING:
 _running: dict[str, BaseAgent] = {}
 
 
-def register(session_id: str, agent: BaseAgent) -> None:
-    _running[session_id] = agent
+def register(project_id: str, agent: BaseAgent) -> None:
+    _running[project_id] = agent
 
 
-def get(session_id: str) -> BaseAgent | None:
-    return _running.get(session_id)
+def get(project_id: str) -> BaseAgent | None:
+    return _running.get(project_id)
 
 
-def remove(session_id: str) -> None:
-    _running.pop(session_id, None)
+def remove(project_id: str) -> None:
+    _running.pop(project_id, None)
 
 
 # TODO: not sure im a fan of this global mutable state or the registry pattern in general.

@@ -97,10 +97,10 @@ export function AppShell() {
 
   const handleRailSelect = (p: typeof projects[number]) => {
     useSessionStore.getState().setCurrentProject(p);
-    window.location.hash = `#/project/${p.session_id}`;
+    window.location.hash = `#/project/${p.id}`;
     useFilesStore.getState().reset();
     useFilesStore.getState().loadFileTree();
-    useChatStore.getState().loadHistory(p.session_id);
+    useChatStore.getState().loadHistory(p.id);
   };
 
   const IconRail = () => (

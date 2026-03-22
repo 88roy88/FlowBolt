@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 class BuildAgent(BaseAgent):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
+        self._state = BuildState(project_id=self.project_id, model=self.model)
         self._observation_id: str | None = None
         # Pause/resume for plan approval
         self._approval_event = asyncio.Event()
@@ -58,7 +58,7 @@ class BuildAgent(BaseAgent):
         self._trace_id = langfuse_context.get_current_trace_id()
 
         langfuse_context.update_current_trace(
-            session_id=self.session_id,
+            session_id=self.project_id,
             user_id=self.project_id,
             metadata={"model": self.model or "default"},
             tags=["build-agent"],
@@ -123,7 +123,7 @@ class BuildAgent(BaseAgent):
                 await self.emit({"type": "plan_overview", "overview": self._state.user_overview.model_dump()})
             elif self._approval_action == "reject":
                 await self.emit({"type": "plan_rejected", "overview": self._state.user_overview.model_dump()})
-                self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
+                self._state = BuildState(project_id=self.project_id, model=self.model)
                 await self.emit({"type": "phase", "phase": "idle"})
                 return
 
@@ -435,7 +435,7 @@ class BuildAgent(BaseAgent):
 
             paths: list[str] = []
             for path, content in generated:
-                await write_file(self.session_id, path, content)
+                await write_file(self.project_id, path, content)
                 self._state.completed_files[path] = content
                 paths.append(path)
                 await self.emit({"type": "task_update", "taskId": task.id, "status": "running", "file": path})
@@ -452,7 +452,7 @@ class BuildAgent(BaseAgent):
 
     async def _typecheck(self) -> str:
         try:
-            sandbox = sandbox_manager.get_sandbox(self.session_id)
+            sandbox = sandbox_manager.get_sandbox(self.project_id)
             if sandbox is None:
                 return ""
             lines: list[str] = []
@@ -465,7 +465,7 @@ class BuildAgent(BaseAgent):
 
     async def _build(self) -> str:
         try:
-            sandbox = sandbox_manager.get_sandbox(self.session_id)
+            sandbox = sandbox_manager.get_sandbox(self.project_id)
             if sandbox is None:
                 return ""
             lines: list[str] = []
@@ -494,7 +494,7 @@ class BuildAgent(BaseAgent):
             parser.flush()
 
             for path, content in generated:
-                await write_file(self.session_id, path, content)
+                await write_file(self.project_id, path, content)
                 self._state.completed_files[path] = content
                 await self.emit({"type": "file", "path": path, "content": content})
         except Exception:

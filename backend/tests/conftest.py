@@ -22,7 +22,7 @@ async def test_db(tmp_path: Path) -> str:
             CREATE TABLE projects (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                session_id TEXT NOT NULL UNIQUE,
+                project_id TEXT NOT NULL UNIQUE,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -40,7 +40,7 @@ async def test_db(tmp_path: Path) -> str:
         await db.execute("""
             CREATE TABLE agent_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
                 event_type TEXT NOT NULL,
                 payload TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

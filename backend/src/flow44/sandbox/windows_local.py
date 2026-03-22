@@ -75,7 +75,7 @@ class WindowsLocalSandbox(Sandbox):
         self._dev_process = _PopenWrapper(proc)  # type: ignore[assignment]
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
-            self.session_id,
+            self.project_id,
             self.port,
             proc.pid,
         )
@@ -99,6 +99,6 @@ class WindowsLocalSandbox(Sandbox):
         _ensure_bashrc(self.workspace_dir)
         proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)
 
-        handle = PtyHandle(pid=proc.pid, session_id=self.session_id, winpty_process=proc)
+        handle = PtyHandle(pid=proc.pid, project_id=self.project_id, winpty_process=proc)
         _active_ptys.add(handle)
         return handle

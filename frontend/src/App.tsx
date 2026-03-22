@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
 
-function getSessionIdFromHash(): string | null {
+function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
   return match ? match[1] : null;
 }
@@ -29,8 +29,8 @@ export default function App() {
 
   const selectProject = useCallback((project: typeof projects[number]) => {
     setCurrentProject(project);
-    window.location.hash = `#/project/${project.session_id}`;
-    loadHistory(project.session_id);
+    window.location.hash = `#/project/${project.id}`;
+    loadHistory(project.id);
     loadFileTree();
   }, [setCurrentProject, loadHistory, loadFileTree]);
 
@@ -90,9 +90,9 @@ export default function App() {
     }
     if (currentProject) return;
 
-    const hashSessionId = getSessionIdFromHash();
-    const match = hashSessionId
-      ? projects.find((p) => p.session_id === hashSessionId)
+    const hashProjectId = getProjectIdFromHash();
+    const match = hashProjectId
+      ? projects.find((p) => p.id === hashProjectId)
       : null;
     const target = match ?? projects[0];
     selectProject(target);
@@ -101,9 +101,9 @@ export default function App() {
   // Listen for hash changes (back/forward)
   useEffect(() => {
     function onHashChange() {
-      const hashSessionId = getSessionIdFromHash();
-      if (!hashSessionId) return;
-      const match = projects.find((p) => p.session_id === hashSessionId);
+      const hashProjectId = getProjectIdFromHash();
+      if (!hashProjectId) return;
+      const match = projects.find((p) => p.id === hashProjectId);
       if (match && match.id !== currentProject?.id) {
         selectProject(match);
       }
@@ -121,8 +121,8 @@ export default function App() {
     // Set the hash URL and start polling for files (scaffold takes a few seconds).
     const session = useSessionStore.getState();
     if (session.currentProject) {
-      window.location.hash = `#/project/${session.currentProject.session_id}`;
-      loadHistory(session.currentProject.session_id);
+      window.location.hash = `#/project/${session.currentProject.id}`;
+      loadHistory(session.currentProject.id);
       pollFileTree();
     }
   };

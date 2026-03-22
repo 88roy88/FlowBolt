@@ -76,15 +76,15 @@ def _parse_error_block(block: str) -> dict[str, Any] | None:
     }
 
 
-@router.websocket("/ws/errors/{session_id}")
-async def errors_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901, PLR0915
+@router.websocket("/ws/errors/{project_id}")
+async def errors_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901, PLR0915
     """Watch ``.dev-server.log`` for error patterns and send structured events.
 
     Sends JSON messages::
 
         {"source": "build", "message": "...", "file": "...", "line": 12, "column": 5}
     """
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         await websocket.close(code=1008, reason="No sandbox")
         return
@@ -157,7 +157,7 @@ async def errors_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C90
                     # This allows future server-side logging/analysis
                     logger.info(
                         "[errors] Runtime error in session %s: %s",
-                        session_id,
+                        project_id,
                         data.get("message", "")[:200],
                     )
             except (json.JSONDecodeError, TypeError):
@@ -165,7 +165,7 @@ async def errors_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C90
     except WebSocketDisconnect:
         pass  # noqa: S110 — expected on client disconnect
     except Exception:
-        logger.debug("Error WebSocket failed for session %s", session_id)
+        logger.debug("Error WebSocket failed for session %s", project_id)
     finally:
         stop.set()
         watch_task.cancel()

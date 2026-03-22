@@ -24,7 +24,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isCreating: false,
 
   setCurrentProject(project: Project) {
-    set({ currentProject: project, sessionId: project.session_id });
+    set({ currentProject: project, sessionId: project.id });
     // Restore the selected model for this project
     if (project.selected_model) {
       useChatStore.setState({ selectedModel: project.selected_model });
@@ -44,7 +44,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const project = await api.createProject(name);
       const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
-      set({ projects, currentProject: project, sessionId: project.session_id });
+      set({ projects, currentProject: project, sessionId: project.id });
     } finally {
       set({ isCreating: false });
     }
@@ -52,8 +52,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   async deleteProject(id: string) {
     const projectToDelete = get().projects.find((p) => p.id === id);
-    if (projectToDelete?.session_id) {
-      closeChatSocket(projectToDelete.session_id);
+    if (projectToDelete) {
+      closeChatSocket(projectToDelete.id);
     }
     await api.deleteProject(id);
     const projects = get().projects.filter((p) => p.id !== id);
@@ -63,7 +63,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({
         projects,
         currentProject: next,
-        sessionId: next?.session_id ?? null,
+        sessionId: next?.id ?? null,
       });
     } else {
       set({ projects });

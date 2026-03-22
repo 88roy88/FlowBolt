@@ -83,7 +83,7 @@ class FixErrorAgent(BaseAgent):
         if generated_files:
             await self._send_step(fix_steps, "write", "running", "Writing fixed files...")
             for path, content in generated_files:
-                await write_file(self.session_id, path, content)
+                await write_file(self.project_id, path, content)
                 await self.emit({"type": "file", "path": path, "content": content})
             await self._send_step(fix_steps, "write", "completed", f"Wrote {len(generated_files)} file(s)")
 
@@ -120,7 +120,7 @@ class FixErrorAgent(BaseAgent):
             files_to_read.append(self._normalize_path(error_file))
         else:
             try:
-                tree = await list_files(self.session_id)
+                tree = await list_files(self.project_id)
                 for entry in tree:
                     if entry.name == "src" and entry.children:
                         for child in entry.children:
@@ -132,18 +132,18 @@ class FixErrorAgent(BaseAgent):
         file_contents: dict[str, str] = {}
         for path in files_to_read[:10]:
             try:
-                file_contents[path] = await read_file(self.session_id, path)
+                file_contents[path] = await read_file(self.project_id, path)
             except Exception:
                 logger.warning("[fix-error] Could not read %s", path)
                 if not file_contents and error_file:
                     try:
-                        tree = await list_files(self.session_id)
+                        tree = await list_files(self.project_id)
                         for entry in tree:
                             if entry.name == "src" and entry.children:
                                 for child in entry.children:
                                     if child.path.endswith((".tsx", ".ts", ".jsx", ".js", ".css")):
                                         try:
-                                            file_contents[child.path] = await read_file(self.session_id, child.path)
+                                            file_contents[child.path] = await read_file(self.project_id, child.path)
                                         except Exception:
                                             logger.debug("Could not read fallback file %s", child.path)
                                 break
@@ -154,9 +154,9 @@ class FixErrorAgent(BaseAgent):
     # TODO: we might want genral utils outside of the agent. also, me might want to move this to the sandbox manager.
     # TODO: or even to the frontend
     def _normalize_path(self, path: str) -> str:
-        if f"/{self.session_id}/" in path:
-            idx = path.find(f"/{self.session_id}/")
-            path = path[idx + len(self.session_id) + 2 :]
+        if f"/{self.project_id}/" in path:
+            idx = path.find(f"/{self.project_id}/")
+            path = path[idx + len(self.project_id) + 2 :]
             if not path.startswith("/"):
                 path = "/" + path
         elif not path.startswith("/src/"):
@@ -171,7 +171,7 @@ class FixErrorAgent(BaseAgent):
     # TODO: seems like a repeating function? make common?
     async def _build(self) -> str:
         try:
-            sandbox = sandbox_manager.get_sandbox(self.session_id)
+            sandbox = sandbox_manager.get_sandbox(self.project_id)
             if sandbox is None:
                 return ""
             lines: list[str] = []
@@ -197,7 +197,7 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
             for path, content in generated:
-                await write_file(self.session_id, path, content)
+                await write_file(self.project_id, path, content)
                 await self.emit({"type": "file", "path": path, "content": content})
         except Exception:
             logger.exception("[fix-error] Retry fix failed")

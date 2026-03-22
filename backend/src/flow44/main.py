@@ -50,8 +50,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from flow44.models.project import list_projects  # noqa: PLC0415
 
     live_projects = await list_projects()
-    live_session_ids = {p.session_id for p in live_projects}
-    await sandbox_manager.restore_existing_workspaces(live_session_ids)
+    live_project_ids = {p.id for p in live_projects}
+    await sandbox_manager.restore_existing_workspaces(live_project_ids)
     logger.info("Sandbox restoration complete.")
 
     yield

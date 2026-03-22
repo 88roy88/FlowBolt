@@ -20,19 +20,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-export async function fetchFileTree(sessionId: string): Promise<FileEntry[]> {
-  return request<FileEntry[]>(`/files/${sessionId}/tree`);
+export async function fetchFileTree(projectId: string): Promise<FileEntry[]> {
+  return request<FileEntry[]>(`/files/${projectId}/tree`);
 }
 
-export async function fetchFileContent(sessionId: string, path: string): Promise<string> {
+export async function fetchFileContent(projectId: string, path: string): Promise<string> {
   const data = await request<{ path: string; content: string }>(
-    `/files/${sessionId}/content?path=${encodeURIComponent(path)}`
+    `/files/${projectId}/content?path=${encodeURIComponent(path)}`
   );
   return data.content;
 }
 
-export async function saveFileContent(sessionId: string, path: string, content: string): Promise<void> {
-  await request(`/files/${sessionId}/content`, {
+export async function saveFileContent(projectId: string, path: string, content: string): Promise<void> {
+  await request(`/files/${projectId}/content`, {
     method: 'PUT',
     body: JSON.stringify({ path, content }),
   });
@@ -67,17 +67,17 @@ export async function updateProjectModel(projectId: string, model: string): Prom
   });
 }
 
-export async function fetchPreviewPort(sessionId: string): Promise<number> {
-  const data = await request<{ session_id: string; port: number }>(`/preview/${sessionId}/port`);
+export async function fetchPreviewPort(projectId: string): Promise<number> {
+  const data = await request<{ port: number }>(`/preview/${projectId}/port`);
   return data.port;
 }
 
-export async function fetchChatHistory(sessionId: string): Promise<{ id: string; role: string; content: string; created_at: string }[]> {
-  return request(`/chat/${sessionId}/history`);
+export async function fetchChatHistory(projectId: string): Promise<{ id: string; role: string; content: string; created_at: string }[]> {
+  return request(`/chat/${projectId}/history`);
 }
 
-export async function fetchAgentEvents(sessionId: string): Promise<Record<string, unknown>[]> {
-  return request(`/chat/${sessionId}/events`);
+export async function fetchAgentEvents(projectId: string): Promise<Record<string, unknown>[]> {
+  return request(`/chat/${projectId}/events`);
 }
 
 export async function fetchModels(): Promise<AIModel[]> {
@@ -93,12 +93,12 @@ export async function searchDataSources(queryOrId: string): Promise<DataSourceSe
   return request<DataSourceSearchRecord[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
 }
 
-export function downloadZip(sessionId: string): void {
-  window.open(`${BASE}/export/${sessionId}/zip`, '_blank');
+export function downloadZip(projectId: string): void {
+  window.open(`${BASE}/export/${projectId}/zip`, '_blank');
 }
 
-export function downloadSingleHtml(sessionId: string): void {
-  window.open(`${BASE}/export/${sessionId}/html`, '_blank');
+export function downloadSingleHtml(projectId: string): void {
+  window.open(`${BASE}/export/${projectId}/html`, '_blank');
 }
 
 export async function checkBackendHealth(): Promise<boolean> {

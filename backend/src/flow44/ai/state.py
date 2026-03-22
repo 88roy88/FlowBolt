@@ -7,7 +7,6 @@ from flow44.ai.task_tree import WorkPlan
 
 
 class BuildState(BaseModel):
-    session_id: str
     project_id: str
     model: str | None = None
     user_content: str = ""

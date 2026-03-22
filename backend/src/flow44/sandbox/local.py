@@ -54,7 +54,7 @@ class LocalSandbox(Sandbox):
         )
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
-            self.session_id,
+            self.project_id,
             self.port,
             self._dev_process.pid,
         )
@@ -88,6 +88,6 @@ class LocalSandbox(Sandbox):
         flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
         fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=pid, session_id=self.session_id)
+        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=pid, project_id=self.project_id)
         _active_ptys.add(handle)
         return handle

@@ -18,7 +18,7 @@ from flow44.ai.tools.grep import grep
 from flow44.ai.tools.read_file import read_file_with_lines
 from flow44.ai.tools.write_file import write_file_with_diff
 from flow44.models.chat import get_messages
-from flow44.models.project import get_project_by_session
+from flow44.models.project import get_project
 from flow44.sandbox.filesystem import list_files, read_file
 
 from ._base import BaseAgent
@@ -44,7 +44,7 @@ class FollowUpAgent(BaseAgent):
         self._executor = self._build_tool_executor()
 
     def _build_tool_executor(self) -> ToolExecutor:
-        sid = self.session_id
+        sid = self.project_id
 
         # TODO: why we stopped supporting path?
         # TODO: we might want a better prompt for the llm to understand how to use grep patterns.
@@ -144,7 +144,7 @@ class FollowUpAgent(BaseAgent):
 
     # TODO: We will want to have a smarted memory system in the future
     async def _build_context(self) -> dict[str, str]:
-        project = await get_project_by_session(self.session_id)
+        project = await get_project(self.project_id)
         summary = ""
         if project and project.summary:
             try:
@@ -158,7 +158,7 @@ class FollowUpAgent(BaseAgent):
                 summary = "(no project summary available)"
 
         try:
-            file_entries = await list_files(self.session_id)
+            file_entries = await list_files(self.project_id)
             file_tree = self._format_file_tree(file_entries)
         except Exception:
             file_tree = "(unable to list files)"

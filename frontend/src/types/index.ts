@@ -44,7 +44,6 @@ export interface FileEntry {
 export interface Project {
   id: string;
   name: string;
-  session_id: string;
   created_at: string;
   summary?: string;
   selected_model?: string;

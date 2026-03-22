@@ -28,9 +28,9 @@ def _get_db_path() -> str:
 class Project:
     id: str
     name: str
-    session_id: str
     created_at: str
     updated_at: str
+    session_id: str = ""  # deprecated — kept for backward compat with existing DBs
     summary: str = ""
     selected_model: str = ""
     data_source_id: str = ""
@@ -133,14 +133,14 @@ async def create_project(name: str) -> Project:
     project = Project(
         id=str(uuid.uuid4()),
         name=name,
-        session_id=str(uuid.uuid4()),
         created_at=datetime.now(UTC).isoformat(),
         updated_at=datetime.now(UTC).isoformat(),
     )
     async with aiosqlite.connect(_get_db_path()) as db:
+        # session_id column still exists in older DBs — write project.id to keep NOT NULL constraint happy
         await db.execute(
             "INSERT INTO projects (id, name, session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            (project.id, project.name, project.session_id, project.created_at, project.updated_at),
+            (project.id, project.name, project.id, project.created_at, project.updated_at),
         )
         await db.commit()
     return project
@@ -151,17 +151,6 @@ async def get_project(project_id: str) -> Project | None:
     async with aiosqlite.connect(_get_db_path()) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)) as cur:
-            row = await cur.fetchone()
-            if row is None:
-                return None
-            return Project(**dict(row))
-
-
-async def get_project_by_session(session_id: str) -> Project | None:
-    """Fetch a single project by session_id."""
-    async with aiosqlite.connect(_get_db_path()) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM projects WHERE session_id = ?", (session_id,)) as cur:
             row = await cur.fetchone()
             if row is None:
                 return None

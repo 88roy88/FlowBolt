@@ -25,7 +25,7 @@ vi.mock('../session', () => ({
   useSessionStore: {
     getState: () => ({
       currentProject: { id: 'proj-1' },
-      sessionId: 'sess-1',
+      sessionId: 'proj-1',
       updateProjectSummary: vi.fn(),
     }),
   },
