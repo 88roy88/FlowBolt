@@ -4,7 +4,7 @@ export interface Message {
   content: string;
   actions?: Action[];
   timestamp: number;
-  cases?: { id: number; name: string }[];
+  dataSources?: { id: number; name: string }[];
   agentCard?: AgentCard;
 }
 
@@ -22,7 +22,7 @@ export type AgentCard =
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'error_fix_request'; errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string }
   | { type: 'fix_progress'; steps: FixStep[] }
-  | { type: 'cases_fetched'; cases: { packageId: string; packageName: string; dataSchema: string; relevantFields?: string }[] }
+  | { type: 'data_sources_fetched'; dataSources: { dataSourceId: string; dataSourceName: string; dataSchema: string; relevantFields?: string }[] }
 
   | { type: 'followup_progress'; steps: FollowUpStep[]; answer?: string; filesChanged?: string[]; diffs?: FileDiff[] };
 
@@ -56,7 +56,7 @@ export interface AIModel {
   provider: string;
 }
 
-export interface PackageSearchRecord {
+export interface DataSourceSearchRecord {
   Id: number;
   Name: string;
   Purpose?: string;
@@ -72,7 +72,7 @@ export interface PackageSearchRecord {
 export type AgentPhase =
   | 'idle'
   | 'classifying'
-  | 'fetching_cases'
+  | 'fetching_data_sources'
   | 'designing'
   | 'planning'
   | 'awaiting_approval'
@@ -144,11 +144,11 @@ export type WSMessage =
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'fix_step'; step: 'discover' | 'generate' | 'write' | 'validate' | 'retry'; status: 'running' | 'completed' | 'failed'; message: string }
   | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; model?: string }
-  | { type: 'cases_fetched'; cases: { package_id: string; package_name: string; data_schema: string; relevant_fields?: string }[] }
-  | { type: 'case_error'; message: string }
+  | { type: 'data_sources_fetched'; data_sources: { data_source_id: string; data_source_name: string; data_schema: string; relevant_fields?: string }[] }
+  | { type: 'data_source_error'; message: string }
 
   | { type: 'followup_step'; tool: string; args: Record<string, string>; status: string; result_preview?: string; iteration: number }
   | { type: 'followup_diffs'; diffs: FileDiff[] }
-  | { type: 'user_message'; content: string; cases?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
+  | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
   | { type: 'plan_accepted'; overview: PlanOverview }
   | { type: 'plan_rejected'; overview: PlanOverview };

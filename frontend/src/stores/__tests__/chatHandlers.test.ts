@@ -62,7 +62,7 @@ const INITIAL_STATE: ChatState = {
   projectSummary: null,
   models: [],
   selectedModel: null,
-  selectedCases: [],
+  selectedDataSources: [],
   historyLoaded: true,
   sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
   sendFixError: vi.fn() as unknown as ChatState['sendFixError'],
@@ -73,9 +73,9 @@ const INITIAL_STATE: ChatState = {
   clearError: vi.fn() as unknown as ChatState['clearError'],
   setStreaming: vi.fn() as unknown as ChatState['setStreaming'],
   setSelectedModel: vi.fn() as unknown as ChatState['setSelectedModel'],
-  addCase: vi.fn() as unknown as ChatState['addCase'],
-  removeCase: vi.fn() as unknown as ChatState['removeCase'],
-  clearCases: vi.fn() as unknown as ChatState['clearCases'],
+  addDataSource: vi.fn() as unknown as ChatState['addDataSource'],
+  removeDataSource: vi.fn() as unknown as ChatState['removeDataSource'],
+  clearDataSources: vi.fn() as unknown as ChatState['clearDataSources'],
   loadModels: vi.fn() as unknown as ChatState['loadModels'],
 };
 
@@ -196,34 +196,34 @@ describe('createSendMessageHandler — build flow', () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
-  it('cases_fetched creates a card with package data', () => {
+  it('data_sources_fetched creates a card with data source info', () => {
     handler(msg({
-      type: 'cases_fetched',
-      cases: [{
-        package_id: '42',
-        package_name: 'Sales Data',
+      type: 'data_sources_fetched',
+      data_sources: [{
+        data_source_id: '42',
+        data_source_name: 'Sales Data',
         data_schema: '{ revenue: number }',
         relevant_fields: 'revenue, date',
       }],
     }));
 
-    const found = store.state().messages.find(m => m.agentCard?.type === 'cases_fetched');
+    const found = store.state().messages.find(m => m.agentCard?.type === 'data_sources_fetched');
     expect(found).toBeDefined();
-    const card = found!.agentCard as { type: 'cases_fetched'; cases: { packageName: string }[] };
-    expect(card.cases).toHaveLength(1);
-    expect(card.cases[0].packageName).toBe('Sales Data');
+    const card = found!.agentCard as { type: 'data_sources_fetched'; dataSources: { dataSourceName: string }[] };
+    expect(card.dataSources).toHaveLength(1);
+    expect(card.dataSources[0].dataSourceName).toBe('Sales Data');
   });
 
-  it('user_message with cases attaches them', () => {
+  it('user_message with data_sources attaches them', () => {
     handler(msg({
       type: 'user_message',
       content: 'Show me the data',
-      cases: [{ id: 1, name: 'Sales' }],
+      data_sources: [{ id: 1, name: 'Sales' }],
     }));
 
     const result = store.state().messages[0];
     expect(result.role).toBe('user');
-    expect(result.cases).toEqual([{ id: 1, name: 'Sales' }]);
+    expect(result.dataSources).toEqual([{ id: 1, name: 'Sales' }]);
   });
 
   it('unknown event type does not crash', () => {

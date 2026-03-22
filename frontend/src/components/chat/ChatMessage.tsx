@@ -4,7 +4,7 @@ import { FileText, TerminalSquare } from 'lucide-react';
 import type { Message } from '../../types';
 import { Badge } from '../ui/badge';
 import {
-  CasesFetchedCard,
+  DataSourcesFetchedCard,
   DesignCompleteCard,
   PlanOverviewCard,
   TaskProgressCard,
@@ -23,8 +23,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
   const card = message.agentCard!;
 
   switch (card.type) {
-    case 'cases_fetched':
-      return <CasesFetchedCard cases={card.cases} />;
+    case 'data_sources_fetched':
+      return <DataSourcesFetchedCard dataSources={card.dataSources} />;
     case 'design_complete':
       return <DesignCompleteCard architecture={card.architecture} ux={card.ux} />;
     case 'plan_overview':
@@ -54,14 +54,14 @@ function AgentCardRenderer({ message }: { message: Message }) {
   }
 }
 
-function CaseBadges({ cases }: { cases: { id: number; name: string }[] }) {
+function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: string }[] }) {
   return (
     <div className="flex flex-wrap gap-1 mb-1.5">
-      {cases.map((c) => (
-        <Badge key={c.id} variant="accent">
-          <span className="text-muted-foreground font-semibold">Case</span>
-          <span className="font-semibold">{c.name}</span>
-          <span className="text-muted-foreground">#{c.id}</span>
+      {dataSources.map((ds) => (
+        <Badge key={ds.id} variant="accent">
+          <span className="text-muted-foreground font-semibold">Data</span>
+          <span className="font-semibold">{ds.name}</span>
+          <span className="text-muted-foreground">#{ds.id}</span>
         </Badge>
       ))}
     </div>
@@ -93,8 +93,8 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
           isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
         }`}
       >
-        {isUser && message.cases && message.cases.length > 0 && (
-          <CaseBadges cases={message.cases} />
+        {isUser && message.dataSources && message.dataSources.length > 0 && (
+          <DataSourceBadges dataSources={message.dataSources} />
         )}
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>

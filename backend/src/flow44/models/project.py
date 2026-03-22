@@ -33,9 +33,9 @@ class Project:
     updated_at: str
     summary: str = ""
     selected_model: str = ""
-    package_id: str = ""
-    package_context: str = ""
-    cases: str = "[]"
+    data_source_id: str = ""
+    data_source_context: str = ""
+    data_sources: str = "[]"
 
 
 # TODO: use Alembic, move to PG and SQLModel.
@@ -83,26 +83,46 @@ async def init_db() -> None:
         except Exception:  # noqa: S110 — column already exists
             pass
 
-    # Migration-safe: add package_id column if it doesn't exist
+    # Migration-safe: rename package_id → case_id → data_source_id
+    for old, new in [("package_id", "case_id"), ("case_id", "data_source_id")]:
+        async with aiosqlite.connect(_get_db_path()) as db:
+            try:
+                await db.execute(f"ALTER TABLE projects RENAME COLUMN {old} TO {new}")  # noqa: S608
+                await db.commit()
+            except Exception:  # noqa: S110
+                pass
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
-            await db.execute("ALTER TABLE projects ADD COLUMN package_id TEXT DEFAULT ''")
+            await db.execute("ALTER TABLE projects ADD COLUMN data_source_id TEXT DEFAULT ''")
             await db.commit()
         except Exception:  # noqa: S110 — column already exists
             pass
 
-    # Migration-safe: add package_context column if it doesn't exist
+    # Migration-safe: rename package_context → case_context → data_source_context
+    for old, new in [("package_context", "case_context"), ("case_context", "data_source_context")]:
+        async with aiosqlite.connect(_get_db_path()) as db:
+            try:
+                await db.execute(f"ALTER TABLE projects RENAME COLUMN {old} TO {new}")  # noqa: S608
+                await db.commit()
+            except Exception:  # noqa: S110
+                pass
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
-            await db.execute("ALTER TABLE projects ADD COLUMN package_context TEXT DEFAULT ''")
+            await db.execute("ALTER TABLE projects ADD COLUMN data_source_context TEXT DEFAULT ''")
             await db.commit()
         except Exception:  # noqa: S110 — column already exists
             pass
 
-    # Migration-safe: add cases column if it doesn't exist
+    # Migration-safe: rename cases → data_sources
     async with aiosqlite.connect(_get_db_path()) as db:
         try:
-            await db.execute("ALTER TABLE projects ADD COLUMN cases TEXT DEFAULT '[]'")
+            await db.execute("ALTER TABLE projects RENAME COLUMN cases TO data_sources")
+            await db.commit()
+        except Exception:  # noqa: S110
+            pass
+    async with aiosqlite.connect(_get_db_path()) as db:
+        try:
+            await db.execute("ALTER TABLE projects ADD COLUMN data_sources TEXT DEFAULT '[]'")
             await db.commit()
         except Exception:  # noqa: S110 — column already exists
             pass
@@ -187,51 +207,51 @@ async def update_project_model(project_id: str, model: str) -> None:
         await db.commit()
 
 
-async def update_project_package(project_id: str, package_id: str, package_context: str) -> None:
-    """Update the package_id and package_context fields for a project."""
+async def update_project_data_source(project_id: str, data_source_id: str, data_source_context: str) -> None:
+    """Update the data_source_id and data_source_context fields for a project."""
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
-            "UPDATE projects SET package_id = ?, package_context = ?, updated_at = ? WHERE id = ?",
-            (package_id, package_context, datetime.now(UTC).isoformat(), project_id),
+            "UPDATE projects SET data_source_id = ?, data_source_context = ?, updated_at = ? WHERE id = ?",
+            (data_source_id, data_source_context, datetime.now(UTC).isoformat(), project_id),
         )
         await db.commit()
 
 
-async def update_project_cases(project_id: str, cases: list[dict[str, Any]]) -> None:
-    """Update the cases column (JSON array) for a project."""
+async def update_project_data_sources(project_id: str, data_sources: list[dict[str, Any]]) -> None:
+    """Update the data_sources column (JSON array) for a project."""
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
-            "UPDATE projects SET cases = ?, updated_at = ? WHERE id = ?",
-            (json.dumps(cases), datetime.now(UTC).isoformat(), project_id),
+            "UPDATE projects SET data_sources = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(data_sources), datetime.now(UTC).isoformat(), project_id),
         )
         await db.commit()
 
 
-async def get_project_cases(project_id: str) -> list[dict[str, Any]]:
-    """Read the cases column, falling back to old package_id/package_context for backward compat."""
+async def get_project_data_sources(project_id: str) -> list[dict[str, Any]]:
+    """Read the data_sources column, falling back to single data_source_id/data_source_context."""
     async with aiosqlite.connect(_get_db_path()) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT cases, package_id, package_context FROM projects WHERE id = ?", (project_id,)
+            "SELECT data_sources, data_source_id, data_source_context FROM projects WHERE id = ?", (project_id,)
         ) as cur:
             row = await cur.fetchone()
             if row is None:
                 return []
-            cases_raw = row["cases"]
-            if cases_raw and cases_raw != "[]":
+            raw = row["data_sources"]
+            if raw and raw != "[]":
                 try:
-                    return cast(list[dict[str, Any]], json.loads(cases_raw))
+                    return cast(list[dict[str, Any]], json.loads(raw))
                 except (json.JSONDecodeError, TypeError):
                     pass
-            # Backward compat: synthesize from old columns
-            pkg_id = row["package_id"]
-            pkg_ctx = row["package_context"]
-            if pkg_id:
+            # Fallback: synthesize from single-source columns
+            dsid = row["data_source_id"]
+            dsctx = row["data_source_context"]
+            if dsid:
                 try:
-                    ctx = json.loads(pkg_ctx) if pkg_ctx else {}
+                    ctx = json.loads(dsctx) if dsctx else {}
                 except (json.JSONDecodeError, TypeError):
                     ctx = {}
-                ctx["package_id"] = pkg_id
+                ctx["data_source_id"] = dsid
                 return [ctx]
             return []
 

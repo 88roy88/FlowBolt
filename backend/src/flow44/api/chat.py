@@ -83,26 +83,26 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901,
             if msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
-                case_ids: list[int] = data.get("caseIds") or []
+                ds_ids: list[int] = data.get("dataSourceIds") or []
 
                 # Save user message (for LLM context in followup agent)
                 await save_message(project.id, "user", user_content)
 
                 # Emit user_message event (for frontend history reconstruction)
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
-                if case_ids:
-                    from flow44.api.package_api import _package_search  # noqa: PLC0415
+                if ds_ids:
+                    from flow44.api.flapi_api import _package_search  # noqa: PLC0415
 
-                    case_names: list[str] = []
-                    for cid in case_ids:
+                    ds_names: list[str] = []
+                    for dsid in ds_ids:
                         try:
-                            results = await _package_search(str(cid))
-                            name = results[0].get("Name", f"Case #{cid}") if results else f"Case #{cid}"
+                            results = await _package_search(str(dsid))
+                            name = results[0].get("Name", f"Data source #{dsid}") if results else f"Data source #{dsid}"
                         except Exception:
-                            name = f"Case #{cid}"
-                        case_names.append(name)
-                    user_event["cases"] = [
-                        {"id": cid, "name": cname} for cid, cname in zip(case_ids, case_names, strict=True)
+                            name = f"Data source #{dsid}"
+                        ds_names.append(name)
+                    user_event["data_sources"] = [
+                        {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                     ]
                 await emit_event(session_id, user_event, notify=False)
 
@@ -119,7 +119,8 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901,
                         _run_agent_safe(
                             session_id,
                             build_agent.run(
-                                user_content, case_ids=[str(cid) for cid in case_ids] if case_ids else None
+                                user_content,
+                                data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
                             ),
                         )
                     )

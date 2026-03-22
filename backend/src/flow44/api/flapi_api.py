@@ -1,6 +1,6 @@
-"""Backend routes that proxy to the Package API (FLAPI).
+"""Backend routes that proxy to FLAPI (package search & execution).
 
-These routes are what the frontend should call. They can later be pointed at
+These routes are what the frontend calls. They can later be pointed at
 real FLAPI (cluster) or the local mock by switching configuration.
 """
 
@@ -12,15 +12,15 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from flow44.config import settings
-from flow44.integrations.package_api import PackageApiClient, PackageApiUpstreamError
+from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/package", tags=["package"])
+router = APIRouter(prefix="/api/data-source", tags=["data-source"])
 
 
-def _client() -> PackageApiClient:
-    return PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
+def _client() -> FlapiClient:
+    return FlapiClient(base_url=settings.FLAPI_BASE_URL)
 
 
 async def _package_search(query_or_id: str) -> list[Any]:
@@ -29,7 +29,7 @@ async def _package_search(query_or_id: str) -> list[Any]:
 
     try:
         return await _client().search(query_or_id)
-    except PackageApiUpstreamError as e:
+    except FlapiUpstreamError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
@@ -49,7 +49,7 @@ async def _run_package(
 
     try:
         return await _client().run_package(package_id, all_queries=allQueries, body=body)
-    except PackageApiUpstreamError as e:
+    except FlapiUpstreamError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 

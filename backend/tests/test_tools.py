@@ -110,10 +110,12 @@ class TestToolExecutor:
         async def tool_b() -> str:
             return "b"
 
-        executor = ToolExecutor([
-            FunctionTool(tool_a, name="a"),
-            FunctionTool(tool_b, name="b"),
-        ])
+        executor = ToolExecutor(
+            [
+                FunctionTool(tool_a, name="a"),
+                FunctionTool(tool_b, name="b"),
+            ]
+        )
 
         result = await executor.execute("b")
         assert result.value == "b"

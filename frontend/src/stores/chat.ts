@@ -21,7 +21,7 @@ export interface ChatState {
   followUpDiffs: FileDiff[];
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
-  selectedCases: { id: number; name: string }[];
+  selectedDataSources: { id: number; name: string }[];
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'reject' | 'modify', feedback?: string) => void;
@@ -32,9 +32,9 @@ export interface ChatState {
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
   setSelectedModel: (model: string) => void;
-  addCase: (pkg: { id: number; name: string }) => void;
-  removeCase: (id: number) => void;
-  clearCases: () => void;
+  addDataSource: (pkg: { id: number; name: string }) => void;
+  removeDataSource: (id: number) => void;
+  clearDataSources: () => void;
   loadModels: () => Promise<void>;
 }
 
@@ -92,7 +92,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   followUpDiffs: [],
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
-  selectedCases: [],
+  selectedDataSources: [],
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const sessionId = useSessionStore.getState().sessionId;
@@ -136,14 +136,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const sessionId = useSessionStore.getState().sessionId;
     if (!sessionId) return;
 
-    const { selectedCases, selectedModel } = get();
+    const { selectedDataSources, selectedModel } = get();
 
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
       content,
       timestamp: Date.now(),
-      cases: selectedCases.length > 0 ? [...selectedCases] : undefined,
+      dataSources: selectedDataSources.length > 0 ? [...selectedDataSources] : undefined,
     };
 
     set((state) => ({
@@ -161,7 +161,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       type: 'message',
       content,
       ...(selectedModel && { model: selectedModel }),
-      ...(selectedCases.length > 0 && { caseIds: selectedCases.map((c) => c.id) }),
+      ...(selectedDataSources.length > 0 && { dataSourceIds: selectedDataSources.map((c) => c.id) }),
     });
 
     // Persist the model to the project so it's restored on next visit
@@ -170,7 +170,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updateProjectModel(currentProject.id, selectedModel).catch(() => {});
     }
 
-    set({ selectedCases: [] });
+    set({ selectedDataSources: [] });
   },
 
   respondToPlan(action: 'accept' | 'reject' | 'modify', feedback?: string) {
@@ -242,19 +242,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  addCase(pkg: { id: number; name: string }) {
+  addDataSource(pkg: { id: number; name: string }) {
     set((state) => {
-      if (state.selectedCases.some((c) => c.id === pkg.id)) return state;
-      return { selectedCases: [...state.selectedCases, pkg] };
+      if (state.selectedDataSources.some((c) => c.id === pkg.id)) return state;
+      return { selectedDataSources: [...state.selectedDataSources, pkg] };
     });
   },
 
-  removeCase(id: number) {
-    set((state) => ({ selectedCases: state.selectedCases.filter((c) => c.id !== id) }));
+  removeDataSource(id: number) {
+    set((state) => ({ selectedDataSources: state.selectedDataSources.filter((c) => c.id !== id) }));
   },
 
-  clearCases() {
-    set({ selectedCases: [] });
+  clearDataSources() {
+    set({ selectedDataSources: [] });
   },
 
   async loadModels() {

@@ -96,8 +96,8 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     });
   });
 
-  // --- Package search ---
-  await page.route('**/api/package/search/**', async (route) => {
+  // --- Data source search ---
+  await page.route('**/api/data-source/search/**', async (route) => {
     return route.fulfill({ json: [] });
   });
 }

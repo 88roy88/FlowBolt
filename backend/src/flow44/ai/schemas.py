@@ -78,10 +78,10 @@ class ClassificationResult(BaseModel):
     classification: str  # "new_project" or "follow_up"
 
 
-# --- Package analysis ---
+# --- Data source analysis ---
 
 
-class PackageAnalysis(BaseModel):
+class DataSourceAnalysis(BaseModel):
     data_schema: str = ""
     relevant_fields: str = ""
     data_characteristics: str = ""

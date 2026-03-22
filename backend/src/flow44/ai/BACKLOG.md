@@ -131,10 +131,10 @@ existing projects without starting over.
 
 ---
 
-## B7. Rename "package" to "case" in backend
+## B7. Rename "package" to "case" in backend ✅
 
-Align backend naming with frontend: `PackageApiClient` → `CaseApiClient`,
-`package_id` → `case_id`, etc.
+Done. `CaseApiClient`, `case_id`, `case_name` throughout. DB columns renamed
+via `ALTER TABLE RENAME COLUMN`. Route prefix changed from `/api/package` to `/api/case`.
 
 ---
 
@@ -386,7 +386,7 @@ Replace manual span management in BuildAgent with decorators.
 ## A6. Structured output for JSON prompts (PARTIALLY DONE)
 
 Pydantic schemas created in `schemas.py` (ArchitectureDesign, UXDesign,
-UserPlanOverview, ProjectSummary, PackageAnalysis, ClassificationResult).
+UserPlanOverview, ProjectSummary, CaseAnalysis, ClassificationResult).
 BuildState and BuildAgent now validate LLM responses into these models.
 
 Remaining: use LiteLLM `response_format` or tool-based extraction to enforce
@@ -401,7 +401,7 @@ malformed JSON.
 
 Use structured output (tool calling / response_format) instead:
 - Define Pydantic models for each expected response (ArchitectureDesign, UXDesign,
-  UserPlanOverview, TechnicalPlan, ProjectSummary, PackageAnalysis)
+  UserPlanOverview, TechnicalPlan, ProjectSummary, CaseAnalysis)
 - Use LiteLLM's `response_format` parameter or tool-based extraction (like
   primesrc's `chat_structured`)
 - Eliminates JSON parsing failures, markdown fence stripping, and fallback logic
@@ -414,7 +414,7 @@ Use structured output (tool calling / response_format) instead:
 - `merge.jinja2` → `TechnicalPlan` model
 - `summary.jinja2` → `ProjectSummary` model
 - `classify.jinja2` → `ClassificationResult` model
-- Package analysis in BuildAgent → `PackageAnalysis` model
+- Package analysis in BuildAgent → `CaseAnalysis` model
 
 **NOT candidates** (free-form output):
 - `codegen.jinja2` — outputs XML/code, not JSON

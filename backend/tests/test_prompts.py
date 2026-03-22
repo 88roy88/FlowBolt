@@ -22,8 +22,8 @@ class TestPromptRendering:
     def test_architecture_with_cases(self) -> None:
         cases = [
             {
-                "package_id": "123",
-                "package_name": "Sales Data",
+                "data_source_id": "123",
+                "data_source_name": "Sales Data",
                 "data_schema": "Array of records",
                 "relevant_fields": "date, amount",
                 "data_characteristics": "time-series",
@@ -31,23 +31,23 @@ class TestPromptRendering:
                 "integration_notes": "Use fetch",
             }
         ]
-        result = render_architecture(case_contexts=cases)
+        result = render_architecture(data_source_contexts=cases)
         assert "Sales Data" in result
-        assert "following cases" in result
+        assert "following data sources" in result
         assert "123" in result
-        assert "api/package" in result
+        assert "api/data-source" in result
 
     def test_architecture_without_cases(self) -> None:
-        result = render_architecture(case_contexts=None)
-        assert "Case Data Integration" not in result
+        result = render_architecture(data_source_contexts=None)
+        assert "Data Source Integration" not in result
 
     def test_merge_without_cases(self) -> None:
-        result = render_merge(has_cases=False)
-        assert "Case Data Integration Tasks" not in result
+        result = render_merge(has_data_sources=False)
+        assert "Data Source Integration Tasks" not in result
 
     def test_merge_with_cases(self) -> None:
-        result = render_merge(has_cases=True)
-        assert "Case Data Integration Tasks" in result
+        result = render_merge(has_data_sources=True)
+        assert "Data Source Integration Tasks" in result
 
     def test_user_plan_basic(self) -> None:
         result = render_user_plan()
@@ -103,10 +103,10 @@ class TestPromptRendering:
             task_files=["src/Dashboard.tsx"],
             architecture={},
             ux_design={},
-            case_contexts=[
+            data_source_contexts=[
                 {
-                    "package_id": "456",
-                    "package_name": "Analytics",
+                    "data_source_id": "456",
+                    "data_source_name": "Analytics",
                     "data_schema": "Metrics array",
                     "relevant_fields": "metric, value",
                     "data_characteristics": "Real-time",
@@ -116,4 +116,4 @@ class TestPromptRendering:
             ],
         )
         assert "Analytics" in result
-        assert "/api/package/456/run" in result
+        assert "/api/data-source/456/run" in result

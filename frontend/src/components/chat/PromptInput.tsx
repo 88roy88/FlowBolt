@@ -2,20 +2,20 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
-import { CaseSelector } from './CaseSelector';
+import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 
 export function PromptInput() {
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
-  const [showCaseSelector, setShowCaseSelector] = useState(false);
+  const [showDsSelector, setShowDsSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const agentPhase = useChatStore((s) => s.agentPhase);
-  const selectedCases = useChatStore((s) => s.selectedCases);
-  const removeCase = useChatStore((s) => s.removeCase);
+  const selectedDataSources = useChatStore((s) => s.selectedDataSources);
+  const removeDataSource = useChatStore((s) => s.removeDataSource);
   const sessionId = useSessionStore((s) => s.sessionId);
 
   const adjustHeight = useCallback(() => {
@@ -71,7 +71,7 @@ export function PromptInput() {
 
   const busyLabel =
     agentPhase === 'classifying' ? 'Analyzing' :
-    agentPhase === 'fetching_cases' ? 'Fetching case data' :
+    agentPhase === 'fetching_data_sources' ? 'Fetching data sources' :
     agentPhase === 'designing' ? 'Designing' :
     agentPhase === 'planning' ? 'Planning' :
     agentPhase === 'executing' ? 'Building' :
@@ -79,23 +79,23 @@ export function PromptInput() {
 
   return (
     <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
-      {/* Case selector */}
-      {!isBusy && sessionId && showCaseSelector && (
+      {/* Data source selector */}
+      {!isBusy && sessionId && showDsSelector && (
         <div className="mb-2.5 relative">
-          <CaseSelector isOpen={showCaseSelector} />
+          <DataSourceSelector isOpen={showDsSelector} />
         </div>
       )}
 
-      {/* Selected case badges */}
-      {!showCaseSelector && selectedCases.length > 0 && (
+      {/* Selected data source badges */}
+      {!showDsSelector && selectedDataSources.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {selectedCases.map((c) => (
+          {selectedDataSources.map((c) => (
             <Badge key={c.id} variant="accent" className="gap-1">
               <span className="font-medium">{c.name}</span>
               <button
-                onClick={() => removeCase(c.id)}
+                onClick={() => removeDataSource(c.id)}
                 className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20"
-                title="Remove case"
+                title="Remove data source"
               >
                 <X size={12} />
               </button>
@@ -120,19 +120,19 @@ export function PromptInput() {
             : 'border border-border shadow-[var(--shadow-sm)]'
         }`}
       >
-        {/* Case selector toggle */}
+        {/* Data source selector toggle */}
         {!isBusy && sessionId && (
           <button
-            onClick={() => setShowCaseSelector((v) => !v)}
+            onClick={() => setShowDsSelector((v) => !v)}
             className={`relative w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-colors ${
-              showCaseSelector ? 'bg-primary/15' : ''
-            } ${selectedCases.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
-            title={showCaseSelector ? 'Hide case selector' : 'Attach cases'}
+              showDsSelector ? 'bg-primary/15' : ''
+            } ${selectedDataSources.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
+            title={showDsSelector ? 'Hide data source selector' : 'Attach data sources'}
           >
             <Database size={16} />
-            {selectedCases.length > 0 && (
+            {selectedDataSources.length > 0 && (
               <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
-                {selectedCases.length}
+                {selectedDataSources.length}
               </span>
             )}
           </button>
@@ -169,9 +169,9 @@ export function PromptInput() {
       <div className="flex items-center justify-between mt-1.5 pt-1 px-1 gap-2">
         <div className="flex items-center gap-2 min-w-0 shrink-0">
           <ModelSelector />
-          {selectedCases.length > 0 && (
+          {selectedDataSources.length > 0 && (
             <span className="text-[10px] text-muted-foreground/50 hidden sm:inline">
-              {selectedCases.length} case{selectedCases.length > 1 ? 's' : ''} attached
+              {selectedDataSources.length} data source{selectedDataSources.length > 1 ? 's' : ''} attached
             </span>
           )}
         </div>

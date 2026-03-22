@@ -9,7 +9,7 @@ export function GlobalProgress() {
   const progress =
     agentPhase === 'idle' ? 0 :
     agentPhase === 'classifying' ? 5 :
-    agentPhase === 'fetching_cases' ? 10 :
+    agentPhase === 'fetching_data_sources' ? 10 :
     agentPhase === 'designing' ? 15 :
     agentPhase === 'planning' ? 30 :
     agentPhase === 'awaiting_approval' ? 35 :

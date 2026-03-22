@@ -27,7 +27,7 @@ from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.config import settings
-from flow44.integrations.package_api import PackageApiClient, PackageApiUpstreamError
+from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
 from flow44.models.project import update_project_summary
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
@@ -52,9 +52,9 @@ class BuildAgent(BaseAgent):
     # -- Entry point --
 
     @observe(name="build-agent-run")  # type: ignore[untyped-decorator]
-    async def run(self, content: str, case_ids: list[str] | None = None) -> None:
+    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._state.user_content = content
-        self._state.case_ids = case_ids or []
+        self._state.data_source_ids = data_source_ids or []
         self._trace_id = langfuse_context.get_current_trace_id()
 
         langfuse_context.update_current_trace(
@@ -64,28 +64,30 @@ class BuildAgent(BaseAgent):
             tags=["build-agent"],
         )
 
-        # Fetch case data
-        if self._state.case_ids:
-            await self.emit({"type": "phase", "phase": "fetching_cases"})
-            results = await asyncio.gather(*[self._fetch_and_analyze_case(cid) for cid in self._state.case_ids])
-            self._state.case_contexts = [ctx for ctx in results if ctx is not None]
+        # Fetch data source metadata
+        if self._state.data_source_ids:
+            await self.emit({"type": "phase", "phase": "fetching_data_sources"})
+            results = await asyncio.gather(
+                *[self._fetch_and_analyze_data_source(sid) for sid in self._state.data_source_ids]
+            )
+            self._state.data_source_contexts = [ctx for ctx in results if ctx is not None]
 
-            if self._state.case_contexts:
-                from flow44.models.project import update_project_cases  # noqa: PLC0415
+            if self._state.data_source_contexts:
+                from flow44.models.project import update_project_data_sources  # noqa: PLC0415
 
-                await update_project_cases(self.project_id, self._state.case_contexts)
+                await update_project_data_sources(self.project_id, self._state.data_source_contexts)
 
                 await self.emit(
                     {
-                        "type": "cases_fetched",
-                        "cases": [
+                        "type": "data_sources_fetched",
+                        "data_sources": [
                             {
-                                "package_id": ctx["package_id"],
-                                "package_name": ctx["package_name"],
+                                "data_source_id": ctx["data_source_id"],
+                                "data_source_name": ctx["data_source_name"],
                                 "data_schema": ctx.get("data_schema", ""),
                                 "relevant_fields": ctx.get("relevant_fields", ""),
                             }
-                            for ctx in self._state.case_contexts
+                            for ctx in self._state.data_source_contexts
                         ],
                     }
                 )
@@ -178,22 +180,22 @@ class BuildAgent(BaseAgent):
 
     # -- Design --
 
-    async def _fetch_and_analyze_case(self, package_id: str) -> dict[str, Any] | None:
+    async def _fetch_and_analyze_data_source(self, data_source_id: str) -> dict[str, Any] | None:
         try:
-            package_api = PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
-            search_results = await package_api.search(package_id)
+            flapi = FlapiClient(base_url=settings.FLAPI_BASE_URL)
+            search_results = await flapi.search(data_source_id)
             if not search_results:
-                await self.emit({"type": "case_error", "message": f"Package {package_id} not found"})
+                await self.emit({"type": "data_source_error", "message": f"Data source {data_source_id} not found"})
                 return None
 
             metadata = search_results[0] if isinstance(search_results, list) else search_results
-            package_name = metadata.get("Name", f"Package {package_id}")
-            sample_data = await package_api.run_package(package_id, all_queries=True, body=None)
+            ds_name = metadata.get("Name", f"Data source {data_source_id}")
+            sample_data = await flapi.run_package(data_source_id, all_queries=True, body=None)
 
             analysis_prompt = (
-                f"Analyze this API package data in the context of the user's request.\n\n"
+                f"Analyze this API data source in the context of the user's request.\n\n"
                 f"User wants to build: {self._state.user_content}\n\n"
-                f"Package: {package_name}\nSample API Response:\n```json\n"
+                f"Data source: {ds_name}\nSample API Response:\n```json\n"
                 f"{json.dumps(sample_data, indent=2)[:2000]}\n```\n\n"
                 f'Respond with ONLY a JSON object:\n{{"data_schema": "...", "relevant_fields": "...", '
                 f'"data_characteristics": "...", "integration_notes": "..."}}'
@@ -204,34 +206,38 @@ class BuildAgent(BaseAgent):
                     [Message.user(analysis_prompt)],
                     "You are a software architect analyzing API data for integration.",
                     model=self.model,
-                    metadata=self._llm_metadata("package_analysis"),
+                    metadata=self._llm_metadata("data_source_analysis"),
                 )
                 analysis = parse_json_response(raw)
             except Exception:
-                logger.exception("[build] Package analysis failed")
+                logger.exception("[build] Data source analysis failed")
                 analysis = {
                     "data_schema": (
-                        f"Package data with "
-                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"  # type: ignore[unreachable]
+                        f"Data source with {len(sample_data) if isinstance(sample_data, list) else 'structured'} records"  # type: ignore[unreachable]
                     ),
                     "relevant_fields": "See raw data",
                     "data_characteristics": "Fetched from API",
                     "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
                 }
 
-            return {"package_id": package_id, "package_name": package_name, "sample_data": sample_data, **analysis}
+            return {
+                "data_source_id": data_source_id,
+                "data_source_name": ds_name,
+                "sample_data": sample_data,
+                **analysis,
+            }
 
-        except PackageApiUpstreamError as e:
-            await self.emit({"type": "case_error", "message": f"Failed to fetch package data: {e}"})
+        except FlapiUpstreamError as e:
+            await self.emit({"type": "data_source_error", "message": f"Failed to fetch data source: {e}"})
             return None
         except Exception:
-            logger.exception("[build] Unexpected error fetching package")
-            await self.emit({"type": "case_error", "message": "Unexpected error fetching package data"})
+            logger.exception("[build] Unexpected error fetching data source")
+            await self.emit({"type": "data_source_error", "message": "Unexpected error fetching data source"})
             return None
 
     @observe(name="design-architecture")  # type: ignore[untyped-decorator]
     async def _design_architecture(self) -> ArchitectureDesign:
-        prompt = render_architecture(case_contexts=self._state.case_contexts or None)
+        prompt = render_architecture(data_source_contexts=self._state.data_source_contexts or None)
         try:
             raw = await complete_chat(
                 [Message.user(self._state.user_content)],
@@ -309,25 +315,25 @@ class BuildAgent(BaseAgent):
             "ux_design": self._state.ux_design.model_dump(),
             "user_preferences": [d.model_dump() for d in self._state.user_overview.decisions],
         }
-        if self._state.case_contexts:
-            merge_data["case_integrations"] = [
+        if self._state.data_source_contexts:
+            merge_data["data_source_integrations"] = [
                 {
                     k: ctx[k]
                     for k in (
-                        "package_id",
-                        "package_name",
+                        "data_source_id",
+                        "data_source_name",
                         "data_schema",
                         "relevant_fields",
                         "data_characteristics",
                         "integration_notes",
                     )
                 }
-                for ctx in self._state.case_contexts
+                for ctx in self._state.data_source_contexts
             ]
 
         raw = await complete_chat(
             [Message.user(json.dumps(merge_data, indent=2))],
-            render_merge(has_cases=bool(self._state.case_contexts)),
+            render_merge(has_data_sources=bool(self._state.data_source_contexts)),
             model=self.model,
             metadata=self._llm_metadata("build_technical_plan"),
         )
@@ -412,7 +418,7 @@ class BuildAgent(BaseAgent):
             ux_design=self._state.work_plan.ux_design.model_dump(),
             dependency_files={p: c for p, c in self._state.completed_files.items() if p in dep_paths} or None,
             other_completed_files={p: c for p, c in self._state.completed_files.items() if p not in dep_paths} or None,
-            case_contexts=self._state.case_contexts or None,
+            data_source_contexts=self._state.data_source_contexts or None,
         )
 
         try:

@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langfuse import Langfuse
 
-from flow44.api import chat, errors, export, files, models, package_api, preview, projects, server_log, terminal
+from flow44.api import chat, errors, export, files, flapi_api, models, preview, projects, server_log, terminal
 from flow44.config import settings
 from flow44.models.events import init_events_table
 from flow44.models.project import init_db
@@ -81,7 +81,7 @@ app.include_router(files.router)
 app.include_router(preview.router)
 app.include_router(models.router)
 app.include_router(export.router)
-app.include_router(package_api.router)
+app.include_router(flapi_api.router)
 
 # WebSocket routers
 app.include_router(chat.router)

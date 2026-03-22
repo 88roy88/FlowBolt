@@ -1,4 +1,4 @@
-import type { FileEntry, Project, AIModel, PackageSearchRecord } from '../types';
+import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
 
 const BASE = '/api';
 
@@ -89,8 +89,8 @@ export async function fetchDefaultModel(): Promise<string> {
   return data.model;
 }
 
-export async function searchPackages(queryOrId: string): Promise<PackageSearchRecord[]> {
-  return request<PackageSearchRecord[]>(`/package/search/${encodeURIComponent(queryOrId)}`);
+export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
+  return request<DataSourceSearchRecord[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
 }
 
 export function downloadZip(sessionId: string): void {
