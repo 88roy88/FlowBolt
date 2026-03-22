@@ -383,7 +383,16 @@ Replace manual span management in BuildAgent with decorators.
 
 ---
 
-## A6. Structured output for JSON prompts
+## A6. Structured output for JSON prompts (PARTIALLY DONE)
+
+Pydantic schemas created in `schemas.py` (ArchitectureDesign, UXDesign,
+UserPlanOverview, ProjectSummary, PackageAnalysis, ClassificationResult).
+BuildState and BuildAgent now validate LLM responses into these models.
+
+Remaining: use LiteLLM `response_format` or tool-based extraction to enforce
+structured output at the LLM level (not just post-parse validation).
+
+### Original description:
 
 Several prompts ask the LLM to respond with "ONLY a JSON object" and then we parse
 it with `_parse_json_response` which strips markdown fences and does fallback
@@ -414,7 +423,10 @@ Use structured output (tool calling / response_format) instead:
 
 ---
 
-## I6. CI/CD pipeline
+## ~~I6. CI/CD pipeline~~ DONE
+
+GitHub Actions at repo root: ci.yaml → backend.yaml (ruff + mypy + pytest).
+Reusable workflow pattern. uv-setup shared action.
 
 No CI/CD exists. Set up:
 
@@ -852,7 +864,7 @@ templates on project creation is partially implemented.
 
 ---
 
-## F22. Mobile layout — chat + preview only
+## ~~F22. Mobile layout — chat + preview only~~ DONE
 
 The builder UI only works on desktop. Add a simple mobile layout for
 chatting with the AI and viewing the preview. No code editor on mobile.
