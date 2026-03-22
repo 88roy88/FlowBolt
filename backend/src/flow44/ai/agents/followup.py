@@ -4,6 +4,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 from langfuse.decorators import langfuse_context, observe
 
@@ -34,9 +35,9 @@ class FileDiff:
 
 
 class FollowUpAgent(BaseAgent):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self._steps: list[dict] = []
+        self._steps: list[dict[str, Any]] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
         self._iteration = 0
@@ -103,7 +104,7 @@ class FollowUpAgent(BaseAgent):
             ]
         )
 
-    @observe(name="followup-agent-run")
+    @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str) -> None:
         langfuse_context.update_current_observation(tags=["follow-up-agent"])
         # TODO: add metadata. like SID  # noqa: E501
@@ -115,7 +116,7 @@ class FollowUpAgent(BaseAgent):
         # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
         history = await get_messages(self.project_id)
         messages = [
-            Message(role=m.role, content=m.content)
+            Message(role=m.role, content=m.content)  # type: ignore[arg-type]
             for m in history
             if m.role == "user" or (m.role == "assistant" and m.content.strip())
         ]
@@ -142,7 +143,7 @@ class FollowUpAgent(BaseAgent):
         await self.emit({"type": "action_complete"})
 
     # TODO: We will want to have a smarted memory system in the future
-    async def _build_context(self) -> dict:
+    async def _build_context(self) -> dict[str, str]:
         project = await get_project_by_session(self.session_id)
         summary = ""
         if project and project.summary:
@@ -165,7 +166,7 @@ class FollowUpAgent(BaseAgent):
         return {"summary": summary, "file_tree": file_tree}
 
     # TODO: feels like a general utils that should go out.
-    def _format_file_tree(self, entries, indent: int = 0) -> str:
+    def _format_file_tree(self, entries: list[Any], indent: int = 0) -> str:
         lines = []
         for entry in entries:
             prefix = "  " * indent
@@ -180,7 +181,7 @@ class FollowUpAgent(BaseAgent):
     # TODO: switch here to use Flow? We can create a subclass of Flow ReActFlow  # noqa: E501
     # if needed something specific for general ReAct Flows.
     async def _react_loop(self, messages: list[Message], system_prompt: str) -> str:
-        working_messages: list[dict] = [m.to_dict() for m in messages]
+        working_messages: list[dict[str, Any]] = [m.to_dict() for m in messages]
         tool_schemas = self._executor.get_schemas()
         last_content = ""
 
@@ -188,7 +189,7 @@ class FollowUpAgent(BaseAgent):
         # TODO: use max tools instead of max iterations? or maybe a combination of both?
         for self._iteration in range(MAX_ITERATIONS):
             response = await complete_chat_with_tools(
-                messages=working_messages,
+                messages=working_messages,  # type: ignore[arg-type]
                 system_prompt=system_prompt,
                 tools=tool_schemas,
                 model=self.model,

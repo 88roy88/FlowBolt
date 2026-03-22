@@ -24,6 +24,7 @@ dev = [
 
     "ruff>=0.14.2",
     "mypy>=1.10.1",
+    "boto3-stubs[bedrock-runtime]>=1.42.0",
 
     "pytest>=8.2.2,<9",
     "pytest-asyncio>=0.23.7,<0.24",

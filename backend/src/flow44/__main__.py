@@ -3,7 +3,7 @@
 import uvicorn
 
 
-def main_dev():
+def main_dev() -> None:
     """Run the server with auto-reload for development."""
     uvicorn.run(
         "flow44.main:app",
@@ -15,7 +15,7 @@ def main_dev():
     )
 
 
-def main():
+def main() -> None:
     uvicorn.run(
         "flow44.main:app",
         host="0.0.0.0",

@@ -43,7 +43,7 @@ async def _run_package(
     package_id: str,
     allQueries: bool | None,  # noqa: N803 — matches API query parameter name
     body: Any | None,
-):
+) -> Any:
     if not package_id.strip():
         raise HTTPException(status_code=422, detail="package_id is required")
 
@@ -58,7 +58,7 @@ async def run_package(
     package_id: str,
     allQueries: bool | None = Query(default=None),  # noqa: N803
     body: Any | None = Body(default=None),
-):
+) -> Any:
     """Proxy 'run package' to FLAPI."""
     return await _run_package(package_id, allQueries=allQueries, body=body)
 
@@ -68,6 +68,6 @@ async def run_package(
 async def run_package_get(
     package_id: str,
     allQueries: bool | None = Query(default=None),  # noqa: N803
-):
+) -> Any:
     """Proxy 'run package' to FLAPI."""
     return await _run_package(package_id, allQueries=allQueries, body=None)

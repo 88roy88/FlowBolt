@@ -55,7 +55,7 @@ async def grep(
 
         lines = []
         for raw_line in output.splitlines()[:50]:
-            cleaned = raw_line[len(workspace):] if raw_line.startswith(workspace) else raw_line
+            cleaned = raw_line[len(workspace) :] if raw_line.startswith(workspace) else raw_line
             lines.append(cleaned)
 
         if not lines:

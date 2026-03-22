@@ -10,7 +10,7 @@ from flow44.config import settings
 
 
 # TODO: when will messages be dicts?
-def _to_dicts(messages: list[dict | Message]) -> list[dict]:
+def _to_dicts(messages: list[dict[str, Any] | Message]) -> list[dict[str, Any]]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]
 
 
@@ -18,10 +18,10 @@ def _to_dicts(messages: list[dict | Message]) -> list[dict]:
 
 
 async def complete_chat(
-    messages: list[dict | Message],
+    messages: list[dict[str, Any] | Message],
     system_prompt: str,
     model: str | None = None,
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> str:
     resolved_model = model or settings.AI_MODEL
     full_messages: list[dict[str, Any]] = [
@@ -36,20 +36,20 @@ async def complete_chat(
         metadata=metadata or {},
     )
 
-    content = response.choices[0].message.content
+    content: str | None = response.choices[0].message.content
     if content is None:
         raise ValueError("LLM returned empty response")
     return content
 
 
 async def complete_chat_with_tools(
-    messages: list[dict | Message],
+    messages: list[dict[str, Any] | Message],
     system_prompt: str,
-    tools: list[dict],
+    tools: list[dict[str, Any]],
     model: str | None = None,
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,
     tool_choice: str = "auto",
-):
+) -> Any:
     resolved_model = model or settings.AI_MODEL
     full_messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
@@ -67,10 +67,10 @@ async def complete_chat_with_tools(
 
 
 async def stream_chat(
-    messages: list[dict | Message],
+    messages: list[dict[str, Any] | Message],
     system_prompt: str,
     model: str | None = None,
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
     resolved_model = model or settings.AI_MODEL
     full_messages: list[dict[str, Any]] = [
@@ -86,7 +86,7 @@ async def stream_chat(
     )
 
     async for chunk in response:
-        delta = chunk.choices[0].delta  # type: ignore[union-attr]
+        delta = chunk.choices[0].delta
         content = getattr(delta, "content", None)
         if content:
             yield content

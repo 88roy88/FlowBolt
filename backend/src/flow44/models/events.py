@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import aiosqlite
 
@@ -11,16 +12,16 @@ from flow44.models.project import _get_db_path
 
 logger = logging.getLogger(__name__)
 
-_channels: dict[str, list[asyncio.Queue]] = {}
+_channels: dict[str, list[asyncio.Queue[dict[str, Any]]]] = {}
 
 
-def subscribe(session_id: str) -> asyncio.Queue:
-    queue: asyncio.Queue = asyncio.Queue()
+def subscribe(session_id: str) -> asyncio.Queue[dict[str, Any]]:
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
     _channels.setdefault(session_id, []).append(queue)
     return queue
 
 
-def unsubscribe(session_id: str, queue: asyncio.Queue) -> None:
+def unsubscribe(session_id: str, queue: asyncio.Queue[dict[str, Any]]) -> None:
     if session_id in _channels:
         try:
             _channels[session_id].remove(queue)
@@ -30,7 +31,7 @@ def unsubscribe(session_id: str, queue: asyncio.Queue) -> None:
             del _channels[session_id]
 
 
-async def _notify(session_id: str, event: dict) -> None:
+async def _notify(session_id: str, event: dict[str, Any]) -> None:
     for queue in _channels.get(session_id, []):
         try:
             queue.put_nowait(event)
@@ -43,7 +44,7 @@ class AgentEvent:
     id: int
     session_id: str
     event_type: str
-    payload: dict
+    payload: dict[str, Any]
     created_at: str
 
 
@@ -64,7 +65,7 @@ async def init_events_table() -> None:
         await db.commit()
 
 
-async def emit_event(session_id: str, event: dict, *, notify: bool = True) -> None:
+async def emit_event(session_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
     event_type = event.get("type", "unknown")
     payload_json = json.dumps(event, separators=(",", ":"))
 

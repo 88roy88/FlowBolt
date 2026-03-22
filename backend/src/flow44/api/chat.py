@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import asdict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
@@ -26,7 +27,7 @@ async def _is_new_project(session_id: str) -> bool:
     return not any(e.payload.get("type") == "action_complete" for e in events)
 
 
-async def _run_agent_safe(session_id: str, coro) -> None:
+async def _run_agent_safe(session_id: str, coro: Any) -> None:
     try:
         await coro
     except Exception:
@@ -37,7 +38,7 @@ async def _run_agent_safe(session_id: str, coro) -> None:
 
 
 @router.get("/api/chat/{session_id}/history")
-async def chat_history(session_id: str):
+async def chat_history(session_id: str) -> list[dict[str, Any]]:
     project = await get_project_by_session(session_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Unknown session")
@@ -46,7 +47,7 @@ async def chat_history(session_id: str):
 
 
 @router.get("/api/chat/{session_id}/events")
-async def chat_events(session_id: str):
+async def chat_events(session_id: str) -> list[dict[str, Any]]:
     events = await get_events(session_id)
     return [{**evt.payload, "_ts": evt.created_at} for evt in events]
 
@@ -88,7 +89,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                 await save_message(project.id, "user", user_content)
 
                 # Emit user_message event (for frontend history reconstruction)
-                user_event: dict = {"type": "user_message", "content": user_content}
+                user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                 if case_ids:
                     from flow44.api.package_api import _package_search
 
@@ -101,42 +102,43 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                             name = f"Case #{cid}"
                         case_names.append(name)
                     user_event["cases"] = [
-                        {"id": cid, "name": cname}
-                        for cid, cname in zip(case_ids, case_names, strict=True)
+                        {"id": cid, "name": cname} for cid, cname in zip(case_ids, case_names, strict=True)
                     ]
                 await emit_event(session_id, user_event, notify=False)
 
                 is_new = await _is_new_project(session_id)
 
                 if is_new:
-                    agent = BuildAgent(
+                    build_agent = BuildAgent(
                         session_id=session_id,
                         project_id=project.id,
                         model=selected_model,
                     )
-                    register(session_id, agent)
+                    register(session_id, build_agent)
                     asyncio.create_task(
                         _run_agent_safe(
                             session_id,
-                            agent.run(user_content, case_ids=[str(cid) for cid in case_ids] if case_ids else None),
+                            build_agent.run(
+                                user_content, case_ids=[str(cid) for cid in case_ids] if case_ids else None
+                            ),
                         )
                     )
                 else:
-                    agent = FollowUpAgent(
+                    followup_agent = FollowUpAgent(
                         session_id=session_id,
                         project_id=project.id,
                         model=selected_model,
                     )
-                    register(session_id, agent)
-                    asyncio.create_task(_run_agent_safe(session_id, agent.run(user_content)))
+                    register(session_id, followup_agent)
+                    asyncio.create_task(_run_agent_safe(session_id, followup_agent.run(user_content)))
 
             elif msg_type == "plan_response":
                 action = data.get("action", "reject")
                 feedback = data.get("feedback")
 
-                agent = get_agent(session_id)
-                if isinstance(agent, BuildAgent):
-                    agent.signal_plan_response(action, feedback)
+                running_agent = get_agent(session_id)
+                if isinstance(running_agent, BuildAgent):
+                    running_agent.signal_plan_response(action, feedback)
                 else:
                     await websocket.send_json({"type": "error", "message": "No active build session"})
 
@@ -169,16 +171,16 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
                     notify=False,
                 )
 
-                agent = FixErrorAgent(
+                fix_agent = FixErrorAgent(
                     session_id=session_id,
                     project_id=project.id,
                     model=selected_model,
                 )
-                register(session_id, agent)
+                register(session_id, fix_agent)
                 asyncio.create_task(
                     _run_agent_safe(
                         session_id,
-                        agent.run(
+                        fix_agent.run(
                             error_message=error_message,
                             error_file=error_file,
                             error_line=error_line,

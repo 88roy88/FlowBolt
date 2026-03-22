@@ -6,6 +6,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any, cast
 
 import aiosqlite
 
@@ -196,7 +197,7 @@ async def update_project_package(project_id: str, package_id: str, package_conte
         await db.commit()
 
 
-async def update_project_cases(project_id: str, cases: list[dict]) -> None:
+async def update_project_cases(project_id: str, cases: list[dict[str, Any]]) -> None:
     """Update the cases column (JSON array) for a project."""
     async with aiosqlite.connect(_get_db_path()) as db:
         await db.execute(
@@ -206,7 +207,7 @@ async def update_project_cases(project_id: str, cases: list[dict]) -> None:
         await db.commit()
 
 
-async def get_project_cases(project_id: str) -> list[dict]:
+async def get_project_cases(project_id: str) -> list[dict[str, Any]]:
     """Read the cases column, falling back to old package_id/package_context for backward compat."""
     async with aiosqlite.connect(_get_db_path()) as db:
         db.row_factory = aiosqlite.Row
@@ -219,7 +220,7 @@ async def get_project_cases(project_id: str) -> list[dict]:
             cases_raw = row["cases"]
             if cases_raw and cases_raw != "[]":
                 try:
-                    return json.loads(cases_raw)
+                    return cast(list[dict[str, Any]], json.loads(cases_raw))
                 except (json.JSONDecodeError, TypeError):
                     pass
             # Backward compat: synthesize from old columns

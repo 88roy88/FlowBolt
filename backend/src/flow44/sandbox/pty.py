@@ -6,6 +6,7 @@ import os
 import signal
 from collections import deque
 from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class PtyHandle:
     write_fd: int = -1
     pid: int = -1
     session_id: str = ""
-    winpty_process: object | None = field(default=None, repr=False)
+    winpty_process: Any | None = field(default=None, repr=False)  # pywinpty PtyProcess (optional dep)
     _scrollback: deque[bytes] = field(default_factory=deque, repr=False)
     _scrollback_bytes: int = field(default=0, repr=False)
 
@@ -29,8 +30,9 @@ class PtyHandle:
 
     def alive(self) -> bool:
         """Return True if the underlying process is still running."""
-        if self.is_winpty:
-            return bool(self.winpty_process.isalive())
+        wp = self.winpty_process
+        if wp is not None:
+            return bool(wp.isalive())
         if self.pid <= 0:
             return False
         try:
@@ -40,11 +42,12 @@ class PtyHandle:
             return False
 
     def read(self, size: int = 4096) -> bytes:
-        if self.is_winpty:
+        wp = self.winpty_process
+        if wp is not None:
             try:
-                if not self.winpty_process.isalive():
+                if not wp.isalive():
                     return b""
-                return self.winpty_process.read(size).encode("utf-8", errors="replace")
+                return wp.read(size).encode("utf-8", errors="replace")  # type: ignore[no-any-return]
             except Exception:
                 return b""
         try:
@@ -56,8 +59,9 @@ class PtyHandle:
         return data
 
     def write(self, data: bytes) -> None:
-        if self.is_winpty:
-            self.winpty_process.write(data.decode("utf-8", errors="replace"))
+        wp = self.winpty_process
+        if wp is not None:
+            wp.write(data.decode("utf-8", errors="replace"))
             return
         os.write(self.write_fd, data)
 
@@ -73,10 +77,11 @@ class PtyHandle:
             self._scrollback_bytes -= len(removed)
 
     def kill(self) -> None:
-        if self.is_winpty:
+        wp = self.winpty_process
+        if wp is not None:
             try:
-                if self.winpty_process.isalive():
-                    self.winpty_process.close(force=True)
+                if wp.isalive():
+                    wp.close(force=True)
             except Exception:
                 logger.debug("Failed to close winpty process", exc_info=True)
             return

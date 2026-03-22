@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 
 @router.get("/{session_id}/port")
-async def get_preview_port(session_id: str):
+async def get_preview_port(session_id: str) -> dict[str, str | int]:
     """Return the allocated port for the sandbox's dev server."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
@@ -38,7 +38,7 @@ async def get_preview_port(session_id: str):
     "/{session_id}/proxy/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
-async def proxy_to_sandbox(session_id: str, path: str, request: Request):
+async def proxy_to_sandbox(session_id: str, path: str, request: Request) -> Response:
     """Reverse proxy requests to the sandbox's dev server.
 
     Vite serves content under its ``base`` path, so the proxy forwards the
@@ -98,8 +98,9 @@ async def proxy_to_sandbox(session_id: str, path: str, request: Request):
 # ---------------------------------------------------------------------------
 
 
+@router.websocket("/{session_id}/proxy/")
 @router.websocket("/{session_id}/proxy")
-async def proxy_ws(websocket: WebSocket, session_id: str):
+async def proxy_ws(websocket: WebSocket, session_id: str) -> None:
     """Proxy WebSocket connections for Vite HMR."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
@@ -113,12 +114,15 @@ async def proxy_ws(websocket: WebSocket, session_id: str):
     import websockets
 
     proxy_prefix = f"/api/preview/{session_id}/proxy"
+    query = websocket.scope.get("query_string", b"").decode()
     target_url = f"ws://127.0.0.1:{sandbox.port}{proxy_prefix}"
+    if query:
+        target_url += f"?{query}"
 
     try:
         async with websockets.connect(target_url) as upstream:
 
-            async def client_to_upstream():
+            async def client_to_upstream() -> None:
                 try:
                     while True:
                         data = await websocket.receive_text()
@@ -126,10 +130,10 @@ async def proxy_ws(websocket: WebSocket, session_id: str):
                 except WebSocketDisconnect:
                     pass
 
-            async def upstream_to_client():
+            async def upstream_to_client() -> None:
                 try:
                     async for msg in upstream:
-                        await websocket.send_text(msg)
+                        await websocket.send_text(str(msg))
                 except Exception:
                     logger.debug("HMR upstream→client relay ended")
 

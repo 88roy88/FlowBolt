@@ -30,7 +30,7 @@ async def read_file(session_id: str, path: str) -> str:
         return fh.read()
 
 
-@observe(name="write-file", as_type="span")
+@observe(name="write-file", as_type="span")  # type: ignore[untyped-decorator]
 async def write_file(session_id: str, path: str, content: str) -> None:
     full, _ = _resolve_safe(session_id, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)

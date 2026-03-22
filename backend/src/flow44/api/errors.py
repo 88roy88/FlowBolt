@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -36,7 +37,7 @@ _FILE_LINE_COL = re.compile(r"(?P<file>/[^\s:]+\.\w+):(?P<line>\d+):(?P<col>\d+)
 _GENERIC_ERROR = re.compile(r"(?:error|Error|ERROR)[:\s]")
 
 
-def _parse_error_block(block: str) -> dict | None:
+def _parse_error_block(block: str) -> dict[str, Any] | None:
     """Try to extract structured error info from a block of log text."""
     # Try TS-style first
     m = _TS_ERROR.search(block)

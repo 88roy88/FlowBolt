@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import uuid
+from typing import Any
 
 from langfuse import Langfuse
 from langfuse.decorators import langfuse_context, observe
@@ -22,6 +23,7 @@ from flow44.ai.prompts import (
     render_user_plan,
 )
 from flow44.ai.provider import complete_chat, stream_chat
+from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.config import settings
@@ -38,7 +40,7 @@ logger = logging.getLogger(__name__)
 # TODO: maybe split this into two agents and get rid of the approval event stuff?
 # TODO: or think about how to add support for it in the Flow framework.
 class BuildAgent(BaseAgent):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
         self._observation_id: str | None = None
@@ -49,7 +51,7 @@ class BuildAgent(BaseAgent):
 
     # -- Entry point --
 
-    @observe(name="build-agent-run")
+    @observe(name="build-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, case_ids: list[str] | None = None) -> None:
         self._state.user_content = content
         self._state.case_ids = case_ids or []
@@ -102,7 +104,7 @@ class BuildAgent(BaseAgent):
         # Present for approval and wait
         self._state.phase = "awaiting_approval"
         await self.emit({"type": "phase", "phase": "awaiting_approval"})
-        await self.emit({"type": "plan_overview", "overview": self._state.user_overview})
+        await self.emit({"type": "plan_overview", "overview": self._state.user_overview.model_dump()})
 
         # Approval loop: wait for user response, handle modify/reject/accept
         while True:
@@ -116,9 +118,9 @@ class BuildAgent(BaseAgent):
                 self._state.user_overview = await self._rebuild_overview_with_feedback(self._approval_feedback)
                 self._state.phase = "awaiting_approval"
                 await self.emit({"type": "phase", "phase": "awaiting_approval"})
-                await self.emit({"type": "plan_overview", "overview": self._state.user_overview})
+                await self.emit({"type": "plan_overview", "overview": self._state.user_overview.model_dump()})
             elif self._approval_action == "reject":
-                await self.emit({"type": "plan_rejected", "overview": self._state.user_overview})
+                await self.emit({"type": "plan_rejected", "overview": self._state.user_overview.model_dump()})
                 self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
                 await self.emit({"type": "phase", "phase": "idle"})
                 return
@@ -131,7 +133,7 @@ class BuildAgent(BaseAgent):
         self._approval_event.set()
 
     async def _accept_plan(self) -> None:
-        await self.emit({"type": "plan_accepted", "overview": self._state.user_overview})
+        await self.emit({"type": "plan_accepted", "overview": self._state.user_overview.model_dump()})
         langfuse_client = Langfuse()
 
         # Build technical plan
@@ -176,7 +178,7 @@ class BuildAgent(BaseAgent):
 
     # -- Design --
 
-    async def _fetch_and_analyze_case(self, package_id: str) -> dict | None:
+    async def _fetch_and_analyze_case(self, package_id: str) -> dict[str, Any] | None:
         try:
             package_api = PackageApiClient(base_url=settings.PACKAGE_API_BASE_URL)
             search_results = await package_api.search(package_id)
@@ -210,7 +212,7 @@ class BuildAgent(BaseAgent):
                 analysis = {
                     "data_schema": (
                         f"Package data with "
-                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"
+                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"  # type: ignore[unreachable]
                     ),
                     "relevant_fields": "See raw data",
                     "data_characteristics": "Fetched from API",
@@ -227,8 +229,8 @@ class BuildAgent(BaseAgent):
             await self.emit({"type": "case_error", "message": "Unexpected error fetching package data"})
             return None
 
-    @observe(name="design-architecture")
-    async def _design_architecture(self) -> dict:
+    @observe(name="design-architecture")  # type: ignore[untyped-decorator]
+    async def _design_architecture(self) -> ArchitectureDesign:
         prompt = render_architecture(case_contexts=self._state.case_contexts or None)
         try:
             raw = await complete_chat(
@@ -238,14 +240,14 @@ class BuildAgent(BaseAgent):
                 metadata=self._llm_metadata("design_architecture"),
             )
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "complete"})
-            return parse_json_response(raw)
+            return ArchitectureDesign.model_validate(parse_json_response(raw))
         except Exception:
             logger.exception("[build] Architecture design failed")
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "failed"})
-            return {}
+            return ArchitectureDesign()
 
-    @observe(name="design-ux")
-    async def _design_ux(self) -> dict:
+    @observe(name="design-ux")  # type: ignore[untyped-decorator]
+    async def _design_ux(self) -> UXDesign:
         try:
             raw = await complete_chat(
                 [Message.user(self._state.user_content)],
@@ -254,19 +256,19 @@ class BuildAgent(BaseAgent):
                 metadata=self._llm_metadata("design_ux"),
             )
             await self.emit({"type": "design_progress", "stream": "ux", "content": "complete"})
-            return parse_json_response(raw)
+            return UXDesign.model_validate(parse_json_response(raw))
         except Exception:
             logger.exception("[build] UX design failed")
             await self.emit({"type": "design_progress", "stream": "ux", "content": "failed"})
-            return {}
+            return UXDesign()
 
-    @observe(name="build-user-overview")
-    async def _build_user_overview(self) -> dict:
+    @observe(name="build-user-overview")  # type: ignore[untyped-decorator]
+    async def _build_user_overview(self) -> UserPlanOverview:
         plan_input = json.dumps(
             {
                 "user_request": self._state.user_content,
-                "architecture": self._state.architecture,
-                "ux_design": self._state.ux_design,
+                "architecture": self._state.architecture.model_dump(),
+                "ux_design": self._state.ux_design.model_dump(),
             },
             indent=2,
         )
@@ -276,15 +278,15 @@ class BuildAgent(BaseAgent):
             model=self.model,
             metadata=self._llm_metadata("build_user_overview"),
         )
-        return parse_json_response(raw)
+        return UserPlanOverview.model_validate(parse_json_response(raw))
 
-    async def _rebuild_overview_with_feedback(self, feedback: str) -> dict:
+    async def _rebuild_overview_with_feedback(self, feedback: str) -> UserPlanOverview:
         plan_input = json.dumps(
             {
                 "user_request": self._state.user_content,
-                "architecture": self._state.architecture,
-                "ux_design": self._state.ux_design,
-                "previous_overview": self._state.user_overview,
+                "architecture": self._state.architecture.model_dump(),
+                "ux_design": self._state.ux_design.model_dump(),
+                "previous_overview": self._state.user_overview.model_dump(),
                 "user_feedback": feedback,
             },
             indent=2,
@@ -295,17 +297,17 @@ class BuildAgent(BaseAgent):
             model=self.model,
             metadata=self._llm_metadata("rebuild_overview_with_feedback"),
         )
-        return parse_json_response(raw)
+        return UserPlanOverview.model_validate(parse_json_response(raw))
 
     # -- Planning --
 
-    @observe(name="build-technical-plan")
+    @observe(name="build-technical-plan")  # type: ignore[untyped-decorator]
     async def _build_technical_plan(self) -> WorkPlan:
-        merge_data: dict = {
+        merge_data: dict[str, object] = {
             "user_request": self._state.user_content,
-            "architecture": self._state.architecture,
-            "ux_design": self._state.ux_design,
-            "user_preferences": self._state.user_overview.get("decisions", []),
+            "architecture": self._state.architecture.model_dump(),
+            "ux_design": self._state.ux_design.model_dump(),
+            "user_preferences": [d.model_dump() for d in self._state.user_overview.decisions],
         }
         if self._state.case_contexts:
             merge_data["case_integrations"] = [
@@ -406,8 +408,8 @@ class BuildAgent(BaseAgent):
             task_title=task.title,
             task_description=task.description,
             task_files=task.files,
-            architecture=self._state.work_plan.architecture,
-            ux_design=self._state.work_plan.ux_design,
+            architecture=self._state.work_plan.architecture.model_dump(),
+            ux_design=self._state.work_plan.ux_design.model_dump(),
             dependency_files={p: c for p, c in self._state.completed_files.items() if p in dep_paths} or None,
             other_completed_files={p: c for p, c in self._state.completed_files.items() if p not in dep_paths} or None,
             case_contexts=self._state.case_contexts or None,
@@ -444,8 +446,11 @@ class BuildAgent(BaseAgent):
 
     async def _typecheck(self) -> str:
         try:
+            sandbox = sandbox_manager.get_sandbox(self.session_id)
+            if sandbox is None:
+                return ""
             lines: list[str] = []
-            async for line in sandbox_manager.get_sandbox(self.session_id).exec("npx tsc --noEmit 2>&1"):
+            async for line in sandbox.exec("npx tsc --noEmit 2>&1"):
                 lines.append(line.rstrip())
             return "\n".join(lines).strip()
         except Exception:
@@ -454,8 +459,11 @@ class BuildAgent(BaseAgent):
 
     async def _build(self) -> str:
         try:
+            sandbox = sandbox_manager.get_sandbox(self.session_id)
+            if sandbox is None:
+                return ""
             lines: list[str] = []
-            async for line in sandbox_manager.get_sandbox(self.session_id).exec("pnpm build 2>&1"):
+            async for line in sandbox.exec("pnpm build 2>&1"):
                 lines.append(line.rstrip())
             output = "\n".join(lines).strip()
             return output if output and ("error" in output.lower() or "failed" in output.lower()) else ""
@@ -463,7 +471,7 @@ class BuildAgent(BaseAgent):
             logger.exception("[build] Build failed")
             return ""
 
-    @observe(name="fix-errors-auto")
+    @observe(name="fix-errors-auto")  # type: ignore[untyped-decorator]
     async def _fix_errors(self, errors: str) -> None:
         await self.emit({"type": "phase", "phase": "fixing"})
         prompt = render_fix_errors(errors=errors, files=self._state.completed_files)
@@ -493,7 +501,7 @@ class BuildAgent(BaseAgent):
             summary_input = json.dumps(
                 {
                     "user_request": self._state.user_content,
-                    "architecture": self._state.architecture,
+                    "architecture": self._state.architecture.model_dump(),
                     "files_created": list(self._state.completed_files.keys()),
                 },
                 indent=2,

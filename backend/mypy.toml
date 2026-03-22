@@ -56,6 +56,8 @@ warn_untyped_fields = true
 
 ###### MISSING IMPORTS  #####
 [[tool.mypy.overrides]]
-module = []
+module = [
+    "langfuse.*",
+]
 ignore_missing_imports = true
 ##############################

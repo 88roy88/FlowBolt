@@ -21,7 +21,7 @@ def render_classify() -> str:
     return render("classify.jinja2")
 
 
-def render_architecture(*, case_contexts: list[dict] | None = None) -> str:
+def render_architecture(*, case_contexts: list[dict[str, Any]] | None = None) -> str:
     prepared = None
     if case_contexts:
         prepared = [
@@ -56,11 +56,11 @@ def render_codegen(
     task_title: str,
     task_description: str,
     task_files: list[str],
-    architecture: dict,
-    ux_design: dict,
+    architecture: dict[str, Any],
+    ux_design: dict[str, Any],
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
-    case_contexts: list[dict] | None = None,
+    case_contexts: list[dict[str, Any]] | None = None,
 ) -> str:
     prepared_cases = None
     if case_contexts:

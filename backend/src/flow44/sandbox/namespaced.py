@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import fcntl  # type: ignore[import-not-found]
+import fcntl
 import logging
 import os
 import subprocess

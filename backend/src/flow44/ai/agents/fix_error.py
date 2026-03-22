@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 from langfuse.decorators import observe
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 class FixErrorAgent(BaseAgent):
     # TODO: make run abstract in the base class so all agents will be the same.
     # TODO: I like it that the run is the last function of the class and not the first :)
-    @observe(name="fix-error-agent-run")
+    @observe(name="fix-error-agent-run")  # type: ignore[untyped-decorator]
     async def run(
         self,
         error_message: str,
@@ -30,7 +31,7 @@ class FixErrorAgent(BaseAgent):
         error_stack: str | None = None,
     ) -> None:
         await self.emit({"type": "phase", "phase": "fixing"})
-        fix_steps: list[dict] = []
+        fix_steps: list[dict[str, Any]] = []
 
         await self._send_step(fix_steps, "discover", "running", "Discovering files to fix...")
         file_contents = await self._discover_files(error_file)
@@ -101,7 +102,7 @@ class FixErrorAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "idle"})
 
     # TODO: this is probably redundant now. we can use the emit.
-    async def _send_step(self, steps: list[dict], step: str, status: str, message: str) -> None:
+    async def _send_step(self, steps: list[dict[str, Any]], step: str, status: str, message: str) -> None:
         await self.emit({"type": "fix_step", "step": step, "status": status, "message": message})
         for s in steps:
             if s["step"] == step:
@@ -170,8 +171,11 @@ class FixErrorAgent(BaseAgent):
     # TODO: seems like a repeating function? make common?
     async def _build(self) -> str:
         try:
+            sandbox = sandbox_manager.get_sandbox(self.session_id)
+            if sandbox is None:
+                return ""
             lines: list[str] = []
-            async for line in sandbox_manager.get_sandbox(self.session_id).exec("pnpm build 2>&1"):
+            async for line in sandbox.exec("pnpm build 2>&1"):
                 lines.append(line.rstrip())
             output = "\n".join(lines).strip()
             return output if output and ("error" in output.lower() or "failed" in output.lower()) else ""

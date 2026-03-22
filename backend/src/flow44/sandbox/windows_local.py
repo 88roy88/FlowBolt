@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class _PopenWrapper:
     """Minimal wrapper so subprocess.Popen looks like asyncio.subprocess.Process."""
 
-    def __init__(self, proc: subprocess.Popen) -> None:
+    def __init__(self, proc: subprocess.Popen[bytes]) -> None:
         self._proc = proc
 
     @property
@@ -59,7 +59,7 @@ class WindowsLocalSandbox(Sandbox):
         env["FORCE_COLOR"] = "1"
 
         log_path = os.path.join(self.workspace_dir, ".dev-server.log")
-        log_file = open(log_path, "w")  # noqa: SIM115
+        log_file = open(log_path, "wb")  # noqa: SIM115
 
         dev_cmd = f"cd /d {self.workspace_dir} && pnpm dev --port {self.port} --host 0.0.0.0"
         proc = subprocess.Popen(
@@ -68,7 +68,7 @@ class WindowsLocalSandbox(Sandbox):
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             env=env,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]  # Windows-only
         )
 
         self._dev_log_file = log_file
@@ -93,7 +93,8 @@ class WindowsLocalSandbox(Sandbox):
             self._dev_log_file = None
 
     def create_pty(self) -> PtyHandle:
-        from winpty import PtyProcess as WinPtyProcess  # type: ignore[import-untyped]
+        # TODO: move to top and have try/except ImportError to raise a clear error about missing dependency on Windows
+        from winpty import PtyProcess as WinPtyProcess  # type: ignore[import-not-found]
 
         _ensure_bashrc(self.workspace_dir)
         proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)

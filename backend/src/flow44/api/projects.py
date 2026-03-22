@@ -6,6 +6,7 @@ import asyncio
 import logging
 import shutil
 from dataclasses import asdict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -40,34 +41,23 @@ class UpdateProjectModelRequest(BaseModel):
 
 
 @router.get("")
-async def list_all_projects():
-    """Return all projects."""
+async def list_all_projects() -> list[dict[str, Any]]:
     projects = await list_projects()
     return [asdict(p) for p in projects]
 
 
 @router.post("", status_code=201)
-async def create_new_project(body: CreateProjectRequest):
-    """Create a project, spin up a sandbox, and return the project with session_id."""
+async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
     project = await create_project(body.name)
 
-    # Create sandbox for this project
     sandbox = await sandbox_manager.create_sandbox(project.session_id)
-
-    # Register session
     session_registry.register(project.session_id, project.id, sandbox.info)
 
-    # Scaffold + start dev server in the background (don't block response)
-    async def _scaffold_and_start():
+    async def _scaffold_and_start() -> None:
         logger.info("[projects] Scaffolding project for session %s", project.session_id)
-
-        # Step 1: Copy template into workspace
         shutil.copytree(settings.TEMPLATE_DIR, sandbox.workspace_dir, dirs_exist_ok=True)
-
-        # Step 2: Stamp session ID into vite config
         stamp_vite_config(project.session_id, sandbox.workspace_dir)
 
-        # Step 3: Install dependencies (lockfile is already in the template)
         try:
             async for line in sandbox.exec("pnpm install 2>&1"):
                 logger.info("[scaffold] %s", line.rstrip())
@@ -75,18 +65,15 @@ async def create_new_project(body: CreateProjectRequest):
             logger.exception("[projects] pnpm install failed for session %s", project.session_id)
             return
 
-        # Step 4: Start dev server
         logger.info("[projects] Starting dev server for session %s", project.session_id)
         await sandbox.start_dev_server()
 
     asyncio.create_task(_scaffold_and_start())
-
     return asdict(project)
 
 
 @router.patch("/{project_id}/name", status_code=200)
-async def rename_existing_project(project_id: str, body: RenameProjectRequest):
-    """Rename a project."""
+async def rename_existing_project(project_id: str, body: RenameProjectRequest) -> dict[str, bool]:
     project = await get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -98,8 +85,7 @@ async def rename_existing_project(project_id: str, body: RenameProjectRequest):
 
 
 @router.patch("/{project_id}/model", status_code=200)
-async def update_project_selected_model(project_id: str, body: UpdateProjectModelRequest):
-    """Update the selected model for a project."""
+async def update_project_selected_model(project_id: str, body: UpdateProjectModelRequest) -> dict[str, bool]:
     project = await get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -109,15 +95,11 @@ async def update_project_selected_model(project_id: str, body: UpdateProjectMode
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_existing_project(project_id: str):
-    """Delete a project and tear down its sandbox."""
+async def delete_existing_project(project_id: str) -> None:
     project = await get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Destroy sandbox (kills dev server + PTYs + deletes workspace)
     await sandbox_manager.destroy_sandbox(project.session_id, delete_workspace=True)
     session_registry.remove(project.session_id)
-
-    # Delete from database
     await delete_project(project_id)

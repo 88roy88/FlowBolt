@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flow44.ai.schemas import ArchitectureDesign, UXDesign
 
 
 # TODO: why dataclass instead of pydantic?
@@ -22,8 +26,8 @@ class Task:
 class WorkPlan:
     id: str
     summary: str
-    architecture: dict
-    ux_design: dict
+    architecture: ArchitectureDesign
+    ux_design: UXDesign
     tasks: list[Task]
 
     def execution_layers(self) -> list[list[Task]]:

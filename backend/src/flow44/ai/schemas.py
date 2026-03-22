@@ -1,0 +1,88 @@
+"""Pydantic models for structured LLM responses."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+# --- Architecture design ---
+
+
+class ArchitectureComponent(BaseModel):
+    name: str
+    file: str
+    purpose: str
+
+
+class ArchitectureDesign(BaseModel):
+    components: list[ArchitectureComponent] = Field(default_factory=list)
+    data_flow: str = ""
+    file_structure: list[str] = Field(default_factory=list)
+    state_management: str = ""
+    key_dependencies: str = ""
+    notes: str = ""
+
+
+# --- UX design ---
+
+
+class UXComponent(BaseModel):
+    name: str
+    layout: str
+    interactions: str
+
+
+class UXDesign(BaseModel):
+    layout: str = ""
+    color_scheme: str = ""
+    components_ui: list[UXComponent] = Field(default_factory=list)
+    animations: str = ""
+    accessibility: str = ""
+    notes: str = ""
+
+
+# --- User plan overview ---
+
+
+class PlanFeature(BaseModel):
+    title: str
+    description: str
+
+
+class PlanDecision(BaseModel):
+    id: str
+    title: str
+    chosen: str
+    alternatives: list[str] = Field(default_factory=list)
+
+
+class UserPlanOverview(BaseModel):
+    summary: str = ""
+    features: list[PlanFeature] = Field(default_factory=list)
+    decisions: list[PlanDecision] = Field(default_factory=list)
+
+
+# --- Project summary ---
+
+
+class ProjectSummary(BaseModel):
+    summary: str = ""
+    tech_stack: list[str] = Field(default_factory=list)
+    features: list[str] = Field(default_factory=list)
+    file_overview: dict[str, str] = Field(default_factory=dict)
+
+
+# --- Classification ---
+
+
+class ClassificationResult(BaseModel):
+    classification: str  # "new_project" or "follow_up"
+
+
+# --- Package analysis ---
+
+
+class PackageAnalysis(BaseModel):
+    data_schema: str = ""
+    relevant_fields: str = ""
+    data_characteristics: str = ""
+    integration_notes: str = ""
