@@ -1,0 +1,157 @@
+name: Update Research Package Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_version_type:
+        description: 'Release Type'
+        required: true
+        default: "patch"
+        type: choice
+        options:
+            - "patch"
+            - "minor"
+            - "major"
+    secrets:
+      ACTIONS_APP_SECRET:
+        description: 'Action app secret'
+        required: true
+  workflow_call:
+    inputs:
+      bump_version_type:
+        description: 'Release Type'
+        required: true
+        default: "alpha"
+        type: string
+    secrets:
+      ACTIONS_APP_SECRET:
+        description: 'Action app secret'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  BUMP_TYPE: ${{ inputs.bump_version_type }}
+  COMMIT_ID: "default"
+  ROLE_TO_ASSUME: ${{ vars.DEV_ROLE_TO_ASSUME }}
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION }}
+  AWS_REGION: eu-central-1
+  PYPI_DOMAIN: primesec
+
+jobs:
+  update-research-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: mask secrets
+        shell: bash
+        run: |
+          echo "github.actor is ${{ github.actor }}"
+          echo "::add-mask::${{ vars.ACTIONS_APP_ID }}"
+          echo "::add-mask::${{ secrets.ACTIONS_APP_SECRET }}"
+
+      - name: create app token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.ACTIONS_APP_ID }}
+          private-key: ${{ secrets.ACTIONS_APP_SECRET }}
+          owner: primesec-ai
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: get code artifact token
+        uses: ./.github/actions/get-code-artifact-token
+        id: code-artifact-token
+
+      - name: setup python and uv
+        uses: ./.github/actions/uv-setup
+
+      - name: Get Branch Name and Commit
+        id: get_branch_and_commit
+        run: |
+          # Configure Github commit details.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"                   
+
+          echo "Working Directory: `pwd`"
+          BRANCH_NAME=`git branch --show-current | awk '{printf $0}'`
+          echo "On Branch: ${BRANCH_NAME}"
+          
+          COMMIT_ID=`git log -n1 --pretty=format:"%h" | awk '{printf $0}'`
+          echo "Last Commit ID was ${COMMIT_ID}"
+          
+          if [ "${BRANCH_NAME}" = "main" -a ${{ inputs.bump_version_type == 'alpha' }} ]
+          then
+            BUMP_TYPE="patch"
+          fi
+          
+          echo "BUMP_TYPE is now ${BUMP_TYPE}"
+          
+          # Set outputs so that later steps can reference the branch and version.
+          echo "BRANCH_NAME=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> "$GITHUB_ENV"
+          echo "BUMP_TYPE=$BUMP_TYPE" >> "$GITHUB_OUTPUT"
+          echo "BUMP_TYPE=$BUMP_TYPE" >> "$GITHUB_ENV"
+          echo "COMMIT_ID=$COMMIT_ID" >> "$GITHUB_OUTPUT"
+          echo "COMMIT_ID=$COMMIT_ID" >> "$GITHUB_ENV"
+
+      - name: Run package publish
+        id: publish
+        if: ${{ env.BUMP_TYPE != 'alpha' }}
+        run: |
+          uv version --bump ${{ env.BUMP_TYPE }} --frozen
+          uv build
+          uv publish --index main_repo
+
+      - name: Run package publish alpha
+        id: publish_alpha
+        if: ${{ env.BUMP_TYPE == 'alpha' }}
+        run: |
+          uv run task prerelease
+          uv run task add-tag ${COMMIT_ID}
+          uv build
+          uv publish --index main_repo
+
+      - name: Add Tag
+        id: add_tag
+        if: ${{ (env.BRANCH_NAME == 'main') && (github.actor != 'primesec-actions[bot]') }}
+        run: |
+          # gh auth setup-git
+          
+          # Configure Git commit details.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          NEW_VERSION=`uv version --short` 
+          echo "NEW_VERSION is $NEW_VERSION"
+                              
+          if [ -n "${NEW_VERSION}" ]
+          then                         
+              # Commit the changes.
+              git add -u .
+              git commit -m "Bump research package version to $NEW_VERSION [skip ci]"
+               
+              # Push the new branch to origin.                            
+              git push origin main
+          
+              echo "Tagging new version ${NEW_VERSION} as v${NEW_VERSION}"
+              git tag -a "v${NEW_VERSION}" -m "v${NEW_VERSION}"
+              echo "Pushing new tag v${NEW_VERSION}"
+              git push origin "v${NEW_VERSION}"
+          fi
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+#      - name: Push changes
+#        uses: ad-m/github-push-action@master
+#        if: ${{ env.BRANCH_NAME == 'main' }}
+#        with:
+#          github_token: ${{ steps.app-token.outputs.token }}
+#          branch: ${{ env.BRANCH_NAME }}
+
+          

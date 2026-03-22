@@ -1,0 +1,64 @@
+[tool.mypy]
+# to change once user service is onboard
+strict = false
+pretty = true
+color_output = true
+show_column_numbers = true
+show_error_codes = true
+show_error_context = true
+plugins = ["pydantic.mypy"]
+cache_dir = "/tmp"
+exclude = [
+    "^tests/",
+    "_preprocess/",
+]
+
+# general strict flags we opt in to
+strict_equality = true
+no_implicit_reexport = false
+implicit_reexport = true
+
+# Ensure full coverage
+disallow_untyped_calls = false
+disallow_untyped_defs = true
+disallow_any_unimported = false
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+check_untyped_defs = true
+
+# Restrict dynamic typing
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_return_any = true
+
+# Know exactly what you're doing
+warn_unreachable = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+
+# Explicit is better than implicit
+no_implicit_optional = true
+
+# Miscellaneous
+#non_interactive = true
+#install_types = true
+
+# How imports are discovered and followed
+namespace_packages = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+
+
+###### MISSING IMPORTS  #####
+[[tool.mypy.overrides]]
+module = [
+    "langfuse.*",
+    "pypdfium2.*",
+]
+ignore_missing_imports = true
+##############################

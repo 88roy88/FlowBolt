@@ -18,13 +18,43 @@ dependencies = [
     "pywinpty>=2.0.0; sys_platform == 'win32'",
 ]
 
+[dependency-groups]
+dev = [
+    "taskipy>=1.14.1",
+
+    "ruff>=0.14.2",
+    "mypy>=1.10.1",
+
+    "pytest>=8.2.2,<9",
+    "pytest-asyncio>=0.23.7,<0.24",
+    "pytest-cov>=5.0.0,<6",
+    "pytest-xdist>=3.6.1,<4",
+]
+
 [project.scripts]
-dev = "app.__main__:main_dev"
-start = "app.__main__:main"
+dev = "flow44.__main__:main_dev"
+start = "flow44.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["src/flow44"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+
+
+[tool.taskipy.tasks]
+ruff = "bash -c 'ruff format --config ruff.toml \"$@\" && ruff check --config ruff.toml \"$@\"' --"
+ruff-all = "task ruff src/"
+ruff-dry = "bash -c 'ruff format --check --config ruff.toml \"$@\" && ruff check --no-fix --config ruff.toml \"$@\"' --"
+ruff-dry-all = "task ruff-dry src/"
+
+mypy = "mypy --config-file mypy.toml \"$@\""
+mypy-all = "task mypy src/"
+
+lint = "bash -c 'task mypy \"$@\" && task ruff \"$@\"' --"
+lint-all = "task lint src/"
+
+tests = "pytest tests"
+tests-all = "task tests"
