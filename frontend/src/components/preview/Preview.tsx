@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
+import { useFilesStore } from '../../stores/files';
 import { RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '../ui/button';
 
 export function Preview() {
   const sessionId = useSessionStore((s) => s.sessionId);
+  const saveVersion = useFilesStore((s) => s.saveVersion);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -20,6 +22,16 @@ export function Preview() {
     setPreviewUrl(url);
     setLoading(false);
   }, [sessionId, refreshKey]);
+
+  // Auto-refresh preview when files are saved (by user or AI).
+  // Debounce to avoid rapid refreshes during bulk writes.
+  const saveVersionRef = useRef(saveVersion);
+  useEffect(() => {
+    if (saveVersion === saveVersionRef.current) return;
+    saveVersionRef.current = saveVersion;
+    const timer = setTimeout(() => setRefreshKey((k) => k + 1), 800);
+    return () => clearTimeout(timer);
+  }, [saveVersion]);
 
   const handleRefresh = () => {
     setRefreshKey((k) => k + 1);
