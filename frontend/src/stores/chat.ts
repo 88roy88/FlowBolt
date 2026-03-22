@@ -3,7 +3,6 @@ import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, Exe
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
-import { readPackageApiAuthorization } from '../services/packageApiAuth';
 import { createFixErrorHandler, createSendMessageHandler } from './chatHandlers';
 
 export interface ChatState {
@@ -158,13 +157,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
     attachHandler(sessionId, socket, handler);
 
-    const pkgAuth = readPackageApiAuthorization();
     socket.send({
       type: 'message',
       content,
       ...(selectedModel && { model: selectedModel }),
       ...(selectedCases.length > 0 && { caseIds: selectedCases.map((c) => c.id) }),
-      ...(pkgAuth && { packageApiAuthorization: pkgAuth }),
     });
 
     // Persist the model to the project so it's restored on next visit

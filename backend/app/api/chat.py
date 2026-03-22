@@ -73,21 +73,22 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:
             pass
 
     async def _receive_actions() -> None:
+        package_api_authorization: str | None = None
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
             msg_type = data.get("type")
 
-            if msg_type == "message":
+            if msg_type == "auth":
+                raw_pkg_auth = data.get("packageApiAuthorization")
+                if isinstance(raw_pkg_auth, str):
+                    package_api_authorization = raw_pkg_auth.strip() or None
+                else:
+                    package_api_authorization = None
+            elif msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
                 case_ids: list[int] = data.get("caseIds") or []
-
-                raw_pkg_auth = data.get("packageApiAuthorization")
-                if isinstance(raw_pkg_auth, str):
-                    package_api_authorization: str | None = raw_pkg_auth.strip() or None
-                else:
-                    package_api_authorization = None
 
                 # Save user message (for LLM context in followup agent)
                 await save_message(project.id, "user", user_content)

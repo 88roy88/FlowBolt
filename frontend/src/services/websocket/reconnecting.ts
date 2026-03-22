@@ -30,8 +30,8 @@ export function createReconnectingSocket(
     socket.addEventListener('open', () => {
       hasConnectedOnce = true;
       retryDelay = 1000;
-      flushQueue();
       onOpen?.();
+      flushQueue();
     });
 
     socket.addEventListener('message', (event) => {

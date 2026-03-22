@@ -1,5 +1,6 @@
 import type { WSMessage } from '../../types';
 import type { ChatSocket } from './types';
+import { readPackageApiAuthorization } from '../packageApiAuth';
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 const chatSockets = new Map<string, ChatSocket>();
@@ -10,9 +11,22 @@ export function getChatSocket(sessionId: string): ChatSocket {
 
   const handlers = new Set<(msg: WSMessage) => void>();
 
+  const sendAuthMessage = (send: (message: WSMessage) => void) => {
+    const rawToken = readPackageApiAuthorization();
+    const packageApiAuthorization = rawToken?.trim() || undefined;
+    send({
+      type: 'auth',
+      ...(packageApiAuthorization && { packageApiAuthorization }),
+    });
+  };
+
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${sessionId}`,
-    undefined,
+    () => {
+      sendAuthMessage((message) => {
+        sendOrQueue(JSON.stringify(message));
+      });
+    },
     (data) => {
       try {
         const msg = JSON.parse(data) as WSMessage;
