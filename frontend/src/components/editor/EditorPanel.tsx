@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { Download, FileCode } from 'lucide-react';
+import { Download, FileCode, Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
 import { downloadZip, downloadSingleHtml } from '../../services/api';
@@ -13,12 +13,13 @@ const FILE_TREE_MIN = 120;
 const FILE_TREE_MAX = 400;
 
 export function EditorPanel() {
-  const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree, pendingRevealLine, pendingRevealColumn, clearPendingReveal } = useFilesStore();
+  const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree, pendingRevealLine, pendingRevealColumn, revealVersion, clearPendingReveal } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
   const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const handleFileTreeResize = useCallback((delta: number) => {
     setFileTreeWidth((w) => Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, w + delta)));
@@ -42,21 +43,36 @@ export function EditorPanel() {
     return () => observer.disconnect();
   }, []);
 
-  // Reveal line/column when navigating from error toast
+  // Reveal line/column when navigating from console or error toast
   useEffect(() => {
-    if (!pendingRevealLine || !editorRef.current) return;
+    if (!pendingRevealLine) return;
     const line = pendingRevealLine;
     const col = pendingRevealColumn ?? 1;
-    const timer = setTimeout(() => {
-      const editor = editorRef.current;
-      if (!editor) return;
-      editor.revealLineInCenter(line);
-      editor.setPosition({ lineNumber: line, column: col });
-      editor.focus();
-    }, 100);
     clearPendingReveal();
-    return () => clearTimeout(timer);
-  }, [pendingRevealLine, pendingRevealColumn, activeFilePath, clearPendingReveal]);
+
+    function tryReveal(attempts: number) {
+      const editor = editorRef.current;
+      if (editor) {
+        editor.revealLineInCenter(line);
+        editor.setPosition({ lineNumber: line, column: col });
+        editor.focus();
+      } else if (attempts > 0) {
+        setTimeout(() => tryReveal(attempts - 1), 150);
+      }
+    }
+    // Delay to allow Monaco to mount/switch file
+    setTimeout(() => tryReveal(3), 100);
+  }, [pendingRevealLine, pendingRevealColumn, revealVersion, activeFilePath, clearPendingReveal]);
+
+  const doSave = useCallback((path: string) => {
+    setSaveStatus('saving');
+    saveFile(path)
+      .then(() => {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 1500);
+      })
+      .catch(() => setSaveStatus('idle'));
+  }, [saveFile]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (!activeFilePath || value === undefined) return;
@@ -67,9 +83,34 @@ export function EditorPanel() {
     }
 
     saveTimerRef.current = setTimeout(() => {
-      saveFile(activeFilePath);
+      doSave(activeFilePath);
     }, 1000);
-  }, [activeFilePath, updateFileContent, saveFile]);
+  }, [activeFilePath, updateFileContent, doSave]);
+
+  // Cleanup save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Cmd+S / Ctrl+S to save immediately
+  useEffect(() => {
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        const path = useFilesStore.getState().activeFilePath;
+        if (path) {
+          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+          doSave(path);
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [doSave]);
 
   const activeContent = activeFilePath ? openFiles.get(activeFilePath) : undefined;
 
@@ -125,7 +166,20 @@ export function EditorPanel() {
       <Resizer direction="horizontal" onDrag={handleFileTreeResize} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <FileTabs />
+        <div className="flex items-center">
+          <div className="flex-1 min-w-0">
+            <FileTabs />
+          </div>
+          {saveStatus !== 'idle' && (
+            <div className="flex items-center gap-1 px-3 text-[11px] text-muted-foreground shrink-0">
+              {saveStatus === 'saving' ? (
+                <><Loader2 size={10} className="animate-spin" /> Saving</>
+              ) : (
+                <><Check size={10} className="text-green-400" /> Saved</>
+              )}
+            </div>
+          )}
+        </div>
 
         {activeFilePath && activeContent !== undefined ? (
           <div style={{ flex: 1, overflow: 'hidden' }}>
