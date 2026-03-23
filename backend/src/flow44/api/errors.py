@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 @router.websocket("/ws/errors/{project_id}")
-async def errors_ws(websocket: WebSocket, project_id: str) -> None:
+async def errors_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901, PLR0915
     """Watch ``.dev-server.log`` for error patterns and send structured events."""
     sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:

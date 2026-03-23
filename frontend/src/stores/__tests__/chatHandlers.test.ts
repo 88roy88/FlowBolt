@@ -17,6 +17,7 @@ vi.mock('../files', () => ({
       openFiles: new Map(),
       updateFileContent: vi.fn(),
       loadFileTree: vi.fn(),
+      refreshOpenFiles: vi.fn(),
     }),
   },
 }));

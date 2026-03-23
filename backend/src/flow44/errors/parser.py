@@ -68,9 +68,7 @@ def _is_user_source(path: str) -> bool:
     """Return True if path looks like a user source file (not node_modules or partial)."""
     if "node_modules" in path:
         return False
-    if "/src/" not in path and not path.startswith("src/"):
-        return False
-    return True
+    return "/src/" in path or path.startswith("src/")
 
 
 def strip_ansi(text: str) -> str:

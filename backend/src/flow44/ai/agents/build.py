@@ -28,8 +28,8 @@ from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.config import settings
-from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
 from flow44.db.project import update_project_summary
+from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
 
@@ -211,7 +211,8 @@ class BuildAgent(BaseAgent):
                 logger.exception("[build] Data source analysis failed")
                 analysis = {
                     "data_schema": (
-                        f"Data source with {len(sample_data) if isinstance(sample_data, list) else 'structured'} records"  # type: ignore[unreachable]
+                        f"Data source with "
+                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"
                     ),
                     "relevant_fields": "See raw data",
                     "data_characteristics": "Fetched from API",

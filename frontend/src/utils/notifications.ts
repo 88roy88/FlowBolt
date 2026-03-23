@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'notify-on-complete';
 
 export function isNotifyEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
   return localStorage.getItem(STORAGE_KEY) !== 'false';
 }
 
@@ -9,14 +10,14 @@ export function setNotifyEnabled(enabled: boolean): void {
 }
 
 export async function requestPermissionIfNeeded(): Promise<void> {
-  if (!('Notification' in window)) return;
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
   if (Notification.permission === 'default') {
     await Notification.requestPermission();
   }
 }
 
 export function notifyBuildComplete(projectName?: string, isError = false): void {
-  if (!('Notification' in window)) return;
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
   if (!isNotifyEnabled()) return;
   if (Notification.permission !== 'granted') return;
   if (!document.hidden) return;
