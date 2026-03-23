@@ -1,28 +1,24 @@
+import functools
 import json
-import mimetypes
-import os
-import zipfile
+import logging
 from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
-from dotenv import load_dotenv
 
-load_dotenv()
+from flow44.config import settings
 
-ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
-ACCESS_KEY = os.getenv("S3_ACCESS_KEY")
-SECRET_KEY = os.getenv("S3_SECRET_KEY")
-BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+logger = logging.getLogger(__name__)
 
 
+@functools.lru_cache(maxsize=1)
 def connect_to_s3() -> Any:
     s3 = boto3.client(
         "s3",
-        use_ssl=(ENDPOINT_URL or "").startswith("https://"),
-        aws_access_key_id=ACCESS_KEY,
-        aws_secret_access_key=SECRET_KEY,
-        endpoint_url=ENDPOINT_URL,
+        use_ssl=(settings.S3_ENDPOINT_URL or "").startswith("https://"),
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+        endpoint_url=settings.S3_ENDPOINT_URL,
     )
     return s3
 
@@ -31,7 +27,7 @@ def setup_bucket(bucket_name: str) -> None:
     s3 = connect_to_s3()
     try:
         s3.create_bucket(Bucket=bucket_name)
-        print(f"Bucket '{bucket_name}' created successfully.")
+        logger.info("Bucket '%s' created successfully.", bucket_name)
     except ClientError as e:
         if e.response["Error"]["Code"] not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
             raise
@@ -54,24 +50,15 @@ def setup_bucket(bucket_name: str) -> None:
     )
 
 
-def deploy_react_app(zip_file: Any, project_id: str) -> str:
-    s3 = connect_to_s3()
-    with zipfile.ZipFile(zip_file, "r") as z:
-        for name in z.namelist():
-            if name.endswith("/"):
-                continue
-            clean_name = name.replace("\\", "/")
-            key = f"{project_id}/{clean_name}"
-            minetype = mimetypes.guess_type(name)[0] or "application/octet-stream"
-            s3.put_object(Bucket=BUCKET_NAME, Key=key, Body=z.read(name), ContentType=minetype, ACL="public-read")
-    return f"{ENDPOINT_URL}/{BUCKET_NAME}/{project_id}/dist/index.html"
-
-
 def deploy_single_html(html_content: str, project_id: str) -> str:
     """Deploy a single HTML string to S3 and return the public URL."""
     s3 = connect_to_s3()
     key = f"published/{project_id}.html"
     s3.put_object(
-        Bucket=BUCKET_NAME, Key=key, Body=html_content.encode("utf-8"), ContentType="text/html", ACL="public-read"
+        Bucket=settings.S3_BUCKET_NAME,
+        Key=key,
+        Body=html_content.encode("utf-8"),
+        ContentType="text/html",
+        ACL="public-read",
     )
-    return f"{ENDPOINT_URL}/{BUCKET_NAME}/{key}"
+    return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"

@@ -9,9 +9,8 @@ import os
 import re
 import zipfile
 
-import httpx
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import Response
 
 from flow44.config import settings
 from flow44.db.project import get_project
@@ -229,20 +228,3 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
         html,
         flags=re.IGNORECASE,
     )
-
-
-@router.get("/published", response_class=HTMLResponse)
-async def proxy_published_app(project_id: str) -> HTMLResponse:
-    """Proxy route to fetch and serve the published HTML from S3."""
-    project = await get_project(project_id)
-    if not project or not project.published_url:
-        raise HTTPException(status_code=404, detail="Published app not found or not published yet.")
-
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(project.published_url, timeout=15.0)
-            resp.raise_for_status()
-            return HTMLResponse(content=resp.text)
-        except Exception:
-            logger.exception("Failed to fetch published app for project %s from %s", project_id, project.published_url)
-            raise HTTPException(status_code=502, detail="Error fetching published app from S3.") from None

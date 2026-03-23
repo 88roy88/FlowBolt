@@ -27,6 +27,7 @@ from flow44.api import (
 )
 from flow44.config import settings
 from flow44.db.database import init_db
+from flow44.integrations.s3 import setup_bucket
 from flow44.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -64,6 +65,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     live_project_ids = {p.id for p in live_projects}
     await sandbox_manager.restore_existing_workspaces(live_project_ids)
     logger.info("Sandbox restoration complete.")
+
+    if settings.S3_BUCKET_NAME:
+        logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
+        try:
+            setup_bucket(settings.S3_BUCKET_NAME)
+            logger.info("S3 bucket setup complete.")
+        except Exception as exc:
+            logger.warning("S3 bucket setup issue (may already exist or be misconfigured): %s", exc)
 
     yield
     logger.info("Shutting down — destroying all sandboxes...")

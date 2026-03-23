@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import logging
 
+import httpx
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 
 from flow44.api.export import build_single_html
 from flow44.config import settings
 from flow44.db.project import get_project, update_project_published_url
-from flow44.integrations.s3 import BUCKET_NAME, deploy_single_html, setup_bucket
+from flow44.integrations.s3 import deploy_single_html
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -26,15 +28,9 @@ async def publish_to_s3(project_id: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail=f"No sandbox found for project {project_id}")
 
     # Ensure the bucket exists with public-read policy
-    if BUCKET_NAME is None:
+    if settings.S3_BUCKET_NAME is None or settings.S3_BUCKET_NAME == "":
         logger.error("S3_BUCKET_NAME environment variable is not set")
         raise HTTPException(status_code=500, detail="S3_BUCKET_NAME is not set")
-
-    bucket: str = BUCKET_NAME
-    try:
-        setup_bucket(bucket)
-    except Exception as exc:
-        logger.warning("Bucket setup issue (may already exist): %s", exc)
 
     # Build a single HTML string containing the entire app with inline assets
     html_content = await build_single_html(project_id)
@@ -62,3 +58,28 @@ async def publish_to_s3(project_id: str) -> dict[str, str]:
     logger.info("Published project '%s' (id %s) to %s (proxy: %s)", project_name, project_id, s3_url, proxy_url)
 
     return {"url": proxy_url, "project_name": project_name}
+
+
+@router.get("/published", response_class=HTMLResponse)
+async def proxy_published_app(project_id: str) -> HTMLResponse:
+    """Proxy route to fetch and serve the published HTML from S3."""
+    project = await get_project(project_id)
+    if not project or not project.published_url:
+        raise HTTPException(status_code=404, detail="Published app not found or not published yet.")
+
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(project.published_url, timeout=15.0)
+            resp.raise_for_status()
+
+            # Forward some headers from S3 for better caching behavior
+            headers = {"Cache-Control": "public, max-age=0, must-revalidate"}
+            if "etag" in resp.headers:
+                headers["ETag"] = resp.headers["etag"]
+            if "last-modified" in resp.headers:
+                headers["Last-Modified"] = resp.headers["last-modified"]
+
+            return HTMLResponse(content=resp.text, headers=headers)
+        except Exception:
+            logger.exception("Failed to fetch published app for project %s from %s", project_id, project.published_url)
+            raise HTTPException(status_code=502, detail="Error fetching published app from S3.") from None
