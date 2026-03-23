@@ -63,9 +63,7 @@ async def _run_package(
         raise HTTPException(status_code=422, detail="package_id is required")
 
     try:
-        return await _client(authorization=authorization).run_package(
-            package_id, all_queries=allQueries, body=body
-        )
+        return await _client(authorization=authorization).run_package(package_id, all_queries=allQueries, body=body)
     except PackageApiUpstreamError as e:
         raise _map_upstream_error(e) from e
 

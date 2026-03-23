@@ -28,9 +28,9 @@ from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.integrations.package_api import PackageApiUpstreamError
 from flow44.models.project import update_project_summary
-from flow44.services.package_cases import fetch_case_package_data
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.package_cases import fetch_case_package_data
 
 from ._base import BaseAgent
 
@@ -59,7 +59,6 @@ class BuildAgent(BaseAgent):
         self._state.user_content = content
         self._state.case_ids = case_ids or []
         self._trace_id = langfuse_context.get_current_trace_id()
-
 
         langfuse_context.update_current_trace(
             session_id=self.session_id,

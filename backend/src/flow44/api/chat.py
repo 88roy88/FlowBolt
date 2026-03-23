@@ -75,7 +75,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901,
         except Exception:
             logger.debug("Event forwarding stopped for session %s", session_id)
 
-    async def _receive_actions() -> None:  # noqa: C901, PLR0915
+    async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         package_api_authorization: str | None = None
         while True:
             raw = await websocket.receive_text()
@@ -84,10 +84,7 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901,
 
             if msg_type == "auth":
                 raw_pkg_auth = data.get("packageApiAuthorization")
-                if isinstance(raw_pkg_auth, str):
-                    package_api_authorization = raw_pkg_auth.strip() or None
-                else:
-                    package_api_authorization = None
+                package_api_authorization = raw_pkg_auth.strip() or None if isinstance(raw_pkg_auth, str) else None
             elif msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")

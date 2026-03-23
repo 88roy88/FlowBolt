@@ -54,9 +54,7 @@ async def fetch_case_package_data(
 
     metadata = results[0]
     package_name = (
-        metadata.get("Name", f"Package {package_id}")
-        if isinstance(metadata, dict)
-        else f"Package {package_id}"
+        metadata.get("Name", f"Package {package_id}") if isinstance(metadata, dict) else f"Package {package_id}"
     )
     sample_data = await _client(authorization=authorization).run_package(
         package_id,
