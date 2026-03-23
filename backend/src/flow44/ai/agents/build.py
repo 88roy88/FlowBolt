@@ -59,7 +59,7 @@ class BuildAgent(BaseAgent):
         self._trace_id = langfuse_context.get_current_trace_id()
 
         langfuse_context.update_current_trace(
-            session_id=self.project_id,
+            project_id=self.project_id,
             user_id=self.project_id,
             metadata={"model": self.model or "default"},
             tags=["build-agent"],

@@ -54,23 +54,23 @@ def setup_bucket(bucket_name: str) -> None:
     )
 
 
-def deploy_react_app(zip_file: Any, session_id: str) -> str:
+def deploy_react_app(zip_file: Any, project_id: str) -> str:
     s3 = connect_to_s3()
     with zipfile.ZipFile(zip_file, "r") as z:
         for name in z.namelist():
             if name.endswith("/"):
                 continue
             clean_name = name.replace("\\", "/")
-            key = f"{session_id}/{clean_name}"
+            key = f"{project_id}/{clean_name}"
             minetype = mimetypes.guess_type(name)[0] or "application/octet-stream"
             s3.put_object(Bucket=BUCKET_NAME, Key=key, Body=z.read(name), ContentType=minetype, ACL="public-read")
-    return f"{ENDPOINT_URL}/{BUCKET_NAME}/{session_id}/dist/index.html"
+    return f"{ENDPOINT_URL}/{BUCKET_NAME}/{project_id}/dist/index.html"
 
 
-def deploy_single_html(html_content: str, session_id: str) -> str:
+def deploy_single_html(html_content: str, project_id: str) -> str:
     """Deploy a single HTML string to S3 and return the public URL."""
     s3 = connect_to_s3()
-    key = f"published/{session_id}.html"
+    key = f"published/{project_id}.html"
     s3.put_object(
         Bucket=BUCKET_NAME, Key=key, Body=html_content.encode("utf-8"), ContentType="text/html", ACL="public-read"
     )

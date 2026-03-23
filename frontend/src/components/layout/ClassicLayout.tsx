@@ -20,7 +20,7 @@ export function ClassicLayout() {
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
@@ -28,10 +28,10 @@ export function ClassicLayout() {
   const isPublished = !!currentProject?.published_url;
 
   const handlePublish = useCallback(async () => {
-    if (!sessionId || isPublishing) return;
+    if (!projectId || isPublishing) return;
     setIsPublishing(true);
     try {
-      const result = await publishToS3(sessionId);
+      const result = await publishToS3(projectId);
       const current = useSessionStore.getState().currentProject;
       if (current) {
         useSessionStore.getState().setProjectPublishedUrl(current.id, result.url);
@@ -42,7 +42,7 @@ export function ClassicLayout() {
     } finally {
       setIsPublishing(false);
     }
-  }, [sessionId, isPublishing]);
+  }, [projectId, isPublishing]);
 
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
@@ -83,9 +83,9 @@ export function ClassicLayout() {
           ))}
 
           <div className="ml-auto pr-2 flex items-center gap-2">
-            {isPublished && sessionId && (
+            {isPublished && projectId && (
               <a
-                href={`/api/export/${sessionId}/published`}
+                href={`/api/export/${projectId}/published`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 text-primary border border-primary/20 hover:bg-primary/10 shadow-sm"
@@ -97,10 +97,10 @@ export function ClassicLayout() {
             )}
             <button
           title={isPublished ? "Republish" : "Publish to S3"}
-          disabled={!sessionId || isPublishing}
+          disabled={!projectId || isPublishing}
               onClick={handlePublish}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 ${
-                sessionId && !isPublishing
+                projectId && !isPublishing
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-sm'
                   : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
               }`}

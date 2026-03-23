@@ -46,7 +46,7 @@ export function FlexibleLayout() {
   const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>(initial.sizes);
   const panesContainerRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
@@ -54,10 +54,10 @@ export function FlexibleLayout() {
   const isPublished = !!currentProject?.published_url;
 
   const handlePublish = useCallback(async () => {
-    if (!sessionId || isPublishing) return;
+    if (!projectId || isPublishing) return;
     setIsPublishing(true);
     try {
-      const result = await publishToS3(sessionId);
+      const result = await publishToS3(projectId);
       const current = useSessionStore.getState().currentProject;
       if (current) {
         useSessionStore.getState().setProjectPublishedUrl(current.id, result.url);
@@ -68,7 +68,7 @@ export function FlexibleLayout() {
     } finally {
       setIsPublishing(false);
     }
-  }, [sessionId, isPublishing]);
+  }, [projectId, isPublishing]);
 
   const togglePane = (pane: PaneId) => {
     setVisiblePanes(prev => {
@@ -166,10 +166,10 @@ export function FlexibleLayout() {
 
         <div className="w-9 h-px bg-border/40 my-1 mx-auto" />
 
-        {isPublished && sessionId && (
+        {isPublished && projectId && (
           <a
             title="View Published App"
-            href={`/api/export/${sessionId}/published`}
+            href={`/api/export/${projectId}/published`}
             target="_blank"
             rel="noopener noreferrer"
             className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 text-secondary-foreground bg-secondary/70 hover:bg-secondary/90 shadow-sm"
@@ -180,10 +180,10 @@ export function FlexibleLayout() {
 
         <button
           title={isPublished ? "Republish" : "Publish to S3"}
-          disabled={!sessionId || isPublishing}
+          disabled={!projectId || isPublishing}
           onClick={handlePublish}
           className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 ${
-            sessionId && !isPublishing
+            projectId && !isPublishing
               ? 'text-primary bg-primary/10 hover:bg-primary hover:text-primary-foreground shadow-sm cursor-pointer'
               : 'text-muted-foreground/30 bg-muted/20 cursor-not-allowed'
           }`}
