@@ -227,9 +227,6 @@ class BuildAgent(BaseAgent):
                 **analysis,
             }
 
-        except LookupError as e:
-            await self.emit({"type": "data_source_error", "message": f"Data source {data_source_id} not found"})
-            raise RuntimeError(f"Data source fetch failed for {data_source_id}: not found") from e
         except FlapiUpstreamError as e:
             await self.emit({"type": "data_source_error", "message": f"Failed to fetch data source: {e}"})
             raise RuntimeError(f"Data source fetch failed for {data_source_id}: upstream error") from e
