@@ -58,6 +58,8 @@ warn_untyped_fields = true
 [[tool.mypy.overrides]]
 module = [
     "langfuse.*",
+    "winpty",
+    "winpty.*",
 ]
 ignore_missing_imports = true
 ##############################
