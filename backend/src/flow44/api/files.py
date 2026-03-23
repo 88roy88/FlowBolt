@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from flow44.sandbox.filesystem import list_files, read_file, write_file
 
-router = APIRouter(prefix="/api/files/{session_id}", tags=["files"])
+router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 
 
 class WriteFileRequest(BaseModel):
@@ -19,18 +19,18 @@ class WriteFileRequest(BaseModel):
 
 
 @router.get("/tree")
-async def get_file_tree(session_id: str) -> list[dict[str, Any]]:
+async def get_file_tree(project_id: str) -> list[dict[str, Any]]:
     try:
-        tree = await list_files(session_id)
+        tree = await list_files(project_id)
         return [asdict(entry) for entry in tree]
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
 
 
 @router.get("/content")
-async def get_file_content(session_id: str, path: str = Query(...)) -> dict[str, str]:
+async def get_file_content(project_id: str, path: str = Query(...)) -> dict[str, str]:
     try:
-        content = await read_file(session_id, path)
+        content = await read_file(project_id, path)
         return {"path": path, "content": content}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -39,9 +39,9 @@ async def get_file_content(session_id: str, path: str = Query(...)) -> dict[str,
 
 
 @router.put("/content")
-async def put_file_content(session_id: str, body: WriteFileRequest) -> dict[str, str]:
+async def put_file_content(project_id: str, body: WriteFileRequest) -> dict[str, str]:
     try:
-        await write_file(session_id, body.path, body.content)
+        await write_file(project_id, body.path, body.content)
         return {"status": "ok", "path": body.path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None

@@ -19,14 +19,14 @@ as part of a larger project.
 ```json
 {{ ux_json }}
 ```
-{% if case_contexts %}
+{% if data_source_contexts %}
 
-## Case Data Integration
+## Data Source Integration
 
-You are integrating data from the following cases:
+You are integrating data from the following data sources:
 
-{% for ctx in case_contexts %}
-### Case: {{ ctx.package_name }} (ID: {{ ctx.package_id }})
+{% for ctx in data_source_contexts %}
+### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }})
 
 **Data Schema:** {{ ctx.data_schema }}
 **Relevant Fields:** {{ ctx.relevant_fields }}
@@ -39,14 +39,14 @@ Sample data structure:
 
 **Integration Notes:** {{ ctx.integration_notes }}
 
-Fetch data from the endpoint: `${API_BASE}/api/package/{{ ctx.package_id }}/run`
+Fetch data from the endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run`
 (import `API_BASE` from `src/config.ts`)
 {% endfor %}
 
-When implementing components that use case data:
+When implementing components that use data source data:
 - **IMPORTANT**: `src/config.ts` is a pre-existing file — do NOT create or modify it. Just import from it:
   `import { API_BASE } from '../config';`
-  `fetch(`${API_BASE}/api/package/${id}/run`)`
+  `fetch(`${API_BASE}/api/data-source/${dataSourceId}/run`)`
 - Use the fetch API or create a custom hook to handle the API calls
 - Include proper loading and error states
 - Focus on the relevant fields identified above for the user's use case

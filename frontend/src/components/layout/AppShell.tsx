@@ -9,6 +9,7 @@ import { FlexibleLayout } from './FlexibleLayout';
 import { MobileLayout } from './MobileLayout';
 import { Terminal } from '../terminal/Terminal';
 import { ServerLog } from '../terminal/ServerLog';
+import { Console } from '../terminal/Console';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
 import { PromptInput } from '../chat/PromptInput';
 import { useChatStore } from '../../stores/chat';
@@ -20,7 +21,7 @@ const SIDEBAR_WIDTH = 280;
 const BOTTOM_MIN = 120;
 const BOTTOM_MAX = 600;
 
-type BottomTab = 'terminal' | 'server';
+type BottomTab = 'terminal' | 'server' | 'console';
 type LayoutMode = 'classic' | 'flexible';
 
 function loadLayoutMode(): LayoutMode {
@@ -97,10 +98,10 @@ export function AppShell() {
 
   const handleRailSelect = (p: typeof projects[number]) => {
     useSessionStore.getState().setCurrentProject(p);
-    window.location.hash = `#/project/${p.session_id}`;
+    window.location.hash = `#/project/${p.id}`;
     useFilesStore.getState().reset();
     useFilesStore.getState().loadFileTree();
-    useChatStore.getState().loadHistory(p.session_id);
+    useChatStore.getState().loadHistory(p.id);
   };
 
   const IconRail = () => (
@@ -138,10 +139,10 @@ export function AppShell() {
         className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer"
       >
         <ChevronUp size={14} className={`transition-transform duration-200 ${!bottomOpen ? '' : 'rotate-180'}`} />
-        <span className="font-medium">{bottomTab === 'server' ? 'Server Log' : 'Terminal'}</span>
+        <span className="font-medium">{bottomTab === 'server' ? 'Server Log' : bottomTab === 'console' ? 'Console' : 'Terminal'}</span>
         {!bottomOpen && (
           <div className="flex gap-2 ml-auto">
-            {(['server', 'terminal'] as BottomTab[]).map((tab) => (
+            {(['server', 'terminal', 'console'] as BottomTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={(e) => { e.stopPropagation(); setBottomTab(tab); setBottomOpen(true); }}
@@ -158,7 +159,7 @@ export function AppShell() {
       {bottomOpen && (
         <>
           <div className="flex items-center border-t border-border shrink-0">
-            {(['server', 'terminal'] as BottomTab[]).map((tab) => (
+            {(['server', 'terminal', 'console'] as BottomTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setBottomTab(tab)}
@@ -168,14 +169,14 @@ export function AppShell() {
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {tab === 'server' ? 'Server' : 'Terminal'}
+                {tab === 'server' ? 'Server' : tab === 'console' ? 'Console' : 'Terminal'}
               </button>
             ))}
           </div>
           <div style={{ height: bottomHeight }}>
             <Resizer direction="vertical" onDrag={handleBottomResize} />
             <div style={{ height: bottomHeight - 1 }} className="overflow-hidden">
-              {bottomTab === 'terminal' ? <Terminal /> : <ServerLog />}
+              {bottomTab === 'terminal' ? <Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
             </div>
           </div>
         </>

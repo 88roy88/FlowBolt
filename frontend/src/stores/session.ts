@@ -7,7 +7,7 @@ import { useChatStore } from './chat';
 interface SessionState {
   currentProject: Project | null;
   projects: Project[];
-  sessionId: string | null;
+  projectId: string | null;
   isCreating: boolean;
   setCurrentProject: (project: Project) => void;
   loadProjects: () => Promise<void>;
@@ -21,16 +21,16 @@ interface SessionState {
 export const useSessionStore = create<SessionState>((set, get) => ({
   currentProject: null,
   projects: [],
-  sessionId: null,
+  projectId: null,
   isCreating: false,
 
   setCurrentProject(project: Project) {
-    set({ currentProject: project, sessionId: project.session_id });
+    set({ currentProject: project, projectId: project.id });
     // Restore the selected model for this project
     if (project.selected_model) {
       useChatStore.setState({ selectedModel: project.selected_model });
     }
-    useChatStore.getState().clearCases();
+    useChatStore.getState().clearDataSources();
   },
 
   async loadProjects() {
@@ -45,7 +45,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const project = await api.createProject(name);
       const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
-      set({ projects, currentProject: project, sessionId: project.session_id });
+      set({ projects, currentProject: project, projectId: project.id });
     } finally {
       set({ isCreating: false });
     }
@@ -53,8 +53,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   async deleteProject(id: string) {
     const projectToDelete = get().projects.find((p) => p.id === id);
-    if (projectToDelete?.session_id) {
-      closeChatSocket(projectToDelete.session_id);
+    if (projectToDelete) {
+      closeChatSocket(projectToDelete.id);
     }
     await api.deleteProject(id);
     const projects = get().projects.filter((p) => p.id !== id);
@@ -64,7 +64,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({
         projects,
         currentProject: next,
-        sessionId: next?.session_id ?? null,
+        projectId: next?.id ?? null,
       });
     } else {
       set({ projects });

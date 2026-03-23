@@ -131,10 +131,10 @@ existing projects without starting over.
 
 ---
 
-## B7. Rename "package" to "case" in backend
+## B7. Rename "package" to "case" in backend ✅
 
-Align backend naming with frontend: `PackageApiClient` → `CaseApiClient`,
-`package_id` → `case_id`, etc.
+Done. `CaseApiClient`, `case_id`, `case_name` throughout. DB columns renamed
+via `ALTER TABLE RENAME COLUMN`. Route prefix changed from `/api/package` to `/api/case`.
 
 ---
 
@@ -145,14 +145,14 @@ wasteful and could exhaust resources. Introduce a shared connection or pool.
 
 ---
 
-## B9. Preview iframe security
+## ~~B9. Preview iframe security~~ DONE
 
 No `sandbox` attribute on the preview iframe — AI-generated code runs with full
 browser privileges. Add `sandbox="allow-scripts allow-same-origin"` + CSP headers.
 
 ---
 
-## B10. Editor save reliability
+## ~~B10. Editor save reliability~~ DONE
 
 - Save debounce can lose edits if component unmounts mid-timer
 - No UI feedback when save fails
@@ -386,7 +386,7 @@ Replace manual span management in BuildAgent with decorators.
 ## A6. Structured output for JSON prompts (PARTIALLY DONE)
 
 Pydantic schemas created in `schemas.py` (ArchitectureDesign, UXDesign,
-UserPlanOverview, ProjectSummary, PackageAnalysis, ClassificationResult).
+UserPlanOverview, ProjectSummary, CaseAnalysis, ClassificationResult).
 BuildState and BuildAgent now validate LLM responses into these models.
 
 Remaining: use LiteLLM `response_format` or tool-based extraction to enforce
@@ -401,7 +401,7 @@ malformed JSON.
 
 Use structured output (tool calling / response_format) instead:
 - Define Pydantic models for each expected response (ArchitectureDesign, UXDesign,
-  UserPlanOverview, TechnicalPlan, ProjectSummary, PackageAnalysis)
+  UserPlanOverview, TechnicalPlan, ProjectSummary, CaseAnalysis)
 - Use LiteLLM's `response_format` parameter or tool-based extraction (like
   primesrc's `chat_structured`)
 - Eliminates JSON parsing failures, markdown fence stripping, and fallback logic
@@ -414,7 +414,7 @@ Use structured output (tool calling / response_format) instead:
 - `merge.jinja2` → `TechnicalPlan` model
 - `summary.jinja2` → `ProjectSummary` model
 - `classify.jinja2` → `ClassificationResult` model
-- Package analysis in BuildAgent → `PackageAnalysis` model
+- Package analysis in BuildAgent → `CaseAnalysis` model
 
 **NOT candidates** (free-form output):
 - `codegen.jinja2` — outputs XML/code, not JSON
@@ -452,9 +452,19 @@ No CI/CD exists. Set up:
 
 ---
 
-## I7. Migrate to Postgres + SQLModel + Alembic
+## I7. Migrate to Postgres + SQLModel + Alembic + DAL (PARTIALLY DONE)
 
-**Current state:** Raw `aiosqlite` with hand-written SQL, no ORM, fragile ALTER TABLE
+**Step 1 done:** SQLModel tables (Project, ChatMessage, AgentEvent), async session
+factory (`db/database.py`), `models/` renamed to `db/`, all migration code deleted,
+`init_db()` uses `SQLModel.metadata.create_all`. Still on SQLite.
+
+**Remaining:**
+- Add Alembic for schema migrations
+- Add Postgres support (`DATABASE_URL` with `postgresql+asyncpg://`)
+- Add DAL (Data Access Layer) pattern to separate DB queries from business logic
+- Connection pooling
+
+**Original state:** Raw `aiosqlite` with hand-written SQL, no ORM, fragile ALTER TABLE
 migrations that swallow errors. SQLite is single-writer and can't scale to multiple
 server instances.
 
@@ -560,7 +570,7 @@ Alternatives: `@hey-api/openapi-ts` (generates client, pair with react-query man
 
 ---
 
-## B14. Frontend reconnect handling
+## ~~B14. Frontend reconnect handling~~ DONE
 
 Part of B0 that needs verification. Backend replays events on WS connect, but
 frontend may not handle receiving a batch of historical events correctly.
@@ -682,7 +692,7 @@ instead of one model for everything.
 
 ---
 
-## F14. Browser notification on build complete
+## ~~F14. Browser notification on build complete~~ DONE
 
 When the user switches to another tab during a build, send a browser notification
 when the agent finishes.
@@ -696,7 +706,7 @@ when the agent finishes.
 
 ---
 
-## F15. Console output capture from preview
+## ~~F15. Console output capture from preview~~ DONE
 
 Capture `console.log`, `console.error`, `console.warn` from the preview iframe
 and display in a "Console" tab next to Terminal / Server Log.
@@ -907,6 +917,20 @@ mid-action.
 
 ---
 
+## B19. Improve read_file tool — reject directories
+
+The LLM sometimes calls `read_file` with a directory path (e.g., `src/`), which
+produces `[Errno 21] Is a directory`. The tool should detect this and return a
+helpful message like "This is a directory, not a file. Use the glob or
+list_files tool to see its contents." instead of a raw OS error.
+
+Also consider improving the tool's system prompt / description to clarify it
+only accepts file paths, not directories.
+
+**Where:** `ai/tools/read_file.py` — add `os.path.isdir()` check before reading.
+
+---
+
 ## F13. VS Code-like editor features
 
 The editor uses Monaco (same engine as VS Code). Many features are built-in and
@@ -1035,3 +1059,25 @@ idle projects is wasteful.
 - `sandbox/base.py` — `evict()` method (stop dev server, rm node_modules/dist)
 - `sandbox/base.py` — `rehydrate()` method (pnpm install, start dev server)
 - `api/chat.py` / `api/terminal.py` — touch last-active on connect
+
+---
+
+## B19. Vite HMR WebSocket fails through preview proxy
+
+Preview iframe shows `[vite] failed to connect to websocket` because the HMR WebSocket
+can't connect through the reverse proxy path (`/api/preview/{id}/proxy/`).
+
+Need to configure Vite's `server.hmr` in the sandbox template to use the correct
+WebSocket URL through the proxy, or disable HMR in the preview iframe.
+
+See: https://vite.dev/config/server-options.html#server-hmr
+
+---
+
+## B20. False-positive build errors from npm notices
+
+The `npm notice` output (e.g. "New major version of npm available!") gets captured as
+a build error by the error detection system and triggers the "Fix with AI" flow.
+
+The error parser in `api/errors.py` should filter out npm notices and other non-error
+stderr output (npm writes notices to stderr).

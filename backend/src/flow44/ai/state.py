@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -9,12 +7,13 @@ from flow44.ai.task_tree import WorkPlan
 
 
 class BuildState(BaseModel):
-    session_id: str
     project_id: str
     model: str | None = None
     user_content: str = ""
-    case_ids: list[str] = Field(default_factory=list)
-    case_contexts: list[dict[str, Any]] = Field(default_factory=list)  # TODO: type with PackageAnalysis + raw data
+    data_source_ids: list[str] = Field(default_factory=list)
+    data_source_contexts: list[dict[str, Any]] = Field(
+        default_factory=list
+    )  # TODO: type with DataSourceAnalysis + raw data
     architecture: ArchitectureDesign = Field(default_factory=ArchitectureDesign)
     ux_design: UXDesign = Field(default_factory=UXDesign)
     user_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)

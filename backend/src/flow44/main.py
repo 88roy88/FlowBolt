@@ -17,8 +17,8 @@ from flow44.api import (
     errors,
     export,
     files,
+    flapi_api,
     models,
-    package_api,
     preview,
     projects,
     publish,
@@ -26,8 +26,7 @@ from flow44.api import (
     terminal,
 )
 from flow44.config import settings
-from flow44.models.events import init_events_table
-from flow44.models.project import init_db
+from flow44.db.database import init_db
 from flow44.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -55,15 +54,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Initialising database...")
     await init_db()
-    await init_events_table()
     logger.info("Database ready.")
 
     logger.info("Restoring existing sandbox workspaces...")
-    from flow44.models.project import list_projects  # noqa: PLC0415
+    from flow44.db.project import list_projects  # noqa: PLC0415
 
     live_projects = await list_projects()
-    live_session_ids = {p.session_id for p in live_projects}
-    await sandbox_manager.restore_existing_workspaces(live_session_ids)
+
+    live_project_ids = {p.id for p in live_projects}
+    await sandbox_manager.restore_existing_workspaces(live_project_ids)
     logger.info("Sandbox restoration complete.")
 
     yield
@@ -94,7 +93,7 @@ app.include_router(preview.router)
 app.include_router(models.router)
 app.include_router(export.router)
 app.include_router(publish.router)
-app.include_router(package_api.router)
+app.include_router(flapi_api.router)
 
 # WebSocket routers
 app.include_router(chat.router)

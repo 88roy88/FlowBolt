@@ -57,7 +57,7 @@ WORKDIR /app
 
 # Install Python dependencies as root (for system-wide installation)
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
+RUN uv sync --no-dev
 
 # Copy application code and set ownership
 COPY --chown=appuser:appuser . .

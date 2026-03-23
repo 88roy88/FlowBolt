@@ -1,6 +1,7 @@
 import type { WSMessage, Message, FollowUpStep } from '../types';
 import { useFilesStore } from './files';
 import { useSessionStore } from './session';
+import { requestPermissionIfNeeded, notifyBuildComplete } from '../utils/notifications';
 
 type GetState = () => import('./chat').ChatState;
 type SetState = (
@@ -49,6 +50,9 @@ function handleText(msg: { content: string }, set: SetState) {
 
 function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
   set({ error: msg.message, isStreaming: false, agentPhase: 'idle' });
+  if (!_skipMessages) {
+    notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
+  }
   cleanup();
 }
 
@@ -81,8 +85,8 @@ function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetSt
     content: msg.content || '',
     timestamp: getTimestamp(),
   };
-  if (msg.cases && msg.cases.length > 0) {
-    userMsg.cases = msg.cases;
+  if (msg.data_sources && msg.data_sources.length > 0) {
+    userMsg.dataSources = msg.data_sources;
   }
   if (msg.error_fix_request) {
     userMsg.agentCard = { type: 'error_fix_request', ...msg.error_fix_request };
@@ -144,8 +148,12 @@ export function createFixErrorHandler(
             agentPhase: 'idle',
           });
         }
+        if (!_skipMessages) {
+          notifyBuildComplete(useSessionStore.getState().currentProject?.name);
+        }
         cleanup();
         useFilesStore.getState().loadFileTree();
+        useFilesStore.getState().refreshOpenFiles();
         break;
       }
     }
@@ -243,16 +251,16 @@ export function createSendMessageHandler(
         handleFileUpdate(msg, set);
         break;
 
-      case 'cases_fetched':
-        handleCasesFetched(msg, set);
+      case 'data_sources_fetched':
+        handleDataSourcesFetched(msg, set);
         break;
 
       case 'user_message':
         handleUserMessage(msg, set);
         break;
 
-      case 'case_error':
-        console.warn(`Case error: ${msg.message}`);
+      case 'data_source_error':
+        console.warn(`Data source error: ${msg.message}`);
         break;
 
       case 'error':
@@ -292,6 +300,7 @@ function handlePhaseChange(
   set({ agentPhase: msg.phase });
   if (msg.phase === 'executing') {
     set({ isStreaming: true });
+    requestPermissionIfNeeded();
   }
 }
 
@@ -355,26 +364,26 @@ function handleFollowUpStep(msg: WSMessage & { type: 'followup_step' }, set: Set
   });
 }
 
-function handleCasesFetched(
-  msg: { cases: { package_id: string; package_name: string; data_schema: string; relevant_fields?: string }[] },
+function handleDataSourcesFetched(
+  msg: { data_sources: { data_source_id: string; data_source_name: string; data_schema: string; relevant_fields?: string }[] },
   set: SetState,
 ) {
-  const casesMsg: Message = {
+  const dsMsg: Message = {
     id: generateId(),
     role: 'assistant',
     content: '',
     timestamp: getTimestamp(),
     agentCard: {
-      type: 'cases_fetched',
-      cases: msg.cases.map((c) => ({
-        packageId: c.package_id,
-        packageName: c.package_name,
-        dataSchema: c.data_schema,
-        relevantFields: c.relevant_fields,
+      type: 'data_sources_fetched',
+      dataSources: msg.data_sources.map((ds) => ({
+        dataSourceId: ds.data_source_id,
+        dataSourceName: ds.data_source_name,
+        dataSchema: ds.data_schema,
+        relevantFields: ds.relevant_fields,
       })),
     },
   };
-  if (!_skipMessages) set((s) => ({ messages: [...s.messages, casesMsg] }));
+  if (!_skipMessages) set((s) => ({ messages: [...s.messages, dsMsg] }));
 }
 
 function handleActionComplete(set: SetState, get: GetState, cleanup: () => void) {
@@ -455,6 +464,10 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     followUpDiffs: [],
     projectSummary: null,
   }));
+  if (!_skipMessages) {
+    notifyBuildComplete(useSessionStore.getState().currentProject?.name);
+  }
   cleanup();
   useFilesStore.getState().loadFileTree();
+  useFilesStore.getState().refreshOpenFiles();
 }

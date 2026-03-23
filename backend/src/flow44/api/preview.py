@@ -1,6 +1,6 @@
 """Preview management and reverse proxy endpoint.
 
-Vite is configured with ``base: '/api/preview/{session_id}/proxy/'`` so all
+Vite is configured with ``base: '/api/preview/{project_id}/proxy/'`` so all
 generated asset paths already include the proxy prefix.  The proxy is a simple
 passthrough — no response rewriting required.
 """
@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 
-@router.get("/{session_id}/port")
-async def get_preview_port(session_id: str) -> dict[str, str | int]:
+@router.get("/{project_id}/port")
+async def get_preview_port(project_id: str) -> dict[str, str | int]:
     """Return the allocated port for the sandbox's dev server."""
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         raise HTTPException(status_code=404, detail="No sandbox found for this session")
-    return {"session_id": session_id, "port": sandbox.port}
+    return {"project_id": project_id, "port": sandbox.port}
 
 
 # ---------------------------------------------------------------------------
@@ -35,20 +35,20 @@ async def get_preview_port(session_id: str) -> dict[str, str | int]:
 
 
 @router.api_route(
-    "/{session_id}/proxy/{path:path}",
+    "/{project_id}/proxy/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
-async def proxy_to_sandbox(session_id: str, path: str, request: Request) -> Response:
+async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Response:
     """Reverse proxy requests to the sandbox's dev server.
 
     Vite serves content under its ``base`` path, so the proxy forwards the
     full prefixed path to the upstream server.
     """
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         raise HTTPException(status_code=404, detail="No sandbox found for this session")
 
-    proxy_prefix = f"/api/preview/{session_id}/proxy"
+    proxy_prefix = f"/api/preview/{project_id}/proxy"
     target_url = f"http://127.0.0.1:{sandbox.port}{proxy_prefix}/{path}"
     if request.url.query:
         target_url += f"?{request.url.query}"
@@ -77,7 +77,7 @@ async def proxy_to_sandbox(session_id: str, path: str, request: Request) -> Resp
             media_type="text/html",
         )
     except Exception:
-        logger.exception("Preview proxy error for session %s", session_id)
+        logger.exception("Preview proxy error for session %s", project_id)
         raise HTTPException(status_code=502, detail="Preview proxy error") from None
 
     # Forward response headers
@@ -98,11 +98,11 @@ async def proxy_to_sandbox(session_id: str, path: str, request: Request) -> Resp
 # ---------------------------------------------------------------------------
 
 
-@router.websocket("/{session_id}/proxy/")
-@router.websocket("/{session_id}/proxy")
-async def proxy_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901
+@router.websocket("/{project_id}/proxy/")
+@router.websocket("/{project_id}/proxy")
+async def proxy_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
     """Proxy WebSocket connections for Vite HMR."""
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         await websocket.close(code=1008, reason="No sandbox")
         return
@@ -113,7 +113,7 @@ async def proxy_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901
 
     import websockets  # noqa: PLC0415
 
-    proxy_prefix = f"/api/preview/{session_id}/proxy"
+    proxy_prefix = f"/api/preview/{project_id}/proxy"
     query = websocket.scope.get("query_string", b"").decode()
     target_url = f"ws://127.0.0.1:{sandbox.port}{proxy_prefix}"
     if query:
@@ -139,7 +139,7 @@ async def proxy_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901
 
             await asyncio.gather(client_to_upstream(), upstream_to_client())
     except Exception:
-        logger.debug("HMR WebSocket proxy failed for session %s", session_id)
+        logger.debug("HMR WebSocket proxy failed for session %s", project_id)
     finally:
         try:
             await websocket.close()

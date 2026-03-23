@@ -7,10 +7,10 @@ from pathlib import Path
 SKIP_DIRS = {"node_modules", ".git", "dist", ".next", ".cache", "__pycache__"}
 
 
-async def glob(session_id: str, pattern: str) -> str:
+async def glob(project_id: str, pattern: str) -> str:
     from flow44.sandbox.manager import sandbox_manager  # noqa: PLC0415
 
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         return "Error: No sandbox found"
 

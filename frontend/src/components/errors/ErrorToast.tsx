@@ -8,12 +8,12 @@ import { Button } from '../ui/button';
 export { useErrorCapture } from '../../hooks/useErrorCapture';
 
 function normalizeFilePath(filePath: string): string {
+  // Already relative like "src/App.tsx"
+  if (filePath.startsWith('src/')) return filePath;
+  // Absolute like "/home/project/src/App.tsx" — extract from /src/ onward
   const srcIdx = filePath.indexOf('/src/');
-  if (srcIdx !== -1) return filePath.slice(srcIdx);
-  if (!filePath.startsWith('/src/')) {
-    if (!filePath.startsWith('/')) filePath = '/' + filePath;
-    return '/src' + filePath;
-  }
+  if (srcIdx !== -1) return filePath.slice(srcIdx + 1);
+  // Already normalized
   return filePath;
 }
 
@@ -43,7 +43,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
       <AlertTriangle size={18} className="text-destructive shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="text-[11px] font-semibold text-destructive uppercase tracking-wider mb-1">
-          {error.source === 'build' ? 'Build Error' : error.source === 'runtime' ? 'Runtime Error' : 'Connection Error'}
+          {error.source === 'build' ? 'Build Error' : error.source === 'runtime' ? 'Runtime Error' : error.source === 'console' ? 'Console Error' : 'Connection Error'}
         </div>
         <div className="text-[13px] leading-snug break-words">
           {error.message.length > 150 ? error.message.slice(0, 150) + '...' : error.message}

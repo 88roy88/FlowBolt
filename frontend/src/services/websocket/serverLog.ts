@@ -1,7 +1,7 @@
 import type { ReadOnlySocket } from './types';
 import { getWsBase } from './reconnecting';
 
-export function createServerLogSocket(sessionId: string): ReadOnlySocket {
+export function createServerLogSocket(projectId: string): ReadOnlySocket {
   const handlers: Array<(data: string) => void> = [];
 
   let socket: WebSocket | null = null;
@@ -9,7 +9,7 @@ export function createServerLogSocket(sessionId: string): ReadOnlySocket {
 
   function connect() {
     if (closed) return;
-    socket = new WebSocket(`${getWsBase()}/ws/server-log/${sessionId}`);
+    socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
     socket.binaryType = 'arraybuffer';
 
     socket.addEventListener('message', (event) => {

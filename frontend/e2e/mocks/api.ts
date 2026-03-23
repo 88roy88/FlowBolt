@@ -7,7 +7,6 @@
 import { type Page } from '@playwright/test';
 import {
   MOCK_PROJECT, MOCK_FILE_TREE, MOCK_APP_TSX, MOCK_MODELS,
-  SESSION_ID, PROJECT_ID,
 } from './data';
 
 export interface MockAPIOptions {
@@ -26,7 +25,6 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
         ...MOCK_PROJECT,
         id: `project-${Date.now()}`,
         name: body?.name ?? 'Untitled',
-        session_id: `session-${Date.now()}`,
       };
       projects.push(newProject);
       return route.fulfill({ json: newProject });
@@ -86,7 +84,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
 
   // --- Preview ---
   await page.route(`**/api/preview/*/port`, async (route) => {
-    return route.fulfill({ json: { session_id: SESSION_ID, port: 3001 } });
+    return route.fulfill({ json: { port: 3001 } });
   });
 
   await page.route(`**/api/preview/*/proxy/**`, async (route) => {
@@ -96,8 +94,8 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     });
   });
 
-  // --- Package search ---
-  await page.route('**/api/package/search/**', async (route) => {
+  // --- Data source search ---
+  await page.route('**/api/data-source/search/**', async (route) => {
     return route.fulfill({ json: [] });
   });
 }
