@@ -33,7 +33,7 @@ export function getChatSocket(projectId: string): ChatSocket {
         const msg = JSON.parse(data) as WSMessage;
         if (msg.type === 'error' && msg.message === 'Unknown session') {
           stopReconnect?.();
-          chatSockets.delete(sessionId);
+          chatSockets.delete(projectId);
           return;
         }
         handlers.forEach((h) => h(msg));

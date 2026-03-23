@@ -1,8 +1,7 @@
 import functools
 from typing import Any
 
-from sqlalchemy import event
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 import flow44.config
@@ -46,7 +45,7 @@ async def reset() -> None:
     get_session_factory.cache_clear()
 
 
-async def init_db() -> None:
+async def init_db() -> None:  # noqa: C901
     from sqlmodel import SQLModel  # noqa: PLC0415
 
     import flow44.db.chat  # noqa: F401, PLC0415
@@ -114,7 +113,7 @@ async def init_db() -> None:
             summary_expr = "COALESCE(summary, '')" if "summary" in existing else "''"
             selected_model_expr = "COALESCE(selected_model, '')" if "selected_model" in existing else "''"
 
-            conn.execute(
+            conn.execute(  # noqa: S608
                 text(
                     f"""
                     INSERT INTO projects__migrated (
@@ -208,9 +207,7 @@ async def init_db() -> None:
         elif "project_id" not in existing:
             conn.execute(text("ALTER TABLE agent_events ADD COLUMN project_id TEXT NOT NULL DEFAULT ''"))
 
-        conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_agent_events_project_id ON agent_events(project_id)")
-        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_agent_events_project_id ON agent_events(project_id)"))
 
     async with get_engine().begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
