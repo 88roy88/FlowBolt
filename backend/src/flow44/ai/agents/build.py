@@ -210,7 +210,7 @@ class BuildAgent(BaseAgent):
                 analysis = {
                     "data_schema": (
                         f"Package data with "
-                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"  # type: ignore[unreachable]
+                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"
                     ),
                     "relevant_fields": "See raw data",
                     "data_characteristics": "Fetched from API",
