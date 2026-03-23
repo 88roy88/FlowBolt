@@ -10,6 +10,7 @@ export function getChatSocket(sessionId: string): ChatSocket {
   if (existing) return existing;
 
   const handlers = new Set<(msg: WSMessage) => void>();
+  let stopReconnect: (() => void) | null = null;
 
   const sendAuthMessage = (send: (message: WSMessage) => void) => {
     const rawToken = readPackageApiAuthorization();
@@ -30,6 +31,11 @@ export function getChatSocket(sessionId: string): ChatSocket {
     (data) => {
       try {
         const msg = JSON.parse(data) as WSMessage;
+        if (msg.type === 'error' && msg.message === 'Unknown session') {
+          stopReconnect?.();
+          chatSockets.delete(sessionId);
+          return;
+        }
         handlers.forEach((h) => h(msg));
       } catch {}
     },
@@ -45,6 +51,7 @@ export function getChatSocket(sessionId: string): ChatSocket {
       }
     },
   );
+  stopReconnect = close;
 
   const socket: ChatSocket = {
     send(message: WSMessage) {

@@ -15,6 +15,7 @@ from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
 from flow44.models.chat import get_messages, save_message
 from flow44.models.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.models.project import get_project_by_session
+from flow44.services.package_cases import get_case_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +99,13 @@ async def chat_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901,
                 # Emit user_message event (for frontend history reconstruction)
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                 if case_ids:
-                    from flow44.api.package_api import _package_search  # noqa: PLC0415
-
                     case_names: list[str] = []
                     for cid in case_ids:
                         try:
-                            results = await _package_search(str(cid), authorization=package_api_authorization)
-                            name = results[0].get("Name", f"Case #{cid}") if results else f"Case #{cid}"
+                            name = await get_case_display_name(
+                                cid,
+                                authorization=package_api_authorization,
+                            )
                         except Exception:
                             name = f"Case #{cid}"
                         case_names.append(name)

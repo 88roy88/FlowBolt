@@ -6,7 +6,6 @@ real FLAPI (cluster) or the local mock by switching configuration.
 
 from __future__ import annotations
 
-import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -14,8 +13,7 @@ from fastapi.security import APIKeyHeader
 
 from flow44.config import settings
 from flow44.integrations.package_api import PackageApiClient, PackageApiUpstreamError
-
-logger = logging.getLogger(__name__)
+from flow44.services.package_cases import normalize_package_authorization, search_packages
 
 router = APIRouter(prefix="/api/package", tags=["package"])
 
@@ -34,20 +32,12 @@ def _map_upstream_error(e: PackageApiUpstreamError) -> HTTPException:
 
 
 async def _package_search(query_or_id: str, *, authorization: str | None) -> list[Any]:
-    if not query_or_id.strip():
-        raise HTTPException(status_code=422, detail="query_or_id is required")
-
     try:
-        return await _client(authorization=authorization).search(query_or_id)
+        return await search_packages(query_or_id, authorization=authorization)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except PackageApiUpstreamError as e:
         raise _map_upstream_error(e) from e
-
-
-def _normalize_package_auth(raw: str | None) -> str | None:
-    if raw is None:
-        return None
-    stripped = raw.strip()
-    return stripped or None
 
 
 @router.get("/search/{query_or_id}")
@@ -56,7 +46,10 @@ async def package_search(
     authorization: Annotated[str | None, Depends(_package_authorization)] = None,
 ) -> list[Any]:
     """Proxy search-by-id or autocomplete to FLAPI."""
-    return await _package_search(query_or_id, authorization=_normalize_package_auth(authorization))
+    return await _package_search(
+        query_or_id,
+        authorization=normalize_package_authorization(authorization),
+    )
 
 
 async def _run_package(
@@ -89,7 +82,7 @@ async def run_package(
         package_id,
         allQueries=allQueries,
         body=body,
-        authorization=_normalize_package_auth(authorization),
+        authorization=normalize_package_authorization(authorization),
     )
 
 
@@ -105,5 +98,5 @@ async def run_package_get(
         package_id,
         allQueries=allQueries,
         body=None,
-        authorization=_normalize_package_auth(authorization),
+        authorization=normalize_package_authorization(authorization),
     )

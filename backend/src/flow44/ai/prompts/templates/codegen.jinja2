@@ -40,13 +40,14 @@ Sample data structure:
 **Integration Notes:** {{ ctx.integration_notes }}
 
 Fetch data from the endpoint: `${API_BASE}/api/package/{{ ctx.package_id }}/run`
-(import `API_BASE` from `src/config.ts`)
+(import `API_BASE` from `src/config.ts`) and include `Authorization` header from localStorage key `flowbolt.packageApiToken`.
 {% endfor %}
 
 When implementing components that use case data:
 - **IMPORTANT**: `src/config.ts` is a pre-existing file — do NOT create or modify it. Just import from it:
   `import { API_BASE } from '../config';`
-  `fetch(`${API_BASE}/api/package/${id}/run`)`
+  `const token = window.localStorage.getItem('flowbolt.packageApiToken')?.trim();`
+  `fetch(`${API_BASE}/api/package/${id}/run`, { headers: token ? { Authorization: token } : undefined })`
 - Use the fetch API or create a custom hook to handle the API calls
 - Include proper loading and error states
 - Focus on the relevant fields identified above for the user's use case

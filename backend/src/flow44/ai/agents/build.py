@@ -26,9 +26,9 @@ from flow44.ai.provider import complete_chat, stream_chat
 from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
-from flow44.config import settings
-from flow44.integrations.package_api import PackageApiClient, PackageApiUpstreamError
+from flow44.integrations.package_api import PackageApiUpstreamError
 from flow44.models.project import update_project_summary
+from flow44.services.package_cases import fetch_case_package_data
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
 
@@ -184,18 +184,10 @@ class BuildAgent(BaseAgent):
 
     async def _fetch_and_analyze_case(self, package_id: str) -> dict[str, Any] | None:
         try:
-            package_api = PackageApiClient(
-                base_url=settings.PACKAGE_API_BASE_URL,
+            package_name, sample_data = await fetch_case_package_data(
+                package_id,
                 authorization=self._package_api_authorization,
             )
-            search_results = await package_api.search(package_id)
-            if not search_results:
-                await self.emit({"type": "case_error", "message": f"Package {package_id} not found"})
-                return None
-
-            metadata = search_results[0] if isinstance(search_results, list) else search_results
-            package_name = metadata.get("Name", f"Package {package_id}")
-            sample_data = await package_api.run_package(package_id, all_queries=True, body=None)
 
             analysis_prompt = (
                 f"Analyze this API package data in the context of the user's request.\n\n"
@@ -228,6 +220,9 @@ class BuildAgent(BaseAgent):
 
             return {"package_id": package_id, "package_name": package_name, "sample_data": sample_data, **analysis}
 
+        except LookupError:
+            await self.emit({"type": "case_error", "message": f"Package {package_id} not found"})
+            return None
         except PackageApiUpstreamError as e:
             await self.emit({"type": "case_error", "message": f"Failed to fetch package data: {e}"})
             return None

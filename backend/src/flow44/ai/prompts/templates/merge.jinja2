@@ -46,7 +46,7 @@ Rules:
 
 When case_integrations is present in the input, you MUST create tasks for each case:
 1. TypeScript interfaces for each case's data structure
-2. A custom hook (e.g., useCaseData) that fetches data using `API_BASE` from `src/config.ts`: ```${API_BASE}/api/package/${id}/run```
+2. A custom hook (e.g., useCaseData) that fetches data using `API_BASE` from `src/config.ts`: ```${API_BASE}/api/package/${id}/run``` with `Authorization` header read from `window.localStorage.getItem('flowbolt.packageApiToken')`
 3. Components that display and interact with the case data
 
 Ensure proper dependency ordering: types → hooks → components → App integration.
