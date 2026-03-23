@@ -49,6 +49,7 @@ class BuildAgent(BaseAgent):
         super().__init__(**kwargs)
         self._state = BuildState(session_id=self.session_id, project_id=self.project_id, model=self.model)
         self._observation_id: str | None = None
+        # Pause/resume for plan approval
         self._approval_event = asyncio.Event()
         self._approval_action: str = "reject"
         self._approval_feedback: str | None = None
