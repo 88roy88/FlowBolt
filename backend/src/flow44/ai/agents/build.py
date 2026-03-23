@@ -27,10 +27,10 @@ from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.integrations.package_api import PackageApiUpstreamError
+from flow44.integrations.package_cases import fetch_case_package_data
 from flow44.models.project import update_project_summary
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
-from flow44.services.package_cases import fetch_case_package_data
 
 from ._base import BaseAgent
 
@@ -70,8 +70,21 @@ class BuildAgent(BaseAgent):
         # Fetch case data
         if self._state.case_ids:
             await self.emit({"type": "phase", "phase": "fetching_cases"})
-            results = await asyncio.gather(*[self._fetch_and_analyze_case(cid) for cid in self._state.case_ids])
-            self._state.case_contexts = [ctx for ctx in results if ctx is not None]
+            results = await asyncio.gather(
+                *[self._fetch_and_analyze_case(cid) for cid in self._state.case_ids],
+                return_exceptions=True,
+            )
+            failures = [r for r in results if isinstance(r, Exception)]
+            if failures:
+                await self.emit(
+                    {
+                        "type": "error",
+                        "message": "Build aborted: failed to fetch required case data.",
+                    }
+                )
+                await self.emit({"type": "phase", "phase": "idle"})
+                return
+            self._state.case_contexts = [ctx for ctx in results if ctx is not None and not isinstance(ctx, Exception)]
 
             if self._state.case_contexts:
                 from flow44.models.project import update_project_cases  # noqa: PLC0415
@@ -219,16 +232,16 @@ class BuildAgent(BaseAgent):
 
             return {"package_id": package_id, "package_name": package_name, "sample_data": sample_data, **analysis}
 
-        except LookupError:
+        except LookupError as e:
             await self.emit({"type": "case_error", "message": f"Package {package_id} not found"})
-            return None
+            raise RuntimeError(f"Case fetch failed for package {package_id}: not found") from e
         except PackageApiUpstreamError as e:
             await self.emit({"type": "case_error", "message": f"Failed to fetch package data: {e}"})
-            return None
-        except Exception:
+            raise RuntimeError(f"Case fetch failed for package {package_id}: upstream error") from e
+        except Exception as e:
             logger.exception("[build] Unexpected error fetching package")
             await self.emit({"type": "case_error", "message": "Unexpected error fetching package data"})
-            return None
+            raise RuntimeError(f"Case fetch failed for package {package_id}: unexpected error") from e
 
     @observe(name="design-architecture")  # type: ignore[untyped-decorator]
     async def _design_architecture(self) -> ArchitectureDesign:

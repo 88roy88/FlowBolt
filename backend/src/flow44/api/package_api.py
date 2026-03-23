@@ -13,7 +13,7 @@ from fastapi.security import APIKeyHeader
 
 from flow44.config import settings
 from flow44.integrations.package_api import PackageApiClient, PackageApiUpstreamError
-from flow44.services.package_cases import normalize_package_authorization, search_packages
+from flow44.integrations.package_cases import normalize_package_authorization, search_packages
 
 router = APIRouter(prefix="/api/package", tags=["package"])
 
