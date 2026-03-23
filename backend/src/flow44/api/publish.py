@@ -9,8 +9,8 @@ from fastapi import APIRouter, HTTPException
 
 from flow44.api.export import build_single_html
 from flow44.config import settings
-from flow44.integrations.s3 import BUCKET_NAME, deploy_single_html, setup_bucket
 from flow44.db.project import get_project, update_project_published_url
+from flow44.integrations.s3 import BUCKET_NAME, deploy_single_html, setup_bucket
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
