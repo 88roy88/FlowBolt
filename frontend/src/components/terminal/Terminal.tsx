@@ -11,10 +11,10 @@ export function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const socketRef = useRef<ReturnType<typeof createTerminalSocket> | null>(null);
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
 
   useEffect(() => {
-    if (!containerRef.current || !sessionId) return;
+    if (!containerRef.current || !projectId) return;
 
     const term = new XTerm({
       theme: getTerminalTheme(),
@@ -34,7 +34,7 @@ export function Terminal() {
     term.open(containerRef.current);
     fitAddon.fit();
 
-    const socket = createTerminalSocket(sessionId);
+    const socket = createTerminalSocket(projectId);
     socketRef.current = socket;
     termRef.current = term;
 
@@ -74,9 +74,9 @@ export function Terminal() {
       termRef.current = null;
       socketRef.current = null;
     };
-  }, [sessionId]);
+  }, [projectId]);
 
-  if (!sessionId) {
+  if (!projectId) {
     return (
       <div style={{
         height: '100%',

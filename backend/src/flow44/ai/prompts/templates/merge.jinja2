@@ -40,14 +40,14 @@ Rules:
 - Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS)
 - Do NOT include tasks for installing dependencies or running the dev server
 - Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
-{% if has_cases %}
+{% if has_data_sources %}
 
-## Case Data Integration Tasks
+## Data Source Integration Tasks
 
-When case_integrations is present in the input, you MUST create tasks for each case:
-1. TypeScript interfaces for each case's data structure
-2. A custom hook (e.g., useCaseData) that fetches data using `API_BASE` from `src/config.ts`: ```${API_BASE}/api/package/${id}/run``` with `Authorization` header read from `window.localStorage.getItem('flowbolt.packageApiToken')`
-3. Components that display and interact with the case data
+When data_source_integrations is present in the input, you MUST create tasks for each data source:
+1. TypeScript interfaces for each data source's data structure
+2. A custom hook (e.g., useDataSource) that fetches data using `API_BASE` from `src/config.ts`: ```${API_BASE}/api/data-source/${dataSourceId}/run``` with `Authorization` header read from `window.localStorage.getItem('flowbolt.packageApiToken')`
+3. Components that display and interact with the data source
 
 Ensure proper dependency ordering: types → hooks → components → App integration.
 {% endif %}

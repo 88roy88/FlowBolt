@@ -21,22 +21,22 @@ def render_classify() -> str:
     return render("classify.jinja2")
 
 
-def render_architecture(*, case_contexts: list[dict[str, Any]] | None = None) -> str:
+def render_architecture(*, data_source_contexts: list[dict[str, Any]] | None = None) -> str:
     prepared = None
-    if case_contexts:
+    if data_source_contexts:
         prepared = [
             {**ctx, "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000]}
-            for ctx in case_contexts
+            for ctx in data_source_contexts
         ]
-    return render("architecture.jinja2", case_contexts=prepared)
+    return render("architecture.jinja2", data_source_contexts=prepared)
 
 
 def render_ux_design() -> str:
     return render("ux_design.jinja2")
 
 
-def render_merge(*, has_cases: bool = False) -> str:
-    return render("merge.jinja2", has_cases=has_cases)
+def render_merge(*, has_data_sources: bool = False) -> str:
+    return render("merge.jinja2", has_data_sources=has_data_sources)
 
 
 def render_user_plan(*, has_feedback: bool = False) -> str:
@@ -60,13 +60,13 @@ def render_codegen(  # noqa: PLR0913
     ux_design: dict[str, Any],
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
-    case_contexts: list[dict[str, Any]] | None = None,
+    data_source_contexts: list[dict[str, Any]] | None = None,
 ) -> str:
-    prepared_cases = None
-    if case_contexts:
-        prepared_cases = []
-        for ctx in case_contexts:
-            prepared_cases.append(
+    prepared_sources = None
+    if data_source_contexts:
+        prepared_sources = []
+        for ctx in data_source_contexts:
+            prepared_sources.append(
                 {
                     **ctx,
                     "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000],
@@ -96,7 +96,21 @@ def render_codegen(  # noqa: PLR0913
         ux_json=json.dumps(ux_design, indent=2, ensure_ascii=False),
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
-        case_contexts=prepared_cases,
+        data_source_contexts=prepared_sources,
+    )
+
+
+def render_data_source_analysis(
+    *,
+    user_content: str,
+    data_source_name: str,
+    sample_data: Any,
+) -> str:
+    return render(
+        "data_source_analysis.jinja2",
+        user_content=user_content,
+        data_source_name=data_source_name,
+        sample_data_json=json.dumps(sample_data, indent=2)[:2000],
     )
 
 

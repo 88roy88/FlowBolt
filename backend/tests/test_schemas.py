@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
-
 from flow44.ai.schemas import (
     ArchitectureDesign,
-    PackageAnalysis,
+    DataSourceAnalysis,
     ProjectSummary,
     UserPlanOverview,
     UXDesign,
@@ -17,9 +14,7 @@ from flow44.ai.schemas import (
 class TestArchitectureDesign:
     def test_valid_response(self) -> None:
         data = {
-            "components": [
-                {"name": "Header", "file": "src/Header.tsx", "purpose": "Navigation bar"}
-            ],
+            "components": [{"name": "Header", "file": "src/Header.tsx", "purpose": "Navigation bar"}],
             "data_flow": "Props down, events up",
             "file_structure": ["src/App.tsx", "src/Header.tsx"],
             "state_management": "useState for local state",
@@ -54,9 +49,7 @@ class TestUXDesign:
         data = {
             "layout": "Single page with sidebar",
             "color_scheme": "Dark mode with blue accents",
-            "components_ui": [
-                {"name": "Sidebar", "layout": "Vertical list", "interactions": "Click to navigate"}
-            ],
+            "components_ui": [{"name": "Sidebar", "layout": "Vertical list", "interactions": "Click to navigate"}],
         }
         result = UXDesign.model_validate(data)
         assert result.layout == "Single page with sidebar"
@@ -95,9 +88,7 @@ class TestUserPlanOverview:
         data = {
             "summary": "test",
             "features": [],
-            "decisions": [
-                {"id": "d1", "title": "Theme", "chosen": "Dark", "alternatives": ["Light"]}
-            ],
+            "decisions": [{"id": "d1", "title": "Theme", "chosen": "Dark", "alternatives": ["Light"]}],
         }
         result = UserPlanOverview.model_validate(data)
         dumped = [d.model_dump() for d in result.decisions]
@@ -117,7 +108,7 @@ class TestProjectSummary:
         assert "src/App.tsx" in result.file_overview
 
 
-class TestPackageAnalysis:
+class TestDataSourceAnalysis:
     def test_valid_analysis(self) -> None:
         data = {
             "data_schema": "Array of sales records",
@@ -125,9 +116,9 @@ class TestPackageAnalysis:
             "data_characteristics": "Time-series, daily",
             "integration_notes": "Use fetch API",
         }
-        result = PackageAnalysis.model_validate(data)
+        result = DataSourceAnalysis.model_validate(data)
         assert "sales" in result.data_schema
 
     def test_empty_analysis(self) -> None:
-        result = PackageAnalysis.model_validate({})
+        result = DataSourceAnalysis.model_validate({})
         assert result.data_schema == ""

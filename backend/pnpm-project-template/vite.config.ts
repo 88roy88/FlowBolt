@@ -5,6 +5,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     plugins: [react()],
-    base: env.VITE_BASE ?? '/api/preview/{{SESSION_ID}}/proxy/',
+    base: env.VITE_BASE ?? '/api/preview/{{PROJECT_ID}}/proxy/',
   }
 })

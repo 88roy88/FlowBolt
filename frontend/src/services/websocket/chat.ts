@@ -5,8 +5,8 @@ import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 const chatSockets = new Map<string, ChatSocket>();
 
-export function getChatSocket(sessionId: string): ChatSocket {
-  const existing = chatSockets.get(sessionId);
+export function getChatSocket(projectId: string): ChatSocket {
+  const existing = chatSockets.get(projectId);
   if (existing) return existing;
 
   const handlers = new Set<(msg: WSMessage) => void>();
@@ -22,7 +22,7 @@ export function getChatSocket(sessionId: string): ChatSocket {
   };
 
   const { sendOrQueue, close } = createReconnectingSocket(
-    `${getWsBase()}/ws/chat/${sessionId}`,
+    `${getWsBase()}/ws/chat/${projectId}`,
     () => {
       sendAuthMessage((message) => {
         sendOrQueue(JSON.stringify(message));
@@ -64,17 +64,17 @@ export function getChatSocket(sessionId: string): ChatSocket {
       handlers.delete(handler);
     },
     close() {
-      chatSockets.delete(sessionId);
+      chatSockets.delete(projectId);
       close();
     },
   };
 
-  chatSockets.set(sessionId, socket);
+  chatSockets.set(projectId, socket);
   return socket;
 }
 
-export function closeChatSocket(sessionId: string): void {
-  const socket = chatSockets.get(sessionId);
+export function closeChatSocket(projectId: string): void {
+  const socket = chatSockets.get(projectId);
   if (socket) socket.close();
 }
 

@@ -3,7 +3,7 @@ import { CardWrapper } from './CardWrapper';
 import { PlanOverviewCard } from './PlanOverviewCard';
 import { TaskProgressCard } from './TaskProgressCard';
 import { DesignCompleteCard } from './DesignCompleteCard';
-import { CasesFetchedCard } from './CasesFetchedCard';
+import { DataSourcesFetchedCard } from './DataSourcesFetchedCard';
 import { ProjectSummaryCard } from './ProjectSummaryCard';
 import { ErrorFixRequestCard } from './ErrorFixRequestCard';
 import { FixProgressCard } from './FixProgressCard';
@@ -109,13 +109,13 @@ export const DesignPartial: StoryObj = {
   ),
 };
 
-export const CasesFetched_: StoryObj = {
+export const DataSourcesFetched_: StoryObj = {
   render: () => (
     <div style={{ maxWidth: 500 }}>
-      <CasesFetchedCard
-        cases={[
-          { packageId: '4', packageName: 'People & Photos', dataSchema: 'Array of person records with id, name, phone, photo_url', relevantFields: 'name, phone, photo_url' },
-          { packageId: '6', packageName: 'People Hebrew Names', dataSchema: 'Array with ID, Hebrew name, department', relevantFields: 'hebrew_name' },
+      <DataSourcesFetchedCard
+        dataSources={[
+          { dataSourceId: '4', dataSourceName: 'People & Photos', dataSchema: 'Array of person records with id, name, phone, photo_url', relevantFields: 'name, phone, photo_url' },
+          { dataSourceId: '6', dataSourceName: 'People Hebrew Names', dataSchema: 'Array with ID, Hebrew name, department', relevantFields: 'hebrew_name' },
         ]}
       />
     </div>

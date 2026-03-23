@@ -16,31 +16,31 @@ class FileEntry:
     children: list[FileEntry] | None = None
 
 
-def _resolve_safe(session_id: str, relative_path: str) -> tuple[str, str]:
+def _resolve_safe(project_id: str, relative_path: str) -> tuple[str, str]:
     """Returns (resolved_path, workspace_root). Raises FileNotFoundError / PermissionError."""
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
-        raise FileNotFoundError(f"No sandbox found for session {session_id}")
+        raise FileNotFoundError(f"No sandbox found for session {project_id}")
     return sandbox._safe_path(relative_path), os.path.realpath(sandbox.workspace_dir)
 
 
-async def read_file(session_id: str, path: str) -> str:
-    full, _ = _resolve_safe(session_id, path)
+async def read_file(project_id: str, path: str) -> str:
+    full, _ = _resolve_safe(project_id, path)
     with open(full, encoding="utf-8") as fh:  # noqa: ASYNC230
         return fh.read()
 
 
 @observe(name="write-file", as_type="span")  # type: ignore[untyped-decorator]
-async def write_file(session_id: str, path: str, content: str) -> None:
-    full, _ = _resolve_safe(session_id, path)
+async def write_file(project_id: str, path: str, content: str) -> None:
+    full, _ = _resolve_safe(project_id, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
     with open(full, "w", encoding="utf-8") as fh:  # noqa: ASYNC230
         fh.write(content)
     langfuse_context.update_current_observation(metadata={"file_path": path, "content_length": len(content)})
 
 
-async def edit_file(session_id: str, path: str, search: str, replace: str) -> None:
-    full, _ = _resolve_safe(session_id, path)
+async def edit_file(project_id: str, path: str, search: str, replace: str) -> None:
+    full, _ = _resolve_safe(project_id, path)
     with open(full, encoding="utf-8") as fh:  # noqa: ASYNC230
         content = fh.read()
     if search not in content:
@@ -50,8 +50,8 @@ async def edit_file(session_id: str, path: str, search: str, replace: str) -> No
         fh.write(content)
 
 
-async def delete_file(session_id: str, path: str) -> None:
-    full, _ = _resolve_safe(session_id, path)
+async def delete_file(project_id: str, path: str) -> None:
+    full, _ = _resolve_safe(project_id, path)
     if os.path.isdir(full):  # noqa: ASYNC240
         os.rmdir(full)
     else:
@@ -61,8 +61,8 @@ async def delete_file(session_id: str, path: str) -> None:
 SKIP_DIRS = {"node_modules", ".git", ".next", "dist", ".cache", "__pycache__", ".vite"}
 
 
-async def list_files(session_id: str, path: str = "/") -> list[FileEntry]:
-    full, workspace = _resolve_safe(session_id, path)
+async def list_files(project_id: str, path: str = "/") -> list[FileEntry]:
+    full, workspace = _resolve_safe(project_id, path)
     if not os.path.isdir(full):  # noqa: ASYNC240
         raise NotADirectoryError(f"{path} is not a directory")
 

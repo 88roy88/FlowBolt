@@ -74,18 +74,18 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
     clearMessages();
     const session = useSessionStore.getState();
     if (session.currentProject) {
-      window.location.hash = `#/project/${session.currentProject.session_id}`;
-      loadHistory(session.currentProject.session_id);
+      window.location.hash = `#/project/${session.currentProject.id}`;
+      loadHistory(session.currentProject.id);
       pollFileTree();
     }
   };
 
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
-    window.location.hash = `#/project/${project.session_id}`;
+    window.location.hash = `#/project/${project.id}`;
     resetFiles();
     loadFileTree();
-    loadHistory(project.session_id);
+    loadHistory(project.id);
   };
 
   const handleDelete = async (id: string) => {
@@ -100,11 +100,11 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
     if (wasSelected) {
       const next = useSessionStore.getState().currentProject;
       if (next) {
-        window.location.hash = `#/project/${next.session_id}`;
+        window.location.hash = `#/project/${next.id}`;
         resetFiles();
         loadFileTree();
         clearMessages();
-        loadHistory(next.session_id);
+        loadHistory(next.id);
       } else {
         window.location.hash = '';
         resetFiles();

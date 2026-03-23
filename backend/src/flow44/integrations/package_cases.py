@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from flow44.config import settings
-from flow44.integrations.package_api import PackageApiClient
+from flow44.integrations.flapi_api import FlapiClient
 
 
 def normalize_package_authorization(raw: str | None) -> str | None:
@@ -13,9 +13,9 @@ def normalize_package_authorization(raw: str | None) -> str | None:
     return token or None
 
 
-def _client(*, authorization: str | None) -> PackageApiClient:
-    return PackageApiClient(
-        base_url=settings.PACKAGE_API_BASE_URL,
+def _client(*, authorization: str | None) -> FlapiClient:
+    return FlapiClient(
+        base_url=settings.FLAPI_BASE_URL,
         authorization=normalize_package_authorization(authorization),
     )
 

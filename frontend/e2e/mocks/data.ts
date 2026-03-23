@@ -1,12 +1,10 @@
 /** Shared mock data used across API mocks and assertions. */
 
-export const SESSION_ID = 'e2e-test-session-0000-000000000001';
 export const PROJECT_ID = 'e2e-test-project-001';
 
 export const MOCK_PROJECT = {
   id: PROJECT_ID,
   name: 'E2E Test Project',
-  session_id: SESSION_ID,
   created_at: new Date().toISOString(),
   model: 'mock/test-model',
 };

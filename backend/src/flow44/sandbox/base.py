@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SandboxInfo:
-    session_id: str
+    project_id: str
     workspace_dir: str
     port: int
 
@@ -67,8 +67,8 @@ class Sandbox(ABC):
         self._pty: PtyHandle | None = None
 
     @property
-    def session_id(self) -> str:
-        return self.info.session_id
+    def project_id(self) -> str:
+        return self.info.project_id
 
     @property
     def workspace_dir(self) -> str:

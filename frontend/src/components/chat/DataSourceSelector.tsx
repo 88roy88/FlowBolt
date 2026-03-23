@@ -1,22 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../../stores/chat';
-import { searchPackages } from '../../services/api';
-import type { PackageSearchRecord } from '../../types';
+import { searchDataSources } from '../../services/api';
+import type { DataSourceSearchRecord } from '../../types';
 import { X, Search } from 'lucide-react';
 import { Badge } from '../ui/badge';
 
-interface CaseSelectorProps {
+interface DataSourceSelectorProps {
   isOpen: boolean;
 }
 
-export function CaseSelector({ isOpen }: CaseSelectorProps) {
+export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<PackageSearchRecord[]>([]);
+  const [results, setResults] = useState<DataSourceSearchRecord[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const selectedCases = useChatStore((s) => s.selectedCases);
-  const addCase = useChatStore((s) => s.addCase);
-  const removeCase = useChatStore((s) => s.removeCase);
+  const selectedDataSources = useChatStore((s) => s.selectedDataSources);
+  const addDataSource = useChatStore((s) => s.addDataSource);
+  const removeDataSource = useChatStore((s) => s.removeDataSource);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -46,34 +46,34 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
     setIsLoading(true);
     setShowDropdown(true);
     try {
-      const packages = await searchPackages(searchQuery);
-      setResults(packages.slice(0, 10));
+      const sources = await searchDataSources(searchQuery);
+      setResults(sources.slice(0, 10));
     } catch (err) {
-      console.error('Failed to search cases:', err);
+      console.error('Failed to search data sources:', err);
       setResults([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSelect = (pkg: PackageSearchRecord) => {
-    addCase({ id: pkg.Id, name: pkg.Name });
+  const handleSelect = (pkg: DataSourceSearchRecord) => {
+    addDataSource({ id: pkg.Id, name: pkg.Name });
     setQuery('');
     setResults([]);
     setShowDropdown(false);
   };
 
-  const selectedIds = new Set(selectedCases.map((c) => c.id));
+  const selectedIds = new Set(selectedDataSources.map((c) => c.id));
 
   return (
     <div ref={dropdownRef} className="relative">
-      {/* Selected case badges */}
-      {selectedCases.length > 0 && (
+      {/* Selected data source badges */}
+      {selectedDataSources.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {selectedCases.map((c) => (
+          {selectedDataSources.map((c) => (
             <Badge key={c.id} variant="accent" className="gap-1">
               <span className="font-medium">{c.name}</span>
-              <button onClick={() => removeCase(c.id)} className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20" title="Remove case">
+              <button onClick={() => removeDataSource(c.id)} className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20" title="Remove data source">
                 <X size={12} />
               </button>
             </Badge>
@@ -90,7 +90,7 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
-          placeholder="Search cases (optional)"
+          placeholder="Search data sources (optional)"
           className="flex-1 text-[13px] bg-transparent"
         />
       </div>
@@ -101,7 +101,7 @@ export function CaseSelector({ isOpen }: CaseSelectorProps) {
           {isLoading ? (
             <div className="p-3 text-center text-[13px] text-muted-foreground">Searching...</div>
           ) : results.length === 0 ? (
-            <div className="p-3 text-center text-[13px] text-muted-foreground">No cases found</div>
+            <div className="p-3 text-center text-[13px] text-muted-foreground">No data sources found</div>
           ) : (
             results.map((pkg) => {
               const alreadySelected = selectedIds.has(pkg.Id);
