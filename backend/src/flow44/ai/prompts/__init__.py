@@ -100,6 +100,20 @@ def render_codegen(  # noqa: PLR0913
     )
 
 
+def render_data_source_analysis(
+    *,
+    user_content: str,
+    data_source_name: str,
+    sample_data: Any,
+) -> str:
+    return render(
+        "data_source_analysis.jinja2",
+        user_content=user_content,
+        data_source_name=data_source_name,
+        sample_data_json=json.dumps(sample_data, indent=2)[:2000],
+    )
+
+
 def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
     return render("fix_errors.jinja2", errors=errors, files=files)
 

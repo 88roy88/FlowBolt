@@ -18,6 +18,7 @@ from flow44.ai.prompts import (
     UX_DESIGN_PROMPT,
     render_architecture,
     render_codegen,
+    render_data_source_analysis,
     render_fix_errors,
     render_merge,
     render_user_plan,
@@ -192,19 +193,16 @@ class BuildAgent(BaseAgent):
             ds_name = metadata.get("Name", f"Data source {data_source_id}")
             sample_data = await flapi.run_package(data_source_id, all_queries=True, body=None)
 
-            analysis_prompt = (
-                f"Analyze this API data source in the context of the user's request.\n\n"
-                f"User wants to build: {self._state.user_content}\n\n"
-                f"Data source: {ds_name}\nSample API Response:\n```json\n"
-                f"{json.dumps(sample_data, indent=2)[:2000]}\n```\n\n"
-                f'Respond with ONLY a JSON object:\n{{"data_schema": "...", "relevant_fields": "...", '
-                f'"data_characteristics": "...", "integration_notes": "..."}}'
+            analysis_prompt = render_data_source_analysis(
+                user_content=self._state.user_content,
+                data_source_name=ds_name,
+                sample_data=sample_data,
             )
 
             try:
                 raw = await complete_chat(
-                    [Message.user(analysis_prompt)],
-                    "You are a software architect analyzing API data for integration.",
+                    [Message.user("Analyze this data source.")],
+                    analysis_prompt,
                     model=self.model,
                     metadata=self._llm_metadata("data_source_analysis"),
                 )

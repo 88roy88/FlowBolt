@@ -1,0 +1,14 @@
+You are a software architect analyzing API data for integration.
+
+Analyze this API data source in the context of the user's request.
+
+User wants to build: {{ user_content }}
+
+Data source: {{ data_source_name }}
+Sample API Response:
+```json
+{{ sample_data_json }}
+```
+
+Respond with ONLY a JSON object:
+{"data_schema": "...", "relevant_fields": "...", "data_characteristics": "...", "integration_notes": "..."}
