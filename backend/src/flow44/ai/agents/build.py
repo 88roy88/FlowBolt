@@ -210,10 +210,7 @@ class BuildAgent(BaseAgent):
             except Exception:
                 logger.exception("[build] Data source analysis failed")
                 analysis = {
-                    "data_schema": (
-                        f"Data source with "
-                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"
-                    ),
+                    "data_schema": "Failed to analyze",
                     "relevant_fields": "See raw data",
                     "data_characteristics": "Fetched from API",
                     "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
