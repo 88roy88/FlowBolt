@@ -1,16 +1,12 @@
-"""Project model and CRUD operations."""
-
-from __future__ import annotations
-
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
-from sqlalchemy import Column, Text
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel, select
 
-from flow44.db.database import async_session
+from flow44.db import database
 
 
 class Project(SQLModel, table=True):
@@ -23,14 +19,13 @@ class Project(SQLModel, table=True):
     summary: str = Field(default="")
     selected_model: str = Field(default="")
     data_source_id: str = Field(default="")
-    data_source_context: str = Field(default="", sa_column=Column(Text, default=""))
-    data_sources: str = Field(default="[]", sa_column=Column(Text, default="[]"))
+    data_source_context: str = Field(default="")
+    data_sources: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, default=[]))
 
 
 async def create_project(name: str) -> Project:
-    """Insert a new project and return it."""
     project = Project(name=name)
-    async with async_session() as session:
+    async with database.async_session() as session:
         session.add(project)
         await session.commit()
         await session.refresh(project)
@@ -38,21 +33,18 @@ async def create_project(name: str) -> Project:
 
 
 async def get_project(project_id: str) -> Project | None:
-    """Fetch a single project by id."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         return await session.get(Project, project_id)
 
 
 async def list_projects() -> list[Project]:
-    """Return all projects ordered by creation date (newest first)."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         result = await session.execute(select(Project).order_by(Project.created_at.desc()))  # type: ignore[arg-type]
         return list(result.scalars().all())
 
 
 async def update_project_summary(project_id: str, summary: str) -> None:
-    """Update the summary field for a project."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
             project.summary = summary
@@ -62,8 +54,7 @@ async def update_project_summary(project_id: str, summary: str) -> None:
 
 
 async def rename_project(project_id: str, name: str) -> None:
-    """Update the name of a project."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
             project.name = name
@@ -73,8 +64,7 @@ async def rename_project(project_id: str, name: str) -> None:
 
 
 async def update_project_model(project_id: str, model: str) -> None:
-    """Update the selected_model field for a project."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
             project.selected_model = model
@@ -84,8 +74,7 @@ async def update_project_model(project_id: str, model: str) -> None:
 
 
 async def update_project_data_source(project_id: str, data_source_id: str, data_source_context: str) -> None:
-    """Update the data_source_id and data_source_context fields for a project."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
             project.data_source_id = data_source_id
@@ -96,28 +85,23 @@ async def update_project_data_source(project_id: str, data_source_id: str, data_
 
 
 async def update_project_data_sources(project_id: str, data_sources: list[dict[str, Any]]) -> None:
-    """Update the data_sources column (JSON array) for a project."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
-            project.data_sources = json.dumps(data_sources)
+            project.data_sources = data_sources
             project.updated_at = datetime.now(UTC).isoformat()
             session.add(project)
             await session.commit()
 
 
 async def get_project_data_sources(project_id: str) -> list[dict[str, Any]]:
-    """Read the data_sources column, falling back to single data_source_id/data_source_context."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project is None:
             return []
-        raw = project.data_sources
-        if raw and raw != "[]":
-            try:
-                return cast(list[dict[str, Any]], json.loads(raw))
-            except (json.JSONDecodeError, TypeError):
-                pass
+        if project.data_sources:
+            return project.data_sources
+        # TODO: what is this VVVVV
         # Fallback: synthesize from single-source columns
         dsid = project.data_source_id
         dsctx = project.data_source_context
@@ -132,8 +116,7 @@ async def get_project_data_sources(project_id: str) -> list[dict[str, Any]]:
 
 
 async def delete_project(project_id: str) -> None:
-    """Delete a project and its chat messages (cascade)."""
-    async with async_session() as session:
+    async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
             await session.delete(project)

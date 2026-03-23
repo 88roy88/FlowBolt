@@ -1,6 +1,6 @@
 [run]
-source = flow44
+source = src/flow44
 
 [report]
 show_missing = true
-fail_under = 10
+fail_under = 25

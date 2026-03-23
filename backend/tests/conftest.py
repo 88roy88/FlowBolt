@@ -1,13 +1,13 @@
-"""Shared test fixtures."""
-
-from __future__ import annotations
-
+import os
 from pathlib import Path
 
 import pytest
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+import flow44.config
+import flow44.db.database
+from flow44.config import Settings
+from flow44.db.database import get_engine, init_db, reset
 
 
 @pytest.fixture
@@ -15,27 +15,36 @@ def tmp_dir(tmp_path: Path) -> Path:
     return tmp_path
 
 
+@pytest.fixture(scope="session")
+async def setup_test_db(tmp_path_factory: pytest.TempPathFactory):
+    """Session-scoped: create engine and tables once for all tests."""
+    db_path = tmp_path_factory.mktemp("db") / "test.db"
+    os.environ["AIB_DATABASE_URL"] = f"sqlite:///{db_path}"
+
+    flow44.config.settings = Settings()
+    await reset()
+    await init_db()
+
+    yield db_path
+
+    await reset()
+    db_path.unlink(missing_ok=True)
+
+
 @pytest.fixture
-async def test_db(monkeypatch: pytest.MonkeyPatch):
-    """Provide an in-memory SQLite DB with all tables created via SQLModel."""
-    # Import model modules to register tables on SQLModel.metadata
-    import flow44.db.chat  # noqa: F401
-    import flow44.db.events  # noqa: F401
-    import flow44.db.project  # noqa: F401
+async def test_db(setup_test_db):
+    """Function-scoped: wrap each test in a transaction that gets rolled back."""
+    engine = get_engine()
+    original_async_session = flow44.db.database.async_session
 
-    test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    async with engine.connect() as conn:
+        trans = await conn.begin()
+        bound_factory = async_sessionmaker(bind=conn, class_=AsyncSession, expire_on_commit=False)
 
-    @event.listens_for(test_engine.sync_engine, "connect")
-    def _pragma(dbapi_conn, _):  # noqa: ANN001
-        dbapi_conn.cursor().execute("PRAGMA foreign_keys=ON")
+        flow44.db.database.async_session = lambda: bound_factory()
 
-    test_session_factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+        async with bound_factory() as session:
+            yield session
 
-    async with test_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-
-    monkeypatch.setattr("flow44.db.database.async_session", test_session_factory)
-
-    yield test_session_factory
-
-    await test_engine.dispose()
+        flow44.db.database.async_session = original_async_session
+        await trans.rollback()

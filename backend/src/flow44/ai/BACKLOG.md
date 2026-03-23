@@ -452,9 +452,19 @@ No CI/CD exists. Set up:
 
 ---
 
-## I7. Migrate to Postgres + SQLModel + Alembic
+## I7. Migrate to Postgres + SQLModel + Alembic + DAL (PARTIALLY DONE)
 
-**Current state:** Raw `aiosqlite` with hand-written SQL, no ORM, fragile ALTER TABLE
+**Step 1 done:** SQLModel tables (Project, ChatMessage, AgentEvent), async session
+factory (`db/database.py`), `models/` renamed to `db/`, all migration code deleted,
+`init_db()` uses `SQLModel.metadata.create_all`. Still on SQLite.
+
+**Remaining:**
+- Add Alembic for schema migrations
+- Add Postgres support (`DATABASE_URL` with `postgresql+asyncpg://`)
+- Add DAL (Data Access Layer) pattern to separate DB queries from business logic
+- Connection pooling
+
+**Original state:** Raw `aiosqlite` with hand-written SQL, no ORM, fragile ALTER TABLE
 migrations that swallow errors. SQLite is single-writer and can't scale to multiple
 server instances.
 

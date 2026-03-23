@@ -1,16 +1,11 @@
-"""Agent event model, persistence, and in-memory pub/sub."""
-
-from __future__ import annotations
-
 import asyncio
-import json
 import logging
 from typing import Any
 
-from sqlalchemy import Column, Text
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel, select
 
-from flow44.db.database import async_session
+from flow44.db import database
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +51,7 @@ class AgentEvent(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     project_id: str = Field(index=True)
     event_type: str
-    payload: str = Field(default="{}", sa_column=Column(Text, default="{}"))
+    payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, default={}))
     created_at: str | None = Field(default=None)
 
 
@@ -67,10 +62,9 @@ class AgentEvent(SQLModel, table=True):
 
 async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
     event_type = event.get("type", "unknown")
-    payload_json = json.dumps(event, separators=(",", ":"))
 
-    async with async_session() as session:
-        row = AgentEvent(project_id=project_id, event_type=event_type, payload=payload_json)
+    async with database.async_session() as session:
+        row = AgentEvent(project_id=project_id, event_type=event_type, payload=event)
         session.add(row)
         await session.commit()
 
@@ -79,24 +73,18 @@ async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = T
 
 
 async def get_events(project_id: str, after_id: int = 0) -> list[AgentEvent]:
-    async with async_session() as session:
+    async with database.async_session() as session:
         result = await session.execute(
             select(AgentEvent)
             .where(AgentEvent.project_id == project_id, AgentEvent.id > after_id)  # type: ignore[operator]
             .order_by(AgentEvent.id.asc())  # type: ignore[union-attr]
         )
-        rows = list(result.scalars().all())
-    # Parse payload JSON for each event
-    for row in rows:
-        row.payload = json.loads(row.payload) if isinstance(row.payload, str) else row.payload  # type: ignore[assignment]
-    return rows
+        return list(result.scalars().all())
 
 
 async def clear_events(project_id: str) -> None:
-    async with async_session() as session:
-        result = await session.execute(
-            select(AgentEvent).where(AgentEvent.project_id == project_id)
-        )
+    async with database.async_session() as session:
+        result = await session.execute(select(AgentEvent).where(AgentEvent.project_id == project_id))
         for row in result.scalars().all():
             await session.delete(row)
         await session.commit()
