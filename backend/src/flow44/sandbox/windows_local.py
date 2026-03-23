@@ -94,7 +94,7 @@ class WindowsLocalSandbox(Sandbox):
 
     def create_pty(self) -> PtyHandle:
         # TODO: move to top and have try/except ImportError to raise a clear error about missing dependency on Windows
-        from winpty import PtyProcess as WinPtyProcess  # type: ignore[import-not-found]  # noqa: PLC0415
+        from winpty import PtyProcess as WinPtyProcess  # type: ignore[import-untyped]  # noqa: PLC0415
 
         _ensure_bashrc(self.workspace_dir)
         proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)

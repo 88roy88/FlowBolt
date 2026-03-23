@@ -48,12 +48,18 @@ class FlapiClient:
         result: list[Any] = await self._get_json(url)
         return result
 
-    async def run_package(self, package_id: str, *, all_queries: bool | None, body: Any | None) -> dict[str, Any]:
+    async def run_data_source(
+        self,
+        data_source_id: str,
+        *,
+        all_queries: bool | None,
+        body: Any | None,
+    ) -> dict[str, Any]:
         params: dict[str, Any] = {}
         if all_queries is not None:
             # Upstream uses allQueries=true/false
             params["allQueries"] = "true" if all_queries else "false"
-        safe = quote(str(package_id), safe="")
+        safe = quote(str(data_source_id), safe="")
         url = self._url(f"/package/v3/{safe}")
         result: dict[str, Any] = await self._post_json(url, params=params, json=body)
         return result

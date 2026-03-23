@@ -6,7 +6,7 @@ from flow44.config import settings
 from flow44.integrations.flapi_api import FlapiClient
 
 
-def normalize_package_authorization(raw: str | None) -> str | None:
+def normalize_flapi_authorization(raw: str | None) -> str | None:
     if raw is None:
         return None
     token = raw.strip()
@@ -16,19 +16,19 @@ def normalize_package_authorization(raw: str | None) -> str | None:
 def _client(*, authorization: str | None) -> FlapiClient:
     return FlapiClient(
         base_url=settings.FLAPI_BASE_URL,
-        authorization=normalize_package_authorization(authorization),
+        authorization=normalize_flapi_authorization(authorization),
     )
 
 
-async def search_packages(query_or_id: str, *, authorization: str | None) -> list[Any]:
+async def search_data_sources(query_or_id: str, *, authorization: str | None) -> list[Any]:
     if not query_or_id.strip():
         raise ValueError("query_or_id is required")
     return await _client(authorization=authorization).search(query_or_id)
 
 
-async def get_case_display_name(case_id: int, *, authorization: str | None) -> str:
-    fallback = f"Case #{case_id}"
-    results = await search_packages(str(case_id), authorization=authorization)
+async def get_data_source_display_name(data_source_id: int, *, authorization: str | None) -> str:
+    fallback = f"Data source #{data_source_id}"
+    results = await search_data_sources(str(data_source_id), authorization=authorization)
     if not results:
         return fallback
 
@@ -43,22 +43,24 @@ async def get_case_display_name(case_id: int, *, authorization: str | None) -> s
     return fallback
 
 
-async def fetch_case_package_data(
-    package_id: str,
+async def fetch_data_source_data(
+    data_source_id: str,
     *,
     authorization: str | None,
 ) -> tuple[str, Any]:
-    results = await search_packages(package_id, authorization=authorization)
+    results = await search_data_sources(data_source_id, authorization=authorization)
     if not results:
-        raise LookupError(f"Package {package_id} not found")
+        raise LookupError(f"Data source {data_source_id} not found")
 
     metadata = results[0]
-    package_name = (
-        metadata.get("Name", f"Package {package_id}") if isinstance(metadata, dict) else f"Package {package_id}"
+    data_source_name = (
+        metadata.get("Name", f"Data source {data_source_id}")
+        if isinstance(metadata, dict)
+        else f"Data source {data_source_id}"
     )
-    sample_data = await _client(authorization=authorization).run_package(
-        package_id,
+    sample_data = await _client(authorization=authorization).run_data_source(
+        data_source_id,
         all_queries=True,
         body=None,
     )
-    return package_name, sample_data
+    return data_source_name, sample_data

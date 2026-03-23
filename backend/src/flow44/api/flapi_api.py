@@ -11,8 +11,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.security import APIKeyHeader
 
+from flow44.integrations.data_source_cases import normalize_flapi_authorization, search_data_sources
 from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
-from flow44.integrations.package_cases import normalize_package_authorization, search_packages
 
 router = APIRouter(prefix="/api/data-source", tags=["data-source"])
 
@@ -34,7 +34,7 @@ def _map_upstream_error(e: FlapiUpstreamError) -> HTTPException:
 
 async def _data_source_search(query_or_id: str, *, authorization: str | None) -> list[Any]:
     try:
-        return await search_packages(query_or_id, authorization=authorization)
+        return await search_data_sources(query_or_id, authorization=authorization)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except FlapiUpstreamError as e:
@@ -49,7 +49,7 @@ async def data_source_search(
     """Proxy search-by-id or autocomplete to FLAPI."""
     return await _data_source_search(
         query_or_id,
-        authorization=normalize_package_authorization(authorization),
+        authorization=normalize_flapi_authorization(authorization),
     )
 
 
@@ -64,7 +64,7 @@ async def _run_data_source(
         raise HTTPException(status_code=422, detail="data_source_id is required")
 
     try:
-        return await _client(authorization=authorization).run_package(
+        return await _client(authorization=authorization).run_data_source(
             data_source_id,
             all_queries=allQueries,
             body=body,
@@ -85,7 +85,7 @@ async def run_data_source(
         data_source_id,
         allQueries=allQueries,
         body=body,
-        authorization=normalize_package_authorization(authorization),
+        authorization=normalize_flapi_authorization(authorization),
     )
 
 
@@ -101,5 +101,5 @@ async def run_data_source_get(
         data_source_id,
         allQueries=allQueries,
         body=None,
-        authorization=normalize_package_authorization(authorization),
+        authorization=normalize_flapi_authorization(authorization),
     )

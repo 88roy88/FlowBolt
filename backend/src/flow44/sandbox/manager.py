@@ -4,8 +4,8 @@ import asyncio
 import logging
 import os
 import shutil
-import socket
 import signal
+import socket
 
 from flow44.config import settings
 from flow44.sandbox.base import Sandbox, SandboxInfo

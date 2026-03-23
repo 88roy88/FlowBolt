@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorBody } from './errorBody.js';
-import { stubPackageResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics, stubHRResults, stubEcommerceResults, stubLogisticsResults, stubPhoneDevicesResults, stubPhoneCallsResults, stubPhoneRepairsResults, stubPhoneMarketResults } from './stubData.js';
+import { stubDataSourceResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics, stubHRResults, stubEcommerceResults, stubLogisticsResults, stubPhoneDevicesResults, stubPhoneCallsResults, stubPhoneRepairsResults, stubPhoneMarketResults } from './stubData.js';
 
 const app = express();
 app.use(cors());
@@ -154,7 +154,7 @@ const applyInjectionFlows = (rawHtml) => {
 };
 
 /** FLAPI expects a non-empty Authorization header; empty or missing => 401 (mock parity). */
-const assertPackageApiAuthorized = (req, res) => {
+const assertFlapiApiAuthorized = (req, res) => {
   const raw = req.headers.authorization;
   if (typeof raw !== 'string' || !raw.trim()) {
     res
@@ -260,20 +260,20 @@ function handlePackageSearchByPartialOrId(partialOrId) {
 }
 
 app.get('/package/v1/search/:partial', (req, res) => {
-  if (!assertPackageApiAuthorized(req, res)) return;
+  if (!assertFlapiApiAuthorized(req, res)) return;
   const { status, body } = handlePackageSearchByPartialOrId(req.params.partial);
   res.status(status).json(body);
 });
 
 app.get('/api/flapi/packages/search', (req, res) => {
-  if (!assertPackageApiAuthorized(req, res)) return;
+  if (!assertFlapiApiAuthorized(req, res)) return;
   const query = typeof req.query.q === 'string' ? req.query.q : '';
   const { status, body } = handlePackageSearchByPartialOrId(query);
   res.status(status).json(body);
 });
 
-function getRunResults(packageId) {
-  const id = String(packageId).trim();
+function getRunResults(dataSourceId) {
+  const id = String(dataSourceId).trim();
   if (id === '3') return { results: { ...stubIntelligenceResults } };
   if (id === '4') return { results: { ...stubPeopleWithPhotosResults } };
   if (id === '5') return { results: getRealtimeMetrics() };
@@ -285,45 +285,45 @@ function getRunResults(packageId) {
   if (id === '11') return { results: { ...stubPhoneCallsResults } };
   if (id === '12') return { results: { ...stubPhoneRepairsResults } };
   if (id === '13') return { results: { ...stubPhoneMarketResults } };
-  return { results: { ...stubPackageResults } };
+  return { results: { ...stubDataSourceResults } };
 }
 
 app.post('/package/:packageId', (req, res) => {
-  if (!assertPackageApiAuthorized(req, res)) return;
-  const { packageId } = req.params;
-  if (!packageId?.trim()) {
-    return res.status(400).json(errorBody('invalid_package_id', 'packageId is required'));
+  if (!assertFlapiApiAuthorized(req, res)) return;
+  const dataSourceId = req.params.packageId;
+  if (!dataSourceId?.trim()) {
+    return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(packageId));
+  res.status(200).json(getRunResults(dataSourceId));
 });
 
 app.post('/package/v3/:packageId', (req, res) => {
-  if (!assertPackageApiAuthorized(req, res)) return;
-  const { packageId } = req.params;
-  if (!packageId?.trim()) {
-    return res.status(400).json(errorBody('invalid_package_id', 'packageId is required'));
+  if (!assertFlapiApiAuthorized(req, res)) return;
+  const dataSourceId = req.params.packageId;
+  if (!dataSourceId?.trim()) {
+    return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(packageId));
+  res.status(200).json(getRunResults(dataSourceId));
 });
 
 app.post('/api/flapi/packages/:packageId/run', (req, res) => {
-  if (!assertPackageApiAuthorized(req, res)) return;
-  const { packageId } = req.params;
-  if (!packageId?.trim()) {
+  if (!assertFlapiApiAuthorized(req, res)) return;
+  const dataSourceId = req.params.packageId;
+  if (!dataSourceId?.trim()) {
     return res
       .status(400)
-      .json(errorBody('invalid_package_id', 'packageId is required'));
+      .json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(packageId));
+  res.status(200).json(getRunResults(dataSourceId));
 });
 
 app.post('/api/flapi/package/v3/:packageId', (req, res) => {
-  if (!assertPackageApiAuthorized(req, res)) return;
-  const { packageId } = req.params;
-  if (!packageId?.trim()) {
-    return res.status(400).json(errorBody('invalid_package_id', 'packageId is required'));
+  if (!assertFlapiApiAuthorized(req, res)) return;
+  const dataSourceId = req.params.packageId;
+  if (!dataSourceId?.trim()) {
+    return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(packageId));
+  res.status(200).json(getRunResults(dataSourceId));
 });
 
 // ——— Config & Models (for client) ———

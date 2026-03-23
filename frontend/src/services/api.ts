@@ -1,5 +1,5 @@
 import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
-import { readPackageApiAuthorization } from './packageApiAuth';
+import { readFlapiApiAuthorization } from './flapiApiAuth';
 
 const BASE = '/api';
 
@@ -92,7 +92,7 @@ export async function fetchDefaultModel(): Promise<string> {
 
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
   const headers: Record<string, string> = {};
-  const auth = readPackageApiAuthorization();
+  const auth = readFlapiApiAuthorization();
   if (auth) headers.Authorization = auth;
   const res = await fetch(`${BASE}/data-source/search/${encodeURIComponent(queryOrId)}`, { headers });
   const text = await res.text();

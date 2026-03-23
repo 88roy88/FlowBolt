@@ -1,7 +1,7 @@
-/** Stub package run results for Flapi mock (server-spec §2.1).
+/** Stub data source run results for Flapi mock (server-spec §2.1).
  *  Shared fields across cubes: customer_id, name, region, product, store_id, date.
  *  Each cube provides a different business perspective on the same sales domain. */
-export const stubPackageResults = {
+export const stubDataSourceResults = {
   sales_cube: [
     { id: 1,  customer_id: 'C001', name: 'Alice', region: 'North', store_id: 'S01', product: 'Widget A', amount: 100, quantity: 5,  date: '2025-01-15', channel: 'Online' },
     { id: 2,  customer_id: 'C002', name: 'Bob',   region: 'South', store_id: 'S02', product: 'Widget B', amount: 150, quantity: 3,  date: '2025-01-16', channel: 'Retail' },

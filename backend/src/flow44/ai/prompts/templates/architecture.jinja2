@@ -39,6 +39,6 @@ Sample data:
 ```json
 {{ ctx.sample_data_json }}
 ```
-Endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run` (import API_BASE from src/config.ts) with `Authorization` header from localStorage key `flowbolt.packageApiToken`
+Endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run` (import API_BASE from src/config.ts) with `Authorization` header from localStorage key `flowbolt.flapiApiToken`
 {% endfor %}
 {% endif %}

@@ -14,7 +14,7 @@ from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.project import get_project
-from flow44.integrations.package_cases import get_case_display_name
+from flow44.integrations.data_source_cases import get_data_source_display_name
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -84,19 +84,19 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
             logger.debug("Event forwarding stopped for session %s", project_id)
 
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
-        package_api_authorization: str | None = None
+        flapi_api_authorization: str | None = None
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
             msg_type = data.get("type")
 
             if msg_type == "auth":
-                raw_pkg_auth = data.get("packageApiAuthorization")
-                package_api_authorization = raw_pkg_auth.strip() or None if isinstance(raw_pkg_auth, str) else None
+                raw_auth = data.get("flapiApiAuthorization")
+                flapi_api_authorization = raw_auth.strip() or None if isinstance(raw_auth, str) else None
             elif msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
-                ds_ids: list[int] = data.get("dataSourceIds") or data.get("caseIds") or []
+                ds_ids: list[int] = data.get("dataSourceIds") or []
 
                 # Save user message (for LLM context in followup agent)
                 await save_message(project.id, ChatRole.user, user_content)
@@ -107,9 +107,9 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                     ds_names: list[str] = []
                     for dsid in ds_ids:
                         try:
-                            name = await get_case_display_name(
+                            name = await get_data_source_display_name(
                                 dsid,
-                                authorization=package_api_authorization,
+                                authorization=flapi_api_authorization,
                             )
                         except Exception:
                             name = f"Data source #{dsid}"
@@ -125,7 +125,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                     build_agent = BuildAgent(
                         project_id=project_id,
                         model=selected_model,
-                        package_api_authorization=package_api_authorization,
+                        flapi_api_authorization=flapi_api_authorization,
                     )
                     register(project_id, build_agent)
                     asyncio.create_task(
