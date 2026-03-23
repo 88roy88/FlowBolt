@@ -55,6 +55,12 @@ export function getChatSocket(projectId: string): ChatSocket {
 
   const socket: ChatSocket = {
     send(message: WSMessage) {
+      // Re-send auth before outbound messages so backend has latest token value.
+      if (message.type !== 'auth') {
+        sendAuthMessage((authMessage) => {
+          sendOrQueue(JSON.stringify(authMessage));
+        });
+      }
       sendOrQueue(JSON.stringify(message));
     },
     onMessage(handler: (msg: WSMessage) => void) {
