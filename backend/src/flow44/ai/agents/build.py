@@ -219,17 +219,9 @@ class BuildAgent(BaseAgent):
                     metadata=self._llm_metadata("package_analysis"),
                 )
                 analysis = parse_json_response(raw)
-            except Exception:
+            except Exception as e:
                 logger.exception("[build] Package analysis failed")
-                analysis = {
-                    "data_schema": (
-                        f"Package data with "
-                        f"{len(sample_data) if isinstance(sample_data, list) else 'structured'} records"
-                    ),
-                    "relevant_fields": "See raw data",
-                    "data_characteristics": "Fetched from API",
-                    "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
-                }
+                raise RuntimeError(f"Case analysis failed for package {package_id}") from e
 
             return {"package_id": package_id, "package_name": package_name, "sample_data": sample_data, **analysis}
 
@@ -239,6 +231,8 @@ class BuildAgent(BaseAgent):
         except PackageApiUpstreamError as e:
             await self.emit({"type": "case_error", "message": f"Failed to fetch package data: {e}"})
             raise RuntimeError(f"Case fetch failed for package {package_id}: upstream error") from e
+        except RuntimeError:
+            raise
         except Exception as e:
             logger.exception("[build] Unexpected error fetching package")
             await self.emit({"type": "case_error", "message": "Unexpected error fetching package data"})
