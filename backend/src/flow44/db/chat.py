@@ -37,6 +37,6 @@ async def get_messages(project_id: str) -> list[ChatMessage]:
     """Return all messages for a project in chronological order."""
     async with database.async_session() as session:
         result = await session.execute(
-            select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(ChatMessage.created_at.asc())  # type: ignore[arg-type]
+            select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(ChatMessage.created_at.asc())  # type: ignore[attr-defined]
         )
         return list(result.scalars().all())

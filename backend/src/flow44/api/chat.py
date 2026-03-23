@@ -11,7 +11,7 @@ from flow44.ai.agent_registry import get as get_agent
 from flow44.ai.agent_registry import register
 from flow44.ai.agent_registry import remove as remove_agent
 from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
-from flow44.db.chat import get_messages, save_message
+from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.project import get_project
 
@@ -85,7 +85,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 ds_ids: list[int] = data.get("dataSourceIds") or []
 
                 # Save user message (for LLM context in followup agent)
-                await save_message(project.id, "user", user_content)
+                await save_message(project.id, ChatRole.user, user_content)
 
                 # Emit user_message event (for frontend history reconstruction)
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
@@ -151,7 +151,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 error_desc = f"Fix error: {error_message}"
                 if error_file:
                     error_desc += f" in {error_file}"
-                await save_message(project.id, "user", error_desc)
+                await save_message(project.id, ChatRole.user, error_desc)
 
                 # Emit user_message event (for frontend history reconstruction)
                 await emit_event(

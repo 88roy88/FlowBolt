@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 def stamp_vite_config(project_id: str, workspace_dir: str) -> None:
-    """Read vite.config.ts from the template and replace the session placeholder."""
+    """Read vite.config.ts from the template and replace the project ID placeholder."""
     template_path = os.path.join(settings.TEMPLATE_DIR, "vite.config.ts")
     with open(template_path, encoding="utf-8") as f:
         content = f.read()
     dest_path = os.path.join(workspace_dir, "vite.config.ts")
     with open(dest_path, "w", encoding="utf-8") as f:
-        f.write(content.replace("{{SESSION_ID}}", project_id))
+        f.write(content.replace("{{PROJECT_ID}}", project_id))
 
 
 class SandboxManager:

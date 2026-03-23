@@ -5,7 +5,7 @@
  * with scripted event sequences.
  */
 import { type Page } from '@playwright/test';
-import { BUILD_EVENT_SEQUENCE, SESSION_ID } from './data';
+import { BUILD_EVENT_SEQUENCE, PROJECT_ID } from './data';
 
 interface MockWSOptions {
   /** Events to send on the chat WebSocket after connection. */
@@ -147,7 +147,7 @@ export async function setupMockWS(page: Page, options: MockWSOptions = {}) {
     (window as any).WebSocket.OPEN = 1;
     (window as any).WebSocket.CLOSING = 2;
     (window as any).WebSocket.CLOSED = 3;
-  }, { projectId: SESSION_ID, events: chatEvents, delay: eventDelay });
+  }, { projectId: PROJECT_ID, events: chatEvents, delay: eventDelay });
 }
 
 /**

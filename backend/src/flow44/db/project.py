@@ -39,7 +39,7 @@ async def get_project(project_id: str) -> Project | None:
 
 async def list_projects() -> list[Project]:
     async with database.async_session() as session:
-        result = await session.execute(select(Project).order_by(Project.created_at.desc()))  # type: ignore[arg-type]
+        result = await session.execute(select(Project).order_by(Project.created_at.desc()))  # type: ignore[attr-defined]
         return list(result.scalars().all())
 
 

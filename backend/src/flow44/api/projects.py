@@ -75,7 +75,7 @@ async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_scaffold_and_start())
-    return p.model_dump(roject)
+    return project.model_dump()
 
 
 @router.patch("/{project_id}/name", status_code=200)
