@@ -72,12 +72,11 @@ class BuildAgent(BaseAgent):
         # Fetch data source metadata
         if self._state.data_source_ids:
             await self.emit({"type": "phase", "phase": "fetching_data_sources"})
-            results = await asyncio.gather(
-                *[self._fetch_and_analyze_data_source(sid) for sid in self._state.data_source_ids],
-                return_exceptions=True,
-            )
-            failures = [r for r in results if isinstance(r, Exception)]
-            if failures:
+            try:
+                results = await asyncio.gather(
+                    *[self._fetch_and_analyze_data_source(sid) for sid in self._state.data_source_ids]
+                )
+            except Exception:
                 await self.emit(
                     {
                         "type": "error",
@@ -86,7 +85,7 @@ class BuildAgent(BaseAgent):
                 )
                 await self.emit({"type": "phase", "phase": "idle"})
                 return
-            self._state.data_source_contexts = [ctx for ctx in results if isinstance(ctx, dict)]
+            self._state.data_source_contexts = [ctx for ctx in results if ctx is not None]
 
             if self._state.data_source_contexts:
                 from flow44.db.project import update_project_data_sources  # noqa: PLC0415
