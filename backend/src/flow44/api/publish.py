@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/export/{session_id}", tags=["publish"])
 
 
 @router.post("/publish")
-async def publish_to_s3(session_id: str):
+async def publish_to_s3(session_id: str) -> dict[str, str]:
     """Build the project and deploy to S3, returning the public URL."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
@@ -28,8 +28,13 @@ async def publish_to_s3(session_id: str):
     workspace_dir = sandbox.workspace_dir
 
     # Ensure the bucket exists with public-read policy
+    if BUCKET_NAME is None:
+        logger.error("S3_BUCKET_NAME environment variable is not set")
+        raise HTTPException(status_code=500, detail="S3_BUCKET_NAME is not set")
+
+    bucket: str = BUCKET_NAME
     try:
-        setup_bucket(BUCKET_NAME)
+        setup_bucket(bucket)
     except Exception as exc:
         logger.warning("Bucket setup issue (may already exist): %s", exc)
 

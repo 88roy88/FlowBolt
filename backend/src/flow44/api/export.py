@@ -164,7 +164,7 @@ async def build_single_html(session_id: str) -> str:
 
 
 @router.get("/html")
-async def export_html(session_id: str):
+async def export_html(session_id: str) -> Response:
     """Build the project and return a single self-contained HTML file."""
     html = await build_single_html(session_id)
 
@@ -220,7 +220,7 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
 
 
 @router.get("/published", response_class=HTMLResponse)
-async def proxy_published_app(session_id: str):
+async def proxy_published_app(session_id: str) -> HTMLResponse:
     """Proxy route to fetch and serve the published HTML from S3."""
     project = await get_project_by_session(session_id)
     if not project or not project.published_url:

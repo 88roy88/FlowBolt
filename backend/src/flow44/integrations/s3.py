@@ -1,12 +1,12 @@
 import json
 import mimetypes
-import boto3
 import os
 import zipfile
-import io
-import botocore.exceptions as ClientError
-from dotenv import load_dotenv
+from typing import TYPE_CHECKING, Any
 
+import boto3
+from botocore.exceptions import ClientError
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -16,10 +16,10 @@ SECRET_KEY = os.getenv('S3_SECRET_KEY')
 BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 
-def connect_to_s3():
+def connect_to_s3() -> Any:
     s3 = boto3.client(
         "s3",
-        use_ssl= ENDPOINT_URL.startswith("https://"),
+        use_ssl=(ENDPOINT_URL or "").startswith("https://"),
         aws_access_key_id=ACCESS_KEY,
         aws_secret_access_key=SECRET_KEY,
         endpoint_url=ENDPOINT_URL,
@@ -27,7 +27,7 @@ def connect_to_s3():
     return s3
 
 
-def setup_bucket(bucket_name):
+def setup_bucket(bucket_name: str) -> None:
     s3 = connect_to_s3()
     try:
         s3.create_bucket(Bucket=bucket_name)
@@ -51,7 +51,7 @@ def setup_bucket(bucket_name):
     )
 
 
-def deploy_react_app(zip_file, session_id):
+def deploy_react_app(zip_file: Any, session_id: str) -> str:
     s3 = connect_to_s3()
     with zipfile.ZipFile(zip_file, "r") as z:
         for name in z.namelist():
