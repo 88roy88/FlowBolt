@@ -19,6 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/uv-setup
+      - uses: actions/cache@v4
+        with:
+          path: backend/.mypy_cache
+          key: mypy-${{ hashFiles('backend/uv.lock', 'backend/mypy.toml') }}
+          restore-keys: mypy-
       - run: uv run task mypy-all
         working-directory: backend
 
