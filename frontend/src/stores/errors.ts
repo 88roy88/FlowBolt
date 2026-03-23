@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export interface AppError {
   id: string;
-  source: 'build' | 'runtime' | 'connection';
+  source: 'build' | 'runtime' | 'console' | 'connection';
   message: string;
   file?: string;
   line?: number;
