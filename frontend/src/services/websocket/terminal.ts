@@ -1,7 +1,7 @@
 import type { TerminalSocket } from './types';
 import { getWsBase } from './reconnecting';
 
-export function createTerminalSocket(sessionId: string): TerminalSocket {
+export function createTerminalSocket(projectId: string): TerminalSocket {
   const handlers: Array<(data: string) => void> = [];
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -18,7 +18,7 @@ export function createTerminalSocket(sessionId: string): TerminalSocket {
 
   function connect() {
     if (closed) return;
-    const ws = new WebSocket(`${getWsBase()}/ws/terminal/${sessionId}`);
+    const ws = new WebSocket(`${getWsBase()}/ws/terminal/${projectId}`);
     ws.binaryType = 'arraybuffer';
     socket = ws;
 

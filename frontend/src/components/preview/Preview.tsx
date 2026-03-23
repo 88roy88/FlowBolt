@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
+import { useConsoleStore } from '../../stores/console';
 import { RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '../ui/button';
 
 export function Preview() {
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
   const saveVersion = useFilesStore((s) => s.saveVersion);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -13,15 +14,15 @@ export function Preview() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!projectId) {
       setPreviewUrl(null);
       return;
     }
     setLoading(true);
-    const url = `/api/preview/${sessionId}/proxy/`;
+    const url = `/api/preview/${projectId}/proxy/`;
     setPreviewUrl(url);
     setLoading(false);
-  }, [sessionId, refreshKey]);
+  }, [projectId, refreshKey]);
 
   // Auto-refresh preview when files are saved (by user or AI).
   // Debounce to avoid rapid refreshes during bulk writes.
@@ -29,15 +30,17 @@ export function Preview() {
   useEffect(() => {
     if (saveVersion === saveVersionRef.current) return;
     saveVersionRef.current = saveVersion;
-    const timer = setTimeout(() => setRefreshKey((k) => k + 1), 800);
+    const timer = setTimeout(() => { clearConsole(); setRefreshKey((k) => k + 1); }, 800);
     return () => clearTimeout(timer);
   }, [saveVersion]);
 
+  const clearConsole = useConsoleStore((s) => s.clear);
   const handleRefresh = () => {
+    clearConsole();
     setRefreshKey((k) => k + 1);
   };
 
-  if (!sessionId) {
+  if (!projectId) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
         No preview available

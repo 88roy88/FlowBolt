@@ -1,11 +1,11 @@
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 export function createErrorSocket(
-  sessionId: string,
+  projectId: string,
   onError: (data: unknown) => void,
 ): { close(): void } {
   const { close } = createReconnectingSocket(
-    `${getWsBase()}/ws/errors/${sessionId}`,
+    `${getWsBase()}/ws/errors/${projectId}`,
     undefined,
     (data) => {
       try {

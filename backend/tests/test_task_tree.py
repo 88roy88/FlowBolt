@@ -19,11 +19,13 @@ def _make_plan(tasks: list[Task]) -> WorkPlan:
 class TestExecutionLayers:
     def test_no_dependencies(self) -> None:
         """All tasks with no deps should run in a single layer."""
-        plan = _make_plan([
-            Task(id="t1", title="A", description="", files=[]),
-            Task(id="t2", title="B", description="", files=[]),
-            Task(id="t3", title="C", description="", files=[]),
-        ])
+        plan = _make_plan(
+            [
+                Task(id="t1", title="A", description="", files=[]),
+                Task(id="t2", title="B", description="", files=[]),
+                Task(id="t3", title="C", description="", files=[]),
+            ]
+        )
 
         layers = plan.execution_layers()
         assert len(layers) == 1
@@ -31,11 +33,13 @@ class TestExecutionLayers:
 
     def test_linear_chain(self) -> None:
         """A → B → C should produce 3 layers of 1 task each."""
-        plan = _make_plan([
-            Task(id="t1", title="A", description="", files=[]),
-            Task(id="t2", title="B", description="", files=[], depends_on=["t1"]),
-            Task(id="t3", title="C", description="", files=[], depends_on=["t2"]),
-        ])
+        plan = _make_plan(
+            [
+                Task(id="t1", title="A", description="", files=[]),
+                Task(id="t2", title="B", description="", files=[], depends_on=["t1"]),
+                Task(id="t3", title="C", description="", files=[], depends_on=["t2"]),
+            ]
+        )
 
         layers = plan.execution_layers()
         assert len(layers) == 3
@@ -45,12 +49,14 @@ class TestExecutionLayers:
 
     def test_diamond_dependency(self) -> None:
         """Diamond: A → (B, C) → D. B and C should be in the same layer."""
-        plan = _make_plan([
-            Task(id="t1", title="A", description="", files=[]),
-            Task(id="t2", title="B", description="", files=[], depends_on=["t1"]),
-            Task(id="t3", title="C", description="", files=[], depends_on=["t1"]),
-            Task(id="t4", title="D", description="", files=[], depends_on=["t2", "t3"]),
-        ])
+        plan = _make_plan(
+            [
+                Task(id="t1", title="A", description="", files=[]),
+                Task(id="t2", title="B", description="", files=[], depends_on=["t1"]),
+                Task(id="t3", title="C", description="", files=[], depends_on=["t1"]),
+                Task(id="t4", title="D", description="", files=[], depends_on=["t2", "t3"]),
+            ]
+        )
 
         layers = plan.execution_layers()
         assert len(layers) == 3
@@ -61,10 +67,12 @@ class TestExecutionLayers:
 
     def test_circular_dependency_fallback(self) -> None:
         """Circular deps should not infinite loop — remaining tasks dumped in last layer."""
-        plan = _make_plan([
-            Task(id="t1", title="A", description="", files=[], depends_on=["t2"]),
-            Task(id="t2", title="B", description="", files=[], depends_on=["t1"]),
-        ])
+        plan = _make_plan(
+            [
+                Task(id="t1", title="A", description="", files=[], depends_on=["t2"]),
+                Task(id="t2", title="B", description="", files=[], depends_on=["t1"]),
+            ]
+        )
 
         layers = plan.execution_layers()
         # Both tasks end up in a single fallback layer
@@ -77,9 +85,11 @@ class TestExecutionLayers:
         assert layers == []
 
     def test_single_task(self) -> None:
-        plan = _make_plan([
-            Task(id="t1", title="A", description="", files=["src/App.tsx"]),
-        ])
+        plan = _make_plan(
+            [
+                Task(id="t1", title="A", description="", files=["src/App.tsx"]),
+            ]
+        )
 
         layers = plan.execution_layers()
         assert len(layers) == 1
@@ -87,13 +97,21 @@ class TestExecutionLayers:
 
     def test_typical_project_structure(self) -> None:
         """Realistic: types → hooks + components → App integration."""
-        plan = _make_plan([
-            Task(id="types", title="Types", description="", files=["src/types.ts"]),
-            Task(id="hooks", title="Hooks", description="", files=["src/hooks.ts"], depends_on=["types"]),
-            Task(id="header", title="Header", description="", files=["src/Header.tsx"], depends_on=["types"]),
-            Task(id="sidebar", title="Sidebar", description="", files=["src/Sidebar.tsx"], depends_on=["types"]),
-            Task(id="app", title="App", description="", files=["src/App.tsx"], depends_on=["hooks", "header", "sidebar"]),
-        ])
+        plan = _make_plan(
+            [
+                Task(id="types", title="Types", description="", files=["src/types.ts"]),
+                Task(id="hooks", title="Hooks", description="", files=["src/hooks.ts"], depends_on=["types"]),
+                Task(id="header", title="Header", description="", files=["src/Header.tsx"], depends_on=["types"]),
+                Task(id="sidebar", title="Sidebar", description="", files=["src/Sidebar.tsx"], depends_on=["types"]),
+                Task(
+                    id="app",
+                    title="App",
+                    description="",
+                    files=["src/App.tsx"],
+                    depends_on=["hooks", "header", "sidebar"],
+                ),
+            ]
+        )
 
         layers = plan.execution_layers()
         assert len(layers) == 3

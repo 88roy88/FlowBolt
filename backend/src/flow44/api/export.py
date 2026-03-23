@@ -13,29 +13,29 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
 from flow44.config import settings
-from flow44.models.project import get_project_by_session
+from flow44.db.project import get_project
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/export/{session_id}", tags=["export"])
+router = APIRouter(prefix="/api/export/{project_id}", tags=["export"])
 
 EXCLUDED_DIRS = {"node_modules", ".git", "dist", ".cache"}
 
 
 @router.get("/zip")
-async def export_zip(session_id: str) -> Response:
+async def export_zip(project_id: str) -> Response:
     """Download the entire project workspace as a ZIP file."""
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
-        raise HTTPException(status_code=404, detail=f"No sandbox found for session {session_id}")
+        raise HTTPException(status_code=404, detail=f"No sandbox found for session {project_id}")
 
     workspace_dir = sandbox.workspace_dir
     if not os.path.isdir(workspace_dir):  # noqa: ASYNC240
         raise HTTPException(status_code=404, detail="Workspace directory not found")
 
-    project = await get_project_by_session(session_id)
-    project_name = project.name if project else session_id
+    project = await get_project(project_id)
+    project_name = project.name if project else project_id
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -61,11 +61,11 @@ async def export_zip(session_id: str) -> Response:
 
 
 @router.get("/html")
-async def export_html(session_id: str) -> Response:  # noqa: C901, PLR0915
+async def export_html(project_id: str) -> Response:  # noqa: C901, PLR0915
     """Build the project and return a single self-contained HTML file."""
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
-        raise HTTPException(status_code=404, detail=f"No sandbox found for session {session_id}")
+        raise HTTPException(status_code=404, detail=f"No sandbox found for session {project_id}")
 
     workspace_dir = sandbox.workspace_dir
 
@@ -160,8 +160,8 @@ async def export_html(session_id: str) -> Response:  # noqa: C901, PLR0915
         flags=re.DOTALL | re.IGNORECASE,
     )
 
-    project = await get_project_by_session(session_id)
-    project_name = project.name if project else session_id
+    project = await get_project(project_id)
+    project_name = project.name if project else project_id
     safe_name = re.sub(r"[^\w\-. ]", "_", project_name)
 
     return Response(

@@ -5,7 +5,7 @@
  * with scripted event sequences.
  */
 import { type Page } from '@playwright/test';
-import { BUILD_EVENT_SEQUENCE, SESSION_ID } from './data';
+import { BUILD_EVENT_SEQUENCE, PROJECT_ID } from './data';
 
 interface MockWSOptions {
   /** Events to send on the chat WebSocket after connection. */
@@ -24,7 +24,7 @@ export async function setupMockWS(page: Page, options: MockWSOptions = {}) {
   const chatEvents = options.chatEvents ?? BUILD_EVENT_SEQUENCE;
   const eventDelay = options.eventDelay ?? 50;
 
-  await page.addInitScript(({ sessionId, events, delay }) => {
+  await page.addInitScript(({ projectId, events, delay }) => {
     const OriginalWebSocket = window.WebSocket;
 
     class MockWebSocket extends EventTarget {
@@ -51,10 +51,10 @@ export async function setupMockWS(page: Page, options: MockWSOptions = {}) {
         this.url = url.toString();
 
         // If this is NOT a URL we want to mock, use the real WebSocket
-        const isChatWs = this.url.includes(`/ws/chat/${sessionId}`);
-        const isTerminalWs = this.url.includes(`/ws/terminal/${sessionId}`);
-        const isErrorWs = this.url.includes(`/ws/errors/${sessionId}`);
-        const isServerLogWs = this.url.includes(`/ws/server-log/${sessionId}`);
+        const isChatWs = this.url.includes(`/ws/chat/${projectId}`);
+        const isTerminalWs = this.url.includes(`/ws/terminal/${projectId}`);
+        const isErrorWs = this.url.includes(`/ws/errors/${projectId}`);
+        const isServerLogWs = this.url.includes(`/ws/server-log/${projectId}`);
 
         if (!isChatWs && !isTerminalWs && !isErrorWs && !isServerLogWs) {
           // Fall through to real WebSocket for unknown URLs
@@ -147,7 +147,7 @@ export async function setupMockWS(page: Page, options: MockWSOptions = {}) {
     (window as any).WebSocket.OPEN = 1;
     (window as any).WebSocket.CLOSING = 2;
     (window as any).WebSocket.CLOSED = 3;
-  }, { sessionId: SESSION_ID, events: chatEvents, delay: eventDelay });
+  }, { projectId: PROJECT_ID, events: chatEvents, delay: eventDelay });
 }
 
 /**

@@ -4,7 +4,7 @@ import type { AgentPhase } from '../../types';
 const PHASE_LABELS: Record<AgentPhase, string> = {
   idle: '',
   classifying: 'Analyzing your request...',
-  fetching_cases: '',
+  fetching_data_sources: '',
   designing: 'Designing the application...',
   planning: 'Building work plan...',
   awaiting_approval: 'Review the plan below',

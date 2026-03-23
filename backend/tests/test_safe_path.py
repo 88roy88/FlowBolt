@@ -28,7 +28,7 @@ def sandbox(tmp_path) -> _DummySandbox:  # type: ignore[type-arg]
     workspace.mkdir()
     (workspace / "src").mkdir()
     (workspace / "src" / "App.tsx").write_text("export default function App() {}")
-    info = SandboxInfo(session_id="test", workspace_dir=str(workspace), port=3000)
+    info = SandboxInfo(project_id="test", workspace_dir=str(workspace), port=3000)
     return _DummySandbox(info)
 
 

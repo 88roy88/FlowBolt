@@ -27,7 +27,7 @@ _CGROUPV2_AVAILABLE = _can_use_cgroupv2() if not os.environ.get("AIB_SANDBOX_DIS
 
 
 def _build_nsjail_args(
-    session_id: str,
+    project_id: str,
     workspace_dir: str,
     port: int,
     command: str | None = None,
@@ -89,7 +89,7 @@ def _build_nsjail_args(
         "--rlimit_nofile",
         "soft",
         "--hostname",
-        f"sandbox-{session_id[:8]}",
+        f"sandbox-{project_id[:8]}",
         "--disable_clone_newnet",
         "--user",
         "1000:1000:1",
@@ -123,7 +123,7 @@ def _build_nsjail_args(
 
 class NamespacedSandbox(Sandbox):
     async def exec(self, command: str) -> AsyncIterator[str]:
-        cmd = _build_nsjail_args(self.session_id, self.workspace_dir, self.port, command=command)
+        cmd = _build_nsjail_args(self.project_id, self.workspace_dir, self.port, command=command)
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -147,7 +147,7 @@ class NamespacedSandbox(Sandbox):
         self._dev_log_file = open(log_path, "wb")  # noqa: ASYNC230, SIM115
 
         cmd = _build_nsjail_args(
-            self.session_id,
+            self.project_id,
             self.workspace_dir,
             self.port,
             command=f"pnpm dev --port {self.port} --host 0.0.0.0",
@@ -166,7 +166,7 @@ class NamespacedSandbox(Sandbox):
         )
         logger.info(
             "Dev server started for session %s on port %d (pid %s)",
-            self.session_id,
+            self.project_id,
             self.port,
             self._dev_process.pid,
         )
@@ -182,7 +182,7 @@ class NamespacedSandbox(Sandbox):
 
         _ensure_bashrc(self.workspace_dir)
 
-        cmd = _build_nsjail_args(self.session_id, self.workspace_dir, self.port, command=None, time_limit=0)
+        cmd = _build_nsjail_args(self.project_id, self.workspace_dir, self.port, command=None, time_limit=0)
         proc = subprocess.Popen(
             cmd,
             stdin=slave_fd,
@@ -197,6 +197,6 @@ class NamespacedSandbox(Sandbox):
         flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
         fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=proc.pid, session_id=self.session_id)
+        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=proc.pid, project_id=self.project_id)
         _active_ptys.add(handle)
         return handle

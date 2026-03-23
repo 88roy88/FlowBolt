@@ -1,4 +1,4 @@
-"""Package API (FLAPI) client used by backend routes.
+"""FLAPI client — proxies package search and execution to the upstream service.
 
 This module intentionally keeps all upstream (FLAPI) HTTP concerns isolated:
 timeouts, error mapping, and URL construction.
@@ -16,12 +16,12 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-class PackageApiUpstreamError(RuntimeError):
-    """Raised when the upstream Package API returns an error or is unreachable."""
+class FlapiUpstreamError(RuntimeError):
+    """Raised when the upstream FLAPI returns an error or is unreachable."""
 
 
 @dataclass(frozen=True, slots=True)
-class PackageApiClient:
+class FlapiClient:
     base_url: str
     timeout_s: float = 20.0
 
@@ -49,11 +49,11 @@ class PackageApiClient:
             try:
                 resp = await client.get(url)
             except httpx.HTTPError as e:
-                logger.warning("Package API GET failed: %s", e)
-                raise PackageApiUpstreamError("Package API unreachable") from e
+                logger.warning("FLAPI GET failed: %s", e)
+                raise FlapiUpstreamError("FLAPI unreachable") from e
 
         if resp.status_code >= 400:
-            raise PackageApiUpstreamError(f"Package API error ({resp.status_code})")
+            raise FlapiUpstreamError(f"FLAPI error ({resp.status_code})")
         return resp.json()
 
     async def _post_json(self, url: str, *, params: dict[str, Any] | None, json: Any | None) -> Any:
@@ -61,9 +61,9 @@ class PackageApiClient:
             try:
                 resp = await client.post(url, params=params, json=json)
             except httpx.HTTPError as e:
-                logger.warning("Package API POST failed: %s", e)
-                raise PackageApiUpstreamError("Package API unreachable") from e
+                logger.warning("FLAPI POST failed: %s", e)
+                raise FlapiUpstreamError("FLAPI unreachable") from e
 
         if resp.status_code >= 400:
-            raise PackageApiUpstreamError(f"Package API error ({resp.status_code})")
+            raise FlapiUpstreamError(f"FLAPI error ({resp.status_code})")
         return resp.json()

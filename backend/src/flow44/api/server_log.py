@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.websocket("/ws/server-log/{session_id}")
-async def server_log_ws(websocket: WebSocket, session_id: str) -> None:  # noqa: C901
+@router.websocket("/ws/server-log/{project_id}")
+async def server_log_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
     """Stream ``.dev-server.log`` to the client.
 
     Reads the file in binary mode so ANSI color codes are preserved.
     The xterm frontend renders them natively.
     """
-    sandbox = sandbox_manager.get_sandbox(session_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         await websocket.close(code=1008, reason="No sandbox")
         return
@@ -60,7 +60,7 @@ async def server_log_ws(websocket: WebSocket, session_id: str) -> None:  # noqa:
     except WebSocketDisconnect:
         pass  # noqa: S110 — expected on client disconnect
     except Exception:
-        logger.debug("Server log WebSocket error for session %s", session_id)
+        logger.debug("Server log WebSocket error for session %s", project_id)
     finally:
         stop.set()
         tail_task.cancel()

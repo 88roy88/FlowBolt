@@ -19,7 +19,7 @@ class PtyHandle:
     read_fd: int = -1
     write_fd: int = -1
     pid: int = -1
-    session_id: str = ""
+    project_id: str = ""
     winpty_process: Any | None = field(default=None, repr=False)  # pywinpty PtyProcess (optional dep)
     _scrollback: deque[bytes] = field(default_factory=deque, repr=False)
     _scrollback_bytes: int = field(default=0, repr=False)

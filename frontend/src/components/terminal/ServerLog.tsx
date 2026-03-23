@@ -9,10 +9,10 @@ import '@xterm/xterm/css/xterm.css';
 
 export function ServerLog() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
 
   useEffect(() => {
-    if (!containerRef.current || !sessionId) return;
+    if (!containerRef.current || !projectId) return;
 
     const term = new XTerm({
       theme: getTerminalTheme(),
@@ -32,7 +32,7 @@ export function ServerLog() {
     term.open(containerRef.current);
     fitAddon.fit();
 
-    const socket = createServerLogSocket(sessionId);
+    const socket = createServerLogSocket(projectId);
 
     socket.onData((data) => {
       term.write(data);
@@ -62,9 +62,9 @@ export function ServerLog() {
       socket.close();
       term.dispose();
     };
-  }, [sessionId]);
+  }, [projectId]);
 
-  if (!sessionId) {
+  if (!projectId) {
     return (
       <div style={{
         height: '100%',
