@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import logging
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException
 
 from flow44.api.export import build_single_html
 from flow44.config import settings
-from flow44.integrations.s3 import deploy_single_html, setup_bucket, BUCKET_NAME
+from flow44.integrations.s3 import BUCKET_NAME, deploy_single_html, setup_bucket
 from flow44.models.project import get_project_by_session, update_project_published_url_by_session
 from flow44.sandbox.manager import sandbox_manager
 
@@ -24,8 +24,6 @@ async def publish_to_s3(session_id: str) -> dict[str, str]:
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
         raise HTTPException(status_code=404, detail=f"No sandbox found for session {session_id}")
-
-    workspace_dir = sandbox.workspace_dir
 
     # Ensure the bucket exists with public-read policy
     if BUCKET_NAME is None:
@@ -47,7 +45,7 @@ async def publish_to_s3(session_id: str) -> dict[str, str]:
         s3_url = await loop.run_in_executor(None, deploy_single_html, html_content, session_id)
     except Exception as exc:
         logger.exception("S3 deployment failed for session %s", session_id)
-        raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}")
+        raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}") from exc
 
     # Save the published URL in our database
     await update_project_published_url_by_session(session_id, s3_url)

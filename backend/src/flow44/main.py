@@ -12,7 +12,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langfuse import Langfuse
 
-from flow44.api import chat, errors, export, files, models, package_api, preview, projects, publish, server_log, terminal
+from flow44.api import (
+    chat,
+    errors,
+    export,
+    files,
+    models,
+    package_api,
+    preview,
+    projects,
+    publish,
+    server_log,
+    terminal,
+)
 from flow44.config import settings
 from flow44.models.events import init_events_table
 from flow44.models.project import init_db

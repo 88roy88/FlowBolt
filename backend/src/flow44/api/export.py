@@ -8,10 +8,10 @@ import logging
 import os
 import re
 import zipfile
-import httpx
 
+import httpx
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response, HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from flow44.config import settings
 from flow44.models.project import get_project_by_session
@@ -61,7 +61,7 @@ async def export_zip(session_id: str) -> Response:
     )
 
 
-async def build_single_html(session_id: str) -> str:
+async def build_single_html(session_id: str) -> str:  # noqa: C901
     """Build the project and return a single self-contained HTML string."""
     sandbox = sandbox_manager.get_sandbox(session_id)
     if sandbox is None:
@@ -102,6 +102,27 @@ async def build_single_html(session_id: str) -> str:
         html = f.read()
 
     # --- Inline CSS ---
+    html = _inline_css_assets(html, dist_dir)
+
+    # --- Inline JS ---
+    html = _inline_js_assets(html, dist_dir)
+
+    # --- Inline favicon as data URI ---
+    html = _inline_favicon(html, dist_dir, workspace_dir)
+
+    # --- Strip the error reporter script (only useful inside the builder iframe) ---
+    html = re.sub(
+        r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*',
+        "",
+        html,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+    return html
+
+
+def _inline_css_assets(html: str, dist_dir: str) -> str:
+    """Inline CSS stylesheets from the dist directory into the HTML."""
     def inline_css(match: re.Match[str]) -> str:
         href = match.group(1)
         css_path = _resolve_asset_path(dist_dir, href)
@@ -120,14 +141,16 @@ async def build_single_html(session_id: str) -> str:
         html,
         flags=re.IGNORECASE,
     )
-    html = re.sub(
+    return re.sub(
         r'<link\s[^>]*?rel=["\']stylesheet["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
         inline_css,
         html,
         flags=re.IGNORECASE,
     )
 
-    # --- Inline JS ---
+
+def _inline_js_assets(html: str, dist_dir: str) -> str:
+    """Inline JS scripts from the dist directory into the HTML."""
     def inline_js(match: re.Match[str]) -> str:
         src = match.group(1)
         js_path = _resolve_asset_path(dist_dir, src)
@@ -142,25 +165,12 @@ async def build_single_html(session_id: str) -> str:
                 pass
         return match.group(0)
 
-    html = re.sub(
+    return re.sub(
         r'<script\s[^>]*?src=["\']([^"\']+)["\'][^>]*?>\s*</script>',
         inline_js,
         html,
         flags=re.IGNORECASE,
     )
-
-    # --- Inline favicon as data URI ---
-    html = _inline_favicon(html, dist_dir, workspace_dir)
-
-    # --- Strip the error reporter script (only useful inside the builder iframe) ---
-    html = re.sub(
-        r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*',
-        "",
-        html,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
-
-    return html
 
 
 @router.get("/html")
@@ -225,12 +235,12 @@ async def proxy_published_app(session_id: str) -> HTMLResponse:
     project = await get_project_by_session(session_id)
     if not project or not project.published_url:
         raise HTTPException(status_code=404, detail="Published app not found or not published yet.")
-    
+
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(project.published_url, timeout=15.0)
             resp.raise_for_status()
             return HTMLResponse(content=resp.text)
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to fetch published app for session %s from %s", session_id, project.published_url)
-            raise HTTPException(status_code=502, detail="Error fetching published app from S3.")
+            raise HTTPException(status_code=502, detail="Error fetching published app from S3.") from None
