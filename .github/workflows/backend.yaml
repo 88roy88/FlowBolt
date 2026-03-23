@@ -16,6 +16,8 @@ jobs:
   mypy:
     name: Type check (mypy)
     runs-on: ubuntu-latest
+    env:
+      MYPY_CACHE_DIR: ${{ github.workspace }}/backend/.mypy_cache
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/uv-setup
