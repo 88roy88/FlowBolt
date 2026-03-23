@@ -25,7 +25,3 @@ class BuildState(BaseModel):
     phase: str = "idle"
 
     model_config = {"arbitrary_types_allowed": True}
-
-
-# Pydantic v2: ensure forward refs are resolved for runtime model creation.
-BuildState.model_rebuild()
