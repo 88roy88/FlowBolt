@@ -123,6 +123,7 @@ async def build_single_html(session_id: str) -> str:  # noqa: C901
 
 def _inline_css_assets(html: str, dist_dir: str) -> str:
     """Inline CSS stylesheets from the dist directory into the HTML."""
+
     def inline_css(match: re.Match[str]) -> str:
         href = match.group(1)
         css_path = _resolve_asset_path(dist_dir, href)
@@ -151,6 +152,7 @@ def _inline_css_assets(html: str, dist_dir: str) -> str:
 
 def _inline_js_assets(html: str, dist_dir: str) -> str:
     """Inline JS scripts from the dist directory into the HTML."""
+
     def inline_js(match: re.Match[str]) -> str:
         src = match.group(1)
         js_path = _resolve_asset_path(dist_dir, src)
