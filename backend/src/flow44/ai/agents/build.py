@@ -28,8 +28,7 @@ from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.db.project import update_project_summary
-from flow44.integrations.data_source_cases import fetch_data_source_data
-from flow44.integrations.flapi_api import FlapiUpstreamError
+from flow44.integrations.data_source_cases import DataSourceUpstreamError, fetch_data_source_data
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
 
@@ -44,7 +43,7 @@ class BuildAgent(BaseAgent):
     def __init__(
         self,
         *,
-        flapi_api_authorization: str | None = None,
+        data_source_authorization: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -54,7 +53,7 @@ class BuildAgent(BaseAgent):
         self._approval_event = asyncio.Event()
         self._approval_action: str = "reject"
         self._approval_feedback: str | None = None
-        self._flapi_api_authorization = flapi_api_authorization
+        self._data_source_authorization = data_source_authorization
 
     @observe(name="build-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
@@ -199,7 +198,7 @@ class BuildAgent(BaseAgent):
         try:
             ds_name, sample_data = await fetch_data_source_data(
                 data_source_id,
-                authorization=self._flapi_api_authorization,
+                authorization=self._data_source_authorization,
             )
 
             analysis_prompt = render_data_source_analysis(
@@ -227,7 +226,7 @@ class BuildAgent(BaseAgent):
                 **analysis,
             }
 
-        except FlapiUpstreamError:
+        except DataSourceUpstreamError:
             await self.emit({"type": "data_source_error", "message": "Failed to fetch data source: upstream error"})
             raise RuntimeError(f"Data source fetch failed for {data_source_id}: upstream error") from None
         except RuntimeError:

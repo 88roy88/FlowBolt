@@ -84,15 +84,15 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
             logger.debug("Event forwarding stopped for session %s", project_id)
 
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
-        flapi_api_authorization: str | None = None
+        data_source_authorization: str | None = None
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
             msg_type = data.get("type")
 
             if msg_type == "auth":
-                raw_auth = data.get("flapiApiAuthorization")
-                flapi_api_authorization = raw_auth.strip() or None if isinstance(raw_auth, str) else None
+                raw_auth = data.get("dataSourceAuthorization")
+                data_source_authorization = raw_auth.strip() or None if isinstance(raw_auth, str) else None
             elif msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
@@ -109,7 +109,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                         try:
                             name = await get_data_source_display_name(
                                 dsid,
-                                authorization=flapi_api_authorization,
+                                authorization=data_source_authorization,
                             )
                         except Exception:
                             name = f"Data source #{dsid}"
@@ -125,7 +125,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                     build_agent = BuildAgent(
                         project_id=project_id,
                         model=selected_model,
-                        flapi_api_authorization=flapi_api_authorization,
+                        data_source_authorization=data_source_authorization,
                     )
                     register(project_id, build_agent)
                     asyncio.create_task(

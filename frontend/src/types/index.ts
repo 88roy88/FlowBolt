@@ -128,7 +128,7 @@ export interface FollowUpStep {
 }
 
 export type WSMessage =
-  | { type: 'auth'; flapiApiAuthorization?: string }
+  | { type: 'auth'; dataSourceAuthorization?: string }
   | { type: 'message'; content: string; model?: string; dataSourceIds?: number[] }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }

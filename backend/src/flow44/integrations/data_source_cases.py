@@ -3,10 +3,18 @@ from __future__ import annotations
 from typing import Any
 
 from flow44.config import settings
-from flow44.integrations.flapi_api import FlapiClient
+from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
 
 
-def normalize_flapi_authorization(raw: str | None) -> str | None:
+class DataSourceUpstreamError(RuntimeError):
+    """Raised when the data-source upstream returns an error or is unreachable."""
+
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def normalize_data_source_authorization(raw: str | None) -> str | None:
     if raw is None:
         return None
     token = raw.strip()
@@ -16,14 +24,34 @@ def normalize_flapi_authorization(raw: str | None) -> str | None:
 def _client(*, authorization: str | None) -> FlapiClient:
     return FlapiClient(
         base_url=settings.FLAPI_BASE_URL,
-        authorization=normalize_flapi_authorization(authorization),
+        authorization=normalize_data_source_authorization(authorization),
     )
 
 
 async def search_data_sources(query_or_id: str, *, authorization: str | None) -> list[Any]:
     if not query_or_id.strip():
         raise ValueError("query_or_id is required")
-    return await _client(authorization=authorization).search(query_or_id)
+    try:
+        return await _client(authorization=authorization).search(query_or_id)
+    except FlapiUpstreamError as err:
+        raise DataSourceUpstreamError(str(err), status_code=err.status_code) from err
+
+
+async def run_data_source(
+    data_source_id: str,
+    *,
+    authorization: str | None,
+    all_queries: bool | None,
+    body: Any | None,
+) -> Any:
+    try:
+        return await _client(authorization=authorization).run_data_source(
+            data_source_id,
+            all_queries=all_queries,
+            body=body,
+        )
+    except FlapiUpstreamError as err:
+        raise DataSourceUpstreamError(str(err), status_code=err.status_code) from err
 
 
 async def get_data_source_display_name(data_source_id: int, *, authorization: str | None) -> str:
@@ -58,9 +86,14 @@ async def fetch_data_source_data(
         if isinstance(metadata, dict)
         else f"Data source {data_source_id}"
     )
-    sample_data = await _client(authorization=authorization).run_data_source(
+    sample_data = await run_data_source(
         data_source_id,
+        authorization=authorization,
         all_queries=True,
         body=None,
     )
     return data_source_name, sample_data
+
+
+# Backward compatibility for callers that still import the old helper name.
+normalize_flapi_authorization = normalize_data_source_authorization

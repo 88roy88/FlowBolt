@@ -1,6 +1,6 @@
 import type { WSMessage } from '../../types';
 import type { ChatSocket } from './types';
-import { readFlapiApiAuthorization } from '../flapiApiAuth';
+import { readDataSourceAuthorization } from '../dataSourceAuth';
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 const chatSockets = new Map<string, ChatSocket>();
@@ -13,11 +13,11 @@ export function getChatSocket(projectId: string): ChatSocket {
   let stopReconnect: (() => void) | null = null;
 
   const sendAuthMessage = (send: (message: WSMessage) => void) => {
-    const rawToken = readFlapiApiAuthorization();
-    const flapiApiAuthorization = rawToken?.trim() || undefined;
+    const rawToken = readDataSourceAuthorization();
+    const dataSourceAuthorization = rawToken?.trim() || undefined;
     send({
       type: 'auth',
-      ...(flapiApiAuthorization && { flapiApiAuthorization }),
+      ...(dataSourceAuthorization && { dataSourceAuthorization }),
     });
   };
 
