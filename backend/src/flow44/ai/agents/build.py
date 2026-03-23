@@ -85,7 +85,7 @@ class BuildAgent(BaseAgent):
                 )
                 await self.emit({"type": "phase", "phase": "idle"})
                 return
-            self._state.case_contexts = [ctx for ctx in results if ctx is not None and not isinstance(ctx, Exception)]
+            self._state.case_contexts = [ctx for ctx in results if isinstance(ctx, dict)]
 
             if self._state.case_contexts:
                 from flow44.models.project import update_project_cases  # noqa: PLC0415
