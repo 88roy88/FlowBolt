@@ -15,6 +15,7 @@ from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.project import get_project
 from flow44.integrations.package_cases import get_case_display_name
+from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,14 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
     project = await get_project(project_id)
     if project is None:
         await websocket.send_json({"type": "error", "message": "Unknown project"})
+        await websocket.close()
+        return
+
+    try:
+        await sandbox_manager.ensure_ready(project_id)
+    except Exception:
+        logger.exception("[chat] Failed to prepare sandbox for session %s", project_id)
+        await websocket.send_json({"type": "error", "message": "Failed to prepare project sandbox"})
         await websocket.close()
         return
 

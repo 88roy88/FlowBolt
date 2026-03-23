@@ -41,7 +41,7 @@ class LocalSandbox(Sandbox):
         env = os.environ.copy()
         env["FORCE_COLOR"] = "1"
 
-        dev_cmd = f"pnpm dev --port {self.port} --host 0.0.0.0"
+        dev_cmd = f"pnpm dev --port {self.port} --strictPort --host 0.0.0.0"
         self._dev_process = await asyncio.create_subprocess_exec(
             "/bin/bash",
             "-c",

@@ -61,7 +61,7 @@ class WindowsLocalSandbox(Sandbox):
         log_path = os.path.join(self.workspace_dir, ".dev-server.log")
         log_file = open(log_path, "wb")  # noqa: ASYNC230, SIM115
 
-        dev_cmd = f"cd /d {self.workspace_dir} && pnpm dev --port {self.port} --host 0.0.0.0"
+        dev_cmd = f"cd /d {self.workspace_dir} && pnpm dev --port {self.port} --strictPort --host 0.0.0.0"
         proc = subprocess.Popen(  # noqa: ASYNC220
             ["cmd", "/c", dev_cmd],  # noqa: S607
             stdout=log_file,
