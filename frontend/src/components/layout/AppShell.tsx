@@ -223,25 +223,41 @@ export function AppShell() {
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <GlobalProgress />
 
-        {isEmptyState ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8">
-            <FlowBrand size="lg" />
-            <p className="text-base text-muted-foreground max-w-md text-center leading-relaxed">
-              Describe what you want to build and the AI will design, plan, and code it for you.
-            </p>
-            <div className="w-full max-w-2xl">
-              <PromptInput />
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-              {['A dashboard with charts', 'A todo app with drag & drop', 'A landing page with animations'].map((hint) => (
-                <button
-                  key={hint}
-                  onClick={() => useChatStore.getState().sendMessage(hint)}
-                  className="px-3 py-1.5 text-xs text-foreground/80 bg-muted/40 border border-border/80 rounded-full shadow-[var(--shadow-sm)] hover:border-primary/50 hover:text-primary hover:bg-accent-bg transition-all duration-150 cursor-pointer"
-                >
-                  {hint}
-                </button>
-              ))}
+        {isNewProject ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8 relative overflow-hidden">
+            {/* Animated glow orb */}
+            <div className="absolute top-[25%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent),transparent_70%)] pointer-events-none animate-[drift_14s_ease-in-out_infinite]" />
+
+            <style>{`
+              @keyframes drift { 0%, 100% { transform: translateX(-50%) translate(0, 0); } 33% { transform: translateX(-50%) translate(30px, -20px); } 66% { transform: translateX(-50%) translate(-20px, 15px); } }
+            `}</style>
+
+            <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-2xl">
+              {/* Logo with glow */}
+              <div className="relative">
+                <div className="absolute inset-0 blur-3xl bg-[color-mix(in_srgb,var(--primary)_25%,transparent)] scale-[2] pointer-events-none" />
+                <div className="relative drop-shadow-[0_0_20px_color-mix(in_srgb,var(--primary)_30%,transparent)]">
+                  <FlowBrand size="lg" />
+                </div>
+              </div>
+              <p className="text-base text-muted-foreground max-w-md text-center leading-relaxed">
+                Describe what you want to build and the AI will design, plan,
+                and code it for you.
+              </p>
+              <div className="w-full rounded-2xl bg-surface/80 border border-border/50 shadow-[0_2px_20px_color-mix(in_srgb,var(--primary)_4%,transparent)] overflow-hidden [&>div]:border-t-0">
+                <PromptInput />
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {['A dashboard with charts', 'A todo app with drag & drop', 'A landing page with animations'].map((hint) => (
+                  <button
+                    key={hint}
+                    onClick={() => useChatStore.getState().sendMessage(hint)}
+                    className="px-3 py-1.5 text-xs text-muted-foreground/70 border border-border/50 rounded-full hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
+                  >
+                    {hint}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
