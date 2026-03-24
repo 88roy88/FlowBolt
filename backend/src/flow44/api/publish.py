@@ -9,11 +9,11 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 
-from flow44.api.export import build_single_html
 from flow44.config import settings
 from flow44.db.project import get_project, update_project_published_url
 from flow44.integrations.s3 import deploy_single_html
 from flow44.sandbox.manager import sandbox_manager
+from flow44.sandbox.operations import BuildError, build_single_html
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,12 @@ async def publish_to_s3(project_id: str) -> dict[str, str]:
         raise HTTPException(status_code=500, detail="S3_BUCKET_NAME is not set")
 
     # Build a single HTML string containing the entire app with inline assets
-    html_content = await build_single_html(project_id)
+    try:
+        html_content = await build_single_html(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except BuildError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     # Deploy the single HTML to S3 securely without blocking the event loop
     try:
