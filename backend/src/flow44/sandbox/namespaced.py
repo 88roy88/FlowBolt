@@ -150,7 +150,7 @@ class NamespacedSandbox(Sandbox):
             self.project_id,
             self.workspace_dir,
             self.port,
-            command=f"pnpm dev --port {self.port} --host 0.0.0.0",
+            command=f"pnpm dev --port {self.port} --strictPort --host 0.0.0.0",
             time_limit=0,
         )
 

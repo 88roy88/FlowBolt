@@ -27,9 +27,8 @@ from flow44.ai.provider import complete_chat, stream_chat
 from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
-from flow44.config import settings
 from flow44.db.project import update_project_summary
-from flow44.integrations.flapi_api import FlapiClient, FlapiUpstreamError
+from flow44.integrations.data_source_cases import DataSourceUpstreamError, fetch_data_source_data
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
 
@@ -41,7 +40,12 @@ logger = logging.getLogger(__name__)
 # TODO: maybe split this into two agents and get rid of the approval event stuff?
 # TODO: or think about how to add support for it in the Flow framework.
 class BuildAgent(BaseAgent):
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *,
+        data_source_authorization: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self._state = BuildState(project_id=self.project_id, model=self.model)
         self._observation_id: str | None = None
@@ -49,8 +53,7 @@ class BuildAgent(BaseAgent):
         self._approval_event = asyncio.Event()
         self._approval_action: str = "reject"
         self._approval_feedback: str | None = None
-
-    # -- Entry point --
+        self._data_source_authorization = data_source_authorization
 
     @observe(name="build-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
@@ -68,9 +71,19 @@ class BuildAgent(BaseAgent):
         # Fetch data source metadata
         if self._state.data_source_ids:
             await self.emit({"type": "phase", "phase": "fetching_data_sources"})
-            results = await asyncio.gather(
-                *[self._fetch_and_analyze_data_source(sid) for sid in self._state.data_source_ids]
-            )
+            try:
+                results = await asyncio.gather(
+                    *[self._fetch_and_analyze_data_source(sid) for sid in self._state.data_source_ids]
+                )
+            except Exception:
+                await self.emit(
+                    {
+                        "type": "error",
+                        "message": "Build aborted: failed to fetch required data source data.",
+                    }
+                )
+                await self.emit({"type": "phase", "phase": "idle"})
+                return
             self._state.data_source_contexts = [ctx for ctx in results if ctx is not None]
 
             if self._state.data_source_contexts:
@@ -183,15 +196,10 @@ class BuildAgent(BaseAgent):
 
     async def _fetch_and_analyze_data_source(self, data_source_id: str) -> dict[str, Any] | None:
         try:
-            flapi = FlapiClient(base_url=settings.FLAPI_BASE_URL)
-            search_results = await flapi.search(data_source_id)
-            if not search_results:
-                await self.emit({"type": "data_source_error", "message": f"Data source {data_source_id} not found"})
-                return None
-
-            metadata = search_results[0] if isinstance(search_results, list) else search_results
-            ds_name = metadata.get("Name", f"Data source {data_source_id}")
-            sample_data = await flapi.run_package(data_source_id, all_queries=True, body=None)
+            ds_name, sample_data = await fetch_data_source_data(
+                data_source_id,
+                authorization=self._data_source_authorization,
+            )
 
             analysis_prompt = render_data_source_analysis(
                 user_content=self._state.user_content,
@@ -207,14 +215,9 @@ class BuildAgent(BaseAgent):
                     metadata=self._llm_metadata("data_source_analysis"),
                 )
                 analysis = parse_json_response(raw)
-            except Exception:
+            except Exception as e:
                 logger.exception("[build] Data source analysis failed")
-                analysis = {
-                    "data_schema": "Failed to analyze",
-                    "relevant_fields": "See raw data",
-                    "data_characteristics": "Fetched from API",
-                    "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
-                }
+                raise RuntimeError(f"Data source analysis failed for {data_source_id}") from e
 
             return {
                 "data_source_id": data_source_id,
@@ -223,13 +226,15 @@ class BuildAgent(BaseAgent):
                 **analysis,
             }
 
-        except FlapiUpstreamError as e:
-            await self.emit({"type": "data_source_error", "message": f"Failed to fetch data source: {e}"})
-            return None
-        except Exception:
+        except DataSourceUpstreamError:
+            await self.emit({"type": "data_source_error", "message": "Failed to fetch data source: upstream error"})
+            raise RuntimeError(f"Data source fetch failed for {data_source_id}: upstream error") from None
+        except RuntimeError:
+            raise
+        except Exception as e:
             logger.exception("[build] Unexpected error fetching data source")
             await self.emit({"type": "data_source_error", "message": "Unexpected error fetching data source"})
-            return None
+            raise RuntimeError(f"Data source fetch failed for {data_source_id}: unexpected error") from e
 
     @observe(name="design-architecture")  # type: ignore[untyped-decorator]
     async def _design_architecture(self) -> ArchitectureDesign:

@@ -13,7 +13,7 @@ export default meta;
 type Story = StoryObj<typeof Badge>;
 
 export const Default: Story = { args: { children: 'Badge' } };
-export const Accent: Story = { args: { variant: 'accent', children: 'Case #4' } };
+export const Accent: Story = { args: { variant: 'accent', children: 'Data source #4' } };
 export const Success: Story = { args: { variant: 'success', children: 'Complete' } };
 export const Destructive: Story = { args: { variant: 'destructive', children: 'Error' } };
 

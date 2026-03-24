@@ -14,6 +14,8 @@ from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.project import get_project
+from flow44.integrations.data_source_cases import get_data_source_display_name
+from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,14 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         await websocket.close()
         return
 
+    try:
+        await sandbox_manager.ensure_ready(project_id)
+    except Exception:
+        logger.exception("[chat] Failed to prepare sandbox for session %s", project_id)
+        await websocket.send_json({"type": "error", "message": "Failed to prepare project sandbox"})
+        await websocket.close()
+        return
+
     # Subscribe to live events (replay is handled by GET /api/chat/{project_id}/events)
     queue = subscribe(project_id)
 
@@ -73,13 +83,17 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         except Exception:
             logger.debug("Event forwarding stopped for session %s", project_id)
 
-    async def _receive_actions() -> None:  # noqa: C901, PLR0915
+    async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
+        data_source_authorization: str | None = None
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
             msg_type = data.get("type")
 
-            if msg_type == "message":
+            if msg_type == "auth":
+                raw_auth = data.get("dataSourceAuthorization")
+                data_source_authorization = raw_auth.strip() or None if isinstance(raw_auth, str) else None
+            elif msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
                 ds_ids: list[int] = data.get("dataSourceIds") or []
@@ -90,13 +104,13 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 # Emit user_message event (for frontend history reconstruction)
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                 if ds_ids:
-                    from flow44.api.flapi_api import _package_search  # noqa: PLC0415
-
                     ds_names: list[str] = []
                     for dsid in ds_ids:
                         try:
-                            results = await _package_search(str(dsid))
-                            name = results[0].get("Name", f"Data source #{dsid}") if results else f"Data source #{dsid}"
+                            name = await get_data_source_display_name(
+                                dsid,
+                                authorization=data_source_authorization,
+                            )
                         except Exception:
                             name = f"Data source #{dsid}"
                         ds_names.append(name)
@@ -111,6 +125,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                     build_agent = BuildAgent(
                         project_id=project_id,
                         model=selected_model,
+                        data_source_authorization=data_source_authorization,
                     )
                     register(project_id, build_agent)
                     asyncio.create_task(
