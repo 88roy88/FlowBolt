@@ -15,8 +15,8 @@ class Settings(BaseSettings):
 
     WORKSPACE_BASE_DIR: str = _DEFAULT_WORKSPACE
     TEMPLATE_DIR: str = _DEFAULT_TEMPLATE
-    SANDBOX_PORT_RANGE_START: int = 3001
-    SANDBOX_PORT_RANGE_END: int = 3100
+    SANDBOX_PORT_RANGE_START: int = 3101
+    SANDBOX_PORT_RANGE_END: int = 4101
     NSJAIL_BIN: str = "/usr/bin/nsjail"
     AI_MODEL: str = "bedrock/us.anthropic.claude-sonnet-4-6"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
