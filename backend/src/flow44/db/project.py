@@ -21,6 +21,7 @@ class Project(SQLModel, table=True):
     data_source_id: str = Field(default="")
     data_source_context: str = Field(default="")
     data_sources: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, default=[]))
+    published_url: str = Field(default="")
 
 
 async def create_project(name: str) -> Project:
@@ -120,4 +121,14 @@ async def delete_project(project_id: str) -> None:
         project = await session.get(Project, project_id)
         if project:
             await session.delete(project)
+            await session.commit()
+
+
+async def update_project_published_url(project_id: str, url: str) -> None:
+    async with database.async_session() as session:
+        project = await session.get(Project, project_id)
+        if project:
+            project.published_url = url
+            project.updated_at = datetime.now(UTC).isoformat()
+            session.add(project)
             await session.commit()
