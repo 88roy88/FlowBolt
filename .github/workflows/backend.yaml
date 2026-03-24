@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/uv-setup
-      - run: uv run task ruff-dry-all
+      - run: uv run --no-sync task ruff-dry-all
         working-directory: backend
 
   mypy:
@@ -26,7 +26,7 @@ jobs:
           path: backend/.mypy_cache
           key: mypy-${{ hashFiles('backend/uv.lock', 'backend/mypy.toml') }}
           restore-keys: mypy-
-      - run: uv run task mypy-all
+      - run: uv run --no-sync task mypy-all
         working-directory: backend
 
   tests:
@@ -35,5 +35,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/uv-setup
-      - run: uv run task tests
+      - run: uv run --no-sync task tests
         working-directory: backend
