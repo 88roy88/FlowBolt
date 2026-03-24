@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import quote
 
 import httpx
 
@@ -31,17 +31,8 @@ class FlapiClient:
     # Sent as Authorization header to FLAPI (e.g. Bearer token from the browser).
     authorization: str | None = None
 
-    def _base_url_without_ssl(self) -> str:
-        """Normalize base URL to non-SSL transport for FLAPI."""
-        raw_base = self.base_url.strip()
-        parts = urlsplit(raw_base)
-        if parts.scheme == "https":
-            logger.info("FLAPI base URL uses https; downgrading to http: %s", raw_base)
-            return urlunsplit(("http", parts.netloc, parts.path, parts.query, parts.fragment))
-        return raw_base
-
     def _url(self, path: str) -> str:
-        return f"{self._base_url_without_ssl().rstrip('/')}{path}"
+        return f"{self.base_url.rstrip('/')}{path}"
 
     def _upstream_headers(self) -> dict[str, str]:
         if self.authorization is None:
