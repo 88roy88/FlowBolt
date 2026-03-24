@@ -19,6 +19,8 @@ import re
 from collections.abc import Callable
 from enum import Enum, auto
 
+_CDATA_RE = re.compile(r"<!\[CDATA\[(.*?)]]>", re.DOTALL)
+
 
 class _State(Enum):
     TEXT = auto()
@@ -122,7 +124,10 @@ class ActionParser:
                 self._action_body += self._buffer[:close_idx]
                 self._buffer = self._buffer[close_idx + len(self._ACTION_CLOSE) :]
 
-                self.on_file_action(self._action_file_path, self._action_body.strip())
+                body = self._action_body.strip()
+                # Strip CDATA wrappers that some models produce
+                body = _CDATA_RE.sub(r"\1", body)
+                self.on_file_action(self._action_file_path, body)
 
                 self._action_file_path = ""
                 self._action_body = ""
