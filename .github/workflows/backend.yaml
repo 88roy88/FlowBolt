@@ -10,16 +10,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/uv-setup
-      - run: uv run task ruff-dry-all
+      - run: uv run --no-sync task ruff-dry-all
         working-directory: backend
 
   mypy:
     name: Type check (mypy)
     runs-on: ubuntu-latest
+    env:
+      MYPY_CACHE_DIR: ${{ github.workspace }}/backend/.mypy_cache
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/uv-setup
-      - run: uv run task mypy-all
+      - uses: actions/cache@v4
+        with:
+          path: backend/.mypy_cache
+          key: mypy-${{ hashFiles('backend/uv.lock', 'backend/mypy.toml') }}
+          restore-keys: mypy-
+      - run: uv run --no-sync task mypy-all
         working-directory: backend
 
   tests:
@@ -28,5 +35,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/uv-setup
-      - run: uv run task tests
+      - run: uv run --no-sync task tests
         working-directory: backend

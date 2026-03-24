@@ -142,6 +142,11 @@ def _get_openrouter_models() -> list[dict[str, str]]:
             "name": "GLM-4.7 (OpenRouter)",
             "provider": "openrouter",
         },
+        {
+            "id": "openrouter/qwen/qwen3-coder-30b-a3b-instruct",
+            "name": "Qwen3 Coder 30B (OpenRouter)",
+            "provider": "openrouter",
+        },
     ]
 
 
