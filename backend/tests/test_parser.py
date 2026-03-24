@@ -170,3 +170,41 @@ class TestActionParserEdgeCases:
 
         assert len(files) == 1
         assert "<div" in files[0][1]
+
+    def test_cdata_stripped(self) -> None:
+        """CDATA wrappers should be removed from file content."""
+        files: list[tuple[str, str]] = []
+        parser = ActionParser(on_file_action=lambda p, c: files.append((p, c)))
+
+        parser.feed(
+            '<flowArtifact id="test" title="test">'
+            '<flowAction type="file" filePath="app.tsx">'
+            "<![CDATA[export default function App() {\n  return <h1>Hello</h1>;\n}]]>"
+            "</flowAction>"
+            "</flowArtifact>"
+        )
+        parser.flush()
+
+        assert len(files) == 1
+        assert "CDATA" not in files[0][1]
+        assert "export default function App()" in files[0][1]
+        assert "<h1>Hello</h1>" in files[0][1]
+
+    def test_multiple_cdata_sections(self) -> None:
+        """Multiple CDATA sections in one file should all be unwrapped."""
+        files: list[tuple[str, str]] = []
+        parser = ActionParser(on_file_action=lambda p, c: files.append((p, c)))
+
+        parser.feed(
+            '<flowArtifact id="test" title="test">'
+            '<flowAction type="file" filePath="app.tsx">'
+            "<![CDATA[const a = 1;]]>\n<![CDATA[const b = 2;]]>"
+            "</flowAction>"
+            "</flowArtifact>"
+        )
+        parser.flush()
+
+        assert len(files) == 1
+        assert "const a = 1;" in files[0][1]
+        assert "const b = 2;" in files[0][1]
+        assert "CDATA" not in files[0][1]

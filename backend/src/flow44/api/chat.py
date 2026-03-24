@@ -101,7 +101,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 # Save user message (for LLM context in followup agent)
                 await save_message(project.id, ChatRole.user, user_content)
 
-                # Emit user_message event (for frontend history reconstruction)
+                # Emit user_message event (for frontend history reconstruction) TODO: is redundant? also in the chat db
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                 if ds_ids:
                     ds_names: list[str] = []
