@@ -47,6 +47,12 @@ export default function App() {
         : 'dark';
     }
     document.documentElement.dataset.theme = theme;
+
+    // TODO: remove this when real Flapi auth was added
+    // Set default data source API token if not already set
+    if (!window.localStorage.getItem('flowbolt.dataSourceApiToken')) {
+      window.localStorage.setItem('flowbolt.dataSourceApiToken', 'maz-default-value');
+    }
   }, []);
 
   // Check backend availability on mount
