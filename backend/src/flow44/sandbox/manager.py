@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import signal
+import socket
 
 from flow44.config import settings
 from flow44.sandbox.base import Sandbox, SandboxInfo
@@ -32,6 +33,25 @@ class SandboxManager:
         self._ensure_pnpm_store()
 
     @staticmethod
+    def _port_is_available(port: int) -> bool:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
+        finally:
+            sock.close()
+
+    def _take_available_port(self) -> int:
+        for port in sorted(self._available_ports):
+            if not self._port_is_available(port):
+                continue
+            self._available_ports.remove(port)
+            return port
+        raise RuntimeError("No available ports in the sandbox pool")
+
+    @staticmethod
     def _ensure_pnpm_store() -> None:
         try:
             os.makedirs(settings.PNPM_STORE_DIR, exist_ok=True)
@@ -57,10 +77,7 @@ class SandboxManager:
             if project_id in self._sandboxes:
                 return self._sandboxes[project_id]
 
-            if not self._available_ports:
-                raise RuntimeError("No available ports in the sandbox pool")
-
-            port = self._available_ports.pop()
+            port = self._take_available_port()
 
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
         info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
@@ -85,6 +102,27 @@ class SandboxManager:
 
     def get_sandbox(self, project_id: str) -> Sandbox | None:
         return self._sandboxes.get(project_id)
+
+    async def ensure_ready(self, project_id: str) -> Sandbox:
+        """Ensure sandbox exists, has template files, and dev server is running."""
+        sandbox = self.get_sandbox(project_id)
+        if sandbox is None:
+            sandbox = await self.create_sandbox(project_id)
+
+        package_json = os.path.join(sandbox.workspace_dir, "package.json")
+        if not os.path.isfile(package_json):  # noqa: ASYNC240
+            logger.info("Bootstrapping sandbox workspace for session %s", project_id)
+            shutil.copytree(settings.TEMPLATE_DIR, sandbox.workspace_dir, dirs_exist_ok=True)
+            stamp_vite_config(project_id, sandbox.workspace_dir)
+
+            async for line in sandbox.exec("pnpm install 2>&1"):
+                logger.info("[sandbox-bootstrap] %s", line.rstrip())
+
+        if not sandbox.dev_server_running():
+            logger.info("Starting sandbox dev server for session %s", project_id)
+            await sandbox.start_dev_server()
+
+        return sandbox
 
     @staticmethod
     def _kill_stale_dev_servers() -> None:  # noqa: C901
@@ -163,7 +201,11 @@ class SandboxManager:
                 if not self._available_ports:
                     logger.warning("No ports left to restore sandbox %s", name)
                     continue
-                port = self._available_ports.pop()
+                try:
+                    port = self._take_available_port()
+                except RuntimeError:
+                    logger.warning("No free ports to restore sandbox %s", name)
+                    continue
 
             info = SandboxInfo(project_id=name, workspace_dir=workspace_dir, port=port)
             sandbox = self._create_sandbox_instance(info)
