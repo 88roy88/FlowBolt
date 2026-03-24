@@ -17,12 +17,12 @@ class BuildError(Exception):
     """Raised when the build process fails."""
 
 
-@observe(name="build-single-html")
+@observe(name="build_single_html")
 async def build_single_html(project_id: str) -> str:
     """Build the project and return a single self-contained HTML string."""
     sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
-        raise ValueError(f"No sandbox found for session {project_id}")
+        raise ValueError(f"No sandbox found for project {project_id}")
 
     workspace_dir = sandbox.workspace_dir
 
