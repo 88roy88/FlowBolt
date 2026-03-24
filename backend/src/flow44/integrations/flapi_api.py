@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
 
@@ -31,8 +31,17 @@ class FlapiClient:
     # Sent as Authorization header to FLAPI (e.g. Bearer token from the browser).
     authorization: str | None = None
 
+    def _base_url_without_ssl(self) -> str:
+        """Normalize base URL to non-SSL transport for FLAPI."""
+        raw_base = self.base_url.strip()
+        parts = urlsplit(raw_base)
+        if parts.scheme == "https":
+            logger.info("FLAPI base URL uses https; downgrading to http: %s", raw_base)
+            return urlunsplit(("http", parts.netloc, parts.path, parts.query, parts.fragment))
+        return raw_base
+
     def _url(self, path: str) -> str:
-        return f"{self.base_url.rstrip('/')}{path}"
+        return f"{self._base_url_without_ssl().rstrip('/')}{path}"
 
     def _upstream_headers(self) -> dict[str, str]:
         if self.authorization is None:
@@ -66,7 +75,8 @@ class FlapiClient:
 
     async def _get_json(self, url: str) -> Any:
         headers = self._upstream_headers()
-        async with httpx.AsyncClient(timeout=self.timeout_s) as client:
+        # FLAPI in this environment is intentionally called without SSL verification.
+        async with httpx.AsyncClient(timeout=self.timeout_s, verify=False) as client:  # noqa: S501
             try:
                 resp = await client.get(url, headers=headers or None)
             except httpx.HTTPError as e:
@@ -82,7 +92,8 @@ class FlapiClient:
 
     async def _post_json(self, url: str, *, params: dict[str, Any] | None, json: Any | None) -> Any:
         headers = self._upstream_headers()
-        async with httpx.AsyncClient(timeout=self.timeout_s) as client:
+        # FLAPI in this environment is intentionally called without SSL verification.
+        async with httpx.AsyncClient(timeout=self.timeout_s, verify=False) as client:  # noqa: S501
             try:
                 resp = await client.post(url, params=params, json=json, headers=headers or None)
             except httpx.HTTPError as e:
