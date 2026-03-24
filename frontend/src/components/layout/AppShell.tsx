@@ -71,6 +71,7 @@ export function AppShell() {
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
 
+  const isNewProject = !historyLoaded || (messages.length === 0 && !isStreaming);
   const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
 
   const handleBottomResize = useCallback((delta: number) => {
@@ -246,7 +247,7 @@ export function AppShell() {
         ) : (
           <>
             {layoutMode === 'classic' ? <ClassicLayout /> : <FlexibleLayout />}
-            <BottomDrawer />
+            {!isNewProject && !isEmptyState && <BottomDrawer />}
           </>
         )}
       </div>
