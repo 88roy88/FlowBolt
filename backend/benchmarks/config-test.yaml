@@ -1,0 +1,17 @@
+# Minimal test config — 1 prompt, 1 run
+#model: bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
+#model: openrouter/qwen/qwen3.5-9b
+#model: openrouter/qwen/qwen3.5-35b-a3b
+model: openrouter/minimax/minimax-m2.5
+#model: openrouter/nvidia/nemotron-3-nano-30b-a3b
+#model: openrouter/qwen/qwen3-coder-30b-a3b-instruct
+
+runs_per_prompt: 2
+
+prompts:
+#  - name: "Simple Counter"
+#    content: "Build a simple counter app with increment and decrement buttons"
+
+  - name: "People Directory"
+    content: "Build an app that displays a directory of people with their photos and phone numbers"
+    data_source_ids: ["4"]

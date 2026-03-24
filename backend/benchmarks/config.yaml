@@ -1,0 +1,19 @@
+# Run with: uv run benchmarks --config config.yaml
+
+model: bedrock/us.anthropic.claude-sonnet-4-6
+#model: bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
+runs_per_prompt: 5
+
+prompts:
+  - name: "Todo App"
+    content: "Build a simple todo app with add, remove, and mark as complete functionality"
+
+  - name: "Weather Dashboard"
+    content: "Build a weather dashboard that shows current conditions, a 5-day forecast, and a temperature chart"
+
+  - name: "Landing Page"
+    content: "Build a modern SaaS landing page with a hero section, features grid, pricing table, and footer"
+
+  - name: "People Directory"
+    content: "Build an app that displays a directory of people with their photos, names, and phone numbers"
+    data_source_ids: ["4"]
