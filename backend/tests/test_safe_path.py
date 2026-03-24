@@ -35,12 +35,12 @@ def sandbox(tmp_path) -> _DummySandbox:  # type: ignore[type-arg]
 class TestSafePath:
     def test_normal_path(self, sandbox: _DummySandbox) -> None:
         result = sandbox._safe_path("src/App.tsx")
-        assert result.endswith("src/App.tsx")
+        assert result.endswith(os.path.join("src", "App.tsx"))
         assert os.path.isfile(result)
 
     def test_leading_slash_stripped(self, sandbox: _DummySandbox) -> None:
         result = sandbox._safe_path("/src/App.tsx")
-        assert result.endswith("src/App.tsx")
+        assert result.endswith(os.path.join("src", "App.tsx"))
 
     def test_dotdot_attack_blocked(self, sandbox: _DummySandbox) -> None:
         with pytest.raises(PermissionError, match="Path traversal"):
@@ -54,7 +54,7 @@ class TestSafePath:
         """Leading slash is stripped, so /etc/passwd becomes etc/passwd inside workspace."""
         result = sandbox._safe_path("/etc/passwd")
         assert sandbox.workspace_dir in result
-        assert result.endswith("etc/passwd")
+        assert result.endswith(os.path.join("etc", "passwd"))
 
     def test_root_path(self, sandbox: _DummySandbox) -> None:
         result = sandbox._safe_path("/")

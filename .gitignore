@@ -51,3 +51,6 @@ nsjail-repro/
 # Misc artifacts
 *.zip
 frontend/img.png
+
+# AI Instructions
+AI_INSTRUCTIONS.md

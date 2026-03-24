@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_WORKSPACE = str(_BACKEND_ROOT / "data" / "workspaces")
@@ -31,14 +32,20 @@ class Settings(BaseSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
     FLAPI_BASE_URL: str = "http://localhost:4000"
     # Public base URL of this backend, used in HTML exports so API calls work standalone.
-    EXPORT_API_BASE_URL: str = ""
+    EXPORT_API_BASE_URL: str = "http://localhost:8000"
+
+    # S3 / Object Storage
+    S3_ENDPOINT_URL: str = Field(default="", validation_alias="S3_ENDPOINT_URL")
+    S3_ACCESS_KEY: str = Field(default="", validation_alias="S3_ACCESS_KEY")
+    S3_SECRET_KEY: str = Field(default="", validation_alias="S3_SECRET_KEY")
+    S3_BUCKET_NAME: str = Field(default="", validation_alias="S3_BUCKET_NAME")
 
     # Langfuse (optional — set public/secret key to enable)
     LANGFUSE_PUBLIC_KEY: str = ""
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
 
-    model_config = {"env_prefix": "AIB_", "env_file": ".env", "extra": "ignore"}
+    model_config = SettingsConfigDict(env_prefix="AIB_", env_file=".env", extra="ignore")
 
 
 settings = Settings()

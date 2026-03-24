@@ -14,6 +14,7 @@ from flow44.db.project import (
     update_project_data_source,
     update_project_data_sources,
     update_project_model,
+    update_project_published_url,
     update_project_summary,
 )
 
@@ -110,6 +111,16 @@ class TestProjectCRUD:
 
         fetched = await get_project(project.id)
         assert fetched is None
+
+    async def test_update_project_published_url(self, test_db):
+        project = await create_project("App")
+        url = "https://s3.amazonaws.com/my-bucket/project-id/index.html"
+        await update_project_published_url(project.id, url)
+
+        fetched = await get_project(project.id)
+        assert fetched is not None
+        assert fetched.published_url == url
+        assert fetched.updated_at > project.updated_at
 
     async def test_delete_project_cascades_messages(self, test_db):
         project = await create_project("App")
