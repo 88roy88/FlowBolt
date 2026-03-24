@@ -4,35 +4,18 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
-import { playwright } from '@vitest/browser-playwright';
-const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+import { createRequire } from 'node:module';
 
-// More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src')
-    }
-  },
-  server: {
-    proxy: {
-      // API + preview proxy (including WebSocket for Vite HMR in preview)
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true
-      },
-      '/ws': {
-        target: 'ws://localhost:8000',
-        ws: true
-      }
-    }
-  },
-  test: {
-    projects: [
-      // Unit tests — fast, no browser
+const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+
+// Test plugins are loaded conditionally so `pnpm dev` and `pnpm build`
+// work without test dependencies (storybook, playwright, vitest).
+function loadTestProjects(): object[] | undefined {
+  try {
+    const { storybookTest } = require('@storybook/addon-vitest/vitest-plugin');
+    const { playwright } = require('@vitest/browser-playwright');
+    return [
       {
         extends: true,
         test: {
@@ -41,12 +24,11 @@ export default defineConfig({
           environment: 'node',
         },
       },
-      // Storybook interaction tests — browser
       {
         extends: true,
         plugins: [
           storybookTest({
-            configDir: path.join(dirname, '.storybook')
+            configDir: path.join(dirname, '.storybook'),
           }),
         ],
         test: {
@@ -59,6 +41,33 @@ export default defineConfig({
           },
         },
       },
-    ],
+    ];
+  } catch {
+    return undefined;
   }
+}
+
+const testProjects = loadTestProjects();
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(dirname, './src'),
+    },
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+      },
+    },
+  },
+  ...(testProjects ? { test: { projects: testProjects } } : {}),
 });
