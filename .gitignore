@@ -33,9 +33,6 @@ backend/data/
 *.log
 npm-debug.log*
 
-# uv
-uv.lock
-
 # Docker
 docker-compose.override.yml
 
