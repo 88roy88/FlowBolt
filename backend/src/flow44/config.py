@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
     FLAPI_BASE_URL: str = "http://localhost:4000"
     # Public base URL of this backend, used in HTML exports so API calls work standalone.
-    EXPORT_API_BASE_URL: str = ""
+    EXPORT_API_BASE_URL: str = "http://localhost:8000"
 
     # S3 / Object Storage
     S3_ENDPOINT_URL: str = Field(default="", validation_alias="S3_ENDPOINT_URL")

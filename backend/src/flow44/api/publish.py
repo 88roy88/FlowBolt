@@ -43,13 +43,9 @@ async def publish_to_s3(project_id: str) -> dict[str, str]:
         logger.exception("S3 deployment failed for project %s", project_id)
         raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}") from exc
 
-    # Save the published URL in our database
     await update_project_published_url(project_id, s3_url)
 
-    # Instead of returning the raw S3 url, we return the proxy url to the frontend
-    # Since the frontend accesses the app from the same origin, we can construct
-    # the backend URL from settings.
-    base_url = settings.EXPORT_API_BASE_URL or "http://localhost:8000"
+    base_url = settings.EXPORT_API_BASE_URL
     proxy_url = f"{base_url}/api/export/{project_id}/published"
 
     project = await get_project(project_id)

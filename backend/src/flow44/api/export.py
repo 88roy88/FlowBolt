@@ -72,7 +72,7 @@ async def build_single_html(project_id: str) -> str:  # noqa: C901
     # during the build. This is cross-platform (no shell env prefix needed).
     # VITE_BASE=/ overrides the proxy base path so assets use root-relative URLs.
     # VITE_API_BASE sets the backend URL for runtime fetch() calls.
-    api_base = settings.EXPORT_API_BASE_URL or "http://localhost:8000"
+    api_base = settings.EXPORT_API_BASE_URL
     env_file = os.path.join(workspace_dir, ".env.production.local")
     try:
         with open(env_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
