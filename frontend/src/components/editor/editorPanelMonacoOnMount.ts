@@ -1,4 +1,5 @@
 import type { Monaco, OnMount } from '@monaco-editor/react';
+import type { editor as MonacoEditor } from 'monaco-editor';
 import { useFilesStore } from '../../stores/files';
 import {
   normalizeProjectPath,
@@ -32,17 +33,15 @@ export function createEditorPanelMonacoOnMount(deps: {
       });
     }
     deps.importNavigationDisposableRef.current?.dispose();
-    deps.importNavigationDisposableRef.current = editor.onMouseDown((event: {
-      event?: globalThis.MouseEvent;
-      target?: { position?: { lineNumber: number; column: number } | null };
-    }) => {
-      const browserEvent = event?.event;
-      const isCtrlOrCmd = Boolean(browserEvent?.ctrlKey || browserEvent?.metaKey);
+    deps.importNavigationDisposableRef.current = editor.onMouseDown((event: MonacoEditor.IEditorMouseEvent) => {
+      const monacoMouse = event.event;
+      const isCtrlOrCmd = Boolean(monacoMouse.ctrlKey || monacoMouse.metaKey);
       if (!isCtrlOrCmd) return;
 
-      let position = event?.target?.position ?? null;
-      if (!position && browserEvent && typeof browserEvent.clientX === 'number') {
-        const hit = editor.getTargetAtClientPoint(browserEvent.clientX, browserEvent.clientY);
+      let position = event.target.position;
+      if (!position) {
+        const { clientX, clientY } = monacoMouse.browserEvent;
+        const hit = editor.getTargetAtClientPoint(clientX, clientY);
         position = hit?.position ?? null;
       }
       if (!position) return;
@@ -63,8 +62,8 @@ export function createEditorPanelMonacoOnMount(deps: {
       const targetPath = resolveRelativeImportPath(currentPath, importPath, deps.indexedFilesRef.current);
       if (!targetPath) return;
 
-      browserEvent?.preventDefault?.();
-      browserEvent?.stopPropagation?.();
+      monacoMouse.preventDefault();
+      monacoMouse.stopPropagation();
       void deps.openFile(targetPath, 1, 1);
     });
     editor.onDidDispose(() => {
