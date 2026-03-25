@@ -1,4 +1,5 @@
 import type { Monaco } from '@monaco-editor/react';
+import type { editor, IPosition } from 'monaco-editor';
 import {
   findImportedModuleForSymbol,
   normalizeProjectPath,
@@ -72,7 +73,7 @@ export function installMonacoProjectTypes(monaco: Monaco, getIndexedFilePaths: (
 
     if (!monacoImportDefinitionProviderInitialized) {
       const definitionProvider = {
-        provideDefinition(model: monaco.editor.ITextModel, position: monaco.Position) {
+        provideDefinition(model: editor.ITextModel, position: IPosition) {
           const word = model.getWordAtPosition(position);
           if (!word?.word) return null;
 
