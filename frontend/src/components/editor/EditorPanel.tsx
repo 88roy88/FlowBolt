@@ -143,7 +143,7 @@ export function EditorPanel() {
     clearPendingReveal,
     openFile,
   } = useFilesStore();
-  const sessionId = useSessionStore((s: { sessionId: string | null }) => s.sessionId);
+  const sessionId = useSessionStore((s) => s.projectId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
