@@ -549,7 +549,7 @@ export function EditorPanel() {
         </div>
 
         {activeFilePath && activeContent !== undefined ? (
-          <div style={{ flex: 1, overflow: 'hidden' }} dir="ltr">
+          <div data-testid="monaco-editor-host" style={{ flex: 1, overflow: 'hidden' }} dir="ltr">
             <Editor
               theme={editorTheme}
               language={getEditorLanguageForPath(activeFilePath)}
@@ -570,11 +570,17 @@ export function EditorPanel() {
                 }
                 importNavigationDisposableRef.current?.dispose();
                 importNavigationDisposableRef.current = editor.onMouseDown((event: any) => {
-                  const browserEvent = event?.event;
+                  const browserEvent = event?.event as globalThis.MouseEvent | undefined;
                   const isCtrlOrCmd = Boolean(browserEvent?.ctrlKey || browserEvent?.metaKey);
                   if (!isCtrlOrCmd) return;
 
-                  const position = event?.target?.position;
+                  let position = event?.target?.position ?? null;
+                  // Playwright (and sometimes the a11y textarea layer) yields a mouse target without a position;
+                  // map client coordinates to editor position so Ctrl+click still works.
+                  if (!position && browserEvent && typeof browserEvent.clientX === 'number') {
+                    const hit = editor.getTargetAtClientPoint(browserEvent.clientX, browserEvent.clientY);
+                    position = hit?.position ?? null;
+                  }
                   if (!position) return;
 
                   const model = editor.getModel();

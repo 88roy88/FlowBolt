@@ -6,12 +6,23 @@
  */
 import { type Page } from '@playwright/test';
 import {
-  MOCK_PROJECT, MOCK_FILE_TREE, MOCK_APP_TSX, MOCK_MODELS,
+  MOCK_PROJECT,
+  MOCK_FILE_TREE,
+  MOCK_MODELS,
+  CHAT_SEED_EVENTS,
+  MOCK_FILE_CONTENTS,
 } from './data';
+
+function normalizeContentPathParam(encodedPath: string): string {
+  const raw = decodeURIComponent(encodedPath);
+  return raw.replace(/\\/g, '/').replace(/^\/+/, '');
+}
 
 export interface MockAPIOptions {
   /** Initial project list. Defaults to [MOCK_PROJECT]. Pass [] for empty state. */
   projects?: typeof MOCK_PROJECT[];
+  /** Return a minimal chat event replay so the main layout shows Preview/Code (not empty project). */
+  seedChatHistory?: boolean;
 }
 
 export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
@@ -61,7 +72,35 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     if (route.request().method() === 'PUT') {
       return route.fulfill({ status: 200, json: {} });
     }
-    return route.fulfill({ json: { path: 'src/App.tsx', content: MOCK_APP_TSX } });
+    const url = new URL(route.request().url());
+    const pathParam = url.searchParams.get('path') ?? '';
+    const key = normalizeContentPathParam(pathParam);
+    const content = MOCK_FILE_CONTENTS[key] ?? `// e2e placeholder: ${key}\n`;
+    return route.fulfill({ json: { path: pathParam || key, content } });
+  });
+
+  await page.route(`**/api/files/*/search`, async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fulfill({ status: 405, body: 'Method Not Allowed' });
+    }
+    let body: { query?: string } = {};
+    try {
+      body = route.request().postDataJSON() as { query?: string };
+    } catch {
+      /* ignore */
+    }
+    const q = (body.query ?? '').trim();
+    const results =
+      q.includes('E2E_TYPES_MARKER')
+        ? [
+            {
+              path: '/src/types.ts',
+              uri: 'file:///src/types.ts',
+              hits: [{ line: 4, column: 1, preview: '// E2E_TYPES_MARKER' }],
+            },
+          ]
+        : [];
+    return route.fulfill({ json: { query: q, results } });
   });
 
   // --- Chat ---
@@ -70,7 +109,8 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   });
 
   await page.route(`**/api/chat/*/events`, async (route) => {
-    return route.fulfill({ json: [] });
+    const payload = options.seedChatHistory ? CHAT_SEED_EVENTS : [];
+    return route.fulfill({ json: payload });
   });
 
   // --- Models ---
