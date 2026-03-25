@@ -45,7 +45,8 @@ function loadEditorTabs(projectId: string): { openPaths: string[]; activePath: s
   return null;
 }
 
-let _pendingTreeLoad: string | null = null;
+/** Bumps on every loadFileTree call so in-flight responses from older requests are ignored. */
+let _fileTreeRequestSerial = 0;
 
 export const useFilesStore = create<FilesState>((set, get) => ({
   loadedProjectId: null,
@@ -73,17 +74,15 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       });
     }
 
-    // Deduplicate rapid calls (multiple components react to same project change)
-    if (_pendingTreeLoad === projectId) return;
-    _pendingTreeLoad = projectId;
-    try {
-      const tree = await api.fetchFileTree(projectId);
-      // Ignore stale response if project changed while request was in-flight.
-      if (useSessionStore.getState().projectId !== projectId) return;
-      set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
-    } finally {
-      _pendingTreeLoad = null;
-    }
+    const requestId = ++_fileTreeRequestSerial;
+    const tree = await api.fetchFileTree(projectId);
+    // Drop stale responses (newer loadFileTree started, or project switched).
+    if (requestId !== _fileTreeRequestSerial) return;
+    if (useSessionStore.getState().projectId !== projectId) return;
+    set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
+
+    if (requestId !== _fileTreeRequestSerial) return;
+    if (useSessionStore.getState().projectId !== projectId) return;
 
     // Restore previously open tabs if none are open yet
     if (get().openFiles.size === 0) {
