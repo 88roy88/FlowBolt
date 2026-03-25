@@ -1,5 +1,9 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
-import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
+import Editor, { loader, type Monaco, type OnMount } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor';
+
+// Use local monaco-editor instead of CDN
+loader.config({ monaco });
 import { Download, FileCode, Search, Files, ChevronRight } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';

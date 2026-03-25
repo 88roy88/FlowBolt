@@ -39,7 +39,6 @@ function handleFileUpdate(msg: { path: string; content: string }, set: SetState)
   if (filesStore.openFiles.has(msg.path)) {
     filesStore.updateFileContent(msg.path, msg.content);
   }
-  filesStore.loadFileTree();
 }
 
 function handleText(msg: { content: string }, set: SetState) {
@@ -314,7 +313,11 @@ function handleTaskUpdate(
     ),
   }));
   if (msg.file) {
-    useFilesStore.getState().loadFileTree();
+    // Update content if file is open — tree refresh happens on action_complete
+    const filesStore = useFilesStore.getState();
+    if (filesStore.openFiles.has(msg.file)) {
+      filesStore.refreshOpenFiles();
+    }
   }
 }
 
