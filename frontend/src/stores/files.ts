@@ -4,6 +4,7 @@ import * as api from '../services/api';
 import { useSessionStore } from './session';
 
 interface FilesState {
+  loadedProjectId: string | null;
   fileTree: FileEntry[];
   openFiles: Map<string, string>;
   activeFilePath: string | null;
@@ -45,6 +46,7 @@ function loadEditorTabs(projectId: string): { openPaths: string[]; activePath: s
 }
 
 export const useFilesStore = create<FilesState>((set, get) => ({
+  loadedProjectId: null,
   fileTree: [],
   openFiles: new Map(),
   activeFilePath: null,
@@ -56,7 +58,23 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   async loadFileTree() {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
+
+    const state = get();
+    if (state.loadedProjectId !== projectId) {
+      // Hard project boundary: never keep tabs/models between different projects.
+      set({
+        loadedProjectId: projectId,
+        fileTree: [],
+        openFiles: new Map(),
+        activeFilePath: null,
+        pendingRevealLine: null,
+        pendingRevealColumn: null,
+      });
+    }
+
     const tree = await api.fetchFileTree(projectId);
+    // Ignore stale response if project changed while request was in-flight.
+    if (useSessionStore.getState().projectId !== projectId) return;
     set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
 
     // Restore previously open tabs if none are open yet
@@ -148,6 +166,14 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   },
 
   reset() {
-    set({ fileTree: [], openFiles: new Map(), activeFilePath: null, pendingRevealLine: null, pendingRevealColumn: null, revealVersion: 0 });
+    set({
+      loadedProjectId: null,
+      fileTree: [],
+      openFiles: new Map(),
+      activeFilePath: null,
+      pendingRevealLine: null,
+      pendingRevealColumn: null,
+      revealVersion: 0,
+    });
   },
 }));

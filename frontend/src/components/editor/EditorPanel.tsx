@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
-import { Download, FileCode, Search, Files } from 'lucide-react';
+import { Download, FileCode, Search, Files, ChevronRight } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
 import { downloadZip, downloadSingleHtml, fetchFileContent, searchFiles, type SearchResult } from '../../services/api';
@@ -12,7 +12,7 @@ import type { FileEntry } from '../../types';
 const FILE_TREE_MIN = 120;
 const FILE_TREE_MAX = 400;
 
-let monacoTypesInitialized = false;
+let monacoTypeLibDisposables: Array<{ dispose(): void }> = [];
 let monacoImportDefinitionProviderInitialized = false;
 
 const toMonacoUri = (path: string) => {
@@ -155,6 +155,8 @@ export function EditorPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [collapsedSearchFiles, setCollapsedSearchFiles] = useState<Set<string>>(new Set());
   const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [quickOpenQuery, setQuickOpenQuery] = useState('');
@@ -162,6 +164,8 @@ export function EditorPanel() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const quickOpenInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestIdRef = useRef(0);
+  const searchHighlightDecorationIdsRef = useRef<string[]>([]);
+  const searchHighlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedModelsRef = useRef<Set<string>>(new Set());
   const indexedFilesRef = useRef<Set<string>>(new Set());
   const openFilesRef = useRef(openFiles);
@@ -169,6 +173,23 @@ export function EditorPanel() {
   useEffect(() => {
     openFilesRef.current = openFiles;
   }, [openFiles]);
+
+  useEffect(() => {
+    const styleId = 'editor-search-hit-highlight-style';
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      .editor-search-hit-highlight-inline {
+        background: rgba(255, 211, 77, 0.35);
+        border-radius: 2px;
+      }
+      .editor-search-hit-highlight-line {
+        background: rgba(255, 211, 77, 0.08);
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
 
   useEffect(() => {
     const monaco = monacoRef.current;
@@ -370,12 +391,15 @@ export function EditorPanel() {
     const query = searchQuery.trim();
     if (!query) {
       setSearchResults([]);
+      setSearchError(null);
       return;
     }
 
     const requestId = ++searchRequestIdRef.current;
     setSearchBusy(true);
     setSearchResults([]);
+    setSearchError(null);
+    setCollapsedSearchFiles(new Set());
 
     try {
       const results = await searchFiles(sessionId, query, {
@@ -385,6 +409,10 @@ export function EditorPanel() {
       });
       if (searchRequestIdRef.current !== requestId) return;
       setSearchResults(results);
+    } catch (err) {
+      if (searchRequestIdRef.current !== requestId) return;
+      const message = err instanceof Error ? err.message : 'Search failed';
+      setSearchError(message);
     } finally {
       if (searchRequestIdRef.current === requestId) setSearchBusy(false);
     }
@@ -393,6 +421,82 @@ export function EditorPanel() {
     searchQuery,
     sessionId,
   ]);
+
+  const toggleSearchFileCollapsed = useCallback((path: string) => {
+    setCollapsedSearchFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const jumpToSearchHit = useCallback((path: string, line: number, column: number) => {
+    const highlightLength = Math.max(1, searchQuery.trim().length);
+    const normalizedTargetPath = normalizeProjectPath(path);
+
+    const tryReveal = (attempt: number) => {
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+      const activePath = useFilesStore.getState().activeFilePath;
+      const normalizedActivePath = activePath ? normalizeProjectPath(activePath) : '';
+      const model = editor?.getModel();
+
+      if (!editor || !monaco || !model || normalizedActivePath !== normalizedTargetPath) {
+        if (attempt < 12) {
+          setTimeout(() => tryReveal(attempt + 1), 40);
+        }
+        return;
+      }
+
+      const maxLine = model.getLineCount();
+      const safeLine = Math.max(1, Math.min(line, maxLine));
+      const lineMaxColumn = model.getLineMaxColumn(safeLine);
+      const safeColumn = Math.max(1, Math.min(column, lineMaxColumn));
+      const endColumn = Math.max(safeColumn + 1, Math.min(lineMaxColumn, safeColumn + highlightLength));
+
+      const pos = { lineNumber: safeLine, column: safeColumn };
+      editor.setPosition(pos);
+      editor.revealPositionInCenter(pos);
+      editor.focus();
+      editor.setSelection(new monaco.Selection(safeLine, safeColumn, safeLine, endColumn));
+
+      searchHighlightDecorationIdsRef.current = editor.deltaDecorations(
+        searchHighlightDecorationIdsRef.current,
+        [
+          {
+            range: new monaco.Range(safeLine, safeColumn, safeLine, endColumn),
+            options: {
+              inlineClassName: 'editor-search-hit-highlight-inline',
+              isWholeLine: false,
+            },
+          },
+          {
+            range: new monaco.Range(safeLine, 1, safeLine, lineMaxColumn),
+            options: {
+              className: 'editor-search-hit-highlight-line',
+              isWholeLine: true,
+            },
+          },
+        ]
+      );
+
+      if (searchHighlightClearTimerRef.current) {
+        clearTimeout(searchHighlightClearTimerRef.current);
+      }
+      searchHighlightClearTimerRef.current = setTimeout(() => {
+        const activeEditor = editorRef.current;
+        if (!activeEditor) return;
+        searchHighlightDecorationIdsRef.current = activeEditor.deltaDecorations(
+          searchHighlightDecorationIdsRef.current,
+          []
+        );
+      }, 1800);
+    };
+
+    void openFile(path, line, column);
+    tryReveal(0);
+  }, [openFile, searchQuery]);
 
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
@@ -453,8 +557,8 @@ export function EditorPanel() {
         // Mirror frontend/tsconfig.app.json so Monaco diagnostics match the real build.
         target: monaco.languages.typescript.ScriptTarget.ES2020,
         module: monaco.languages.typescript.ModuleKind.ESNext,
-        // Vite uses TS "bundler" module resolution (not NodeNext).
-        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.Bundler,
+        // Monaco's TS worker is more stable with NodeJs resolution for virtual models.
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
         jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
         allowJs: true,
         allowNonTsExtensions: true,
@@ -466,7 +570,6 @@ export function EditorPanel() {
         strict: true,
         skipLibCheck: true,
         noEmit: true,
-        baseUrl: 'file:///',
       };
 
       tsDefaults.setCompilerOptions(sharedCompilerOptions);
@@ -490,41 +593,106 @@ export function EditorPanel() {
       // even though Monaco runs without full access to `node_modules`.
       const reactTypes = `
 declare module 'react' {
+  export type ReactElement = any;
+  export type ReactNode = ReactElement | string | number | boolean | null | undefined | Iterable<ReactNode>;
+  export type Ref<T> = ((instance: T | null) => void) | { current: T | null } | null;
+  export type RefObject<T> = { current: T | null };
+  export type RefAttributes<T> = { ref?: Ref<T> };
+  export type FC<P = {}> = (props: P & { children?: ReactNode }) => ReactElement | null;
+  export type ForwardRefExoticComponent<P> = FC<P>;
+  export type HTMLAttributes<T = Element> = Record<string, any>;
+  export type ButtonHTMLAttributes<T = Element> = Record<string, any>;
+  export type AnchorHTMLAttributes<T = Element> = Record<string, any>;
+  export type Context<T> = { Provider: FC<{ value: T; children?: ReactNode }>; Consumer: FC<{ children: (value: T) => ReactNode }> };
+  export type CSSProperties = Record<string, string | number>;
+  export type SyntheticEvent<T = Element, E = Event> = {
+    nativeEvent: E;
+    target: EventTarget & T;
+    currentTarget: EventTarget & T;
+    stopPropagation(): void;
+    preventDefault(): void;
+  };
+  export type ChangeEvent<T = Element> = SyntheticEvent<T> & { target: EventTarget & T & { value: string } };
+  export type MouseEvent<T = Element, E = globalThis.MouseEvent> = SyntheticEvent<T, E>;
+  export type KeyboardEvent<T = Element, E = globalThis.KeyboardEvent> = SyntheticEvent<T, E> & { key: string };
+  export type FormEvent<T = Element> = SyntheticEvent<T>;
+
   export function useState<T>(initial: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void];
   export function useEffect(effect: () => void | (() => void), deps?: any[]): void;
   export function useRef<T>(initial: T): { current: T };
   export function useCallback<T extends (...args: any[]) => any>(fn: T, deps: any[]): T;
   export function useMemo<T>(fn: () => T, deps: any[]): T;
-  export const StrictMode: any;
-  const React: any;
-  export function useContext<T>(context: React.Context<T>): T;
-  export function createContext<T>(defaultValue: T): React.Context<T>;
+  export function useContext<T>(context: Context<T>): T;
+  export function createContext<T>(defaultValue: T): Context<T>;
   export function memo<T>(component: T): T;
-  export function forwardRef<T, P>(render: (props: P, ref: React.Ref<T>) => React.ReactElement | null): React.ForwardRefExoticComponent<P & React.RefAttributes<T>>;
-  export type FC<P = {}> = (props: P) => React.ReactElement | null;
-  export type ReactNode = React.ReactElement | string | number | boolean | null | undefined | Iterable<ReactNode>;
-  export type ReactElement = any;
-  export type Ref<T> = ((instance: T | null) => void) | { current: T | null } | null;
-  export type RefAttributes<T> = { ref?: Ref<T> };
-  export type ForwardRefExoticComponent<P> = React.FC<P>;
-  export type Context<T> = { Provider: FC<{ value: T; children?: ReactNode }>; Consumer: FC<{ children: (value: T) => ReactNode }> };
-  export type CSSProperties = Record<string, string | number>;
-  export type ChangeEvent<T = Element> = { target: T & { value: string } };
-  export type MouseEvent<T = Element> = { stopPropagation(): void; preventDefault(): void; target: T };
-  export type KeyboardEvent<T = Element> = { key: string; stopPropagation(): void; preventDefault(): void };
-  export type FormEvent<T = Element> = { stopPropagation(): void; preventDefault(): void };
+  export function forwardRef<T, P>(render: (props: P, ref: Ref<T>) => ReactElement | null): ForwardRefExoticComponent<P & RefAttributes<T>>;
+  export const StrictMode: any;
+
+  const React: {
+    StrictMode: any;
+    useState: typeof useState;
+    useEffect: typeof useEffect;
+    useRef: typeof useRef;
+    useCallback: typeof useCallback;
+    useMemo: typeof useMemo;
+    useContext: typeof useContext;
+    createContext: typeof createContext;
+    memo: typeof memo;
+    forwardRef: typeof forwardRef;
+  };
+
+  namespace React {
+    export type ReactElement = import('react').ReactElement;
+    export type ReactNode = import('react').ReactNode;
+    export type Ref<T> = import('react').Ref<T>;
+    export type RefObject<T> = import('react').RefObject<T>;
+    export type RefAttributes<T> = import('react').RefAttributes<T>;
+    export type FC<P = {}> = import('react').FC<P>;
+    export type ForwardRefExoticComponent<P> = import('react').ForwardRefExoticComponent<P>;
+    export type HTMLAttributes<T = Element> = import('react').HTMLAttributes<T>;
+    export type ButtonHTMLAttributes<T = Element> = import('react').ButtonHTMLAttributes<T>;
+    export type AnchorHTMLAttributes<T = Element> = import('react').AnchorHTMLAttributes<T>;
+    export type Context<T> = import('react').Context<T>;
+    export type CSSProperties = import('react').CSSProperties;
+    export type ChangeEvent<T = Element> = import('react').ChangeEvent<T>;
+    export type MouseEvent<T = Element> = import('react').MouseEvent<T>;
+    export type KeyboardEvent<T = Element> = import('react').KeyboardEvent<T>;
+    export type FormEvent<T = Element> = import('react').FormEvent<T>;
+  }
+
   export default React;
-  namespace React {}
 }
 
 declare module 'react-dom/client' {
   export function createRoot(container: Element): { render(element: any): void };
 }
 
-// Minimal Vite + plugin-react declarations for Monaco.
+// Minimal Node + Vite declarations for Monaco.
 // Monaco runs TS in a virtual environment and cannot reliably resolve node_modules.
+declare const process: {
+  cwd(): string;
+  env: Record<string, string | undefined>;
+};
+
 declare module 'vite' {
-  export function defineConfig(config: any): any;
+  export interface ConfigEnv {
+    command: 'build' | 'serve';
+    mode: string;
+    isSsrBuild?: boolean;
+    isPreview?: boolean;
+  }
+
+  export interface UserConfig {
+    base?: string;
+    plugins?: any[];
+    [key: string]: any;
+  }
+
+  export type UserConfigFn = (env: ConfigEnv) => UserConfig | Promise<UserConfig>;
+  export type UserConfigExport = UserConfig | Promise<UserConfig> | UserConfigFn;
+
+  export function defineConfig(config: UserConfigExport): UserConfigExport;
+  export function loadEnv(mode: string, envDir: string, prefixes?: string | string[]): Record<string, string>;
 }
 
 declare module '@vitejs/plugin-react' {
@@ -532,10 +700,44 @@ declare module '@vitejs/plugin-react' {
   export default react;
 }
 
+// Monaco fallback for relative module specifiers inside virtual projects.
+// This suppresses false "Cannot find module './...'" diagnostics when files
+// are present in the sandbox tree but TS worker resolution lags behind.
+declare module './*' {
+  const mod: any;
+  export = mod;
+}
+declare module '../*' {
+  const mod: any;
+  export = mod;
+}
+declare module '../../*' {
+  const mod: any;
+  export = mod;
+}
+declare module '../../../*' {
+  const mod: any;
+  export = mod;
+}
+
 declare module 'react/jsx-runtime' {
   export const Fragment: any;
   export function jsx(type: any, props: any, key?: any): any;
   export function jsxs(type: any, props: any, key?: any): any;
+}
+
+interface ImportMetaEnv {
+  readonly MODE: string;
+  readonly BASE_URL: string;
+  readonly DEV: boolean;
+  readonly PROD: boolean;
+  readonly SSR: boolean;
+  readonly VITE_API_BASE?: string;
+  readonly [key: string]: string | boolean | undefined;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }
 
 declare namespace JSX {
@@ -606,13 +808,15 @@ declare module '*.webp' {
 }
 `;
 
-      if (!monacoTypesInitialized) {
-        // Use stable but unique virtual file names for TS and JS workers.
-        // This avoids cases where both workers share the same extraLib filename.
-        tsDefaults.addExtraLib(reactTypes, 'file:///monaco/ambient/react-vite.d.ts');
-        jsDefaults.addExtraLib(reactTypes, 'file:///monaco/ambient/react-vite.js.d.ts');
-        monacoTypesInitialized = true;
+      // Refresh Monaco extra libs on each mount to avoid stale worker cache
+      // holding old ambient declarations between project/editor reloads.
+      for (const disposable of monacoTypeLibDisposables) {
+        disposable.dispose();
       }
+      monacoTypeLibDisposables = [
+        tsDefaults.addExtraLib(reactTypes, 'file:///monaco/ambient/react-vite.d.ts'),
+        jsDefaults.addExtraLib(reactTypes, 'file:///monaco/ambient/react-vite.js.d.ts'),
+      ];
 
       if (!monacoImportDefinitionProviderInitialized) {
         const definitionProvider = {
@@ -641,7 +845,10 @@ declare module '*.webp' {
       }
     } catch (err) {
       console.error('Monaco types init failed, will retry on next mount:', err);
-      monacoTypesInitialized = false;
+      for (const disposable of monacoTypeLibDisposables) {
+        disposable.dispose();
+      }
+      monacoTypeLibDisposables = [];
       monacoImportDefinitionProviderInitialized = false;
     }
   }, []);
@@ -832,6 +1039,10 @@ declare module '*.webp' {
             <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
               {searchBusy ? (
                 <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Searching…</div>
+              ) : searchError ? (
+                <div style={{ color: 'var(--danger)', fontSize: 13, padding: '8px 0' }}>
+                  Search failed: {searchError}
+                </div>
               ) : searchResults.length === 0 ? (
                 <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: '8px 0' }}>
                   No results. Try another query.
@@ -840,35 +1051,67 @@ declare module '*.webp' {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {searchResults.map((r: SearchResult) => (
                     <div key={r.path} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
-                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                        {r.path} ({r.hits.length})
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {r.hits.map((h: { line: number; column: number; preview: string }, idx: number) => (
-                          <button
-                            key={`${r.path}:${h.line}:${h.column}:${idx}`}
-                            onClick={() => {
-                              openFile(r.path, h.line, h.column);
-                            }}
-                            style={{
-                              textAlign: 'left',
-                              padding: '6px 8px',
-                              borderRadius: 8,
-                              border: '1px solid var(--border)',
-                              background: 'var(--bg)',
-                              cursor: 'pointer',
-                              color: 'var(--text)',
-                              fontSize: 13,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                            title="Jump to match"
-                          >
-                            {h.line}:{h.column} {h.preview}
-                          </button>
-                        ))}
-                      </div>
+                      {(() => {
+                        const isCollapsed = collapsedSearchFiles.has(r.path);
+                        return (
+                          <>
+                            <button
+                              onClick={() => toggleSearchFileCollapsed(r.path)}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                fontSize: 12,
+                                color: 'var(--text-dim)',
+                                marginBottom: isCollapsed ? 0 : 8,
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                textAlign: 'left',
+                              }}
+                              title={isCollapsed ? 'Show matches in this file' : 'Hide matches in this file'}
+                            >
+                              <ChevronRight
+                                size={13}
+                                style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 120ms ease' }}
+                              />
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {r.path} ({r.hits.length})
+                              </span>
+                            </button>
+                            {!isCollapsed && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {r.hits.map((h: { line: number; column: number; preview: string }, idx: number) => (
+                                  <button
+                                    key={`${r.path}:${h.line}:${h.column}:${idx}`}
+                                    onClick={() => {
+                                      jumpToSearchHit(r.path, h.line, h.column);
+                                    }}
+                                    style={{
+                                      textAlign: 'left',
+                                      padding: '6px 8px',
+                                      borderRadius: 8,
+                                      border: '1px solid var(--border)',
+                                      background: 'var(--bg)',
+                                      cursor: 'pointer',
+                                      color: 'var(--text)',
+                                      fontSize: 13,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                    title="Jump to match"
+                                  >
+                                    {h.line}:{h.column} {h.preview}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

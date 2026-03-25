@@ -78,6 +78,7 @@ async def list_files(project_id: str, path: str = "/") -> list[FileEntry]:
                 continue
             abs_path = os.path.join(dir_path, name)
             rel_path = "/" + os.path.relpath(abs_path, workspace)
+            rel_path = rel_path.replace("\\", "/")
             is_dir = os.path.isdir(abs_path)
             children = _build_tree(abs_path) if is_dir else None
             entries.append(FileEntry(name=name, path=rel_path, is_directory=is_dir, children=children))
