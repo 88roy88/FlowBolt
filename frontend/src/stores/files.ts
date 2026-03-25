@@ -44,6 +44,8 @@ function loadEditorTabs(projectId: string): { openPaths: string[]; activePath: s
   return null;
 }
 
+let _pendingTreeLoad: string | null = null;
+
 export const useFilesStore = create<FilesState>((set, get) => ({
   fileTree: [],
   openFiles: new Map(),
@@ -56,8 +58,15 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   async loadFileTree() {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
-    const tree = await api.fetchFileTree(projectId);
-    set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
+    // Deduplicate rapid calls (multiple components react to same project change)
+    if (_pendingTreeLoad === projectId) return;
+    _pendingTreeLoad = projectId;
+    try {
+      const tree = await api.fetchFileTree(projectId);
+      set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
+    } finally {
+      _pendingTreeLoad = null;
+    }
 
     // Restore previously open tabs if none are open yet
     if (get().openFiles.size === 0) {

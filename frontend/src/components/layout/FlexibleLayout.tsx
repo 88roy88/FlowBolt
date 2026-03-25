@@ -51,6 +51,9 @@ export function FlexibleLayout() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
   
+  const messages = useChatStore((s) => s.messages);
+  const historyLoaded = useChatStore((s) => s.historyLoaded);
+  const isNewProject = !historyLoaded || messages.length === 0;
   const isPublished = !!currentProject?.published_url;
 
   const handlePublish = useCallback(async () => {
@@ -121,6 +124,16 @@ export function FlexibleLayout() {
       case 'preview': return <Preview />;
     }
   };
+
+  if (isNewProject) {
+    return (
+      <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
+        <div className="flex-1 min-h-0 h-full overflow-hidden">
+          <ChatPanel />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
