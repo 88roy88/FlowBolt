@@ -21,6 +21,18 @@ export const test = base.extend<{
     if (isMock) {
       await setupMockWS(page);
       await setupMockAPI(page, mockOptions);
+      // Avoid cross-test leakage in the same worker (e.g. editor sets has-projects; AppShell caches
+      // project-has-messages). Register first so describe-level addInitScript can override.
+      await page.addInitScript(() => {
+        try {
+          localStorage.removeItem('has-projects');
+          for (const k of Object.keys(localStorage)) {
+            if (k.startsWith('project-has-messages:')) localStorage.removeItem(k);
+          }
+        } catch {
+          /* ignore */
+        }
+      });
     }
     await use(page);
   },
