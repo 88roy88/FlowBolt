@@ -143,7 +143,7 @@ export function AppShell() {
 
   const IconRail = () => (
     <div className="flex flex-col items-center h-full py-2 gap-1">
-      <button onClick={() => setSidebarPinned(true)} title="Expand sidebar" className="mb-1 shrink-0">
+      <button onClick={() => setSidebarPinned(true)} title={t('sidebar.expandSidebar')} className="mb-1 shrink-0">
         <FlowLogo size={18} className="text-[#2bbcc4]" />
       </button>
       <div className="w-8 h-px bg-border shrink-0" />

@@ -185,7 +185,7 @@ export function FlexibleLayout() {
 
         {isPublished && projectId && (
           <a
-            title="View Published App"
+            title={t('preview.viewPublishedApp')}
             href={`/api/export/${projectId}/published`}
             target="_blank"
             rel="noopener noreferrer"

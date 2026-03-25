@@ -12,7 +12,8 @@
     "settings": "הגדרות",
     "projectName": "שם הפרויקט",
     "show": "הצג",
-    "hide": "הסתר"
+    "hide": "הסתר",
+    "sendMessage": "שלח הודעה"
   },
   "app": {
     "selectProjectFirst": "בחר פרויקט תחילה",
@@ -24,6 +25,7 @@
   "sidebar": {
     "pinSidebar": "נעץ סרגל צד",
     "unpinSidebar": "בטל נעיצת סרגל צד",
+    "expandSidebar": "הרחב סרגל צד",
     "newProject": "פרויקט חדש",
     "scaffolding": "מכין פרויקט...",
     "rename": "שנה שם",
@@ -56,7 +58,8 @@
     "selectFileToEdit": "בחר קובץ לעריכה",
     "noProjectSelected": "לא נבחר פרויקט",
     "noFileSelected": "לא נבחר קובץ",
-    "selectFile": "בחר קובץ מהעץ כדי להציג את תוכנו"
+    "selectFile": "בחר קובץ מהעץ כדי להציג את תוכנו",
+    "closeTab": "סגור"
   },
   "terminal": {
     "terminal": "טרמינל",
@@ -101,6 +104,7 @@
     "chat": "צ'אט",
     "send": "שלח",
     "newLine": "שורה חדשה",
+    "scrollToBottom": "גלול לתחתית",
     "placeholder": {
       "selectProject": "בחר פרויקט תחילה",
       "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר, שנה או דחה",
@@ -131,7 +135,8 @@
       "uiux": "ממשק משתמש/חווית משתמש"
     },
     "dataSource": {
-      "removeDataSource": "הסר מקור נתונים"
+      "removeDataSource": "הסר מקור נתונים",
+      "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)"
     }
   },
   "publish": {

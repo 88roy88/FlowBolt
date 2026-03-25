@@ -97,7 +97,7 @@ export function PromptInput() {
               <button
                 onClick={() => removeDataSource(c.id)}
                 className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20"
-                title="Remove data source"
+                title={t('chat.dataSource.removeDataSource')}
               >
                 <X size={12} />
               </button>
@@ -163,7 +163,7 @@ export function PromptInput() {
               ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
               : 'bg-border text-muted-foreground opacity-40 cursor-default'
           }`}
-          title="Send message"
+          title={t('common.sendMessage')}
         >
           <ArrowUp size={16} strokeWidth={2.5} />
         </button>

@@ -92,7 +92,7 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
-          placeholder="Search data sources (optional)"
+          placeholder={t('chat.dataSource.searchPlaceholder')}
           className="flex-1 text-[13px] bg-transparent"
         />
       </div>

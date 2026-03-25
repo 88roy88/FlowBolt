@@ -20,7 +20,8 @@ i18n
     interpolation: {
       escapeValue: false, // React already escapes
     },
-  });
+    showSupportNotice: false,
+  } as any);
 
 // Update dir attribute when language changes
 i18n.on('languageChanged', (lng) => {

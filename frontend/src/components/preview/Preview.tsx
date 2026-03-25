@@ -78,7 +78,7 @@ export function Preview() {
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           className="flex-1 w-full border-none"
           style={{ background: 'var(--preview-bg)' }}
-          title="App Preview"
+          title={t('preview.title')}
           data-testid="preview-iframe"
         />
       ) : (

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,11 +40,12 @@ const DialogContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
 DialogContent.displayName = 'DialogContent';
 
 function DialogClose({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClose}
       className="absolute top-3 end-3 rounded p-1 text-muted-foreground hover:text-foreground"
-      title="Close"
+      title={t('common.close')}
     >
       <X size={18} />
     </button>

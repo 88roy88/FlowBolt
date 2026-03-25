@@ -12,7 +12,8 @@
     "settings": "Settings",
     "projectName": "Project name",
     "show": "Show",
-    "hide": "Hide"
+    "hide": "Hide",
+    "sendMessage": "Send message"
   },
   "app": {
     "selectProjectFirst": "Select a project first",
@@ -24,6 +25,7 @@
   "sidebar": {
     "pinSidebar": "Pin sidebar open",
     "unpinSidebar": "Unpin sidebar",
+    "expandSidebar": "Expand sidebar",
     "newProject": "New Project",
     "scaffolding": "Scaffolding project...",
     "rename": "Rename",
@@ -56,7 +58,8 @@
     "selectFileToEdit": "Select a file to edit",
     "noProjectSelected": "No project selected",
     "noFileSelected": "No file selected",
-    "selectFile": "Select a file from the tree to view its contents"
+    "selectFile": "Select a file from the tree to view its contents",
+    "closeTab": "Close"
   },
   "terminal": {
     "terminal": "Terminal",
@@ -101,6 +104,7 @@
     "chat": "Chat",
     "send": "send",
     "newLine": "new line",
+    "scrollToBottom": "Scroll to bottom",
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept, modify, or reject",
@@ -131,7 +135,8 @@
       "uiux": "UI/UX"
     },
     "dataSource": {
-      "removeDataSource": "Remove data source"
+      "removeDataSource": "Remove data source",
+      "searchPlaceholder": "Search data sources (optional)"
     }
   },
   "publish": {

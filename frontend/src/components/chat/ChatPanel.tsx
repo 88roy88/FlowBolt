@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { ChatMessage } from './ChatMessage';
@@ -11,6 +12,7 @@ import { FixProgressCard } from './cards/FixProgressCard';
 import { FollowUpProgress } from './cards/FollowUpProgress';
 
 export function ChatPanel() {
+  const { t } = useTranslation();
   const {
     messages, isStreaming, currentAssistantMessage, actions, error, clearError,
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs,
@@ -116,7 +118,7 @@ export function ChatPanel() {
         <button
           onClick={scrollToBottom}
           className="absolute bottom-[120px] start-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-surface border border-border shadow-[var(--shadow-md)] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150 z-10"
-          title="Scroll to bottom"
+          title={t('chat.scrollToBottom')}
         >
           <ArrowDown size={16} />
         </button>
