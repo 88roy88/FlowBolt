@@ -23,12 +23,12 @@ def generate_report(results_dir: Path, model: str) -> str:
     avg_duration = sum(r.get("duration_s", 0) for r in runs) / total_runs
 
     lines = [
-        f"# Benchmark Report",
-        f"",
+        "# Benchmark Report",
+        "",
         f"**Model:** `{model}` | **Runs:** {total_runs}",
-        f"",
-        f"| Prompt | Run | Agent | Build | Auto-fix | Duration | Tokens | Cost | Files | Preview |",
-        f"|--------|-----|-------|-------|---------|----------|--------|------|-------|---------|",
+        "",
+        "| Prompt | Run | Agent | Build | Auto-fix | Duration | Tokens | Cost | Files | Preview |",
+        "|--------|-----|-------|-------|---------|----------|--------|------|-------|---------|",
     ]
 
     for r in runs:
@@ -44,9 +44,9 @@ def generate_report(results_dir: Path, model: str) -> str:
         lines.append(f"| {r['prompt_name']} | {r['run']} | {agent_ok} | {build_ok} | {auto_fix} | {duration} | {tokens_k} | {cost} | {files} | {preview} |")
 
     lines += [
-        f"",
-        f"## Summary",
-        f"",
+        "",
+        "## Summary",
+        "",
         f"- **Agent success:** {successes}/{total_runs} ({successes * 100 // total_runs}%)",
         f"- **Build success:** {sum(1 for r in runs if r.get('build_success'))}/{total_runs}",
         f"- **Avg duration:** {avg_duration:.0f}s",

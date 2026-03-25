@@ -14,7 +14,6 @@ from typing import Any
 
 from app.sandbox.filesystem import _resolve_safe
 
-
 SKIP_DIRS = {"node_modules", ".git", ".next", "dist", ".cache", "__pycache__", ".vite"}
 DEFAULT_ALLOWED_EXTS = {
     ".ts",
@@ -116,7 +115,7 @@ def _iter_files(workspace: str) -> list[tuple[str, str, int, int]]:
 async def _read_text(abs_path: str, max_bytes: int) -> str | None:
     def _read() -> str | None:
         try:
-            with open(abs_path, "r", encoding="utf-8", errors="replace") as fh:
+            with open(abs_path, encoding="utf-8", errors="replace") as fh:
                 data = fh.read(max_bytes + 1)
                 if len(data) > max_bytes:
                     return None
@@ -298,7 +297,7 @@ async def _search_overflow_file(
     def _run() -> list[dict[str, Any]]:
         hits: list[dict[str, Any]] = []
         try:
-            with open(abs_path, "r", encoding="utf-8", errors="replace") as fh:
+            with open(abs_path, encoding="utf-8", errors="replace") as fh:
                 for line_no, line in enumerate(fh, start=1):
                     hay = line if case_sensitive else line.lower()
                     from_idx = 0

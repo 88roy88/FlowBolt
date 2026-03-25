@@ -14,7 +14,6 @@ from typing import Any
 
 from flow44.sandbox.filesystem import _resolve_safe
 
-
 SKIP_DIRS = {"node_modules", ".git", ".next", "dist", ".cache", "__pycache__", ".vite"}
 DEFAULT_ALLOWED_EXTS = {
     ".ts",
@@ -113,10 +112,15 @@ def _iter_files(workspace: str) -> list[tuple[str, str, int, int]]:
     return out
 
 
+def _resolve_workspace(project_id: str) -> str:
+    workspace_path, _ = _resolve_safe(project_id, "/")
+    return os.path.realpath(workspace_path)
+
+
 async def _read_text(abs_path: str, max_bytes: int) -> str | None:
     def _read() -> str | None:
         try:
-            with open(abs_path, "r", encoding="utf-8", errors="replace") as fh:
+            with open(abs_path, encoding="utf-8", errors="replace") as fh:
                 data = fh.read(max_bytes + 1)
                 if len(data) > max_bytes:
                     return None
@@ -127,7 +131,7 @@ async def _read_text(abs_path: str, max_bytes: int) -> str | None:
     return await asyncio.to_thread(_read)
 
 
-async def ensure_index(
+async def ensure_index(  # noqa: C901, PLR0912
     project_id: str,
     *,
     allowed_exts: set[str] | None = None,
@@ -142,8 +146,7 @@ async def ensure_index(
         if idx is not None and (now - idx.last_built_ts) < stale_after_s:
             return idx
 
-        workspace_path, _ = _resolve_safe(project_id, "/")
-        workspace = os.path.realpath(workspace_path)
+        workspace = _resolve_workspace(project_id)
         exts = allowed_exts or DEFAULT_ALLOWED_EXTS
 
         if idx is None:
@@ -210,7 +213,7 @@ async def ensure_index(
         return idx
 
 
-async def search_across_files(
+async def search_across_files(  # noqa: C901, PLR0912
     project_id: str,
     query: str,
     *,
@@ -287,7 +290,7 @@ async def _search_overflow_file(
     def _run() -> list[dict[str, Any]]:
         hits: list[dict[str, Any]] = []
         try:
-            with open(abs_path, "r", encoding="utf-8", errors="replace") as fh:
+            with open(abs_path, encoding="utf-8", errors="replace") as fh:
                 for line_no, line in enumerate(fh, start=1):
                     hay = line if case_sensitive else line.lower()
                     from_idx = 0
