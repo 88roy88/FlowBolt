@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from flow44.main import app
+from flow44.config import settings
 
 client = TestClient(app)
 
@@ -24,7 +25,7 @@ async def test_proxy_published_app_headers():
             response = client.get(f"/api/export/{project_id}/published")
 
             assert response.status_code == 200
-            assert response.headers["Cache-Control"] == "public, max-age=0, must-revalidate"
+            assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
             assert response.headers["ETag"] == '"12345"'
             assert response.headers["Last-Modified"] == "Wed, 21 Oct 2015 07:28:00 GMT"
             assert response.text == "<html>Testing headers</html>"

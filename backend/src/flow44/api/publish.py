@@ -74,7 +74,7 @@ async def proxy_published_app(project_id: str) -> HTMLResponse:
             resp.raise_for_status()
 
             # Forward some headers from S3 for better caching behavior
-            headers = {"Cache-Control": "public, max-age=0, must-revalidate"}
+            headers = {"Cache-Control": f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"}
             if "etag" in resp.headers:
                 headers["ETag"] = resp.headers["etag"]
             if "last-modified" in resp.headers:
