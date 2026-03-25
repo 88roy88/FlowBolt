@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
@@ -7,6 +8,7 @@ import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 
 export function PromptInput() {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const [showDsSelector, setShowDsSelector] = useState(false);
@@ -62,20 +64,20 @@ export function PromptInput() {
   }, []);
 
   const placeholder = !projectId
-    ? 'Select a project first'
+    ? t('chat.placeholder.selectProject')
     : agentPhase === 'awaiting_approval'
-      ? 'Review the plan above, then accept, modify, or reject'
+      ? t('chat.placeholder.reviewPlan')
       : isBusy
-        ? 'AI is working...'
-        : 'Describe what you want to build...';
+        ? t('chat.placeholder.working')
+        : t('chat.placeholder.default');
 
   const busyLabel =
-    agentPhase === 'classifying' ? 'Analyzing' :
-    agentPhase === 'fetching_data_sources' ? 'Fetching data sources' :
-    agentPhase === 'designing' ? 'Designing' :
-    agentPhase === 'planning' ? 'Planning' :
-    agentPhase === 'executing' ? 'Building' :
-    'Thinking';
+    agentPhase === 'classifying' ? t('chat.phase.analyzing') :
+    agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
+    agentPhase === 'designing' ? t('chat.phase.designing') :
+    agentPhase === 'planning' ? t('chat.phase.planning') :
+    agentPhase === 'executing' ? t('chat.phase.building') :
+    t('chat.phase.thinking');
 
   return (
     <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
@@ -176,9 +178,9 @@ export function PromptInput() {
           )}
         </div>
         <span className="text-[11px] text-muted-foreground/60 hidden md:inline shrink-0">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Enter</kbd> send
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Enter</kbd> {t('chat.send')}
           <span className="mx-1">·</span>
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Shift+Enter</kbd> new line
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Shift+Enter</kbd> {t('chat.newLine')}
         </span>
       </div>
     </div>

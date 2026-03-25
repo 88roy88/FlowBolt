@@ -1,0 +1,144 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "create": "Create",
+    "delete": "Delete",
+    "save": "Save",
+    "edit": "Edit",
+    "add": "Add",
+    "loading": "Loading",
+    "retry": "Retry",
+    "settings": "Settings",
+    "projectName": "Project name",
+    "show": "Show",
+    "hide": "Hide"
+  },
+  "app": {
+    "selectProjectFirst": "Select a project first",
+    "backendUnavailable": "Backend Server Unavailable",
+    "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
+    "retryConnection": "Retry Connection",
+    "createFirstProject": "Create your first project to get started"
+  },
+  "sidebar": {
+    "pinSidebar": "Pin sidebar open",
+    "unpinSidebar": "Unpin sidebar",
+    "newProject": "New Project",
+    "scaffolding": "Scaffolding project...",
+    "rename": "Rename",
+    "summary": "Summary",
+    "confirmDelete": "Confirm delete?"
+  },
+  "settings": {
+    "title": "Settings",
+    "layout": "Layout",
+    "layoutClassic": "Classic",
+    "layoutClassicDesc": "Chat + tabbed panels",
+    "layoutFlexible": "Flexible",
+    "layoutFlexibleDesc": "Independent panels",
+    "theme": "Theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "notifications": "Notifications",
+    "buildAlertsOn": "Build alerts on",
+    "buildAlertsOff": "Build alerts off",
+    "language": "Language",
+    "english": "English",
+    "hebrew": "Hebrew"
+  },
+  "editor": {
+    "files": "Files",
+    "exportZip": "Export ZIP",
+    "exportHtml": "Export HTML",
+    "saving": "Saving",
+    "saved": "Saved",
+    "selectFileToEdit": "Select a file to edit",
+    "noProjectSelected": "No project selected",
+    "noFileSelected": "No file selected",
+    "selectFile": "Select a file from the tree to view its contents"
+  },
+  "terminal": {
+    "terminal": "Terminal",
+    "console": "Console",
+    "server": "Server",
+    "serverLog": "Server Log",
+    "clear": "Clear",
+    "clearConsole": "Clear console",
+    "entry": "entry",
+    "entries": "entries",
+    "noConsoleOutput": "No console output"
+  },
+  "preview": {
+    "title": "Preview",
+    "code": "Code",
+    "loading": "Loading preview...",
+    "error": "Failed to load preview",
+    "refresh": "Refresh",
+    "refreshPreview": "Refresh preview",
+    "open": "Open",
+    "openInNewTab": "Open in new tab",
+    "noPreviewAvailable": "No preview available",
+    "viewLive": "View Live",
+    "viewPublishedApp": "View Published App",
+    "publish": "Publish",
+    "republish": "Republish",
+    "publishing": "Publishing...",
+    "publishToS3": "Publish to S3"
+  },
+  "errors": {
+    "connectionError": "Connection Error",
+    "failedToConnect": "Cannot connect to backend server. Please ensure the server is running.",
+    "buildError": "Build Error",
+    "runtimeError": "Runtime Error",
+    "consoleError": "Console Error",
+    "openInEditor": "Open in editor",
+    "retry": "Retry",
+    "fixWithAI": "Fix with AI",
+    "dismiss": "Dismiss"
+  },
+  "chat": {
+    "chat": "Chat",
+    "send": "send",
+    "newLine": "new line",
+    "placeholder": {
+      "selectProject": "Select a project first",
+      "reviewPlan": "Review the plan above, then accept, modify, or reject",
+      "working": "AI is working...",
+      "default": "Describe what you want to build..."
+    },
+    "phase": {
+      "analyzing": "Analyzing",
+      "fetchingDataSources": "Fetching data sources",
+      "designing": "Designing",
+      "planning": "Planning",
+      "building": "Building",
+      "thinking": "Thinking"
+    },
+    "plan": {
+      "whatYouWillGet": "What you'll get",
+      "keyDecisions": "Key decisions",
+      "otherOptions": "Other options",
+      "modifyPlaceholder": "What would you like to change? e.g. 'Use a dark theme instead' or 'I prefer local storage over a database'",
+      "looksGood": "Looks good, build it",
+      "changeSomething": "Change something",
+      "sendFeedback": "Send feedback",
+      "startOver": "Start over"
+    },
+    "design": {
+      "designComplete": "Design complete",
+      "architecture": "Architecture",
+      "uiux": "UI/UX"
+    },
+    "dataSource": {
+      "removeDataSource": "Remove data source"
+    }
+  },
+  "publish": {
+    "publishFailed": "Publish Failed",
+    "successfullyPublished": "Successfully Published!",
+    "projectIsLive": "Your project is now live. Anyone with this link can view it.",
+    "copyLink": "Copy link",
+    "openLive": "Open Live"
+  }
+}

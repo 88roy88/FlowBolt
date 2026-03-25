@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import './i18n';
 import { useSessionStore } from './stores/session';
 import { useChatStore } from './stores/chat';
 import { useFilesStore } from './stores/files';
@@ -17,6 +19,7 @@ function getProjectIdFromHash(): string | null {
 }
 
 export default function App() {
+  const { t } = useTranslation();
   const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
   const loadHistory = useChatStore((s) => s.loadHistory);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
@@ -66,12 +69,12 @@ export default function App() {
       if (!isAvailable) {
         useErrorStore.getState().pushError({
           source: 'connection',
-          message: 'Cannot connect to backend server. Please ensure the server is running.',
+          message: t('errors.failedToConnect'),
         });
       }
     }
     checkBackend();
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadProjects()
@@ -80,11 +83,11 @@ export default function App() {
         // Show connection error to user
         useErrorStore.getState().pushError({
           source: 'connection',
-          message: 'Failed to connect to backend server. Please ensure the server is running.',
+          message: t('errors.failedToConnect'),
         });
       })
       .finally(() => setLoading(false));
-  }, [loadProjects]);
+  }, [loadProjects, t]);
 
   // On load: match URL hash to a project, or auto-select first
   useEffect(() => {
@@ -177,10 +180,10 @@ export default function App() {
               textAlign: 'center',
             }}>
               <p style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' }}>
-                Backend Server Unavailable
+                {t('app.backendUnavailable')}
               </p>
               <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>
-                Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.
+                {t('app.cannotConnect')}
               </p>
             </div>
             <button
@@ -193,16 +196,16 @@ export default function App() {
                 fontWeight: 600,
               }}
             >
-              Retry Connection
+              {t('app.retryConnection')}
             </button>
           </>
         ) : (
           <>
-            <p style={{ color: 'var(--text-dim)' }}>Create your first project to get started</p>
+            <p style={{ color: 'var(--text-dim)' }}>{t('app.createFirstProject')}</p>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
-                placeholder="Project name"
+                placeholder={t('common.projectName')}
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
@@ -224,7 +227,7 @@ export default function App() {
                   fontWeight: 600,
                 }}
               >
-                Create
+                {t('common.create')}
               </button>
             </div>
           </>

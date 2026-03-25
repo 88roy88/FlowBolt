@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronUp } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Resizer } from './Resizer';
@@ -33,6 +34,7 @@ function loadLayoutMode(): LayoutMode {
 }
 
 export function AppShell() {
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
 
   // All hooks must be called before any conditional returns
@@ -140,7 +142,7 @@ export function AppShell() {
         className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer"
       >
         <ChevronUp size={14} className={`transition-transform duration-200 ${!bottomOpen ? '' : 'rotate-180'}`} />
-        <span className="font-medium">{bottomTab === 'server' ? 'Server Log' : bottomTab === 'console' ? 'Console' : 'Terminal'}</span>
+        <span className="font-medium">{bottomTab === 'server' ? t('terminal.serverLog') : bottomTab === 'console' ? t('terminal.console') : t('terminal.terminal')}</span>
         {!bottomOpen && (
           <div className="flex gap-2 ml-auto">
             {(['server', 'terminal', 'console'] as BottomTab[]).map((tab) => (
@@ -170,7 +172,7 @@ export function AppShell() {
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {tab === 'server' ? 'Server' : tab === 'console' ? 'Console' : 'Terminal'}
+                {tab === 'server' ? t('terminal.server') : tab === 'console' ? t('terminal.console') : t('terminal.terminal')}
               </button>
             ))}
           </div>

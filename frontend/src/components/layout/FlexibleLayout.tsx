@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, Code2, Eye, Globe, Loader2 } from 'lucide-react';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -12,10 +13,10 @@ import { ExternalLink } from 'lucide-react';
 
 type PaneId = 'chat' | 'code' | 'preview';
 
-const PANE_CONFIG: Record<PaneId, { icon: typeof MessageSquare; label: string }> = {
-  chat: { icon: MessageSquare, label: 'Chat' },
-  code: { icon: Code2, label: 'Code' },
-  preview: { icon: Eye, label: 'Preview' },
+const PANE_ICONS: Record<PaneId, typeof MessageSquare> = {
+  chat: MessageSquare,
+  code: Code2,
+  preview: Eye,
 };
 
 const MIN_PANE_PCT = 20;
@@ -41,6 +42,7 @@ function saveLayout(visible: Set<PaneId>, sizes: Record<PaneId, number>) {
 }
 
 export function FlexibleLayout() {
+  const { t } = useTranslation();
   const [initial] = useState(loadLayout);
   const [visiblePanes, setVisiblePanes] = useState<Set<PaneId>>(new Set(initial.visible));
   const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>(initial.sizes);
@@ -159,13 +161,15 @@ export function FlexibleLayout() {
       </div>
 
       <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1.5 rounded-xl bg-surface/90 backdrop-blur-lg border border-border/60 shadow-xl opacity-60 hover:opacity-100 transition-opacity duration-200">
-        {(Object.entries(PANE_CONFIG) as [PaneId, typeof PANE_CONFIG[PaneId]][]).map(([id, { icon: Icon, label }]) => {
+        {(Object.keys(PANE_ICONS) as PaneId[]).map((id) => {
+          const Icon = PANE_ICONS[id];
           const isActive = visiblePanes.has(id);
+          const label = id === 'chat' ? t('chat.chat') : id === 'code' ? t('preview.code') : t('preview.title');
           return (
             <button
               key={id}
               onClick={() => togglePane(id)}
-              title={`${isActive ? 'Hide' : 'Show'} ${label}`}
+              title={`${isActive ? t('common.hide') : t('common.show')} ${label}`}
               className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 ${
                 isActive
                   ? 'text-primary bg-primary/15 shadow-sm'

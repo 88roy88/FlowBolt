@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogTitle, DialogClose } from './dialog';
 import { Copy, ExternalLink, Check, AlertCircle } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface PublishModalProps {
 }
 
 export function PublishModal({ open, onOpenChange, url, errorMessage }: PublishModalProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -35,13 +37,13 @@ export function PublishModal({ open, onOpenChange, url, errorMessage }: PublishM
           </div>
           
           <DialogTitle className="text-xl font-medium tracking-tight">
-            {isError ? 'Publish Failed' : 'Successfully Published!'}
+            {isError ? t('publish.publishFailed') : t('publish.successfullyPublished')}
           </DialogTitle>
-          
+
           <p className="text-sm text-muted-foreground/80 pb-2">
-            {isError 
-              ? errorMessage 
-              : 'Your project is now live. Anyone with this link can view it.'}
+            {isError
+              ? errorMessage
+              : t('publish.projectIsLive')}
           </p>
           
           {!isError && url && (
@@ -52,7 +54,7 @@ export function PublishModal({ open, onOpenChange, url, errorMessage }: PublishM
               <button
                 onClick={handleCopy}
                 className="p-2 h-full rounded-md hover:bg-muted/80 text-foreground transition-colors group"
-                title="Copy link"
+                title={t('publish.copyLink')}
               >
                 {copied ? <Check size={16} className="text-primary" /> : <Copy size={16} className="group-hover:text-primary transition-colors" />}
               </button>
@@ -64,7 +66,7 @@ export function PublishModal({ open, onOpenChange, url, errorMessage }: PublishM
               onClick={() => onOpenChange(false)}
               className="flex-1 px-4 py-2.5 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm font-medium"
             >
-              Close
+              {t('common.close')}
             </button>
             {!isError && url && (
               <a
@@ -75,7 +77,7 @@ export function PublishModal({ open, onOpenChange, url, errorMessage }: PublishM
                 onClick={() => onOpenChange(false)}
               >
                 <ExternalLink size={16} />
-                Open Live
+                {t('publish.openLive')}
               </a>
             )}
           </div>

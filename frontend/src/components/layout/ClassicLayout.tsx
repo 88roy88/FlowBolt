@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Globe, Loader2 } from 'lucide-react';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -16,6 +17,7 @@ const MAIN_SPLIT_MIN = 0.2;
 const MAIN_SPLIT_MAX = 0.8;
 
 export function ClassicLayout() {
+  const { t } = useTranslation();
   const [rightTab, setRightTab] = useState<RightTab>('preview');
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
@@ -91,7 +93,7 @@ export function ClassicLayout() {
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {tab}
+              {tab === 'preview' ? t('preview.title') : t('preview.code')}
             </button>
           ))}
 
@@ -102,14 +104,14 @@ export function ClassicLayout() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 text-primary border border-primary/20 hover:bg-primary/10 shadow-sm"
-                title="View Published App"
+                title={t('preview.viewPublishedApp')}
               >
                 <ExternalLink size={13} />
-                View Live
+                {t('preview.viewLive')}
               </a>
             )}
             <button
-          title={isPublished ? "Republish" : "Publish to S3"}
+          title={isPublished ? t('preview.republish') : t('preview.publishToS3')}
           disabled={!projectId || isPublishing}
               onClick={handlePublish}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 ${
@@ -119,7 +121,7 @@ export function ClassicLayout() {
               }`}
             >
               {isPublishing ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
-              {isPublishing ? 'Publishing...' : isPublished ? 'Republish' : 'Publish'}
+              {isPublishing ? t('preview.publishing') : isPublished ? t('preview.republish') : t('preview.publish')}
             </button>
           </div>
         </div>

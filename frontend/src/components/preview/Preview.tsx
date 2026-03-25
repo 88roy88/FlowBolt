@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useConsoleStore } from '../../stores/console';
@@ -6,6 +7,7 @@ import { RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '../ui/button';
 
 export function Preview() {
+  const { t } = useTranslation();
   const projectId = useSessionStore((s) => s.projectId);
   const saveVersion = useFilesStore((s) => s.saveVersion);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -43,7 +45,7 @@ export function Preview() {
   if (!projectId) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-        No preview available
+        {t('preview.noPreviewAvailable')}
       </div>
     );
   }
@@ -52,18 +54,18 @@ export function Preview() {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-border shrink-0">
-        <Button variant="outline" size="sm" onClick={handleRefresh} title="Refresh preview">
+        <Button variant="outline" size="sm" onClick={handleRefresh} title={t('preview.refreshPreview')}>
           <RefreshCw size={14} />
-          Refresh
+          {t('preview.refresh')}
         </Button>
         {previewUrl && (
-          <Button variant="outline" size="sm" onClick={() => window.open(previewUrl, '_blank')} title="Open in new tab">
+          <Button variant="outline" size="sm" onClick={() => window.open(previewUrl, '_blank')} title={t('preview.openInNewTab')}>
             <ExternalLink size={14} />
-            Open
+            {t('preview.open')}
           </Button>
         )}
         <span className="text-xs text-muted-foreground truncate">
-          {previewUrl ?? 'Loading...'}
+          {previewUrl ?? t('preview.loading')}
         </span>
       </div>
 
@@ -81,7 +83,7 @@ export function Preview() {
         />
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          {loading ? 'Loading preview...' : 'No preview available'}
+          {loading ? t('preview.loading') : t('preview.noPreviewAvailable')}
         </div>
       )}
     </div>
