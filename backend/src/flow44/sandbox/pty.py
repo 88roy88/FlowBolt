@@ -89,17 +89,25 @@ class PtyHandle:
             os.close(self.read_fd)
         except OSError:
             pass
+        self._terminate_process()
+
+    def _terminate_process(self) -> None:
+        """Kill the PTY process. Handles both Unix (killpg) and Windows (kill)."""
         try:
-            os.killpg(os.getpgid(self.pid), signal.SIGTERM)
+            if hasattr(os, "killpg"):
+                os.killpg(os.getpgid(self.pid), signal.SIGTERM)
+            else:
+                os.kill(self.pid, signal.SIGTERM)
         except (ProcessLookupError, PermissionError, OSError):
             try:
                 os.kill(self.pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError):
+            except (ProcessLookupError, PermissionError, OSError):
                 pass
-        try:
-            os.waitpid(self.pid, os.WNOHANG)
-        except ChildProcessError:
-            pass
+        if hasattr(os, "waitpid"):
+            try:
+                os.waitpid(self.pid, os.WNOHANG)
+            except ChildProcessError:
+                pass
 
 
 _active_ptys: set[PtyHandle] = set()

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useConsoleStore, type ConsoleLevel } from '../../stores/console';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
@@ -58,6 +59,7 @@ function FileLink({ file, args }: { file: string; args: string[] }) {
 }
 
 export function Console() {
+  const { t } = useTranslation();
   const entries = useConsoleStore((s) => s.entries);
   const clear = useConsoleStore((s) => s.clear);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -70,12 +72,12 @@ export function Console() {
     <div className="flex flex-col h-full bg-background">
       <div className="flex items-center justify-between px-3 py-1 border-b border-border shrink-0">
         <span className="text-[11px] text-muted-foreground">
-          {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+          {entries.length} {entries.length === 1 ? t('terminal.entry') : t('terminal.entries')}
         </span>
         <button
           onClick={clear}
           className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-          title="Clear console"
+          title={t('terminal.clearConsole')}
         >
           <Trash2 size={12} />
         </button>
@@ -83,7 +85,7 @@ export function Console() {
       <div className="flex-1 overflow-auto font-mono text-[12px] leading-[1.6]">
         {entries.length === 0 ? (
           <div className="flex items-center justify-center h-full text-muted-foreground text-[12px]">
-            No console output
+            {t('terminal.noConsoleOutput')}
           </div>
         ) : (
           entries.map((entry) => (

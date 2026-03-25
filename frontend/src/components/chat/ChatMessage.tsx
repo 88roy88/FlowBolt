@@ -78,18 +78,16 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   // Agent card messages
   if (message.agentCard) {
     return (
-      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
-        <div className="max-w-[85%]">
-          <AgentCardRenderer message={message} />
-        </div>
+      <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
+        <AgentCardRenderer message={message} />
       </div>
     );
   }
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
+    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
       <div
-        className={`max-w-[85%] min-w-0 overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
+        className={`min-w-0 overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
           isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
         }`}
       >
@@ -123,7 +121,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
               {message.content}
             </ReactMarkdown>
             {isStreaming && (
-              <span className="inline-block w-1.5 h-4 bg-primary ml-0.5 align-text-bottom animate-[blink_1s_step-end_infinite]" />
+              <span className="inline-block w-1.5 h-4 bg-primary ms-0.5 align-text-bottom animate-[blink_1s_step-end_infinite]" />
             )}
           </div>
         )}

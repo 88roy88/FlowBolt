@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 from langfuse.decorators import langfuse_context, observe
 
@@ -77,8 +78,7 @@ async def list_files(project_id: str, path: str = "/") -> list[FileEntry]:
             if name.startswith(".") or name in SKIP_DIRS:
                 continue
             abs_path = os.path.join(dir_path, name)
-            rel_path = "/" + os.path.relpath(abs_path, workspace)
-            rel_path = rel_path.replace("\\", "/")
+            rel_path = "/" + PurePosixPath(os.path.relpath(abs_path, workspace)).as_posix()
             is_dir = os.path.isdir(abs_path)
             children = _build_tree(abs_path) if is_dir else None
             entries.append(FileEntry(name=name, path=rel_path, is_directory=is_dir, children=children))

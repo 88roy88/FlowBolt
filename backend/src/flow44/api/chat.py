@@ -14,7 +14,7 @@ from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.project import get_project
-from flow44.integrations.data_source_cases import get_data_source_display_name
+from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -105,15 +105,13 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                 if ds_ids:
                     ds_names: list[str] = []
-                    for dsid in ds_ids:
-                        try:
-                            name = await get_data_source_display_name(
-                                dsid,
-                                authorization=data_source_authorization,
-                            )
-                        except Exception:
-                            name = f"Data source #{dsid}"
+                    for ds_id in ds_ids:
+                        name = await data_source_client.get_display_name(
+                            ds_id,
+                            authorization=data_source_authorization,
+                        )
                         ds_names.append(name)
+                    # TODO: why do we need this event?
                     user_event["data_sources"] = [
                         {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                     ]

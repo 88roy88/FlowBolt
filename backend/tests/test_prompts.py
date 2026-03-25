@@ -19,8 +19,8 @@ class TestPromptRendering:
         assert "JSON" in result
         assert "components" in result
 
-    def test_architecture_with_cases(self) -> None:
-        cases = [
+    def test_architecture_with_data_sources(self) -> None:
+        sources = [
             {
                 "data_source_id": "123",
                 "data_source_name": "Sales Data",
@@ -31,21 +31,21 @@ class TestPromptRendering:
                 "integration_notes": "Use fetch",
             }
         ]
-        result = render_architecture(data_source_contexts=cases)
+        result = render_architecture(data_source_contexts=sources)
         assert "Sales Data" in result
         assert "following data sources" in result
         assert "123" in result
         assert "api/data-source" in result
 
-    def test_architecture_without_cases(self) -> None:
+    def test_architecture_without_data_sources(self) -> None:
         result = render_architecture(data_source_contexts=None)
         assert "Data Source Integration" not in result
 
-    def test_merge_without_cases(self) -> None:
+    def test_merge_without_data_sources(self) -> None:
         result = render_merge(has_data_sources=False)
         assert "Data Source Integration Tasks" not in result
 
-    def test_merge_with_cases(self) -> None:
+    def test_merge_with_data_sources(self) -> None:
         result = render_merge(has_data_sources=True)
         assert "Data Source Integration Tasks" in result
 
@@ -96,7 +96,7 @@ class TestPromptRendering:
         assert "Direct dependency" in result or "dependency" in result.lower()
         assert "Todo" in result
 
-    def test_codegen_with_cases(self) -> None:
+    def test_codegen_with_data_sources(self) -> None:
         result = render_codegen(
             task_title="Dashboard",
             task_description="Build dashboard",

@@ -1,97 +1,100 @@
-"""FLAPI client — proxies package search and execution to the upstream service.
-
-This module intentionally keeps all upstream (FLAPI) HTTP concerns isolated:
-timeouts, error mapping, and URL construction.
-"""
-
-from __future__ import annotations
-
 import logging
-from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 
+from flow44.config import settings
+
 logger = logging.getLogger(__name__)
 
 
 class FlapiUpstreamError(RuntimeError):
-    """Raised when the upstream FLAPI returns an error or is unreachable."""
-
     def __init__(self, message: str, *, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
 
 
-@dataclass(frozen=True, slots=True)
 class FlapiClient:
-    base_url: str
-    timeout_s: float = 20.0
-    # Sent as Authorization header to FLAPI (e.g. Bearer token from the browser).
-    authorization: str | None = None
+    def __init__(self, base_url: str | None = None, *, timeout_s: float = 30.0) -> None:
+        self.base_url = base_url or settings.FLAPI_BASE_URL
+        self._http = httpx.AsyncClient(
+            base_url=self.base_url.rstrip("/"),
+            timeout=timeout_s,
+            verify=settings.VERIFY_FLAPI_SSL,
+        )
 
-    def _url(self, path: str) -> str:
-        return f"{self.base_url.rstrip('/')}{path}"
+    @staticmethod
+    def _auth_header(authorization: str | None) -> dict[str, str]:
+        token = (authorization.strip() or None) if authorization else None
+        return {"Authorization": token} if token else {}
 
-    def _upstream_headers(self) -> dict[str, str]:
-        if self.authorization is None:
-            return {}
-        token = self.authorization.strip()
-        if not token:
-            return {}
-        return {"Authorization": token}
+    async def _request(self, method: str, path: str, *, authorization: str | None = None, **kwargs: Any) -> Any:
+        try:
+            resp = await self._http.request(method, path, headers=self._auth_header(authorization), **kwargs)
+        except httpx.HTTPError as exc:
+            logger.warning("FLAPI %s %s failed: %s", method, path, exc)
+            raise FlapiUpstreamError("FLAPI unreachable") from exc
 
-    async def search(self, query_or_id: str) -> list[Any]:
+        if resp.status_code >= 400:
+            raise FlapiUpstreamError(f"FLAPI error ({resp.status_code})", status_code=resp.status_code)
+        return resp.json()
+
+    # -- API methods --
+
+    async def search(self, query_or_id: str, *, authorization: str | None = None) -> list[Any]:
         safe = quote(str(query_or_id), safe="")
-        url = self._url(f"/package/v1/search/{safe}")
-        result: list[Any] = await self._get_json(url)
+        result: list[Any] = await self._request("GET", f"/package/v1/search/{safe}", authorization=authorization)
         return result
 
     async def run_data_source(
         self,
         data_source_id: str,
         *,
-        all_queries: bool | None,
-        body: Any | None,
+        authorization: str | None = None,
+        all_queries: bool | None = None,
+        execute_continued_process: bool | None = None,
+        body: Any | None = None,
     ) -> dict[str, Any]:
         params: dict[str, Any] = {}
         if all_queries is not None:
-            # Upstream uses allQueries=true/false
             params["allQueries"] = "true" if all_queries else "false"
+        if execute_continued_process is not None:
+            params["executeContinuedProcess"] = "true" if execute_continued_process else "false"
         safe = quote(str(data_source_id), safe="")
-        url = self._url(f"/package/v3/{safe}")
-        result: dict[str, Any] = await self._post_json(url, params=params, json=body)
+        result: dict[str, Any] = await self._request(
+            "POST",
+            f"/package/v3/{safe}",
+            authorization=authorization,
+            params=params,
+            json=body,
+        )
         return result
 
-    async def _get_json(self, url: str) -> Any:
-        headers = self._upstream_headers()
-        async with httpx.AsyncClient(timeout=self.timeout_s) as client:
-            try:
-                resp = await client.get(url, headers=headers or None)
-            except httpx.HTTPError as e:
-                logger.warning("FLAPI GET failed: %s", e)
-                raise FlapiUpstreamError("FLAPI unreachable") from e
+    # -- High-level helpers --
 
-        if resp.status_code >= 400:
-            raise FlapiUpstreamError(
-                f"FLAPI error ({resp.status_code})",
-                status_code=resp.status_code,
-            )
-        return resp.json()
+    async def get_display_name(self, data_source_id: int | str, *, authorization: str | None = None) -> str:
+        results = await self.search(str(data_source_id), authorization=authorization)
+        if not results or not isinstance(results[0], dict) or "Name" not in results[0]:
+            raise LookupError("Failed To get display name for data source %s: not found", data_source_id)
+        name: str = results[0]["Name"].strip()
+        return name
 
-    async def _post_json(self, url: str, *, params: dict[str, Any] | None, json: Any | None) -> Any:
-        headers = self._upstream_headers()
-        async with httpx.AsyncClient(timeout=self.timeout_s) as client:
-            try:
-                resp = await client.post(url, params=params, json=json, headers=headers or None)
-            except httpx.HTTPError as e:
-                logger.warning("FLAPI POST failed: %s", e)
-                raise FlapiUpstreamError("FLAPI unreachable") from e
+    async def fetch_data_source(
+        self,
+        data_source_id: str,
+        *,
+        authorization: str | None = None,
+    ) -> tuple[str, Any]:
+        name = await self.get_display_name(data_source_id, authorization=authorization)
+        sample_data = await self.run_data_source(
+            data_source_id,
+            authorization=authorization,
+            all_queries=True,
+            execute_continued_process=False,
+        )
+        return name, sample_data
 
-        if resp.status_code >= 400:
-            raise FlapiUpstreamError(
-                f"FLAPI error ({resp.status_code})",
-                status_code=resp.status_code,
-            )
-        return resp.json()
+
+# Module-level singleton — reuses TCP connections across requests
+data_source_client = FlapiClient()

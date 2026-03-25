@@ -1,10 +1,11 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Editor, { loader, type Monaco, type OnMount } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 
 // Use local monaco-editor instead of CDN
 loader.config({ monaco });
-import { Download, FileCode, Search, Files, ChevronRight } from 'lucide-react';
+import { Download, FileCode, Search, Files, ChevronRight, Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
 import { downloadZip, downloadSingleHtml, fetchFileContent, searchFiles, type SearchResult } from '../../services/api';
@@ -135,6 +136,7 @@ const scoreQuickOpenPath = (path: string, query: string): number => {
 };
 
 export function EditorPanel() {
+  const { t } = useTranslation();
   const {
     fileTree,
     openFiles,
@@ -144,16 +146,18 @@ export function EditorPanel() {
     loadFileTree,
     pendingRevealLine,
     pendingRevealColumn,
+    revealVersion,
     clearPendingReveal,
     openFile,
   } = useFilesStore();
-  const sessionId = useSessionStore((s) => s.projectId);
+  const projectId = useSessionStore((s) => s.projectId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
-   const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
+  const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'light'>('vs-dark');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const [leftTab, setLeftTab] = useState<'files' | 'search'>('files');
   const [searchQuery, setSearchQuery] = useState('');
@@ -214,7 +218,7 @@ export function EditorPanel() {
 
       model.dispose();
     }
-  }, [sessionId]);
+  }, [projectId]);
   
   const flattenFiles = useCallback((entries: FileEntry[]): string[] => {
     const out: string[] = [];
@@ -236,10 +240,10 @@ export function EditorPanel() {
   }, []);
 
   useEffect(() => {
-    if (sessionId) {
+    if (projectId) {
       loadFileTree();
     }
-  }, [sessionId, loadFileTree]);
+  }, [projectId, loadFileTree]);
 
   // Sync Monaco theme with app light/dark theme
   useEffect(() => {
@@ -269,7 +273,17 @@ export function EditorPanel() {
     }, 100);
     clearPendingReveal();
     return () => clearTimeout(timer);
-  }, [pendingRevealLine, pendingRevealColumn, activeFilePath, clearPendingReveal]);
+  }, [pendingRevealLine, pendingRevealColumn, revealVersion, activeFilePath, clearPendingReveal]);
+
+  const doSave = useCallback((path: string) => {
+    setSaveStatus('saving');
+    saveFile(path)
+      .then(() => {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 1500);
+      })
+      .catch(() => setSaveStatus('idle'));
+  }, [saveFile]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (!activeFilePath || value === undefined) return;
@@ -280,9 +294,32 @@ export function EditorPanel() {
     }
 
     saveTimerRef.current = setTimeout(() => {
-      saveFile(activeFilePath);
+      doSave(activeFilePath);
     }, 1000);
-  }, [activeFilePath, updateFileContent, saveFile]);
+  }, [activeFilePath, updateFileContent, doSave]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        const path = useFilesStore.getState().activeFilePath;
+        if (path) {
+          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+          doSave(path);
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [doSave]);
 
   const activeContent = activeFilePath ? openFiles.get(activeFilePath) : undefined;
 
@@ -340,7 +377,7 @@ export function EditorPanel() {
 
   useEffect(() => {
     const monaco = monacoRef.current;
-    if (!monaco || !sessionId || fileTree.length === 0) return;
+    if (!monaco || !projectId || fileTree.length === 0) return;
   
     let cancelled = false;
   
@@ -362,7 +399,7 @@ export function EditorPanel() {
         if (hydratedModelsRef.current.has(uri) || openFilesRef.current.has(path)) return;
   
         try {
-          const content = await fetchFileContent(sessionId, path);
+          const content = await fetchFileContent(projectId, path);
           if (cancelled) return;
 
           const model = monaco.editor.getModel(monaco.Uri.parse(uri));
@@ -384,14 +421,14 @@ export function EditorPanel() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, fileTree, flattenFiles]);
+  }, [projectId, fileTree, flattenFiles]);
   
   useEffect(() => {
     indexedFilesRef.current = new Set(flattenFiles(fileTree).map((path: string) => normalizeProjectPath(path)));
   }, [fileTree, flattenFiles]);
 
   const performSearch = useCallback(async () => {
-    if (!sessionId) return;
+    if (!projectId) return;
     const query = searchQuery.trim();
     if (!query) {
       setSearchResults([]);
@@ -406,7 +443,7 @@ export function EditorPanel() {
     setCollapsedSearchFiles(new Set());
 
     try {
-      const results = await searchFiles(sessionId, query, {
+      const results = await searchFiles(projectId, query, {
         caseSensitive: searchCaseSensitive,
         maxResults: 2000,
         maxHitsPerFile: 200,
@@ -423,7 +460,7 @@ export function EditorPanel() {
   }, [
     searchCaseSensitive,
     searchQuery,
-    sessionId,
+    projectId,
   ]);
 
   const toggleSearchFileCollapsed = useCallback((path: string) => {
@@ -859,6 +896,7 @@ declare module '*.webp' {
 
   return (
     <div
+      dir="ltr"
       style={{
         display: 'flex',
         flexDirection: 'row',
@@ -878,102 +916,63 @@ declare module '*.webp' {
           flexDirection: 'column',
         }}
       >
-        <div
-          style={{
-            padding: '6px 12px',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--text-dim)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span>{leftTab === 'files' ? 'Files' : 'Search'}</span>
+        <div className="flex items-center justify-between gap-2 px-3 py-[7px] border-b border-border shrink-0">
+          <span className="text-[13px] font-semibold tracking-tight truncate min-w-0">
+            {leftTab === 'files' ? t('editor.files') : t('editor.searchTab')}
+          </span>
 
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="flex gap-1 shrink-0">
             <button
-              title="Export ZIP"
-              disabled={!sessionId}
-              onClick={() => sessionId && downloadZip(sessionId)}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
-                cursor: sessionId ? 'pointer' : 'not-allowed',
-                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: sessionId ? 1 : 0.4,
-              }}
+              type="button"
+              title={t('editor.exportZip')}
+              disabled={!projectId}
+              onClick={() => projectId && downloadZip(projectId)}
+              className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
+                projectId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
             >
               <Download size={13} />
             </button>
 
             <button
-              title="Files"
-              disabled={!sessionId}
+              type="button"
+              title={t('editor.files')}
+              disabled={!projectId}
               onClick={() => {
-                if (!sessionId) return;
+                if (!projectId) return;
                 setLeftTab('files');
               }}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
-                cursor: sessionId ? 'pointer' : 'not-allowed',
-                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: sessionId ? 1 : 0.4,
-              }}
+              className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
+                projectId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
             >
               <Files size={13} />
             </button>
 
             <button
-              title="Search in files (Ctrl+Shift+F)"
-              disabled={!sessionId}
+              type="button"
+              title={t('editor.searchShortcutTitle')}
+              disabled={!projectId}
               onClick={() => {
-                if (!sessionId) return;
+                if (!projectId) return;
                 setLeftTab('search');
                 setTimeout(() => searchInputRef.current?.focus(), 0);
               }}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
-                cursor: sessionId ? 'pointer' : 'not-allowed',
-                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: sessionId ? 1 : 0.4,
-              }}
+              className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
+                projectId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
             >
               <Search size={13} />
             </button>
 
             <button
-              title="Export HTML"
-              disabled={!sessionId}
-              onClick={() => sessionId && downloadSingleHtml(sessionId)}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '3px 5px',
-                cursor: sessionId ? 'pointer' : 'not-allowed',
-                color: sessionId ? 'var(--text)' : 'var(--text-dim)',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: sessionId ? 1 : 0.4,
-              }}
+              type="button"
+              title={t('editor.exportHtml')}
+              disabled={!projectId}
+              onClick={() => projectId && downloadSingleHtml(projectId)}
+              className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
+                projectId ? 'hover:text-foreground hover:bg-muted/50 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+              }`}
             >
               <FileCode size={13} />
             </button>
@@ -993,7 +992,7 @@ declare module '*.webp' {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') performSearch();
               }}
-              placeholder="Search in files..."
+              placeholder={t('editor.searchInFilesPlaceholder')}
               style={{
                 width: '100%',
                 background: 'var(--bg)',
@@ -1009,7 +1008,7 @@ declare module '*.webp' {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <button
                 onClick={performSearch}
-                disabled={searchBusy || !sessionId}
+                disabled={searchBusy || !projectId}
                 style={{
                   padding: '7px 10px',
                   borderRadius: 8,
@@ -1021,9 +1020,9 @@ declare module '*.webp' {
                   whiteSpace: 'nowrap',
                   fontSize: 12,
                 }}
-                title="Search"
+                title={t('editor.runSearch')}
               >
-                {searchBusy ? 'Searching…' : 'Search'}
+                {searchBusy ? t('editor.searching') : t('editor.runSearch')}
               </button>
 
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: 'var(--text-dim)' }}>
@@ -1032,24 +1031,28 @@ declare module '*.webp' {
                   checked={searchCaseSensitive}
                   onChange={(e) => setSearchCaseSensitive(e.target.checked)}
                 />
-                Case sensitive
+                {t('editor.caseSensitive')}
               </label>
 
               <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-dim)' }}>
-                {searchResults.length ? `${searchResults.reduce((a: number, r: SearchResult) => a + r.hits.length, 0)} matches` : ' '}
+                {searchResults.length
+                  ? t('editor.matchesCount', {
+                      count: searchResults.reduce((a: number, r: SearchResult) => a + r.hits.length, 0),
+                    })
+                  : ' '}
               </div>
             </div>
 
             <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
               {searchBusy ? (
-                <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Searching…</div>
+                <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{t('editor.searching')}</div>
               ) : searchError ? (
                 <div style={{ color: 'var(--danger)', fontSize: 13, padding: '8px 0' }}>
-                  Search failed: {searchError}
+                  {t('editor.searchFailedPrefix')}: {searchError}
                 </div>
               ) : searchResults.length === 0 ? (
                 <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: '8px 0' }}>
-                  No results. Try another query.
+                  {t('editor.noSearchResults')}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1075,7 +1078,7 @@ declare module '*.webp' {
                                 padding: 0,
                                 textAlign: 'left',
                               }}
-                              title={isCollapsed ? 'Show matches in this file' : 'Hide matches in this file'}
+                              title={isCollapsed ? t('editor.showMatches') : t('editor.hideMatches')}
                             >
                               <ChevronRight
                                 size={13}
@@ -1106,7 +1109,7 @@ declare module '*.webp' {
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis',
                                     }}
-                                    title="Jump to match"
+                                    title={t('editor.jumpToMatch')}
                                   >
                                     {h.line}:{h.column} {h.preview}
                                   </button>
@@ -1128,10 +1131,27 @@ declare module '*.webp' {
       <Resizer direction="horizontal" onDrag={handleFileTreeResize} />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-        <FileTabs />
+        <div className="flex items-center shrink-0">
+          <div className="flex-1 min-w-0">
+            <FileTabs />
+          </div>
+          {saveStatus !== 'idle' && (
+            <div className="flex items-center gap-1 px-3 text-[11px] text-muted-foreground shrink-0">
+              {saveStatus === 'saving' ? (
+                <>
+                  <Loader2 size={10} className="animate-spin" /> {t('editor.saving')}
+                </>
+              ) : (
+                <>
+                  <Check size={10} className="text-green-400" /> {t('editor.saved')}
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {activeFilePath && activeContent !== undefined ? (
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }} dir="ltr">
             <Editor
               theme={editorTheme}
               language={getLanguage(activeFilePath)}
@@ -1224,7 +1244,7 @@ declare module '*.webp' {
               fontSize: '14px',
             }}
           >
-            {sessionId ? 'Select a file to edit' : 'No project selected'}
+            {projectId ? t('editor.selectFileToEdit') : t('editor.noProjectSelected')}
           </div>
         )}
 
@@ -1284,7 +1304,7 @@ declare module '*.webp' {
                     setQuickOpenVisible(false);
                   }
                 }}
-                placeholder="Type a file name (Ctrl+P)"
+                placeholder={t('editor.quickOpenPlaceholder')}
                 style={{
                   width: '100%',
                   border: 'none',
@@ -1300,7 +1320,7 @@ declare module '*.webp' {
               <div style={{ maxHeight: 320, overflow: 'auto' }}>
                 {quickOpenResults.length === 0 ? (
                   <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 13 }}>
-                    No matching files
+                    {t('editor.noMatchingFiles')}
                   </div>
                 ) : (
                   quickOpenResults.map((path: string, idx: number) => {
