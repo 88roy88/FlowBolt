@@ -53,6 +53,8 @@ class SandboxManager:
 
     @staticmethod
     def _ensure_pnpm_store() -> None:
+        if settings.SANDBOX_MODE != "namespaced":
+            return
         try:
             os.makedirs(settings.PNPM_STORE_DIR, exist_ok=True)
         except OSError:

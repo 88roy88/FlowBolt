@@ -122,6 +122,13 @@ def _build_nsjail_args(
 
 
 class NamespacedSandbox(Sandbox):
+    async def start(self) -> None:
+        await super().start()
+        # Append pnpm store dir — nsjail mounts the shared store at /pnpm-store
+        npmrc = os.path.join(self.workspace_dir, ".npmrc")
+        with open(npmrc, "a", encoding="utf-8") as f:  # noqa: ASYNC230
+            f.write("store-dir=/pnpm-store\n")
+
     async def exec(self, command: str) -> AsyncIterator[str]:
         cmd = _build_nsjail_args(self.project_id, self.workspace_dir, self.port, command=command)
         proc = await asyncio.create_subprocess_exec(
