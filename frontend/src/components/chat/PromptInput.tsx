@@ -106,13 +106,17 @@ export function PromptInput() {
         </div>
       )}
 
-      {/* Busy indicator */}
-      {isBusy && (
+      {/* Busy/awaiting indicator */}
+      {agentPhase === 'awaiting_approval' ? (
+        <div className="flex items-center justify-center gap-1.5 text-xs text-warning mb-2">
+          <span>↑ {t('chat.placeholder.reviewPlan')}</span>
+        </div>
+      ) : isBusy ? (
         <div className="flex items-center justify-center gap-1.5 text-xs text-primary mb-2">
           <Loader2 size={13} className="animate-spin" />
           <span>{busyLabel}...</span>
         </div>
-      )}
+      ) : null}
 
       {/* Input row */}
       <div

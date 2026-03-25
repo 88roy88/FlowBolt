@@ -15,7 +15,7 @@ export function ChatPanel() {
   const { t } = useTranslation();
   const {
     messages, isStreaming, currentAssistantMessage, actions, error, clearError,
-    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs,
+    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs, historyLoaded,
   } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +52,13 @@ export function ChatPanel() {
       setTimeout(scrollToBottom, 100);
     }
   }, [agentPhase, planOverview, scrollToBottom]);
+
+  // Scroll to bottom on initial history load (after page refresh)
+  useEffect(() => {
+    if (historyLoaded && messages.length > 0) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [historyLoaded, scrollToBottom]);
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
