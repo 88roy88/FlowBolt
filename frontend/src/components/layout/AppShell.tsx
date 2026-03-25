@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronUp } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -31,6 +31,23 @@ function loadLayoutMode(): LayoutMode {
     if (v === 'classic' || v === 'flexible') return v;
   } catch {}
   return 'classic';
+}
+
+function getProjectHasMessages(projectId: string): boolean | null {
+  try {
+    const v = localStorage.getItem(`project-has-messages:${projectId}`);
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+    return null; // No cache
+  } catch {
+    return null;
+  }
+}
+
+function setProjectHasMessages(projectId: string, hasMessages: boolean) {
+  try {
+    localStorage.setItem(`project-has-messages:${projectId}`, hasMessages ? 'true' : 'false');
+  } catch {}
 }
 
 export function AppShell() {
@@ -74,8 +91,24 @@ export function AppShell() {
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
 
-  const isNewProject = !historyLoaded || (messages.length === 0 && !isStreaming);
+  // Use cache to determine layout before history loads to prevent flicker
+  // Read project ID from URL hash immediately (don't wait for currentProject to be set)
+  const urlProjectId = window.location.hash.match(/^#\/project\/(.+)$/)?.[1];
+  const projectIdForCache = currentProject?.id || urlProjectId;
+  const cachedHasMessages = projectIdForCache ? getProjectHasMessages(projectIdForCache) : null;
+
+  const isNewProject = historyLoaded
+    ? (messages.length === 0 && !isStreaming)
+    : (cachedHasMessages !== true); // Show empty state unless cache explicitly says has messages
   const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
+
+  // Update cache after history loads
+  useEffect(() => {
+    if (historyLoaded && currentProject) {
+      const hasMessages = messages.length > 0;
+      setProjectHasMessages(currentProject.id, hasMessages);
+    }
+  }, [historyLoaded, messages.length, currentProject?.id]);
 
   const handleBottomResize = useCallback((delta: number) => {
     setBottomHeight((h) => Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h - delta)));

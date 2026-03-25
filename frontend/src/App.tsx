@@ -18,6 +18,38 @@ function getProjectIdFromHash(): string | null {
   return match ? match[1] : null;
 }
 
+function hasProjectsCache(): boolean {
+  try {
+    const cache = localStorage.getItem('has-projects');
+    return cache === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setHasProjectsCache(hasProjects: boolean) {
+  try {
+    localStorage.setItem('has-projects', hasProjects ? 'true' : 'false');
+  } catch {}
+}
+
+// Initialize theme before React renders to prevent flicker
+function initializeTheme() {
+  try {
+    const stored = window.localStorage.getItem('theme');
+    let theme: 'light' | 'dark';
+    if (stored === 'light' || stored === 'dark') {
+      theme = stored;
+    } else {
+      theme = window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.dataset.theme = theme;
+  } catch {}
+}
+
+// Run immediately
+initializeTheme();
+
 export default function App() {
   const { t } = useTranslation();
   const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
@@ -29,6 +61,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const [checkingBackend, setCheckingBackend] = useState(true);
+  const hasCache = hasProjectsCache();
 
   const selectProject = useCallback((project: typeof projects[number]) => {
     setCurrentProject(project);
@@ -37,20 +70,8 @@ export default function App() {
     loadFileTree();
   }, [setCurrentProject, loadHistory, loadFileTree]);
 
-  // Initialize theme (dark/light) once on app load
+  // Initialize data source token on mount
   useEffect(() => {
-    const stored = window.localStorage.getItem('theme');
-    let theme: 'light' | 'dark';
-    if (stored === 'light' || stored === 'dark') {
-      theme = stored;
-    } else {
-      theme = window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: light)').matches
-        ? 'light'
-        : 'dark';
-    }
-    document.documentElement.dataset.theme = theme;
-
     // TODO: remove this when real Flapi auth was added
     // Set default data source API token if not already set
     if (!window.localStorage.getItem('flowbolt.dataSourceApiToken')) {
@@ -61,7 +82,6 @@ export default function App() {
   // Check backend availability on mount
   useEffect(() => {
     async function checkBackend() {
-      setCheckingBackend(true);
       const isAvailable = await api.checkBackendHealth();
       setBackendAvailable(isAvailable);
       setCheckingBackend(false);
@@ -78,6 +98,10 @@ export default function App() {
 
   useEffect(() => {
     loadProjects()
+      .then(() => {
+        const hasProjects = useSessionStore.getState().projects.length > 0;
+        setHasProjectsCache(hasProjects);
+      })
       .catch((error) => {
         console.error('Failed to load projects:', error);
         // Show connection error to user
@@ -94,6 +118,7 @@ export default function App() {
     if (loading || projects.length === 0) {
       if (!loading && projects.length === 0) {
         setShowNewProject(true);
+        setHasProjectsCache(false); // Clear cache if no projects
       }
       return;
     }
@@ -139,6 +164,7 @@ export default function App() {
     await createProject(name);
     setNewProjectName('');
     setShowNewProject(false);
+    setHasProjectsCache(true); // Update cache after creating project
     // After creation, the session store already has the new project selected.
     // Set the hash URL and start polling for files (scaffold takes a few seconds).
     const session = useSessionStore.getState();
@@ -149,7 +175,8 @@ export default function App() {
     }
   };
 
-  if (loading || checkingBackend) {
+  // Only show loading screen if no cache exists
+  if ((loading || checkingBackend) && !hasCache) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
         <FlowBrand size="lg" />
