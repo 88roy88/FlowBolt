@@ -4,3 +4,6 @@ __pycache__/
 *.egg-info/
 *.db
 data/
+
+/.coverage
+benchmarks/results/

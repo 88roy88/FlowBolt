@@ -33,8 +33,22 @@ backend/data/
 *.log
 npm-debug.log*
 
-# uv
-uv.lock
-
 # Docker
 docker-compose.override.yml
+
+# Claude Code
+.claude/
+
+# Scratch / review notes
+CODE_REVIEW*.md
+BACKLOG.md
+
+# Test harnesses
+nsjail-repro/
+
+# Misc artifacts
+*.zip
+frontend/img.png
+
+# AI Instructions
+AI_INSTRUCTIONS.md

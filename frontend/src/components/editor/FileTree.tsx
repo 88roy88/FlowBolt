@@ -1,7 +1,22 @@
 import { useFilesStore } from '../../stores/files';
 import type { FileEntry } from '../../types';
-import { Folder, FolderOpen, File } from 'lucide-react';
+import { Folder, FolderOpen, File, FileJson, FileCode, FileText as FileTextIcon, Image, Settings } from 'lucide-react';
 import { useState } from 'react';
+
+function getFileIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'json': return <FileJson size={14} className="shrink-0 text-[#c9a04a]" />;
+    case 'ts': case 'tsx': return <FileCode size={14} className="shrink-0 text-[#5a9bcf]" />;
+    case 'js': case 'jsx': return <FileCode size={14} className="shrink-0 text-[#c4b456]" />;
+    case 'css': case 'scss': return <FileCode size={14} className="shrink-0 text-[#6b8fd4]" />;
+    case 'html': return <FileCode size={14} className="shrink-0 text-[#c47a5a]" />;
+    case 'md': return <FileTextIcon size={14} className="shrink-0 text-muted-foreground" />;
+    case 'png': case 'jpg': case 'svg': case 'gif': return <Image size={14} className="shrink-0 text-[#7ab88a]" />;
+    case 'toml': case 'yaml': case 'yml': return <Settings size={14} className="shrink-0 text-muted-foreground" />;
+    default: return <File size={14} className="shrink-0 text-muted-foreground" />;
+  }
+}
 
 interface TreeNodeProps {
   entry: FileEntry;
@@ -11,7 +26,6 @@ interface TreeNodeProps {
 function TreeNode({ entry, depth }: TreeNodeProps) {
   const { openFile, activeFilePath } = useFilesStore();
   const [expanded, setExpanded] = useState(depth < 2);
-
   const isActive = activeFilePath === entry.path;
 
   if (entry.is_directory) {
@@ -19,20 +33,12 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
       <div>
         <div
           onClick={() => setExpanded((v) => !v)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '3px 8px',
-            paddingLeft: `${8 + depth * 14}px`,
-            cursor: 'pointer',
-            fontSize: '13px',
-            color: 'var(--text)',
-          }}
+          className="flex items-center gap-1 py-[3px] px-2 cursor-pointer text-[13px] truncate transition-colors duration-75 hover:bg-muted/40"
+          style={{ paddingLeft: `${8 + depth * 14}px` }}
         >
           {expanded
-            ? <FolderOpen size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-            : <Folder size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            ? <FolderOpen size={14} className="text-primary shrink-0" />
+            : <Folder size={14} className="text-primary shrink-0" />
           }
           <span className="truncate">{entry.name}</span>
         </div>
@@ -46,19 +52,12 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
   return (
     <div
       onClick={() => openFile(entry.path)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px',
-        padding: '3px 8px',
-        paddingLeft: `${8 + depth * 14}px`,
-        cursor: 'pointer',
-        fontSize: '13px',
-        color: isActive ? 'var(--accent)' : 'var(--text)',
-        background: isActive ? 'var(--bg)' : 'transparent',
-      }}
+      className={`flex items-center gap-1 py-[3px] px-2 cursor-pointer text-[13px] truncate transition-colors duration-75 hover:bg-muted/40 ${
+        isActive ? 'bg-background text-primary' : ''
+      }`}
+      style={{ paddingLeft: `${8 + depth * 14}px` }}
     >
-      <File size={14} style={{ flexShrink: 0, color: 'var(--text-dim)' }} />
+      {getFileIcon(entry.name)}
       <span className="truncate">{entry.name}</span>
     </div>
   );
@@ -69,19 +68,17 @@ export function FileTree() {
 
   if (fileTree.length === 0) {
     return (
-      <div style={{
-        padding: '12px',
-        fontSize: '12px',
-        color: 'var(--text-dim)',
-        textAlign: 'center',
-      }}>
-        No files yet
+      <div className="flex flex-col items-center justify-center gap-2 py-8 px-4 text-center">
+        <Folder size={28} className="text-muted-foreground opacity-30" />
+        <span className="text-xs text-muted-foreground">
+          No files yet. Start a conversation to scaffold your project.
+        </span>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '4px 0' }}>
+    <div className="py-1">
       {fileTree.map((entry) => (
         <TreeNode key={entry.path} entry={entry} depth={0} />
       ))}

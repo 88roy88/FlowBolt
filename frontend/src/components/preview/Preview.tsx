@@ -1,102 +1,68 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
+import { useFilesStore } from '../../stores/files';
+import { useConsoleStore } from '../../stores/console';
 import { RefreshCw, ExternalLink } from 'lucide-react';
+import { Button } from '../ui/button';
 
 export function Preview() {
-  const sessionId = useSessionStore((s) => s.sessionId);
+  const projectId = useSessionStore((s) => s.projectId);
+  const saveVersion = useFilesStore((s) => s.saveVersion);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!projectId) {
       setPreviewUrl(null);
       return;
     }
     setLoading(true);
-
-    // Use the reverse proxy — it rewrites Vite's absolute paths so assets
-    // like /@vite/client and /src/main.tsx route back through the proxy.
-    const url = `/api/preview/${sessionId}/proxy/`;
+    const url = `/api/preview/${projectId}/proxy/`;
     setPreviewUrl(url);
     setLoading(false);
-  }, [sessionId, refreshKey]);
+  }, [projectId, refreshKey]);
 
+  // Auto-refresh preview when files are saved (by user or AI).
+  // Debounce to avoid rapid refreshes during bulk writes.
+  const saveVersionRef = useRef(saveVersion);
+  useEffect(() => {
+    if (saveVersion === saveVersionRef.current) return;
+    saveVersionRef.current = saveVersion;
+    const timer = setTimeout(() => { clearConsole(); setRefreshKey((k) => k + 1); }, 800);
+    return () => clearTimeout(timer);
+  }, [saveVersion]);
+
+  const clearConsole = useConsoleStore((s) => s.clear);
   const handleRefresh = () => {
+    clearConsole();
     setRefreshKey((k) => k + 1);
   };
 
-  if (!sessionId) {
+  if (!projectId) {
     return (
-      <div style={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--text-dim)',
-        fontSize: '14px',
-      }}>
+      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
         No preview available
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '6px 12px',
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-      }}>
-        <button
-          onClick={handleRefresh}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            color: 'var(--text-dim)',
-            border: '1px solid var(--border)',
-          }}
-          title="Refresh preview"
-        >
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-border shrink-0">
+        <Button variant="outline" size="sm" onClick={handleRefresh} title="Refresh preview">
           <RefreshCw size={14} />
           Refresh
-        </button>
+        </Button>
         {previewUrl && (
-          <button
-            onClick={() => window.open(previewUrl, '_blank')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              color: 'var(--text-dim)',
-              border: '1px solid var(--border)',
-            }}
-            title="Open in new tab"
-          >
+          <Button variant="outline" size="sm" onClick={() => window.open(previewUrl, '_blank')} title="Open in new tab">
             <ExternalLink size={14} />
             Open
-          </button>
+          </Button>
         )}
-        <span style={{
-          fontSize: '12px',
-          color: 'var(--text-dim)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
+        <span className="text-xs text-muted-foreground truncate">
           {previewUrl ?? 'Loading...'}
         </span>
       </div>
@@ -107,23 +73,14 @@ export function Preview() {
           ref={iframeRef}
           key={refreshKey}
           src={previewUrl}
-          style={{
-            flex: 1,
-            width: '100%',
-            border: 'none',
-            background: '#ffffff',
-          }}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          className="flex-1 w-full border-none"
+          style={{ background: 'var(--preview-bg)' }}
           title="App Preview"
+          data-testid="preview-iframe"
         />
       ) : (
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--text-dim)',
-          fontSize: '14px',
-        }}>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           {loading ? 'Loading preview...' : 'No preview available'}
         </div>
       )}

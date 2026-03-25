@@ -4,10 +4,14 @@ import { useChatStore } from './stores/chat';
 import { useFilesStore } from './stores/files';
 import { useErrorStore } from './stores/errors';
 import { AppShell } from './components/layout/AppShell';
-import { ErrorToast, useErrorCapture } from './components/errors/ErrorToast';
+import { ErrorToast } from './components/errors/ErrorToast';
+import { useErrorCapture } from './hooks/useErrorCapture';
+import { pollFileTree } from './utils/pollFileTree';
+import { Loader2 } from 'lucide-react';
+import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
 
-function getSessionIdFromHash(): string | null {
+function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
   return match ? match[1] : null;
 }
@@ -25,8 +29,8 @@ export default function App() {
 
   const selectProject = useCallback((project: typeof projects[number]) => {
     setCurrentProject(project);
-    window.location.hash = `#/project/${project.session_id}`;
-    loadHistory(project.session_id);
+    window.location.hash = `#/project/${project.id}`;
+    loadHistory(project.id);
     loadFileTree();
   }, [setCurrentProject, loadHistory, loadFileTree]);
 
@@ -86,9 +90,9 @@ export default function App() {
     }
     if (currentProject) return;
 
-    const hashSessionId = getSessionIdFromHash();
-    const match = hashSessionId
-      ? projects.find((p) => p.session_id === hashSessionId)
+    const hashProjectId = getProjectIdFromHash();
+    const match = hashProjectId
+      ? projects.find((p) => p.id === hashProjectId)
       : null;
     const target = match ?? projects[0];
     selectProject(target);
@@ -97,9 +101,9 @@ export default function App() {
   // Listen for hash changes (back/forward)
   useEffect(() => {
     function onHashChange() {
-      const hashSessionId = getSessionIdFromHash();
-      if (!hashSessionId) return;
-      const match = projects.find((p) => p.session_id === hashSessionId);
+      const hashProjectId = getProjectIdFromHash();
+      if (!hashProjectId) return;
+      const match = projects.find((p) => p.id === hashProjectId);
       if (match && match.id !== currentProject?.id) {
         selectProject(match);
       }
@@ -107,6 +111,19 @@ export default function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [projects, currentProject, selectProject]);
+
+  // Auto-recover state when network comes back online
+  useEffect(() => {
+    function handleOnline() {
+      const projectId = useSessionStore.getState().projectId;
+      if (projectId) {
+        loadHistory(projectId);
+        loadFileTree();
+      }
+    }
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loadHistory, loadFileTree]);
 
   const handleCreate = async () => {
     const name = newProjectName.trim() || 'My Project';
@@ -117,30 +134,17 @@ export default function App() {
     // Set the hash URL and start polling for files (scaffold takes a few seconds).
     const session = useSessionStore.getState();
     if (session.currentProject) {
-      window.location.hash = `#/project/${session.currentProject.session_id}`;
-      loadHistory(session.currentProject.session_id);
-      // Poll for file tree until scaffold completes
+      window.location.hash = `#/project/${session.currentProject.id}`;
+      loadHistory(session.currentProject.id);
       pollFileTree();
     }
   };
 
-  function pollFileTree() {
-    let attempts = 0;
-    const maxAttempts = 15;
-    const interval = setInterval(async () => {
-      attempts++;
-      await loadFileTree();
-      const tree = useFilesStore.getState().fileTree;
-      if (tree.length > 0 || attempts >= maxAttempts) {
-        clearInterval(interval);
-      }
-    }, 2000);
-  }
-
   if (loading || checkingBackend) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <p style={{ color: 'var(--text-dim)' }}>Loading...</p>
+      <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
+        <FlowBrand size="lg" />
+        <Loader2 size={20} className="animate-spin text-[#2bbcc4]" />
       </div>
     );
   }
@@ -155,7 +159,7 @@ export default function App() {
         height: '100%',
         gap: '16px',
       }}>
-        <h1 style={{ color: 'var(--accent)', fontSize: '24px' }}>AI Builder</h1>
+        <FlowBrand size="lg" />
         {!backendAvailable ? (
           <>
             <div style={{

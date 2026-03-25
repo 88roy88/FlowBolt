@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Teal rounded play triangle -->
+  <path d="M3 4.8C3 3.39 4.55 2.52 5.75 3.27L16.5 9.7c1.15.72 1.15 2.34 0 3.06L5.75 19.23C4.55 19.98 3 19.11 3 17.7V4.8z" fill="#2bbcc4"/>
+  <!-- 44 -->
+  <text x="29.5" y="29" font-family="system-ui,-apple-system,sans-serif" font-weight="800" font-size="16" fill="#2bbcc4" text-anchor="end" letter-spacing="-1">44</text>
+</svg>

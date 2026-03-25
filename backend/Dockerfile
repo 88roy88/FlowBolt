@@ -57,10 +57,13 @@ WORKDIR /app
 
 # Install Python dependencies as root (for system-wide installation)
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
+RUN uv sync --no-dev
 
 # Copy application code and set ownership
 COPY --chown=appuser:appuser . .
+
+# Install the project package itself (deps already installed above)
+RUN uv sync --no-dev --frozen
 
 # Ensure /app directory and all contents are owned by appuser
 RUN chown -R appuser:appuser /app
@@ -68,12 +71,12 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
-# Disable nsjail in container (force fallback mode like macOS)
-ENV AIB_NSJAIL_BIN=/nonexistent
+# Use namespaced sandbox mode in container (nsjail isolation)
+ENV AIB_SANDBOX_MODE=namespaced
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uv", "run", "start"]
+CMD ["uv", "run", "--no-sync", "start"]

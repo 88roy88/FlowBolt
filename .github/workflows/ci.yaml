@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend
+    uses: ./.github/workflows/backend.yaml
+
+  frontend:
+    name: Frontend
+    uses: ./.github/workflows/frontend.yaml

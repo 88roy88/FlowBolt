@@ -1,97 +1,56 @@
 import { CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react';
 import type { ExecutionTask } from '../../types';
-
-interface TaskProgressProps {
-  tasks: ExecutionTask[];
-}
+import { CardWrapper } from './cards/CardWrapper';
 
 function TaskStatusIcon({ status }: { status: ExecutionTask['status'] }) {
   switch (status) {
     case 'pending':
-      return <Circle size={16} style={{ color: 'var(--text-dim)', opacity: 0.4 }} />;
+      return <Circle size={16} className="text-muted-foreground opacity-40" />;
     case 'running':
-      return <Loader2 size={16} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />;
+      return <Loader2 size={16} className="text-primary animate-spin" />;
     case 'completed':
-      return <CheckCircle2 size={16} style={{ color: 'var(--success)' }} />;
+      return <CheckCircle2 size={16} className="text-success" />;
     case 'failed':
-      return <XCircle size={16} style={{ color: 'var(--danger)' }} />;
+      return <XCircle size={16} className="text-destructive" />;
   }
 }
 
-export function TaskProgress({ tasks }: TaskProgressProps) {
+export function TaskProgress({ tasks }: { tasks: ExecutionTask[] }) {
   const completed = tasks.filter((t) => t.status === 'completed').length;
   const total = tasks.length;
 
   return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: '12px',
-      padding: '16px',
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '12px',
-      }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 600 }}>
-          Building your app...
-        </h3>
-        <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-          {completed}/{total}
-        </span>
+    <CardWrapper className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold">Building your app...</h3>
+        <span className="text-xs text-muted-foreground">{completed}/{total}</span>
       </div>
 
       {/* Progress bar */}
-      <div style={{
-        height: '4px',
-        background: 'var(--bg)',
-        borderRadius: '2px',
-        marginBottom: '14px',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          height: '100%',
-          width: `${total > 0 ? (completed / total) * 100 : 0}%`,
-          background: 'var(--success)',
-          borderRadius: '2px',
-          transition: 'width 0.3s ease',
-        }} />
+      <div className="h-1 bg-background rounded-sm mb-3.5 overflow-hidden">
+        <div
+          className={`h-full rounded-sm transition-all duration-500 ease-out ${
+            completed < total ? 'progress-bar-shimmer' : 'bg-success'
+          }`}
+          style={{ width: `${total > 0 ? (completed / total) * 100 : 0}%` }}
+        />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div className="flex flex-col gap-1.5">
         {tasks.map((task) => (
           <div
             key={task.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 8px',
-              borderRadius: '6px',
-              background: task.status === 'running' ? 'rgba(137, 180, 250, 0.08)' : 'transparent',
-              fontSize: '13px',
-              transition: 'background 0.2s',
-            }}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
+              task.status === 'running' ? 'bg-running-bg' : ''
+            }`}
           >
             <TaskStatusIcon status={task.status} />
-            <span style={{
-              color: task.status === 'pending' ? 'var(--text-dim)' : 'var(--text)',
-              opacity: task.status === 'pending' ? 0.6 : 1,
-            }}>
+            <span className={task.status === 'pending' ? 'text-muted-foreground opacity-60' : ''}>
               {task.title}
             </span>
           </div>
         ))}
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+    </CardWrapper>
   );
 }

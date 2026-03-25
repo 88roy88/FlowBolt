@@ -1,11 +1,21 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'path';
+import { fileURLToPath } from 'node:url';
+
+const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(dirname, './src'),
+    },
+  },
   server: {
     proxy: {
-      // API + preview proxy (including WebSocket for Vite HMR in preview)
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
@@ -16,5 +26,9 @@ export default defineConfig({
         ws: true,
       },
     },
+  },
+  test: {
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    environment: 'node',
   },
 });

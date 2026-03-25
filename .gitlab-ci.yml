@@ -1,0 +1,85 @@
+stages:
+  - lint
+  - test
+
+# ---------------------------------------------------------------------------
+# Backend
+# ---------------------------------------------------------------------------
+
+.backend-setup: &backend-setup
+  image: python:3.12-slim
+  before_script:
+    - pip install uv
+    - cd backend
+    - uv sync
+
+backend:ruff:
+  <<: *backend-setup
+  stage: lint
+  script:
+    - uv run task ruff-dry-all
+  rules:
+    - changes:
+        - backend/**/*
+
+backend:mypy:
+  <<: *backend-setup
+  stage: lint
+  script:
+    - uv run task mypy-all
+  rules:
+    - changes:
+        - backend/**/*
+
+backend:tests:
+  <<: *backend-setup
+  stage: test
+  script:
+    - uv run task tests
+  rules:
+    - changes:
+        - backend/**/*
+
+# ---------------------------------------------------------------------------
+# Frontend
+# ---------------------------------------------------------------------------
+
+.frontend-setup: &frontend-setup
+  image: node:20-slim
+  before_script:
+    - corepack enable
+    - cd frontend
+    - pnpm install --frozen-lockfile
+
+frontend:lint:
+  <<: *frontend-setup
+  stage: lint
+  script:
+    - pnpm lint
+  rules:
+    - changes:
+        - frontend/**/*
+
+frontend:typecheck:
+  <<: *frontend-setup
+  stage: lint
+  script:
+    - pnpm typecheck
+  rules:
+    - changes:
+        - frontend/**/*
+
+frontend:e2e:
+  <<: *frontend-setup
+  stage: test
+  script:
+    - pnpm exec playwright install chromium --with-deps
+    - pnpm test:e2e
+  artifacts:
+    when: on_failure
+    paths:
+      - frontend/test-results/
+    expire_in: 7 days
+  rules:
+    - changes:
+        - frontend/**/*
