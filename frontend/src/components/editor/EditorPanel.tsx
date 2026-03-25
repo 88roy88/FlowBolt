@@ -656,6 +656,7 @@ declare module 'react' {
   export type ChangeEvent<T = Element> = SyntheticEvent<T> & { target: EventTarget & T & { value: string } };
   export type MouseEvent<T = Element, E = globalThis.MouseEvent> = SyntheticEvent<T, E>;
   export type KeyboardEvent<T = Element, E = globalThis.KeyboardEvent> = SyntheticEvent<T, E> & { key: string };
+  export type DragEvent<T = Element, E = globalThis.DragEvent> = SyntheticEvent<T, E> & { dataTransfer: DataTransfer };
   export type FormEvent<T = Element> = SyntheticEvent<T>;
 
   export function useState<T>(initial: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void];
@@ -698,6 +699,7 @@ declare module 'react' {
     export type ChangeEvent<T = Element> = import('react').ChangeEvent<T>;
     export type MouseEvent<T = Element> = import('react').MouseEvent<T>;
     export type KeyboardEvent<T = Element> = import('react').KeyboardEvent<T>;
+    export type DragEvent<T = Element> = import('react').DragEvent<T>;
     export type FormEvent<T = Element> = import('react').FormEvent<T>;
   }
 
