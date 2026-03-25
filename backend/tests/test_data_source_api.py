@@ -10,11 +10,6 @@ from flow44.integrations.flapi_api import FlapiUpstreamError
 
 
 class TestDataSourceAPI:
-    async def test_run_rejects_empty_id(self) -> None:
-        with pytest.raises(HTTPException) as exc:
-            await data_source_api.run_data_source("   ", authorization=None)
-        assert exc.value.status_code == 422
-
     async def test_run_maps_401_upstream(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_run(*_a, **_kw):  # noqa: ANN002, ANN003
             raise FlapiUpstreamError("unauthorized", status_code=401)

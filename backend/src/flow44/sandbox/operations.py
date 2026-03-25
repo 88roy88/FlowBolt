@@ -127,10 +127,12 @@ def _inline_js_assets(html: str, dist_dir: str) -> str:
 
 
 def _resolve_asset_path(dist_dir: str, href: str) -> str | None:
-    """Resolve an asset href (possibly relative or absolute) to a filesystem path."""
-    cleaned = href.lstrip("/")
+    cleaned = href.lstrip("/\\")
     candidate = os.path.join(dist_dir, cleaned)
-    if not os.path.realpath(candidate).startswith(os.path.realpath(dist_dir)):
+    try:
+        if os.path.commonpath([os.path.realpath(dist_dir), os.path.realpath(candidate)]) != os.path.realpath(dist_dir):
+            return None
+    except ValueError:
         return None
     return candidate
 
@@ -142,7 +144,7 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
         href = match.group(1)
         # Try dist first, then workspace root (dev favicons live in public/)
         for base in (dist_dir, os.path.join(workspace_dir, "public"), workspace_dir):
-            path = os.path.join(base, href.lstrip("/"))
+            path = os.path.join(base, href.lstrip("/\\"))
             if os.path.isfile(path):
                 try:
                     with open(path, "rb") as f:

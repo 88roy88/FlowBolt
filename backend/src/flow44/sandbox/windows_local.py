@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class _PopenWrapper:
     """Minimal wrapper so subprocess.Popen looks like asyncio.subprocess.Process."""
 
-    def __init__(self, proc: subprocess.Popen[bytes]) -> None:
+    def __init__(self, proc: subprocess.Popen[str] | subprocess.Popen[bytes]) -> None:
         self._proc = proc
 
     @property
@@ -45,6 +45,8 @@ class WindowsLocalSandbox(Sandbox):
                 ["cmd", "/c", cmd],  # noqa: S607
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 cwd=self.workspace_dir,
             ),
         )
@@ -68,6 +70,7 @@ class WindowsLocalSandbox(Sandbox):
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             env=env,
+            encoding="utf-8",
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]  # Windows-only
         )
 
