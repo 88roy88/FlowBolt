@@ -34,7 +34,7 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
         <div
           onClick={() => setExpanded((v) => !v)}
           className="flex items-center gap-1 py-[3px] px-2 cursor-pointer text-[13px] truncate transition-colors duration-75 hover:bg-muted/40"
-          style={{ paddingLeft: `${8 + depth * 14}px` }}
+          style={{ paddingInlineStart: `${8 + depth * 14}px` }}
         >
           {expanded
             ? <FolderOpen size={14} className="text-primary shrink-0" />
@@ -55,7 +55,7 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
       className={`flex items-center gap-1 py-[3px] px-2 cursor-pointer text-[13px] truncate transition-colors duration-75 hover:bg-muted/40 ${
         isActive ? 'bg-background text-primary' : ''
       }`}
-      style={{ paddingLeft: `${8 + depth * 14}px` }}
+      style={{ paddingInlineStart: `${8 + depth * 14}px` }}
     >
       {getFileIcon(entry.name)}
       <span className="truncate">{entry.name}</span>

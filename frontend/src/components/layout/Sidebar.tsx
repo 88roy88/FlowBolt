@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
@@ -15,6 +16,7 @@ type SidebarProps = {
   isPinned?: boolean;
   onPin?: () => void;
   onOpenSettings?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 // Stable color per project based on name hash
@@ -41,7 +43,8 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: SidebarProps) {
+export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBusyChange }: SidebarProps) {
+  const { t } = useTranslation();
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
@@ -53,6 +56,12 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent when user is busy with an action
+  useEffect(() => {
+    const isBusy = showInput || !!menuOpenId || !!renamingId || !!pendingDeleteId;
+    onBusyChange?.(isBusy);
+  }, [showInput, menuOpenId, renamingId, pendingDeleteId, onBusyChange]);
 
   useEffect(() => {
     if (!menuOpenId) return;
@@ -146,12 +155,12 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
         <FlowBrand size="sm" />
         <div className="flex items-center gap-0.5">
           {onPin && !isPinned && (
-            <Button variant="ghost" size="icon-sm" onClick={onPin} title="Pin sidebar open">
+            <Button variant="ghost" size="icon-sm" onClick={onPin} title={t('sidebar.pinSidebar')}>
               <Pin size={14} />
             </Button>
           )}
           {isPinned && onCloseSidebar && (
-            <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title="Unpin sidebar">
+            <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title={t('sidebar.unpinSidebar')}>
               <PinOff size={14} />
             </Button>
           )}
@@ -164,7 +173,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
           <div className="flex gap-1">
             <Input
               autoFocus
-              placeholder="Project name"
+              placeholder={t('common.projectName')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {
@@ -172,7 +181,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
                 if (e.key === 'Escape') setShowInput(false);
               }}
             />
-            <Button size="sm" onClick={handleCreate}>Add</Button>
+            <Button size="sm" onClick={handleCreate}>{t('common.add')}</Button>
           </div>
         ) : (
           <Button
@@ -183,7 +192,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
             className="w-full justify-start gap-2"
           >
             <Plus size={14} />
-            New Project
+            {t('sidebar.newProject')}
           </Button>
         )}
       </div>
@@ -192,7 +201,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
       {isCreating && (
         <div className="flex items-center gap-2 mx-3 px-2 py-2.5 mb-2 rounded-md bg-background border border-border text-[13px] text-muted-foreground">
           <Loader2 size={14} className="shrink-0 animate-spin" />
-          Scaffolding project...
+          {t('sidebar.scaffolding')}
         </div>
       )}
 
@@ -247,14 +256,14 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
               {isMenuOpen && (
                 <div
                   ref={menuRef}
-                  className="absolute right-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
+                  className="absolute end-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
                 >
                   <button
                     onClick={() => startRename(project)}
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
                   >
                     <Pencil size={13} className="text-muted-foreground" />
-                    Rename
+                    {t('sidebar.rename')}
                   </button>
                   {project.summary && (
                     <button
@@ -262,7 +271,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
                       className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
                     >
                       <Info size={13} className="text-muted-foreground" />
-                      Summary
+                      {t('sidebar.summary')}
                     </button>
                   )}
                   <button
@@ -274,7 +283,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
                     }`}
                   >
                     <Trash2 size={13} className={pendingDeleteId === project.id ? 'text-destructive' : 'text-muted-foreground'} />
-                    {pendingDeleteId === project.id ? 'Confirm delete?' : 'Delete'}
+                    {pendingDeleteId === project.id ? t('sidebar.confirmDelete') : t('common.delete')}
                   </button>
                 </div>
               )}
@@ -287,7 +296,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
       <div className="border-t border-border px-3 py-2">
         <Button variant="ghost" size="sm" onClick={onOpenSettings} className="w-full justify-start gap-2 text-muted-foreground">
           <Settings size={14} />
-          <span className="text-[13px]">Settings</span>
+          <span className="text-[13px]">{t('common.settings')}</span>
         </Button>
       </div>
 

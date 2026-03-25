@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { X, LayoutPanelLeft, Columns3, Moon, Sun, Bell } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { X, LayoutPanelLeft, Columns3, Moon, Sun, Bell, Languages } from 'lucide-react';
 import { Button } from '../ui/button';
 import { isNotifyEnabled, setNotifyEnabled, requestPermissionIfNeeded } from '../../utils/notifications';
 
@@ -12,12 +13,19 @@ type SettingsModalProps = {
 };
 
 export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsModalProps) {
+  const { t, i18n } = useTranslation();
   const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
   const [notifyOn, setNotifyOn] = useState(isNotifyEnabled);
+  const currentLanguage = i18n.language;
 
   const setTheme = (theme: 'dark' | 'light') => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
+  };
+
+  const changeLanguage = (lang: string) => {
+    i18n.changeLanguage(lang);
+    localStorage.setItem('language', lang);
   };
 
   return (
@@ -26,7 +34,7 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
       <div className="relative bg-surface border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 animate-card-in">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-base font-semibold">Settings</h2>
+          <h2 className="text-base font-semibold">{t('settings.title')}</h2>
           <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X size={16} />
           </Button>
@@ -36,7 +44,7 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
         <div className="px-5 py-4 space-y-5">
           {/* Layout mode */}
           <div className="space-y-2.5">
-            <label className="text-[13px] font-medium text-foreground">Layout</label>
+            <label className="text-[13px] font-medium text-foreground">{t('settings.layout')}</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => onLayoutChange('classic')}
@@ -48,8 +56,8 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
               >
                 <LayoutPanelLeft size={24} />
                 <div className="text-center">
-                  <div className="text-[13px] font-medium">Classic</div>
-                  <div className="text-[11px] opacity-70">Chat + tabbed panels</div>
+                  <div className="text-[13px] font-medium">{t('settings.layoutClassic')}</div>
+                  <div className="text-[11px] opacity-70">{t('settings.layoutClassicDesc')}</div>
                 </div>
               </button>
               <button
@@ -62,8 +70,8 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
               >
                 <Columns3 size={24} />
                 <div className="text-center">
-                  <div className="text-[13px] font-medium">Flexible</div>
-                  <div className="text-[11px] opacity-70">Independent panels</div>
+                  <div className="text-[13px] font-medium">{t('settings.layoutFlexible')}</div>
+                  <div className="text-[11px] opacity-70">{t('settings.layoutFlexibleDesc')}</div>
                 </div>
               </button>
             </div>
@@ -71,7 +79,7 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
 
           {/* Theme */}
           <div className="space-y-2.5">
-            <label className="text-[13px] font-medium text-foreground">Theme</label>
+            <label className="text-[13px] font-medium text-foreground">{t('settings.theme')}</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setTheme('dark')}
@@ -82,7 +90,7 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
                 }`}
               >
                 <Moon size={18} />
-                <span className="text-[13px] font-medium">Dark</span>
+                <span className="text-[13px] font-medium">{t('settings.themeDark')}</span>
               </button>
               <button
                 onClick={() => setTheme('light')}
@@ -93,14 +101,14 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
                 }`}
               >
                 <Sun size={18} />
-                <span className="text-[13px] font-medium">Light</span>
+                <span className="text-[13px] font-medium">{t('settings.themeLight')}</span>
               </button>
             </div>
           </div>
 
           {/* Notifications */}
           <div className="space-y-2.5">
-            <label className="text-[13px] font-medium text-foreground">Notifications</label>
+            <label className="text-[13px] font-medium text-foreground">{t('settings.notifications')}</label>
             <button
               onClick={() => {
                 const next = !notifyOn;
@@ -116,9 +124,38 @@ export function SettingsModal({ layoutMode, onLayoutChange, onClose }: SettingsM
             >
               <Bell size={18} />
               <span className="text-[13px] font-medium">
-                {notifyOn ? 'Build alerts on' : 'Build alerts off'}
+                {notifyOn ? t('settings.buildAlertsOn') : t('settings.buildAlertsOff')}
               </span>
             </button>
+          </div>
+
+          {/* Language */}
+          <div className="space-y-2.5">
+            <label className="text-[13px] font-medium text-foreground">{t('settings.language')}</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => changeLanguage('en')}
+                className={`flex items-center gap-2.5 p-3 rounded-lg border transition-all duration-150 ${
+                  currentLanguage === 'en'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/30 hover:bg-muted/30 text-muted-foreground'
+                }`}
+              >
+                <Languages size={18} />
+                <span className="text-[13px] font-medium">{t('settings.english')}</span>
+              </button>
+              <button
+                onClick={() => changeLanguage('he')}
+                className={`flex items-center gap-2.5 p-3 rounded-lg border transition-all duration-150 ${
+                  currentLanguage === 'he'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/30 hover:bg-muted/30 text-muted-foreground'
+                }`}
+              >
+                <Languages size={18} />
+                <span className="text-[13px] font-medium">{t('settings.hebrew')}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
@@ -7,6 +8,7 @@ import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 
 export function PromptInput() {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const [showDsSelector, setShowDsSelector] = useState(false);
@@ -41,7 +43,7 @@ export function PromptInput() {
     }
   };
 
-  const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'awaiting_approval' && agentPhase !== 'complete');
+  const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'complete');
   const disabled = isBusy || !projectId;
   const canSend = !!value.trim() && !disabled;
 
@@ -62,20 +64,20 @@ export function PromptInput() {
   }, []);
 
   const placeholder = !projectId
-    ? 'Select a project first'
+    ? t('chat.placeholder.selectProject')
     : agentPhase === 'awaiting_approval'
-      ? 'Review the plan above, then accept, modify, or reject'
+      ? t('chat.placeholder.reviewPlan')
       : isBusy
-        ? 'AI is working...'
-        : 'Describe what you want to build...';
+        ? t('chat.placeholder.working')
+        : t('chat.placeholder.default');
 
   const busyLabel =
-    agentPhase === 'classifying' ? 'Analyzing' :
-    agentPhase === 'fetching_data_sources' ? 'Fetching data sources' :
-    agentPhase === 'designing' ? 'Designing' :
-    agentPhase === 'planning' ? 'Planning' :
-    agentPhase === 'executing' ? 'Building' :
-    'Thinking';
+    agentPhase === 'classifying' ? t('chat.phase.analyzing') :
+    agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
+    agentPhase === 'designing' ? t('chat.phase.designing') :
+    agentPhase === 'planning' ? t('chat.phase.planning') :
+    agentPhase === 'executing' ? t('chat.phase.building') :
+    t('chat.phase.thinking');
 
   return (
     <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
@@ -95,7 +97,7 @@ export function PromptInput() {
               <button
                 onClick={() => removeDataSource(c.id)}
                 className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20"
-                title="Remove data source"
+                title={t('chat.dataSource.removeDataSource')}
               >
                 <X size={12} />
               </button>
@@ -104,13 +106,17 @@ export function PromptInput() {
         </div>
       )}
 
-      {/* Busy indicator */}
-      {isBusy && (
+      {/* Busy/awaiting indicator */}
+      {agentPhase === 'awaiting_approval' ? (
+        <div className="flex items-center justify-center gap-1.5 text-xs text-warning mb-2">
+          <span>↑ {t('chat.placeholder.reviewPlan')}</span>
+        </div>
+      ) : isBusy ? (
         <div className="flex items-center justify-center gap-1.5 text-xs text-primary mb-2">
           <Loader2 size={13} className="animate-spin" />
           <span>{busyLabel}...</span>
         </div>
-      )}
+      ) : null}
 
       {/* Input row */}
       <div
@@ -131,7 +137,7 @@ export function PromptInput() {
           >
             <Database size={16} />
             {selectedDataSources.length > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
+              <span className="absolute top-0.5 end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
                 {selectedDataSources.length}
               </span>
             )}
@@ -161,7 +167,7 @@ export function PromptInput() {
               ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
               : 'bg-border text-muted-foreground opacity-40 cursor-default'
           }`}
-          title="Send message"
+          title={t('common.sendMessage')}
         >
           <ArrowUp size={16} strokeWidth={2.5} />
         </button>
@@ -176,9 +182,9 @@ export function PromptInput() {
           )}
         </div>
         <span className="text-[11px] text-muted-foreground/60 hidden md:inline shrink-0">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Enter</kbd> send
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Enter</kbd> {t('chat.send')}
           <span className="mx-1">·</span>
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Shift+Enter</kbd> new line
+          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Shift+Enter</kbd> {t('chat.newLine')}
         </span>
       </div>
     </div>

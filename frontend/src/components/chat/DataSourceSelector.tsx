@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import { searchDataSources } from '../../services/api';
 import type { DataSourceSearchRecord } from '../../types';
@@ -10,6 +11,7 @@ interface DataSourceSelectorProps {
 }
 
 export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DataSourceSearchRecord[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -73,7 +75,7 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
           {selectedDataSources.map((c) => (
             <Badge key={c.id} variant="accent" className="gap-1">
               <span className="font-medium">{c.name}</span>
-              <button onClick={() => removeDataSource(c.id)} className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20" title="Remove data source">
+              <button onClick={() => removeDataSource(c.id)} className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20" title={t('chat.dataSource.removeDataSource')}>
                 <X size={12} />
               </button>
             </Badge>
@@ -90,14 +92,14 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
-          placeholder="Search data sources (optional)"
+          placeholder={t('chat.dataSource.searchPlaceholder')}
           className="flex-1 text-[13px] bg-transparent"
         />
       </div>
 
       {/* Dropdown results */}
       {showDropdown && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 max-h-60 overflow-y-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-md)] z-[1000]">
+        <div className="absolute bottom-full start-0 end-0 mb-1 max-h-60 overflow-y-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-md)] z-[1000]">
           {isLoading ? (
             <div className="p-3 text-center text-[13px] text-muted-foreground">Searching...</div>
           ) : results.length === 0 ? (

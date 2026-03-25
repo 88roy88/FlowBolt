@@ -146,8 +146,14 @@ class Sandbox(ABC):
 
     def _safe_path(self, relative_path: str) -> str:
         workspace = os.path.realpath(self.workspace_dir)
-        cleaned = relative_path.lstrip("/")
+        cleaned = relative_path.lstrip("/\\")
         target = os.path.realpath(os.path.join(workspace, cleaned))
-        if not target.startswith(workspace):
+        # Use os.path.commonpath to safely compare across platforms
+        try:
+            common = os.path.commonpath([workspace, target])
+        except ValueError as exc:
+            # Different drives on Windows
+            raise PermissionError(f"Path traversal detected: {relative_path}") from exc
+        if common != workspace:
             raise PermissionError(f"Path traversal detected: {relative_path}")
         return target

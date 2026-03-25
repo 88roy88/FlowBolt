@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import './i18n';
 import { useSessionStore } from './stores/session';
 import { useChatStore } from './stores/chat';
 import { useFilesStore } from './stores/files';
@@ -16,7 +18,40 @@ function getProjectIdFromHash(): string | null {
   return match ? match[1] : null;
 }
 
+function hasProjectsCache(): boolean {
+  try {
+    const cache = localStorage.getItem('has-projects');
+    return cache === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setHasProjectsCache(hasProjects: boolean) {
+  try {
+    localStorage.setItem('has-projects', hasProjects ? 'true' : 'false');
+  } catch {}
+}
+
+// Initialize theme before React renders to prevent flicker
+function initializeTheme() {
+  try {
+    const stored = window.localStorage.getItem('theme');
+    let theme: 'light' | 'dark';
+    if (stored === 'light' || stored === 'dark') {
+      theme = stored;
+    } else {
+      theme = window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.dataset.theme = theme;
+  } catch {}
+}
+
+// Run immediately
+initializeTheme();
+
 export default function App() {
+  const { t } = useTranslation();
   const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
   const loadHistory = useChatStore((s) => s.loadHistory);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
@@ -26,6 +61,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const [checkingBackend, setCheckingBackend] = useState(true);
+  const hasCache = hasProjectsCache();
 
   const selectProject = useCallback((project: typeof projects[number]) => {
     setCurrentProject(project);
@@ -34,20 +70,8 @@ export default function App() {
     loadFileTree();
   }, [setCurrentProject, loadHistory, loadFileTree]);
 
-  // Initialize theme (dark/light) once on app load
+  // Initialize data source token on mount
   useEffect(() => {
-    const stored = window.localStorage.getItem('theme');
-    let theme: 'light' | 'dark';
-    if (stored === 'light' || stored === 'dark') {
-      theme = stored;
-    } else {
-      theme = window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: light)').matches
-        ? 'light'
-        : 'dark';
-    }
-    document.documentElement.dataset.theme = theme;
-
     // TODO: remove this when real Flapi auth was added
     // Set default data source API token if not already set
     if (!window.localStorage.getItem('flowbolt.dataSourceApiToken')) {
@@ -58,7 +82,6 @@ export default function App() {
   // Check backend availability on mount
   useEffect(() => {
     async function checkBackend() {
-      setCheckingBackend(true);
       const isAvailable = await api.checkBackendHealth();
       setBackendAvailable(isAvailable);
       setCheckingBackend(false);
@@ -66,31 +89,36 @@ export default function App() {
       if (!isAvailable) {
         useErrorStore.getState().pushError({
           source: 'connection',
-          message: 'Cannot connect to backend server. Please ensure the server is running.',
+          message: t('errors.failedToConnect'),
         });
       }
     }
     checkBackend();
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadProjects()
+      .then(() => {
+        const hasProjects = useSessionStore.getState().projects.length > 0;
+        setHasProjectsCache(hasProjects);
+      })
       .catch((error) => {
         console.error('Failed to load projects:', error);
         // Show connection error to user
         useErrorStore.getState().pushError({
           source: 'connection',
-          message: 'Failed to connect to backend server. Please ensure the server is running.',
+          message: t('errors.failedToConnect'),
         });
       })
       .finally(() => setLoading(false));
-  }, [loadProjects]);
+  }, [loadProjects, t]);
 
   // On load: match URL hash to a project, or auto-select first
   useEffect(() => {
     if (loading || projects.length === 0) {
       if (!loading && projects.length === 0) {
         setShowNewProject(true);
+        setHasProjectsCache(false); // Clear cache if no projects
       }
       return;
     }
@@ -136,6 +164,7 @@ export default function App() {
     await createProject(name);
     setNewProjectName('');
     setShowNewProject(false);
+    setHasProjectsCache(true); // Update cache after creating project
     // After creation, the session store already has the new project selected.
     // Set the hash URL and start polling for files (scaffold takes a few seconds).
     const session = useSessionStore.getState();
@@ -146,7 +175,8 @@ export default function App() {
     }
   };
 
-  if (loading || checkingBackend) {
+  // Only show loading screen if no cache exists
+  if ((loading || checkingBackend) && !hasCache) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
         <FlowBrand size="lg" />
@@ -177,10 +207,10 @@ export default function App() {
               textAlign: 'center',
             }}>
               <p style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' }}>
-                Backend Server Unavailable
+                {t('app.backendUnavailable')}
               </p>
               <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>
-                Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.
+                {t('app.cannotConnect')}
               </p>
             </div>
             <button
@@ -193,16 +223,16 @@ export default function App() {
                 fontWeight: 600,
               }}
             >
-              Retry Connection
+              {t('app.retryConnection')}
             </button>
           </>
         ) : (
           <>
-            <p style={{ color: 'var(--text-dim)' }}>Create your first project to get started</p>
+            <p style={{ color: 'var(--text-dim)' }}>{t('app.createFirstProject')}</p>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
-                placeholder="Project name"
+                placeholder={t('common.projectName')}
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
@@ -224,7 +254,7 @@ export default function App() {
                   fontWeight: 600,
                 }}
               >
-                Create
+                {t('common.create')}
               </button>
             </div>
           </>

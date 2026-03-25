@@ -28,15 +28,16 @@ async def test_export_zip(tmp_path):
     mock_project = AsyncMock()
     mock_project.name = "Test Project"
 
-    with patch("flow44.api.export.sandbox_manager.get_sandbox", return_value=mock_sandbox), \
-         patch("flow44.api.export.get_project", return_value=mock_project):
-        
+    with (
+        patch("flow44.api.export.sandbox_manager.get_sandbox", return_value=mock_sandbox),
+        patch("flow44.api.export.get_project", return_value=mock_project),
+    ):
         response = client.get(f"/api/export/{project_id}/zip")
-        
+
         assert response.status_code == 200
         assert response.headers["Content-Type"] == "application/zip"
-        assert "attachment; filename=\"Test Project.zip\"" in response.headers["Content-Disposition"]
-        
+        assert 'attachment; filename="Test Project.zip"' in response.headers["Content-Disposition"]
+
         # Verify ZIP content
         with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
             files = zf.namelist()
@@ -76,14 +77,15 @@ async def test_export_html():
     mock_project = AsyncMock()
     mock_project.name = "HTML Export"
 
-    with patch("flow44.api.export.build_single_html", return_value=html_content), \
-         patch("flow44.api.export.get_project", return_value=mock_project):
-        
+    with (
+        patch("flow44.api.export.build_single_html", return_value=html_content),
+        patch("flow44.api.export.get_project", return_value=mock_project),
+    ):
         response = client.get(f"/api/export/{project_id}/html")
-        
+
         assert response.status_code == 200
         assert response.headers["Content-Type"] == "text/html; charset=utf-8"
-        assert "attachment; filename=\"HTML Export.html\"" in response.headers["Content-Disposition"]
+        assert 'attachment; filename="HTML Export.html"' in response.headers["Content-Disposition"]
         assert response.text == html_content
 
 
@@ -102,7 +104,7 @@ async def test_proxy_published_app_basic():
     project_id = "published-proj"
     mock_project = AsyncMock()
     mock_project.published_url = "http://s3.local/published.html"
-    
+
     with patch("flow44.api.publish.get_project", return_value=mock_project):
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_resp = AsyncMock()
@@ -111,9 +113,9 @@ async def test_proxy_published_app_basic():
             mock_resp.headers = {"etag": "tag123"}
             mock_resp.raise_for_status = lambda: None
             mock_get.return_value = mock_resp
-            
+
             response = client.get(f"/api/export/{project_id}/published")
-            
+
             assert response.status_code == 200
             assert response.text == "<html>S3 Content</html>"
             assert response.headers["ETag"] == "tag123"
@@ -125,7 +127,7 @@ async def test_proxy_published_app_fetch_error():
     project_id = "fetch-err"
     mock_project = AsyncMock()
     mock_project.published_url = "http://s3.local/published.html"
-    
+
     with patch("flow44.api.publish.get_project", return_value=mock_project):
         with patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")):
             response = client.get(f"/api/export/{project_id}/published")

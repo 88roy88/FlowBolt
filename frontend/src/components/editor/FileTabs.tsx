@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { useFilesStore } from '../../stores/files';
 import { X } from 'lucide-react';
 
 export function FileTabs() {
+  const { t } = useTranslation();
   const { openFiles, activeFilePath, setActiveFile, closeFile } = useFilesStore();
   const paths = Array.from(openFiles.keys());
 
@@ -35,7 +37,7 @@ export function FileTabs() {
                 closeFile(path);
               }}
               className="flex items-center p-0.5 rounded-sm text-muted-foreground opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
-              title="Close"
+              title={t('editor.closeTab')}
             >
               <X size={12} />
             </button>
