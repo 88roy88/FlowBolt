@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY: str = Field(default="", validation_alias="S3_ACCESS_KEY")
     S3_SECRET_KEY: str = Field(default="", validation_alias="S3_SECRET_KEY")
     S3_BUCKET_NAME: str = Field(default="", validation_alias="S3_BUCKET_NAME")
+    S3_CACHE_TTL: int = Field(default=3600, validation_alias="S3_CACHE_TTL")
 
     # Langfuse (optional — set public/secret key to enable)
     LANGFUSE_PUBLIC_KEY: str = ""

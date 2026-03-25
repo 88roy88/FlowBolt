@@ -60,5 +60,6 @@ def deploy_single_html(html_content: str, project_id: str) -> str:
         Body=html_content.encode("utf-8"),
         ContentType="text/html",
         ACL="public-read",
+        StorageClass="STANDARD_IA",
     )
     return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"
