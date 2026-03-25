@@ -66,7 +66,6 @@ class FlapiClient:
 
     async def _get_json(self, url: str) -> Any:
         headers = self._upstream_headers()
-        # FLAPI in this environment is intentionally called without SSL verification.
         async with httpx.AsyncClient(timeout=self.timeout_s, verify=False) as client:  # noqa: S501
             try:
                 resp = await client.get(url, headers=headers or None)
@@ -83,7 +82,6 @@ class FlapiClient:
 
     async def _post_json(self, url: str, *, params: dict[str, Any] | None, json: Any | None) -> Any:
         headers = self._upstream_headers()
-        # FLAPI in this environment is intentionally called without SSL verification.
         async with httpx.AsyncClient(timeout=self.timeout_s, verify=False) as client:  # noqa: S501
             try:
                 resp = await client.post(url, params=params, json=json, headers=headers or None)
