@@ -115,7 +115,7 @@ export function ChatPanel() {
       {showScrollBtn && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-[120px] left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-surface border border-border shadow-[var(--shadow-md)] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150 z-10"
+          className="absolute bottom-[120px] start-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-surface border border-border shadow-[var(--shadow-md)] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150 z-10"
           title="Scroll to bottom"
         >
           <ArrowDown size={16} />

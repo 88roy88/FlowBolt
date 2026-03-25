@@ -97,7 +97,7 @@ export function ClassicLayout() {
             </button>
           ))}
 
-          <div className="ml-auto pr-2 flex items-center gap-2">
+          <div className="ms-auto pe-2 flex items-center gap-2">
             {isPublished && projectId && (
               <a
                 href={`/api/export/${projectId}/published`}

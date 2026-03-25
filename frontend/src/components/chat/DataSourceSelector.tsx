@@ -99,7 +99,7 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
 
       {/* Dropdown results */}
       {showDropdown && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 max-h-60 overflow-y-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-md)] z-[1000]">
+        <div className="absolute bottom-full start-0 end-0 mb-1 max-h-60 overflow-y-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-md)] z-[1000]">
           {isLoading ? (
             <div className="p-3 text-center text-[13px] text-muted-foreground">Searching...</div>
           ) : results.length === 0 ? (

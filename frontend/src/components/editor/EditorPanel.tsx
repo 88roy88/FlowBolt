@@ -122,6 +122,7 @@ export function EditorPanel() {
 
   return (
     <div
+      dir="ltr"
       style={{
         display: 'flex',
         flexDirection: 'row',
@@ -188,7 +189,7 @@ export function EditorPanel() {
         </div>
 
         {activeFilePath && activeContent !== undefined ? (
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }} dir="ltr">
             <Editor
               theme={editorTheme}
               language={getLanguageForPath(activeFilePath)}

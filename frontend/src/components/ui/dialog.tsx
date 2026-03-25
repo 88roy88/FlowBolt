@@ -42,7 +42,7 @@ function DialogClose({ onClose }: { onClose: () => void }) {
   return (
     <button
       onClick={onClose}
-      className="absolute top-3 right-3 rounded p-1 text-muted-foreground hover:text-foreground"
+      className="absolute top-3 end-3 rounded p-1 text-muted-foreground hover:text-foreground"
       title="Close"
     >
       <X size={18} />
@@ -51,7 +51,7 @@ function DialogClose({ onClose }: { onClose: () => void }) {
 }
 
 function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn('pr-6 text-lg font-semibold', className)} {...props} />;
+  return <h3 className={cn('pe-6 text-lg font-semibold', className)} {...props} />;
 }
 
 export { Dialog, DialogContent, DialogClose, DialogTitle };

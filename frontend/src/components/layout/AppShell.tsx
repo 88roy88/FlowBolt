@@ -144,7 +144,7 @@ export function AppShell() {
         <ChevronUp size={14} className={`transition-transform duration-200 ${!bottomOpen ? '' : 'rotate-180'}`} />
         <span className="font-medium">{bottomTab === 'server' ? t('terminal.serverLog') : bottomTab === 'console' ? t('terminal.console') : t('terminal.terminal')}</span>
         {!bottomOpen && (
-          <div className="flex gap-2 ml-auto">
+          <div className="flex gap-2 ms-auto">
             {(['server', 'terminal', 'console'] as BottomTab[]).map((tab) => (
               <button
                 key={tab}
@@ -194,7 +194,7 @@ export function AppShell() {
       {/* Sidebar */}
       {sidebarPinned ? (
         <div
-          className="shrink-0 bg-surface border-r border-border flex flex-col animate-[slideIn_0.25s_ease-out]"
+          className="shrink-0 bg-surface border-e border-border flex flex-col animate-[slideIn_0.25s_ease-out]"
           style={{ width: SIDEBAR_WIDTH }}
         >
           <Sidebar onCloseSidebar={closeSidebar} isPinned={true} onPin={() => setSidebarPinned(true)} onOpenSettings={() => setShowSettings(true)} />
@@ -205,12 +205,12 @@ export function AppShell() {
           onMouseEnter={() => { if (!hoverLockRef.current) setSidebarHover(true); }}
           onMouseLeave={() => closeSidebar()}
         >
-          <div className="w-14 h-full bg-surface border-r border-border flex flex-col">
+          <div className="w-14 h-full bg-surface border-e border-border flex flex-col">
             <IconRail />
           </div>
           {(sidebarHover || sidebarClosing) && (
             <div
-              className={`absolute top-0 left-0 z-30 h-full bg-surface border-r border-border shadow-[var(--shadow-lg)] ${
+              className={`absolute top-0 start-0 z-30 h-full bg-surface border-e border-border shadow-[var(--shadow-lg)] ${
                 sidebarClosing ? 'animate-[slideOut_0.2s_ease-in_forwards]' : 'animate-[slideIn_0.25s_ease-out]'
               }`}
               style={{ width: SIDEBAR_WIDTH }}
@@ -228,7 +228,7 @@ export function AppShell() {
         {isNewProject ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8 relative overflow-hidden">
             {/* Animated glow orb */}
-            <div className="absolute top-[25%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent),transparent_70%)] pointer-events-none animate-[drift_14s_ease-in-out_infinite]" />
+            <div className="absolute top-[25%] start-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent),transparent_70%)] pointer-events-none animate-[drift_14s_ease-in-out_infinite]" />
 
             <style>{`
               @keyframes drift { 0%, 100% { transform: translateX(-50%) translate(0, 0); } 33% { transform: translateX(-50%) translate(30px, -20px); } 66% { transform: translateX(-50%) translate(-20px, 15px); } }

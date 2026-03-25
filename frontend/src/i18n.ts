@@ -5,6 +5,9 @@ import he from './locales/he.json';
 
 const defaultLanguage = localStorage.getItem('language') || 'en';
 
+// Set initial dir attribute
+document.documentElement.dir = defaultLanguage === 'he' ? 'rtl' : 'ltr';
+
 i18n
   .use(initReactI18next)
   .init({
@@ -18,5 +21,10 @@ i18n
       escapeValue: false, // React already escapes
     },
   });
+
+// Update dir attribute when language changes
+i18n.on('languageChanged', (lng) => {
+  document.documentElement.dir = lng === 'he' ? 'rtl' : 'ltr';
+});
 
 export default i18n;

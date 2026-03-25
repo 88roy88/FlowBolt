@@ -4,10 +4,10 @@ import { cn } from '@/lib/utils';
 type AccentColor = 'primary' | 'success' | 'warning' | 'destructive';
 
 const accentClasses: Record<AccentColor, string> = {
-  primary: 'border-l-[3px] border-l-primary',
-  success: 'border-l-[3px] border-l-success',
-  warning: 'border-l-[3px] border-l-warning',
-  destructive: 'border-l-[3px] border-l-destructive',
+  primary: 'border-s-[3px] border-s-primary',
+  success: 'border-s-[3px] border-s-success',
+  warning: 'border-s-[3px] border-s-warning',
+  destructive: 'border-s-[3px] border-s-destructive',
 };
 
 export function CardWrapper({ children, className, accent }: {
@@ -17,7 +17,7 @@ export function CardWrapper({ children, className, accent }: {
 }) {
   return (
     <div className={cn(
-      'rounded-xl border border-border bg-card p-3.5 text-[13px] shadow-[var(--shadow-sm)] animate-card-in',
+      'max-w-[80%] rounded-xl border border-border bg-card p-3.5 text-[13px] shadow-[var(--shadow-sm)] animate-card-in',
       accent && accentClasses[accent],
       className,
     )}>

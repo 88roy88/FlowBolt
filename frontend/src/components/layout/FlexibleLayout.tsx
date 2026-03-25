@@ -160,7 +160,7 @@ export function FlexibleLayout() {
         ))}
       </div>
 
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1.5 rounded-xl bg-surface/90 backdrop-blur-lg border border-border/60 shadow-xl opacity-60 hover:opacity-100 transition-opacity duration-200">
+      <div className="absolute end-3 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1.5 rounded-xl bg-surface/90 backdrop-blur-lg border border-border/60 shadow-xl opacity-60 hover:opacity-100 transition-opacity duration-200">
         {(Object.keys(PANE_ICONS) as PaneId[]).map((id) => {
           const Icon = PANE_ICONS[id];
           const isActive = visiblePanes.has(id);

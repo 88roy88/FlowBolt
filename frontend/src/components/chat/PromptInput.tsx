@@ -43,7 +43,7 @@ export function PromptInput() {
     }
   };
 
-  const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'awaiting_approval' && agentPhase !== 'complete');
+  const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'complete');
   const disabled = isBusy || !projectId;
   const canSend = !!value.trim() && !disabled;
 
@@ -133,7 +133,7 @@ export function PromptInput() {
           >
             <Database size={16} />
             {selectedDataSources.length > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
+              <span className="absolute top-0.5 end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
                 {selectedDataSources.length}
               </span>
             )}

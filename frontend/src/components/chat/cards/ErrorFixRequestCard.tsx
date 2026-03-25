@@ -19,7 +19,7 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
 
       {errorFile && (
         <div className="mb-2 text-xs text-muted-foreground">
-          <FileText size={12} className="inline mr-1" />
+          <FileText size={12} className="inline me-1" />
           <strong>{errorFile}</strong>
           {errorLine && <span>:{errorLine}</span>}
         </div>

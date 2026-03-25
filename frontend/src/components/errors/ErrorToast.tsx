@@ -60,12 +60,12 @@ function SingleErrorToast({ error }: { error: AppError }) {
           </button>
         )}
         {error.source === 'connection' ? (
-          <Button variant="outline" size="sm" onClick={handleRetry} className="mt-2.5 ml-auto">
+          <Button variant="outline" size="sm" onClick={handleRetry} className="mt-2.5 ms-auto">
             <RefreshCw size={12} />
             {t('errors.retry')}
           </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={handleFix} disabled={isStreaming} className="mt-2.5 ml-auto">
+          <Button variant="outline" size="sm" onClick={handleFix} disabled={isStreaming} className="mt-2.5 ms-auto">
             <Wrench size={12} />
             {t('errors.fixWithAI')}
           </Button>
@@ -83,7 +83,7 @@ export function ErrorToast() {
   if (errors.length === 0) return null;
 
   return (
-    <div className="fixed top-3 right-3 z-[9999] flex flex-col gap-2">
+    <div className="fixed top-3 end-3 z-[9999] flex flex-col gap-2">
       {errors.map((error) => (
         <SingleErrorToast key={error.id} error={error} />
       ))}

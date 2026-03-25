@@ -249,7 +249,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
               {isMenuOpen && (
                 <div
                   ref={menuRef}
-                  className="absolute right-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
+                  className="absolute end-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
                 >
                   <button
                     onClick={() => startRename(project)}
