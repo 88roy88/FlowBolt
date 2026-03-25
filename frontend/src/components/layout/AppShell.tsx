@@ -42,6 +42,7 @@ export function AppShell() {
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarHover, setSidebarHover] = useState(false);
   const [sidebarClosing, setSidebarClosing] = useState(false);
+  const [sidebarBusy, setSidebarBusy] = useState(false);
   const hoverLockRef = useRef(false);
 
   const closeSidebar = () => {
@@ -197,13 +198,13 @@ export function AppShell() {
           className="shrink-0 bg-surface border-e border-border flex flex-col animate-[slideIn_0.25s_ease-out]"
           style={{ width: SIDEBAR_WIDTH }}
         >
-          <Sidebar onCloseSidebar={closeSidebar} isPinned={true} onPin={() => setSidebarPinned(true)} onOpenSettings={() => setShowSettings(true)} />
+          <Sidebar onCloseSidebar={closeSidebar} isPinned={true} onPin={() => setSidebarPinned(true)} onOpenSettings={() => setShowSettings(true)} onBusyChange={setSidebarBusy} />
         </div>
       ) : (
         <div
           className="relative shrink-0"
           onMouseEnter={() => { if (!hoverLockRef.current) setSidebarHover(true); }}
-          onMouseLeave={() => closeSidebar()}
+          onMouseLeave={() => { if (!sidebarBusy) closeSidebar(); }}
         >
           <div className="w-14 h-full bg-surface border-e border-border flex flex-col">
             <IconRail />
@@ -215,7 +216,7 @@ export function AppShell() {
               }`}
               style={{ width: SIDEBAR_WIDTH }}
             >
-              <Sidebar onCloseSidebar={closeSidebar} isPinned={false} onPin={() => { setSidebarPinned(true); setSidebarHover(false); }} onOpenSettings={() => setShowSettings(true)} />
+              <Sidebar onCloseSidebar={closeSidebar} isPinned={false} onPin={() => { setSidebarPinned(true); setSidebarHover(false); }} onOpenSettings={() => setShowSettings(true)} onBusyChange={setSidebarBusy} />
             </div>
           )}
         </div>

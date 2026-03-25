@@ -17,7 +17,7 @@ export function CardWrapper({ children, className, accent }: {
 }) {
   return (
     <div className={cn(
-      'max-w-[80%] rounded-xl border border-border bg-card p-3.5 text-[13px] shadow-[var(--shadow-sm)] animate-card-in',
+      'max-w-[85%] rounded-xl border border-border bg-card p-3.5 text-[13px] shadow-[var(--shadow-sm)] animate-card-in',
       accent && accentClasses[accent],
       className,
     )}>

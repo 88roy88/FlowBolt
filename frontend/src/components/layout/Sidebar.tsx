@@ -16,6 +16,7 @@ type SidebarProps = {
   isPinned?: boolean;
   onPin?: () => void;
   onOpenSettings?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 // Stable color per project based on name hash
@@ -42,7 +43,7 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: SidebarProps) {
+export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBusyChange }: SidebarProps) {
   const { t } = useTranslation();
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
@@ -55,6 +56,12 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings }: Sid
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent when user is busy with an action
+  useEffect(() => {
+    const isBusy = showInput || !!menuOpenId || !!renamingId || !!pendingDeleteId;
+    onBusyChange?.(isBusy);
+  }, [showInput, menuOpenId, renamingId, pendingDeleteId, onBusyChange]);
 
   useEffect(() => {
     if (!menuOpenId) return;
