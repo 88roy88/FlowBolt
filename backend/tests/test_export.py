@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from flow44.main import app
+from flow44.config import settings
 
 client = TestClient(app)
 
@@ -119,7 +120,7 @@ async def test_proxy_published_app_basic():
             assert response.status_code == 200
             assert response.text == "<html>S3 Content</html>"
             assert response.headers["ETag"] == "tag123"
-            assert response.headers["Cache-Control"] == "public, max-age=0, must-revalidate"
+            assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
 
 
 @pytest.mark.asyncio
