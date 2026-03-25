@@ -1,0 +1,149 @@
+{
+  "common": {
+    "cancel": "ביטול",
+    "close": "סגור",
+    "create": "צור",
+    "delete": "מחק",
+    "save": "שמור",
+    "edit": "ערוך",
+    "add": "הוסף",
+    "loading": "טוען",
+    "retry": "נסה שוב",
+    "settings": "הגדרות",
+    "projectName": "שם הפרויקט",
+    "show": "הצג",
+    "hide": "הסתר",
+    "sendMessage": "שלח הודעה"
+  },
+  "app": {
+    "selectProjectFirst": "בחר פרויקט תחילה",
+    "backendUnavailable": "השרת לא זמין",
+    "cannotConnect": "לא ניתן להתחבר לשרת. אנא ודא שהשרת פועל ונסה לרענן את הדף.",
+    "retryConnection": "נסה להתחבר שוב",
+    "createFirstProject": "צור את הפרויקט הראשון שלך כדי להתחיל"
+  },
+  "sidebar": {
+    "pinSidebar": "נעץ סרגל צד",
+    "unpinSidebar": "בטל נעיצת סרגל צד",
+    "expandSidebar": "הרחב סרגל צד",
+    "newProject": "פרויקט חדש",
+    "scaffolding": "מכין פרויקט...",
+    "rename": "שנה שם",
+    "summary": "סיכום",
+    "confirmDelete": "אשר מחיקה?"
+  },
+  "settings": {
+    "title": "הגדרות",
+    "layout": "פריסה",
+    "layoutClassic": "קלאסי",
+    "layoutClassicDesc": "צ'אט + לשוניות",
+    "layoutFlexible": "גמיש",
+    "layoutFlexibleDesc": "פאנלים עצמאיים",
+    "theme": "ערכת נושא",
+    "themeDark": "כהה",
+    "themeLight": "בהיר",
+    "notifications": "התראות",
+    "buildAlertsOn": "התראות בנייה פעילות",
+    "buildAlertsOff": "התראות בנייה כבויות",
+    "language": "שפה",
+    "english": "אנגלית",
+    "hebrew": "עברית"
+  },
+  "editor": {
+    "files": "קבצים",
+    "exportZip": "ייצא ZIP",
+    "exportHtml": "ייצא HTML",
+    "saving": "שומר",
+    "saved": "נשמר",
+    "selectFileToEdit": "בחר קובץ לעריכה",
+    "noProjectSelected": "לא נבחר פרויקט",
+    "noFileSelected": "לא נבחר קובץ",
+    "selectFile": "בחר קובץ מהעץ כדי להציג את תוכנו",
+    "closeTab": "סגור"
+  },
+  "terminal": {
+    "terminal": "טרמינל",
+    "console": "קונסול",
+    "server": "שרת",
+    "serverLog": "לוג שרת",
+    "clear": "נקה",
+    "clearConsole": "נקה קונסול",
+    "entry": "רשומה",
+    "entries": "רשומות",
+    "noConsoleOutput": "אין פלט קונסול"
+  },
+  "preview": {
+    "title": "תצוגה מקדימה",
+    "code": "קוד",
+    "loading": "טוען תצוגה מקדימה...",
+    "error": "נכשל בטעינת תצוגה מקדימה",
+    "refresh": "רענן",
+    "refreshPreview": "רענן תצוגה מקדימה",
+    "open": "פתח",
+    "openInNewTab": "פתח בטאב חדש",
+    "noPreviewAvailable": "אין תצוגה מקדימה זמינה",
+    "viewLive": "צפה בגרסה חיה",
+    "viewPublishedApp": "צפה באפליקציה שפורסמה",
+    "publish": "פרסם",
+    "republish": "פרסם מחדש",
+    "publishing": "מפרסם...",
+    "publishToS3": "פרסם ל-S3"
+  },
+  "errors": {
+    "connectionError": "שגיאת חיבור",
+    "failedToConnect": "לא ניתן להתחבר לשרת. אנא ודא שהשרת פועל.",
+    "buildError": "שגיאת בנייה",
+    "runtimeError": "שגיאת זמן ריצה",
+    "consoleError": "שגיאת קונסול",
+    "openInEditor": "פתח בעורך",
+    "retry": "נסה שוב",
+    "fixWithAI": "תקן עם בינה מלאכותית",
+    "dismiss": "סגור"
+  },
+  "chat": {
+    "chat": "צ'אט",
+    "send": "שלח",
+    "newLine": "שורה חדשה",
+    "scrollToBottom": "גלול לתחתית",
+    "placeholder": {
+      "selectProject": "בחר פרויקט תחילה",
+      "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר, שנה או דחה",
+      "working": "הבינה המלאכותית עובדת...",
+      "default": "תאר מה תרצה לבנות..."
+    },
+    "phase": {
+      "analyzing": "מנתח",
+      "fetchingDataSources": "מביא מקורות נתונים",
+      "designing": "מעצב",
+      "planning": "מתכנן",
+      "building": "בונה",
+      "thinking": "חושב"
+    },
+    "plan": {
+      "whatYouWillGet": "מה תקבל",
+      "keyDecisions": "החלטות מפתח",
+      "otherOptions": "אפשרויות אחרות",
+      "modifyPlaceholder": "מה תרצה לשנות? לדוגמה: 'השתמש בערכת נושא כהה במקום' או 'אני מעדיף אחסון מקומי על פני מסד נתונים'",
+      "looksGood": "נראה טוב, תבנה את זה",
+      "changeSomething": "שנה משהו",
+      "sendFeedback": "שלח משוב",
+      "startOver": "התחל מחדש"
+    },
+    "design": {
+      "designComplete": "עיצוב הושלם",
+      "architecture": "ארכיטקטורה",
+      "uiux": "ממשק משתמש/חווית משתמש"
+    },
+    "dataSource": {
+      "removeDataSource": "הסר מקור נתונים",
+      "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)"
+    }
+  },
+  "publish": {
+    "publishFailed": "הפרסום נכשל",
+    "successfullyPublished": "פורסם בהצלחה!",
+    "projectIsLive": "הפרויקט שלך כעת חי. כל מי שיש לו את הקישור הזה יכול לצפות בו.",
+    "copyLink": "העתק קישור",
+    "openLive": "פתח גרסה חיה"
+  }
+}

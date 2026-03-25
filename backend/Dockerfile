@@ -62,6 +62,9 @@ RUN uv sync --no-dev
 # Copy application code and set ownership
 COPY --chown=appuser:appuser . .
 
+# Install the project package itself (deps already installed above)
+RUN uv sync --no-dev --frozen
+
 # Ensure /app directory and all contents are owned by appuser
 RUN chown -R appuser:appuser /app
 
@@ -76,4 +79,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uv", "run", "start"]
+CMD ["uv", "run", "--no-sync", "start"]

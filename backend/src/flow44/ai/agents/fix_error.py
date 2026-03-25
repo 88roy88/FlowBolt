@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from pathlib import PurePosixPath
 from typing import Any
 
 from langfuse.decorators import observe
@@ -154,19 +155,21 @@ class FixErrorAgent(BaseAgent):
     # TODO: we might want genral utils outside of the agent. also, me might want to move this to the sandbox manager.
     # TODO: or even to the frontend
     def _normalize_path(self, path: str) -> str:
-        if f"/{self.project_id}/" in path:
-            idx = path.find(f"/{self.project_id}/")
-            path = path[idx + len(self.project_id) + 2 :]
-            if not path.startswith("/"):
-                path = "/" + path
-        elif not path.startswith("/src/"):
-            if "/src/" in path:
-                path = path[path.rfind("/src/") :]
-            elif not path.startswith("/"):
-                path = "/src/" + path
-            else:
-                path = "/src" + path
-        return path
+        """Extract a workspace-relative path from an absolute or mangled error path."""
+        # Normalize to posix (error messages may contain either separator)
+        parts = PurePosixPath(path.replace("\\", "/")).parts
+
+        # Strip workspace prefix: /var/lib/.../project_id/src/App.tsx → src/App.tsx
+        if self.project_id in parts:
+            idx = parts.index(self.project_id)
+            parts = parts[idx + 1 :]
+
+        # Extract from src/ onward
+        if "src" in parts:
+            idx = parts.index("src")
+            return str(PurePosixPath(*parts[idx:]))
+
+        return str(PurePosixPath("src", *parts))
 
     # TODO: seems like a repeating function? make common?
     async def _build(self) -> str:

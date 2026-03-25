@@ -1,4 +1,5 @@
 import re
+from pathlib import PurePath
 
 from pydantic import BaseModel
 
@@ -66,9 +67,8 @@ class BuildError(BaseModel):
 
 def _is_user_source(path: str) -> bool:
     """Return True if path looks like a user source file (not node_modules or partial)."""
-    if "node_modules" in path:
-        return False
-    return "/src/" in path or path.startswith("src/")
+    parts = PurePath(path).parts
+    return "src" in parts and "node_modules" not in parts
 
 
 def strip_ansi(text: str) -> str:

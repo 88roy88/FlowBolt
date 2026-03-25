@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, X, Pencil, Sparkles, ArrowRight } from 'lucide-react';
 import type { PlanOverview } from '../../types';
 import { useChatStore } from '../../stores/chat';
@@ -11,6 +12,7 @@ interface WorkPlanViewProps {
 }
 
 export function WorkPlanView({ overview }: WorkPlanViewProps) {
+  const { t } = useTranslation();
   const [modifyMode, setModifyMode] = useState(false);
   const [feedback, setFeedback] = useState('');
   const respondToPlan = useChatStore((s) => s.respondToPlan);
@@ -33,7 +35,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
       {/* Features */}
       {overview.features && overview.features.length > 0 && (
         <div className="mb-4">
-          <h4 className="text-[13px] font-semibold text-muted-foreground mb-2">What you'll get</h4>
+          <h4 className="text-[13px] font-semibold text-muted-foreground mb-2">{t('chat.plan.whatYouWillGet')}</h4>
           <div className="flex flex-col gap-1.5">
             {overview.features.map((feature, i) => (
               <div
@@ -55,7 +57,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
       {/* Decisions */}
       {overview.decisions && overview.decisions.length > 0 && (
         <div className="mb-4">
-          <h4 className="text-[13px] font-semibold text-muted-foreground mb-2">Key decisions</h4>
+          <h4 className="text-[13px] font-semibold text-muted-foreground mb-2">{t('chat.plan.keyDecisions')}</h4>
           <div className="flex flex-col gap-2">
             {overview.decisions.map((decision) => (
               <div key={decision.id} className="p-2.5 bg-background rounded-lg text-[13px]">
@@ -66,7 +68,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
                 </div>
                 {decision.alternatives && decision.alternatives.length > 0 && (
                   <div className="text-[11px] text-muted-foreground">
-                    Other options: {decision.alternatives.join(', ')}
+                    {t('chat.plan.otherOptions')}: {decision.alternatives.join(', ')}
                   </div>
                 )}
               </div>
@@ -81,7 +83,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
           <Textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            placeholder="What would you like to change? e.g. 'Use a dark theme instead' or 'I prefer local storage over a database'"
+            placeholder={t('chat.plan.modifyPlaceholder')}
             autoFocus
             className="bg-background"
           />
@@ -92,15 +94,15 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
       <div className="flex gap-2">
         <Button variant="success" onClick={() => respondToPlan('accept')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Check size={14} />
-          Looks good, build it
+          {t('chat.plan.looksGood')}
         </Button>
         <Button variant="warning" onClick={handleModify} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Pencil size={14} />
-          {modifyMode ? 'Send feedback' : 'Change something'}
+          {modifyMode ? t('chat.plan.sendFeedback') : t('chat.plan.changeSomething')}
         </Button>
         <Button variant="outline" onClick={() => respondToPlan('reject')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <X size={14} />
-          Start over
+          {t('chat.plan.startOver')}
         </Button>
       </div>
     </CardWrapper>

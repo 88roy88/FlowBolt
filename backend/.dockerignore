@@ -38,3 +38,4 @@ build/
 .coverage
 htmlcov/
 .tox/
+benchmarks/

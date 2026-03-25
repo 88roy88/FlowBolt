@@ -77,7 +77,7 @@ export function MobileLayout() {
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <div className="relative w-[280px] h-full bg-surface border-r border-border shadow-2xl animate-[slideIn_0.2s_ease-out]">
+          <div className="relative w-[280px] h-full bg-surface border-e border-border shadow-2xl animate-[slideIn_0.2s_ease-out]">
             <Sidebar onCloseSidebar={() => setSidebarOpen(false)} />
           </div>
         </div>

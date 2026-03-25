@@ -28,7 +28,7 @@ from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.db.project import update_project_summary
-from flow44.integrations.data_source_cases import DataSourceUpstreamError, fetch_data_source_data
+from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.filesystem import write_file
 from flow44.sandbox.manager import sandbox_manager
 
@@ -194,47 +194,43 @@ class BuildAgent(BaseAgent):
 
     # -- Design --
 
-    async def _fetch_and_analyze_data_source(self, data_source_id: str) -> dict[str, Any] | None:
+    async def _fetch_and_analyze_data_source(self, data_source_id: str) -> dict[str, Any]:
+        ds_name, sample_data = await data_source_client.fetch_data_source(
+            data_source_id,
+            authorization=self._data_source_authorization,
+        )
+
+        analysis = await self._analyze_data_source(ds_name, sample_data)
+
+        return {
+            "data_source_id": data_source_id,
+            "data_source_name": ds_name,
+            "sample_data": sample_data,
+            **analysis,
+        }
+
+    async def _analyze_data_source(self, ds_name: str, sample_data: Any) -> dict[str, Any]:
+        prompt = render_data_source_analysis(
+            user_content=self._state.user_content,
+            data_source_name=ds_name,
+            sample_data=sample_data,
+        )
         try:
-            ds_name, sample_data = await fetch_data_source_data(
-                data_source_id,
-                authorization=self._data_source_authorization,
+            raw = await complete_chat(
+                [Message.user("Analyze this data source.")],
+                prompt,
+                model=self.model,
+                metadata=self._llm_metadata("data_source_analysis"),
             )
-
-            analysis_prompt = render_data_source_analysis(
-                user_content=self._state.user_content,
-                data_source_name=ds_name,
-                sample_data=sample_data,
-            )
-
-            try:
-                raw = await complete_chat(
-                    [Message.user("Analyze this data source.")],
-                    analysis_prompt,
-                    model=self.model,
-                    metadata=self._llm_metadata("data_source_analysis"),
-                )
-                analysis = parse_json_response(raw)
-            except Exception as e:
-                logger.exception("[build] Data source analysis failed")
-                raise RuntimeError(f"Data source analysis failed for {data_source_id}") from e
-
+            return parse_json_response(raw)
+        except Exception:
+            logger.exception("[build] Data source analysis failed, using degraded result")
             return {
-                "data_source_id": data_source_id,
-                "data_source_name": ds_name,
-                "sample_data": sample_data,
-                **analysis,
+                "data_schema": "Unable to analyze — see raw sample data",
+                "relevant_fields": "See raw data",
+                "data_characteristics": "Fetched from API",
+                "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
             }
-
-        except DataSourceUpstreamError:
-            await self.emit({"type": "data_source_error", "message": "Failed to fetch data source: upstream error"})
-            raise RuntimeError(f"Data source fetch failed for {data_source_id}: upstream error") from None
-        except RuntimeError:
-            raise
-        except Exception as e:
-            logger.exception("[build] Unexpected error fetching data source")
-            await self.emit({"type": "data_source_error", "message": "Unexpected error fetching data source"})
-            raise RuntimeError(f"Data source fetch failed for {data_source_id}: unexpected error") from e
 
     @observe(name="design-architecture")  # type: ignore[untyped-decorator]
     async def _design_architecture(self) -> ArchitectureDesign:

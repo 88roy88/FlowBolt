@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Globe, Loader2 } from 'lucide-react';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -16,6 +17,7 @@ const MAIN_SPLIT_MIN = 0.2;
 const MAIN_SPLIT_MAX = 0.8;
 
 export function ClassicLayout() {
+  const { t } = useTranslation();
   const [rightTab, setRightTab] = useState<RightTab>('preview');
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
@@ -25,6 +27,9 @@ export function ClassicLayout() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
   
+  const messages = useChatStore((s) => s.messages);
+  const historyLoaded = useChatStore((s) => s.historyLoaded);
+  const isNewProject = !historyLoaded || messages.length === 0;
   const isPublished = !!currentProject?.published_url;
 
   const handlePublish = useCallback(async () => {
@@ -58,6 +63,16 @@ export function ClassicLayout() {
     setMainSplit((s) => Math.min(MAIN_SPLIT_MAX, Math.max(MAIN_SPLIT_MIN, s + delta / width)));
   }, []);
 
+  if (isNewProject) {
+    return (
+      <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
+        <div className="flex-1 min-h-0 h-full overflow-hidden">
+          <ChatPanel />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={mainTopRef} className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
       <div style={{ flex: mainSplit, minWidth: 0 }} className="min-h-0 h-full overflow-hidden">
@@ -78,25 +93,25 @@ export function ClassicLayout() {
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {tab}
+              {tab === 'preview' ? t('preview.title') : t('preview.code')}
             </button>
           ))}
 
-          <div className="ml-auto pr-2 flex items-center gap-2">
+          <div className="ms-auto pe-2 flex items-center gap-2">
             {isPublished && projectId && (
               <a
                 href={`/api/export/${projectId}/published`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 text-primary border border-primary/20 hover:bg-primary/10 shadow-sm"
-                title="View Published App"
+                title={t('preview.viewPublishedApp')}
               >
                 <ExternalLink size={13} />
-                View Live
+                {t('preview.viewLive')}
               </a>
             )}
             <button
-          title={isPublished ? "Republish" : "Publish to S3"}
+          title={isPublished ? t('preview.republish') : t('preview.publishToS3')}
           disabled={!projectId || isPublishing}
               onClick={handlePublish}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 ${
@@ -106,7 +121,7 @@ export function ClassicLayout() {
               }`}
             >
               {isPublishing ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
-              {isPublishing ? 'Publishing...' : isPublished ? 'Republish' : 'Publish'}
+              {isPublishing ? t('preview.publishing') : isPublished ? t('preview.republish') : t('preview.publish')}
             </button>
           </div>
         </div>

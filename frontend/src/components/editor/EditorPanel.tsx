@@ -1,5 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import Editor, { type OnMount } from '@monaco-editor/react';
+import { useTranslation } from 'react-i18next';
+import Editor, { loader, type OnMount } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor';
+
+// Use local monaco-editor instead of CDN
+loader.config({ monaco });
 import { Download, FileCode, Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
@@ -13,6 +18,7 @@ const FILE_TREE_MIN = 120;
 const FILE_TREE_MAX = 400;
 
 export function EditorPanel() {
+  const { t } = useTranslation();
   const { openFiles, activeFilePath, updateFileContent, saveFile, loadFileTree, pendingRevealLine, pendingRevealColumn, revealVersion, clearPendingReveal } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,6 +122,7 @@ export function EditorPanel() {
 
   return (
     <div
+      dir="ltr"
       style={{
         display: 'flex',
         flexDirection: 'row',
@@ -133,11 +140,11 @@ export function EditorPanel() {
         }}
       >
         <div className="flex items-center justify-between px-3 py-[7px] border-b border-border">
-          <span className="text-[13px] font-semibold tracking-tight">Files</span>
+          <span className="text-[13px] font-semibold tracking-tight">{t('editor.files')}</span>
 
           <div className="flex gap-1">
             <button
-              title="Export ZIP"
+              title={t('editor.exportZip')}
               disabled={!projectId}
               onClick={() => projectId && downloadZip(projectId)}
               className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
@@ -148,7 +155,7 @@ export function EditorPanel() {
             </button>
 
             <button
-              title="Export HTML"
+              title={t('editor.exportHtml')}
               disabled={!projectId}
               onClick={() => projectId && downloadSingleHtml(projectId)}
               className={`flex items-center p-1 rounded text-muted-foreground transition-colors ${
@@ -173,16 +180,16 @@ export function EditorPanel() {
           {saveStatus !== 'idle' && (
             <div className="flex items-center gap-1 px-3 text-[11px] text-muted-foreground shrink-0">
               {saveStatus === 'saving' ? (
-                <><Loader2 size={10} className="animate-spin" /> Saving</>
+                <><Loader2 size={10} className="animate-spin" /> {t('editor.saving')}</>
               ) : (
-                <><Check size={10} className="text-green-400" /> Saved</>
+                <><Check size={10} className="text-green-400" /> {t('editor.saved')}</>
               )}
             </div>
           )}
         </div>
 
         {activeFilePath && activeContent !== undefined ? (
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }} dir="ltr">
             <Editor
               theme={editorTheme}
               language={getLanguageForPath(activeFilePath)}
@@ -224,7 +231,7 @@ export function EditorPanel() {
               fontSize: '14px',
             }}
           >
-            {projectId ? 'Select a file to edit' : 'No project selected'}
+            {projectId ? t('editor.selectFileToEdit') : t('editor.noProjectSelected')}
           </div>
         )}
       </div>

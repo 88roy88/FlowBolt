@@ -51,7 +51,6 @@ def setup_bucket(bucket_name: str) -> None:
 
 
 def deploy_single_html(html_content: str, project_id: str) -> str:
-    """Deploy a single HTML string to S3 and return the public URL."""
     s3 = connect_to_s3()
     key = f"published/{project_id}.html"
     s3.put_object(

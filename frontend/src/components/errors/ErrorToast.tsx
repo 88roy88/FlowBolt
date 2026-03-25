@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, X, Wrench, RefreshCw } from 'lucide-react';
 import { useErrorStore, type AppError } from '../../stores/errors';
 import { useSessionStore } from '../../stores/session';
@@ -18,6 +19,7 @@ function normalizeFilePath(filePath: string): string {
 }
 
 function SingleErrorToast({ error }: { error: AppError }) {
+  const { t } = useTranslation();
   const dismissError = useErrorStore((s) => s.dismissError);
   const sendFixError = useChatStore((s) => s.sendFixError);
   const isStreaming = useChatStore((s) => s.isStreaming);
@@ -43,7 +45,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
       <AlertTriangle size={18} className="text-destructive shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="text-[11px] font-semibold text-destructive uppercase tracking-wider mb-1">
-          {error.source === 'build' ? 'Build Error' : error.source === 'runtime' ? 'Runtime Error' : error.source === 'console' ? 'Console Error' : 'Connection Error'}
+          {error.source === 'build' ? t('errors.buildError') : error.source === 'runtime' ? t('errors.runtimeError') : error.source === 'console' ? t('errors.consoleError') : t('errors.connectionError')}
         </div>
         <div className="text-[13px] leading-snug break-words">
           {error.message.length > 150 ? error.message.slice(0, 150) + '...' : error.message}
@@ -52,24 +54,24 @@ function SingleErrorToast({ error }: { error: AppError }) {
           <button
             onClick={() => openFile(normalizeFilePath(error.file!), error.line, error.column)}
             className="block text-[11px] text-primary underline mt-1.5 text-left cursor-pointer"
-            title="Open in editor"
+            title={t('errors.openInEditor')}
           >
             {error.file}{error.line ? `:${error.line}` : ''}
           </button>
         )}
         {error.source === 'connection' ? (
-          <Button variant="outline" size="sm" onClick={handleRetry} className="mt-2.5 ml-auto">
+          <Button variant="outline" size="sm" onClick={handleRetry} className="mt-2.5 ms-auto">
             <RefreshCw size={12} />
-            Retry
+            {t('errors.retry')}
           </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={handleFix} disabled={isStreaming} className="mt-2.5 ml-auto">
+          <Button variant="outline" size="sm" onClick={handleFix} disabled={isStreaming} className="mt-2.5 ms-auto">
             <Wrench size={12} />
-            Fix with AI
+            {t('errors.fixWithAI')}
           </Button>
         )}
       </div>
-      <button onClick={() => dismissError(error.id)} className="p-0.5 text-muted-foreground shrink-0" title="Dismiss">
+      <button onClick={() => dismissError(error.id)} className="p-0.5 text-muted-foreground shrink-0" title={t('errors.dismiss')}>
         <X size={14} />
       </button>
     </div>
@@ -81,7 +83,7 @@ export function ErrorToast() {
   if (errors.length === 0) return null;
 
   return (
-    <div className="fixed top-3 right-3 z-[9999] flex flex-col gap-2">
+    <div className="fixed top-3 end-3 z-[9999] flex flex-col gap-2">
       {errors.map((error) => (
         <SingleErrorToast key={error.id} error={error} />
       ))}

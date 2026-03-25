@@ -11,7 +11,7 @@ dependencies = [
     "httpx>=0.28.0",
     "jinja2>=3.1.0",
     "langfuse==2.59.7",
-    "litellm>=1.55.10",
+    "litellm>=1.55.10,<1.82.3",
     "pydantic-settings>=2.7.1",
     "python-multipart>=0.0.19",
     "pywinpty>=2.0.0; sys_platform == 'win32'",
@@ -29,6 +29,10 @@ dev = [
     "mypy>=1.10.1",
     # Typing Stubs
     "boto3-stubs[bedrock-runtime]>=1.42.0",
+    # Benchmarks
+    "pyyaml>=6.0",
+    "typer>=0.24.1",
+    "playwright>=1.58.0",
     # Pytest
     "pytest>=8.2.2,<9",
     "pytest-asyncio>=0.23.7,<0.24",
@@ -63,3 +67,6 @@ lint-all = "task lint src/"
 
 tests = "pytest"
 tests-all = "task tests"
+
+benchmark = "python -m benchmarks.src -c \"$@\""
+benchmark-main = "task benchmark config.yaml"
