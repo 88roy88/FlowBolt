@@ -11,6 +11,8 @@ def _get_async_url() -> str:
     url = flow44.config.settings.DATABASE_URL
     if url.startswith("sqlite:///"):
         return url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url
 
 
@@ -22,9 +24,10 @@ def get_engine(url: str | None = None) -> AsyncEngine:
     # TODO: this is specific for SQLite, remove when migrating to Postgres
     @event.listens_for(eng.sync_engine, "connect")
     def _enable_foreign_keys(dbapi_conn: Any, _connection_record: Any) -> None:
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys = ON")
-        cursor.close()
+        if eng.dialect.name == "sqlite":
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON")
+            cursor.close()
 
     return eng
 
