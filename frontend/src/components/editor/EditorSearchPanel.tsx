@@ -1,6 +1,6 @@
-import type { RefObject } from 'react';
+import { useState, useEffect, type RefObject } from 'react';
 import type { TFunction } from 'i18next';
-import { ChevronRight, Search, X, Loader2, FileText, FileCode } from 'lucide-react';
+import { ChevronRight, Search, X, Loader2, FileText, FileCode, ChevronDown } from 'lucide-react';
 import type { SearchResult } from '../../services/api';
 
 function getFileIcon(path: string) {
@@ -69,6 +69,8 @@ type Props = {
   jumpToSearchHit: (path: string, line: number, column: number) => void;
 };
 
+const INITIAL_VISIBLE_RESULTS = 50;
+
 export function EditorSearchPanel({
   t,
   searchInputRef,
@@ -86,7 +88,15 @@ export function EditorSearchPanel({
   toggleSearchFileCollapsed,
   jumpToSearchHit,
 }: Props) {
+  const [visibleResults, setVisibleResults] = useState(INITIAL_VISIBLE_RESULTS);
   const totalMatches = searchResults.reduce((a: number, r: SearchResult) => a + r.hits.length, 0);
+  const displayedResults = searchResults.slice(0, visibleResults);
+  const hasMore = searchResults.length > visibleResults;
+
+  // Reset visible results when search results change
+  useEffect(() => {
+    setVisibleResults(INITIAL_VISIBLE_RESULTS);
+  }, [searchResults.length, searchQuery]);
 
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 12, flex: 1, overflow: 'hidden' }}>
@@ -174,18 +184,18 @@ export function EditorSearchPanel({
         ) : null}
       </div>
 
-      {/* Search Options & Stats */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Compact Search Options & Stats */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'space-between', minHeight: 24 }}>
         <label
           style={{
             display: 'flex',
-            gap: 6,
+            gap: 4,
             alignItems: 'center',
-            fontSize: 12,
+            fontSize: 11,
             color: 'var(--muted-foreground)',
             cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: 4,
+            padding: '2px 6px',
+            borderRadius: 3,
             transition: 'background 0.2s',
           }}
           onMouseEnter={(e) => {
@@ -194,30 +204,30 @@ export function EditorSearchPanel({
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
           }}
+          title={t('editor.caseSensitive')}
         >
           <input
             type="checkbox"
             checked={searchCaseSensitive}
             onChange={(e) => onSearchCaseSensitiveChange(e.target.checked)}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', width: 12, height: 12 }}
           />
-          <span>Aa</span>
-          <span style={{ fontSize: 11 }}>{t('editor.caseSensitive')}</span>
+          <span style={{ fontWeight: 600 }}>Aa</span>
         </label>
 
         {totalMatches > 0 && (
           <div
             style={{
-              marginLeft: 'auto',
-              fontSize: 11,
+              fontSize: 10,
               color: 'var(--muted-foreground)',
               background: 'var(--muted)',
-              padding: '4px 8px',
-              borderRadius: 4,
-              fontWeight: 500,
+              padding: '2px 6px',
+              borderRadius: 3,
+              fontWeight: 600,
+              letterSpacing: '0.3px',
             }}
           >
-            {totalMatches} {totalMatches === 1 ? 'result' : 'results'}
+            {totalMatches > 999 ? `${Math.floor(totalMatches / 1000)}k+` : totalMatches}
           </div>
         )}
       </div>
@@ -286,8 +296,8 @@ export function EditorSearchPanel({
             <div style={{ fontSize: 12 }}>{t('editor.noSearchResults')}</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {searchResults.map((r: SearchResult) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {displayedResults.map((r: SearchResult) => {
               const FileIcon = getFileIcon(r.path);
               const isCollapsed = collapsedSearchFiles.has(r.path);
               return (
@@ -306,13 +316,13 @@ export function EditorSearchPanel({
                       width: '100%',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 6,
-                      fontSize: 12,
+                      gap: 4,
+                      fontSize: 11,
                       color: 'var(--foreground)',
                       background: 'var(--muted)',
                       border: 'none',
                       cursor: 'pointer',
-                      padding: '8px 10px',
+                      padding: '6px 8px',
                       textAlign: 'left',
                       transition: 'background 0.2s',
                     }}
@@ -322,17 +332,17 @@ export function EditorSearchPanel({
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = 'var(--muted)';
                     }}
-                    title={isCollapsed ? t('editor.showMatches') : t('editor.hideMatches')}
+                    title={`${r.path}\n${isCollapsed ? t('editor.showMatches') : t('editor.hideMatches')}`}
                   >
                     <ChevronRight
-                      size={12}
+                      size={10}
                       style={{
                         transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
                         transition: 'transform 150ms ease',
                         flexShrink: 0,
                       }}
                     />
-                    <FileIcon size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                    <FileIcon size={12} style={{ flexShrink: 0, opacity: 0.7 }} />
                     <span
                       style={{
                         flex: 1,
@@ -340,18 +350,22 @@ export function EditorSearchPanel({
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         fontWeight: 500,
+                        direction: 'rtl',
+                        textAlign: 'left',
                       }}
                     >
-                      {r.path.split('/').pop()}
+                      {r.path.split('/').reverse().join('/ ')}
                     </span>
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: 9,
                         color: 'var(--muted-foreground)',
                         background: 'var(--background)',
-                        padding: '2px 6px',
-                        borderRadius: 3,
-                        fontWeight: 600,
+                        padding: '1px 4px',
+                        borderRadius: 2,
+                        fontWeight: 700,
+                        minWidth: 18,
+                        textAlign: 'center',
                       }}
                     >
                       {r.hits.length}
@@ -367,18 +381,18 @@ export function EditorSearchPanel({
                           }}
                           style={{
                             textAlign: 'left',
-                            padding: '6px 10px 6px 32px',
+                            padding: '4px 8px 4px 24px',
                             border: 'none',
                             borderTop: idx === 0 ? '1px solid var(--border)' : 'none',
                             background: 'var(--background)',
                             cursor: 'pointer',
                             color: 'var(--foreground)',
-                            fontSize: 12,
+                            fontSize: 11,
                             transition: 'background 0.2s',
                             fontFamily: 'monospace',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 8,
+                            gap: 6,
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.background = 'var(--muted)';
@@ -388,7 +402,7 @@ export function EditorSearchPanel({
                           }}
                           title={t('editor.jumpToMatch')}
                         >
-                          <span style={{ color: 'var(--muted-foreground)', minWidth: 40, flexShrink: 0 }}>
+                          <span style={{ color: 'var(--muted-foreground)', minWidth: 35, flexShrink: 0, fontSize: 10 }}>
                             {h.line}:{h.column}
                           </span>
                           <span
@@ -408,6 +422,45 @@ export function EditorSearchPanel({
                 </div>
               );
             })}
+
+            {/* Show More Button */}
+            {hasMore && (
+              <button
+                onClick={() => setVisibleResults((prev) => prev + INITIAL_VISIBLE_RESULTS)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  marginTop: 8,
+                  border: '1px dashed var(--border)',
+                  borderRadius: 6,
+                  background: 'transparent',
+                  color: 'var(--muted-foreground)',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--muted)';
+                  e.currentTarget.style.borderStyle = 'solid';
+                  e.currentTarget.style.color = 'var(--foreground)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.borderStyle = 'dashed';
+                  e.currentTarget.style.color = 'var(--muted-foreground)';
+                }}
+              >
+                <ChevronDown size={12} />
+                <span>
+                  Show {Math.min(INITIAL_VISIBLE_RESULTS, searchResults.length - visibleResults)} more files ({searchResults.length - visibleResults} remaining)
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>
