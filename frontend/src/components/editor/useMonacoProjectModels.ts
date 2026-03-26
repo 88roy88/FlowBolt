@@ -32,14 +32,31 @@ export function useMonacoProjectModels(
     hydratedModelsRef.current.clear();
     indexedFilesRef.current.clear();
 
-    for (const model of m.editor.getModels()) {
+    // Dispose models for previous project
+    const modelsToDispose = m.editor.getModels().filter((model) => {
       const uri = model.uri.toString();
+      return uri !== MONACO_REACT_VITE_DTS_URI && uri !== MONACO_REACT_VITE_JS_DTS_URI;
+    });
 
-      if (uri === MONACO_REACT_VITE_DTS_URI || uri === MONACO_REACT_VITE_JS_DTS_URI) {
-        continue;
+    for (const model of modelsToDispose) {
+      try {
+        // Check if model is still valid before disposing
+        if (!model.isDisposed()) {
+          model.dispose();
+        }
+      } catch (error) {
+        console.error('Failed to dispose Monaco model:', model.uri.toString(), error);
+        // Force removal from editor's model collection if disposal fails
+        try {
+          const uri = model.uri;
+          // Create a new model with same URI to replace the broken one, then dispose both
+          const tempModel = m.editor.createModel('', 'plaintext', uri);
+          tempModel.dispose();
+          model.dispose();
+        } catch {
+          console.error('Could not recover from failed model disposal:', model.uri.toString());
+        }
       }
-
-      model.dispose();
     }
   }, [projectId]);
 

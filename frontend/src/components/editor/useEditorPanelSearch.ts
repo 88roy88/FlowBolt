@@ -23,6 +23,7 @@ export function useEditorPanelSearch(
   const searchRequestIdRef = useRef(0);
   const searchHighlightDecorationIdsRef = useRef<string[]>([]);
   const searchHighlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     ensureEditorSearchHitHighlightStyles();
@@ -59,6 +60,33 @@ export function useEditorPanelSearch(
       if (searchRequestIdRef.current === requestId) setSearchBusy(false);
     }
   }, [searchCaseSensitive, searchQuery, projectId]);
+
+  // Auto-search with debounce when query changes
+  useEffect(() => {
+    // Clear previous timer
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
+    }
+
+    // Don't auto-search if query is empty
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+
+    // Debounce: wait 500ms after user stops typing
+    searchDebounceTimerRef.current = setTimeout(() => {
+      void performSearch();
+    }, 500);
+
+    return () => {
+      if (searchDebounceTimerRef.current) {
+        clearTimeout(searchDebounceTimerRef.current);
+      }
+    };
+  }, [searchQuery, searchCaseSensitive, projectId, performSearch]);
 
   const toggleSearchFileCollapsed = useCallback((path: string) => {
     setCollapsedSearchFiles((prev) => {
