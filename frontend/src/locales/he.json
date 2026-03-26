@@ -59,7 +59,21 @@
     "noProjectSelected": "לא נבחר פרויקט",
     "noFileSelected": "לא נבחר קובץ",
     "selectFile": "בחר קובץ מהעץ כדי להציג את תוכנו",
-    "closeTab": "סגור"
+    "closeTab": "סגור",
+    "searchTab": "חיפוש",
+    "searchInFilesPlaceholder": "חיפוש בקבצים...",
+    "runSearch": "חפש",
+    "searching": "מחפש…",
+    "caseSensitive": "רגיש לאותיות",
+    "matchesCount": "{{count}} התאמות",
+    "searchFailedPrefix": "החיפוש נכשל",
+    "noSearchResults": "אין תוצאות. נסי שאילתה אחרת.",
+    "showMatches": "הצג התאמות בקובץ זה",
+    "hideMatches": "הסתר התאמות בקובץ זה",
+    "jumpToMatch": "קפיצה להתאמה",
+    "quickOpenPlaceholder": "הקלידי שם קובץ (Ctrl+P)",
+    "noMatchingFiles": "אין קבצים תואמים",
+    "searchShortcutTitle": "חיפוש בקבצים (Ctrl+Shift+F)"
   },
   "terminal": {
     "terminal": "טרמינל",

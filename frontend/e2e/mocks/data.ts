@@ -1,5 +1,7 @@
 /** Shared mock data used across API mocks and assertions. */
 
+import type { FileEntry } from '../../src/types';
+
 export const PROJECT_ID = 'e2e-test-project-001';
 
 export const MOCK_PROJECT = {
@@ -9,24 +11,58 @@ export const MOCK_PROJECT = {
   model: 'mock/test-model',
 };
 
-export const MOCK_FILE_TREE = [
-  { name: 'src', type: 'directory' as const, children: [
-    { name: 'App.tsx', type: 'file' as const, path: 'src/App.tsx' },
-    { name: 'main.tsx', type: 'file' as const, path: 'src/main.tsx' },
-    { name: 'index.css', type: 'file' as const, path: 'src/index.css' },
-  ]},
-  { name: 'package.json', type: 'file' as const, path: 'package.json' },
-  { name: 'index.html', type: 'file' as const, path: 'index.html' },
+/** Matches backend `FileEntry` shape (`is_directory`, leading `/` on paths). */
+export const MOCK_FILE_TREE: FileEntry[] = [
+  {
+    name: 'src',
+    path: '/src',
+    is_directory: true,
+    children: [
+      { name: 'App.tsx', path: '/src/App.tsx', is_directory: false },
+      { name: 'types.ts', path: '/src/types.ts', is_directory: false },
+      { name: 'main.tsx', path: '/src/main.tsx', is_directory: false },
+      { name: 'index.css', path: '/src/index.css', is_directory: false },
+    ],
+  },
+  { name: 'package.json', path: '/package.json', is_directory: false },
+  { name: 'index.html', path: '/index.html', is_directory: false },
 ];
 
-export const MOCK_APP_TSX = `import React from 'react';
+export const MOCK_APP_TSX = `import { Todo } from './types';
+
 export default function App() {
+  const _sample: Todo = { id: 'e2e' };
   return <h1>Hello from E2E</h1>;
-}`;
+}
+`;
 
-export const MOCK_MODELS = [
-  { id: 'mock/test-model', name: 'Test Model' },
-];
+export const MOCK_TYPES_TS = `export interface Todo {
+  id: string;
+}
+// E2E_TYPES_MARKER
+`;
+
+export const MOCK_MAIN_TSX = `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
+`;
+
+/** Minimal replay so ClassicLayout leaves "new project" mode and shows Preview/Code. */
+export const CHAT_SEED_EVENTS = [{ type: 'user_message', content: 'E2E bootstrap' }];
+
+/** Path keys without leading slash — matches API ?path= after normalization. */
+export const MOCK_FILE_CONTENTS: Record<string, string> = {
+  'src/App.tsx': MOCK_APP_TSX,
+  'src/types.ts': MOCK_TYPES_TS,
+  'src/main.tsx': MOCK_MAIN_TSX,
+  'src/index.css': '/* e2e */',
+  'package.json': '{"name":"e2e"}',
+  'index.html': '<!DOCTYPE html><html><body><div id="root"></div></body></html>',
+};
+
+export const MOCK_MODELS = [{ id: 'mock/test-model', name: 'Test Model' }];
 
 /** A scripted build sequence — the events the chat WebSocket sends during a build. */
 export const BUILD_EVENT_SEQUENCE = [

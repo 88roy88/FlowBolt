@@ -55,6 +55,7 @@ export default function App() {
   const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
   const loadHistory = useChatStore((s) => s.loadHistory);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
+  const resetFiles = useFilesStore((s) => s.reset);
   useErrorCapture();
   const [newProjectName, setNewProjectName] = useState('');
   const [showNewProject, setShowNewProject] = useState(false);
@@ -66,9 +67,10 @@ export default function App() {
   const selectProject = useCallback((project: typeof projects[number]) => {
     setCurrentProject(project);
     window.location.hash = `#/project/${project.id}`;
+    resetFiles();
     loadHistory(project.id);
     loadFileTree();
-  }, [setCurrentProject, loadHistory, loadFileTree]);
+  }, [setCurrentProject, resetFiles, loadHistory, loadFileTree]);
 
   // Initialize data source token on mount
   useEffect(() => {
@@ -170,6 +172,7 @@ export default function App() {
     const session = useSessionStore.getState();
     if (session.currentProject) {
       window.location.hash = `#/project/${session.currentProject.id}`;
+      resetFiles();
       loadHistory(session.currentProject.id);
       pollFileTree();
     }
