@@ -3,4 +3,4 @@ source = src/flow44
 
 [report]
 show_missing = true
-fail_under = 40
+fail_under = 50
