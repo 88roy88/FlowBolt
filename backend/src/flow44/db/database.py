@@ -19,16 +19,18 @@ def _get_async_url() -> str:
 @functools.lru_cache
 def get_engine(url: str | None = None) -> AsyncEngine:
     async_url = url or _get_async_url()
-    
+
     kwargs = {}
     if not async_url.startswith("sqlite"):
-        kwargs.update({
-            "pool_size": flow44.config.settings.DB_POOL_SIZE,
-            "max_overflow": flow44.config.settings.DB_MAX_OVERFLOW,
-            "pool_recycle": flow44.config.settings.DB_POOL_RECYCLE,
-            "pool_pre_ping": flow44.config.settings.DB_POOL_PRE_PING,
-        })
-        
+        kwargs.update(
+            {
+                "pool_size": flow44.config.settings.DB_POOL_SIZE,
+                "max_overflow": flow44.config.settings.DB_MAX_OVERFLOW,
+                "pool_recycle": flow44.config.settings.DB_POOL_RECYCLE,
+                "pool_pre_ping": flow44.config.settings.DB_POOL_PRE_PING,
+            }
+        )
+
     eng = create_async_engine(async_url, echo=False, **kwargs)
 
     # TODO: this is specific for SQLite, remove when migrating to Postgres
