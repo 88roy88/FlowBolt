@@ -42,29 +42,6 @@ async def complete_chat(
     return content
 
 
-async def complete_chat_with_tools(
-    messages: list[dict[str, Any] | Message],
-    system_prompt: str,
-    tools: list[dict[str, Any]],
-    model: str | None = None,
-    metadata: dict[str, Any] | None = None,
-    tool_choice: str = "auto",
-) -> Any:
-    resolved_model = model or settings.AI_MODEL
-    full_messages: list[dict[str, Any]] = [
-        {"role": "system", "content": system_prompt},
-        *_to_dicts(messages),
-    ]
-
-    return await litellm.acompletion(
-        model=resolved_model,
-        messages=full_messages,
-        tools=tools,
-        tool_choice=tool_choice,
-        stream=False,
-        metadata=metadata or {},
-    )
-
 
 async def stream_chat(
     messages: list[dict[str, Any] | Message],
