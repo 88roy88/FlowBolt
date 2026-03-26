@@ -1,0 +1,36 @@
+# ClusterIP service — sticky sessions are handled at the Ingress layer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-builder.fullname" . }}-backend
+  labels:
+    {{- include "ai-builder.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "ai-builder.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# Headless service required by StatefulSet for stable DNS (backend-0.backend-headless, etc.)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-builder.fullname" . }}-backend-headless
+  labels:
+    {{- include "ai-builder.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  clusterIP: None
+  selector:
+    {{- include "ai-builder.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

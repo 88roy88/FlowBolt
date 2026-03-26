@@ -1,0 +1,47 @@
+# Production overrides — use with:
+#   helm upgrade --install ai-builder ./helm -f helm/values.yaml -f helm/values.prod.yaml
+
+backend:
+  replicaCount: 3
+  sandboxMode: namespaced
+  privilegedSandbox: true
+  pnpmStorePvc:
+    enabled: true
+    storageClass: efs-sc   # AWS EFS CSI driver storage class
+    size: 20Gi
+  workspacePvc:
+    storageClass: gp3
+    size: 50Gi
+  dbPvc:
+    storageClass: gp3
+    size: 5Gi
+  resources:
+    requests:
+      cpu: "1"
+      memory: "1Gi"
+    limits:
+      cpu: "4"
+      memory: "4Gi"
+
+frontend:
+  replicaCount: 2
+
+postgresql:
+  enabled: true
+  auth:
+    database: aibuilder
+    username: aibuilder
+    existingSecret: ai-builder-pg-secret   # created externally
+  primary:
+    persistence:
+      storageClass: gp3
+      size: 20Gi
+
+# Use an externally managed secret (e.g. AWS Secrets Manager + ESO)
+secrets:
+  existingSecretName: ai-builder-secrets
+
+ingress:
+  host: ai-builder.your-domain.com
+  tls: true
+  tlsSecretName: ai-builder-tls

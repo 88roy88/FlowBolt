@@ -1,0 +1,14 @@
+apiVersion: v2
+name: ai-builder
+description: AI Web App Builder — backend (FastAPI) + frontend (React/nginx)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+dependencies:
+  # Optional: enable postgresql.enabled=true to deploy PostgreSQL alongside the app.
+  # For SQLite (single-pod / dev), leave disabled.
+  - name: postgresql
+    version: "16.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled

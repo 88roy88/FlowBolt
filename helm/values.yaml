@@ -1,0 +1,145 @@
+# ─────────────────────────────────────────────
+# ai-builder Helm values
+# ─────────────────────────────────────────────
+
+# -- Backend (FastAPI) ─────────────────────────
+backend:
+  image:
+    repository: ghcr.io/your-org/ai-builder-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # StatefulSet replicas. Each pod gets its own workspace PVC.
+  # Use sticky sessions (see ingress) so each project always lands on the same pod.
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+
+  # Sandbox mode: "namespaced" (nsjail, recommended for production)
+  # or "local" (plain subprocess, no isolation — dev/testing only).
+  sandboxMode: namespaced
+
+  # nsjail requires SYS_ADMIN + relaxed seccomp/apparmor.
+  # Set to false only if sandboxMode=local.
+  privilegedSandbox: true
+
+  # Port allocation range for dev servers inside the pod.
+  sandboxPortRangeStart: 3101
+  sandboxPortRangeEnd: 4101
+
+  # Persistent volume for per-pod workspace directories.
+  workspacePvc:
+    storageClass: ""   # leave empty to use cluster default
+    size: "20Gi"
+
+  # Shared PVC for the pnpm content-addressable store (namespaced mode).
+  # Requires a ReadWriteMany storage class (e.g. EFS on AWS, Filestore on GCP).
+  # Set enabled=false if using a single replica.
+  pnpmStorePvc:
+    enabled: false
+    storageClass: ""   # must support ReadWriteMany
+    size: "10Gi"
+
+  # SQLite database PVC (ignored when postgresql.enabled=true).
+  dbPvc:
+    storageClass: ""
+    size: "2Gi"
+
+  env:
+    AI_MODEL: "bedrock/us.anthropic.claude-sonnet-4-6"
+    FLAPI_BASE_URL: "http://localhost:4000"   # override if using a real FLAPI
+    EXPORT_API_BASE_URL: "https://your-domain.com"
+
+  # Non-sensitive env — add anything that goes to AIB_* env vars.
+  extraEnv: {}
+
+
+# -- Frontend (nginx serving React SPA) ────────
+frontend:
+  image:
+    repository: ghcr.io/your-org/ai-builder-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+
+# -- Secrets ────────────────────────────────────
+# These are rendered into a k8s Secret. In production, prefer an external
+# secret manager (AWS Secrets Manager, Vault, etc.) and set secretRef below.
+secrets:
+  # Set to the name of an existing Secret to skip creating one from values.
+  # If set, all keys below are ignored.
+  existingSecretName: ""
+
+  awsAccessKeyId: ""
+  awsSecretAccessKey: ""
+  awsRegion: "us-east-1"
+
+  databaseUrl: ""       # e.g. postgresql://user:pass@host:5432/aibuilder
+
+  langfusePublicKey: ""
+  langfuseSecretKey: ""
+  langfuseHost: "https://cloud.langfuse.com"
+
+  s3EndpointUrl: ""
+  s3AccessKey: ""
+  s3SecretKey: ""
+  s3BucketName: ""
+
+
+# -- Ingress ────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  host: ai-builder.example.com
+  tls: true
+  tlsSecretName: ai-builder-tls   # cert-manager or manually created
+
+  annotations:
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    # Sticky sessions: route each project to the same backend pod.
+    # Cookie-based affinity is more reliable than IP-based in k8s.
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "BACKEND_POD"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Lax"
+
+
+# -- PostgreSQL subchart (bitnami) ──────────────
+# Enable for production multi-pod deployments.
+# Leave disabled to use SQLite (single-pod / dev).
+postgresql:
+  enabled: false
+  auth:
+    database: aibuilder
+    username: aibuilder
+    # Set a strong password — do not commit in plain text.
+    password: changeme
+  primary:
+    persistence:
+      size: 10Gi
+
+
+# -- Service account ────────────────────────────
+serviceAccount:
+  create: true
+  name: ""

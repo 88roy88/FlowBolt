@@ -1,0 +1,62 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ai-builder.fullname" . }}
+  labels:
+    {{- include "ai-builder.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className | quote }}
+    # ── WebSocket support ─────────────────────────────
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    # ── Sticky sessions for backend ───────────────────
+    # Cookie-based affinity ensures each project always reaches the same
+    # backend pod (which holds the in-memory SandboxManager state).
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "BACKEND_POD"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/api"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Lax"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "86400"
+    # ── Large request bodies for file uploads ─────────
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    {{- range $k, $v := .Values.ingress.annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tlsSecretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          # API + WebSocket endpoints → backend StatefulSet
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ai-builder.fullname" . }}-backend
+                port:
+                  name: http
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ai-builder.fullname" . }}-backend
+                port:
+                  name: http
+          # Everything else → frontend SPA
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ai-builder.fullname" . }}-frontend
+                port:
+                  name: http
+{{- end }}

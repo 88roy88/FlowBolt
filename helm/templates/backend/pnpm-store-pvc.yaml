@@ -1,0 +1,21 @@
+{{- if .Values.backend.pnpmStorePvc.enabled }}
+# Shared pnpm content-addressable store — safe to share across pods
+# because pnpm never modifies existing store entries.
+# Requires a ReadWriteMany storage class (EFS, GCP Filestore, etc.).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ai-builder.fullname" . }}-pnpm-store
+  labels:
+    {{- include "ai-builder.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - ReadWriteMany
+  {{- if .Values.backend.pnpmStorePvc.storageClass }}
+  storageClassName: {{ .Values.backend.pnpmStorePvc.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.pnpmStorePvc.size }}
+{{- end }}

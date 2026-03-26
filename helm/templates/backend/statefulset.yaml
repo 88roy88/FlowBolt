@@ -1,0 +1,195 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ai-builder.fullname" . }}-backend
+  labels:
+    {{- include "ai-builder.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  serviceName: {{ include "ai-builder.fullname" . }}-backend-headless
+  # Pod identity is stable — backend-0, backend-1, etc.
+  # Sticky sessions in the Ingress route each project to the same pod index.
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "ai-builder.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "ai-builder.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      serviceAccountName: {{ include "ai-builder.fullname" . }}
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            # Dev-server port range for sandbox preview (within the pod).
+            # Exposed only within the cluster via the service selector proxy.
+          env:
+            # ── Sandbox ──────────────────────────────────
+            - name: AIB_SANDBOX_MODE
+              value: {{ .Values.backend.sandboxMode | quote }}
+            - name: AIB_WORKSPACE_BASE_DIR
+              value: /var/lib/ai-builder/workspaces
+            - name: AIB_PNPM_STORE_DIR
+              value: {{ include "ai-builder.pnpmStorePath" . | quote }}
+            - name: AIB_SANDBOX_PORT_RANGE_START
+              value: {{ .Values.backend.sandboxPortRangeStart | quote }}
+            - name: AIB_SANDBOX_PORT_RANGE_END
+              value: {{ .Values.backend.sandboxPortRangeEnd | quote }}
+            # ── App config ───────────────────────────────
+            - name: AIB_AI_MODEL
+              value: {{ .Values.backend.env.AI_MODEL | quote }}
+            - name: AIB_FLAPI_BASE_URL
+              value: {{ .Values.backend.env.FLAPI_BASE_URL | quote }}
+            - name: AIB_EXPORT_API_BASE_URL
+              value: {{ .Values.backend.env.EXPORT_API_BASE_URL | quote }}
+            {{- range $k, $v := .Values.backend.extraEnv }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            # ── Secrets (from k8s Secret) ────────────────
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AWS_DEFAULT_REGION
+            - name: AIB_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_DATABASE_URL
+            - name: AIB_LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_LANGFUSE_PUBLIC_KEY
+                  optional: true
+            - name: AIB_LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_LANGFUSE_SECRET_KEY
+                  optional: true
+            - name: AIB_LANGFUSE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_LANGFUSE_HOST
+                  optional: true
+            - name: AIB_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_S3_ENDPOINT_URL
+                  optional: true
+            - name: AIB_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_S3_ACCESS_KEY
+                  optional: true
+            - name: AIB_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_S3_SECRET_KEY
+                  optional: true
+            - name: AIB_S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ai-builder.secretName" . }}
+                  key: AIB_S3_BUCKET_NAME
+                  optional: true
+
+          volumeMounts:
+            - name: workspaces
+              mountPath: /var/lib/ai-builder/workspaces
+            - name: db-data
+              mountPath: /app/data
+            {{- if .Values.backend.pnpmStorePvc.enabled }}
+            - name: pnpm-store
+              mountPath: /pnpm-store
+            {{- end }}
+
+          # nsjail requires SYS_ADMIN to create Linux namespaces.
+          {{- if .Values.backend.privilegedSandbox }}
+          securityContext:
+            capabilities:
+              add:
+                - SYS_ADMIN
+            seccompProfile:
+              type: Unconfined
+            # apparmor is set via pod annotation (see below) not securityContext
+          {{- end }}
+
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+      # apparmor must be set at the pod level on older k8s versions.
+      {{- if .Values.backend.privilegedSandbox }}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/backend: unconfined
+      {{- end }}
+
+      {{- if .Values.backend.pnpmStorePvc.enabled }}
+      volumes:
+        - name: pnpm-store
+          persistentVolumeClaim:
+            claimName: {{ include "ai-builder.fullname" . }}-pnpm-store
+      {{- end }}
+
+  # Per-pod PVCs — each backend pod gets its own workspace and db volumes.
+  volumeClaimTemplates:
+    - metadata:
+        name: workspaces
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.backend.workspacePvc.storageClass }}
+        storageClassName: {{ .Values.backend.workspacePvc.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.backend.workspacePvc.size }}
+    - metadata:
+        name: db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.backend.dbPvc.storageClass }}
+        storageClassName: {{ .Values.backend.dbPvc.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.backend.dbPvc.size }}
