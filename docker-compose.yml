@@ -38,6 +38,8 @@ services:
       retries: 3
     networks:
       - internal
+    depends_on:
+      - postgres
     restart: unless-stopped
 
   cases-mock:
@@ -67,9 +69,27 @@ services:
       - internal
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowbolt-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: flowbolt
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 networks:
   internal:
 
 volumes:
   workspaces:
   db-data:
+  postgres_data:

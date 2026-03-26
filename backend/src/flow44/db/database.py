@@ -1,7 +1,7 @@
 import functools
 from typing import Any
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 import flow44.config
@@ -19,7 +19,17 @@ def _get_async_url() -> str:
 @functools.lru_cache
 def get_engine(url: str | None = None) -> AsyncEngine:
     async_url = url or _get_async_url()
-    eng = create_async_engine(async_url, echo=False)
+    
+    kwargs = {}
+    if not async_url.startswith("sqlite"):
+        kwargs.update({
+            "pool_size": flow44.config.settings.DB_POOL_SIZE,
+            "max_overflow": flow44.config.settings.DB_MAX_OVERFLOW,
+            "pool_recycle": flow44.config.settings.DB_POOL_RECYCLE,
+            "pool_pre_ping": flow44.config.settings.DB_POOL_PRE_PING,
+        })
+        
+    eng = create_async_engine(async_url, echo=False, **kwargs)
 
     # TODO: this is specific for SQLite, remove when migrating to Postgres
     @event.listens_for(eng.sync_engine, "connect")
@@ -49,11 +59,11 @@ async def reset() -> None:
 
 
 async def init_db() -> None:
-    from sqlmodel import SQLModel  # noqa: PLC0415
-
+    """Initialize database connection. Metadata creation is now handled by Alembic."""
     import flow44.db.chat  # noqa: F401, PLC0415
     import flow44.db.events  # noqa: F401, PLC0415
     import flow44.db.project  # noqa: F401, PLC0415
 
+    # We just ping the engine to ensure connectivity
     async with get_engine().begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.execute(text("SELECT 1"))

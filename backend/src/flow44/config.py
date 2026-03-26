@@ -20,13 +20,17 @@ class Settings(BaseSettings):
     NSJAIL_BIN: str = "/usr/bin/nsjail"
     AI_MODEL: str = "bedrock/us.anthropic.claude-sonnet-4-6"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    DATABASE_URL: str = "sqlite:///./ai_builder.db"
+    DATABASE_URL: str = ""
     MAX_COMMAND_TIMEOUT: int = 60
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256
     SANDBOX_DISABLE_CGROUPS: bool = False
     PNPM_STORE_DIR: str = "/var/lib/ai-builder/workspaces/.pnpm-store"
     SANDBOX_MODE: str = "local"  # "local" or "namespaced"
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE: int = 3600
+    DB_POOL_PRE_PING: bool = True
 
     # External APIs
     # FLAPI base URL. In dev you can point to the local mock (default).
@@ -47,7 +51,11 @@ class Settings(BaseSettings):
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
 
-    model_config = SettingsConfigDict(env_prefix="AIB_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="AIB_",
+        env_file=[".env", str(_BACKEND_ROOT.parent / ".env")],
+        extra="ignore",
+    )
 
 
 settings = Settings()
