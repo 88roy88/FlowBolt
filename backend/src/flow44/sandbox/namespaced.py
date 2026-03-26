@@ -1,14 +1,15 @@
 import asyncio
-import fcntl
 import logging
 import os
 import subprocess
 from collections.abc import AsyncIterator
 
+if os.name == "posix":
+    import fcntl
+
 from flow44.config import settings
-from flow44.sandbox.base import _ensure_bashrc
-from flow44.sandbox.pty import PtyHandle, _active_ptys
-from flow44.sandbox.unix_local import UnixSandbox
+from flow44.sandbox.pty import UnixPTY
+from flow44.sandbox.unix_local import UnixSandbox, _ensure_bashrc
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +171,7 @@ class NamespacedSandbox(UnixSandbox):
         self._bg_log_files[name] = log_file
         logger.debug("Background process '%s' started (pid %s)", name, proc.pid)
 
-    def create_pty(self) -> PtyHandle:
+    def create_pty(self) -> UnixPTY:
         master_fd, slave_fd = os.openpty()
 
         env = os.environ.copy()
@@ -196,6 +197,5 @@ class NamespacedSandbox(UnixSandbox):
         flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
         fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=proc.pid, project_id=self.project_id)
-        _active_ptys.add(handle)
-        return handle
+        pty = UnixPTY(read_fd=master_fd, write_fd=master_fd, pid=proc.pid)
+        return pty

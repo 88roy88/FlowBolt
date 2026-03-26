@@ -1,12 +1,13 @@
 import asyncio
 import logging
+import os
 import subprocess
 from collections.abc import AsyncIterator
 
-from flow44.sandbox.base import BaseSandbox, _ensure_bashrc
-from flow44.sandbox.pty import PtyHandle, _active_ptys
+from flow44.sandbox.base import BaseSandbox
+from flow44.sandbox.pty import WinPTY
 
-if __import__("os").name == "nt":
+if os.name == "nt":
     try:
         from winpty import PtyProcess as WinPtyProcess
     except ImportError as e:
@@ -120,10 +121,7 @@ class WindowsLocalSandbox(BaseSandbox):
         except Exception:  # noqa: S110
             pass
 
-    def create_pty(self) -> PtyHandle:
-        _ensure_bashrc(self.workspace_dir)
+    def create_pty(self) -> WinPTY:
         proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)
-
-        handle = PtyHandle(pid=proc.pid, project_id=self.project_id, winpty_process=proc)
-        _active_ptys.add(handle)
-        return handle
+        pty = WinPTY(winpty_process=proc)
+        return pty

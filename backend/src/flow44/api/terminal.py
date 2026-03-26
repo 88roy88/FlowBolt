@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from flow44.api.deps import get_ws_sandbox
-from flow44.sandbox.pty import PtyHandle
+from flow44.sandbox.pty import BasePTY
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ async def terminal_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C
 
     await websocket.accept()
 
-    pty: PtyHandle | None = None
+    pty: BasePTY | None = None
     try:
         pty = sandbox.get_or_create_pty()
     except Exception:
