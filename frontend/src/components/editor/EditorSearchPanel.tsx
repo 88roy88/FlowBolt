@@ -378,6 +378,7 @@ export function EditorSearchPanel({
                 >
                   <button
                     onClick={() => toggleSearchFileCollapsed(r.path)}
+                    aria-label={r.path}
                     style={{
                       width: '100%',
                       display: 'flex',
