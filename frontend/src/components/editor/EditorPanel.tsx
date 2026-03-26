@@ -7,7 +7,6 @@ loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useSessionStore } from '../../stores/session';
-import { downloadZip, downloadSingleHtml } from '../../services/api';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
@@ -147,7 +146,6 @@ export function EditorPanel() {
           t={t}
           leftTab={leftTab}
           projectId={projectId}
-          onExportZip={() => projectId && downloadZip(projectId)}
           onShowFiles={() => {
             if (!projectId) return;
             setLeftTab('files');
@@ -157,7 +155,6 @@ export function EditorPanel() {
             setLeftTab('search');
             setTimeout(() => searchInputRef.current?.focus(), 0);
           }}
-          onExportHtml={() => projectId && downloadSingleHtml(projectId)}
           searchResultCount={searchResults.reduce((sum, r) => sum + r.hits.length, 0)}
         />
 
