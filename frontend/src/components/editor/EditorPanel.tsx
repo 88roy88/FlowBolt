@@ -158,6 +158,7 @@ export function EditorPanel() {
             setTimeout(() => searchInputRef.current?.focus(), 0);
           }}
           onExportHtml={() => projectId && downloadSingleHtml(projectId)}
+          searchResultCount={searchResults.reduce((sum, r) => sum + r.hits.length, 0)}
         />
 
         {leftTab === 'files' ? (

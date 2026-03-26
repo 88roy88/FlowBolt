@@ -62,6 +62,7 @@
     "closeTab": "Close",
     "searchTab": "Search",
     "searchInFilesPlaceholder": "Search in files...",
+    "clearSearch": "Clear search",
     "runSearch": "Search",
     "searching": "Searching…",
     "caseSensitive": "Case sensitive",
