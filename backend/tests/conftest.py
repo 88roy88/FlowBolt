@@ -24,6 +24,11 @@ async def setup_test_db(tmp_path_factory: pytest.TempPathFactory):
     flow44.config.settings = Settings()
     await reset()
     await init_db()
+    
+    # Create tables for the test session
+    from sqlmodel import SQLModel
+    async with get_engine().begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
 
     yield db_path
 
