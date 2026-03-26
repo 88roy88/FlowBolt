@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 import os
@@ -7,16 +5,16 @@ import shutil
 import signal
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from typing import IO
+
+from pydantic import BaseModel
 
 from flow44.sandbox.pty import PtyHandle, _active_ptys
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class SandboxInfo:
+class SandboxInfo(BaseModel, frozen=True):
     project_id: str
     workspace_dir: str
     port: int
@@ -41,6 +39,7 @@ def _ensure_bashrc(workspace_dir: str) -> str:
     return path
 
 
+# TODO: I want to get rid of this
 async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
     """Kill a process and its entire group (Unix only)."""
     if proc.returncode is not None:
@@ -59,11 +58,11 @@ async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
         pass
 
 
-class Sandbox(ABC):
+class BaseSandbox(ABC):
     def __init__(self, info: SandboxInfo) -> None:
         self.info = info
-        self._dev_process: asyncio.subprocess.Process | None = None
-        self._dev_log_file: IO[bytes] | None = None
+        self._bg_processes: dict[str, asyncio.subprocess.Process] = {}
+        self._bg_log_files: dict[str, IO[bytes]] = {}
         self._pty: PtyHandle | None = None
 
     @property
@@ -84,7 +83,7 @@ class Sandbox(ABC):
         os.makedirs(self.workspace_dir, exist_ok=True)
 
     async def destroy(self, *, delete_workspace: bool = True) -> None:
-        await self.stop_dev_server()
+        await self.stop_all_background_processes()
         self.kill_pty()
         if delete_workspace and os.path.isdir(self.workspace_dir):  # noqa: ASYNC240
             shutil.rmtree(self.workspace_dir, ignore_errors=True)
@@ -94,24 +93,45 @@ class Sandbox(ABC):
     @abstractmethod
     def exec(self, command: str) -> AsyncIterator[str]: ...
 
-    # -- Dev server --
+    # -- Background processes --
 
     @abstractmethod
-    async def start_dev_server(self) -> None: ...
+    async def _spawn_background(self, name: str, command: str, env: dict[str, str]) -> None: ...
 
-    async def stop_dev_server(self) -> None:
-        if self._dev_process is not None:
-            await _kill_process_tree(self._dev_process)
-            self._dev_process = None
-        if self._dev_log_file is not None:
+    async def stop_background_process(self, name: str) -> None:
+        proc = self._bg_processes.pop(name, None)
+        if proc is not None:
+            await _kill_process_tree(proc)
+        log_file = self._bg_log_files.pop(name, None)
+        if log_file is not None:
             try:
-                self._dev_log_file.close()
+                log_file.close()
             except Exception:
-                logger.debug("Failed to close dev log file", exc_info=True)
-            self._dev_log_file = None
+                logger.debug("Failed to close log file for %s", name, exc_info=True)
 
-    def dev_server_running(self) -> bool:
-        return self._dev_process is not None and self._dev_process.returncode is None
+    async def stop_all_background_processes(self) -> None:
+        names = list(self._bg_processes.keys())
+        for name in names:
+            await self.stop_background_process(name)
+
+    def is_background_process_running(self, name: str) -> bool:
+        proc = self._bg_processes.get(name)
+        return proc is not None and proc.returncode is None
+
+    @classmethod
+    @abstractmethod
+    def find_pids_in_port_range(cls, port_start: int, port_end: int) -> list[tuple[int, int]]:
+        """Return (pid, port) pairs for processes using ports in [port_start, port_end]."""
+        ...
+
+    @classmethod
+    @abstractmethod
+    def kill_pid(cls, pid: int) -> None:
+        """Terminate a process by PID."""
+        ...
+
+    def get_background_log_path(self, name: str) -> str:
+        return os.path.join(self.workspace_dir, f".{name}.log")
 
     # -- PTY --
 
@@ -132,17 +152,6 @@ class Sandbox(ABC):
             self._pty = None
 
     # -- File I/O --
-
-    async def read_file(self, path: str) -> str:
-        full = self._safe_path(path)
-        with open(full, encoding="utf-8") as f:  # noqa: ASYNC230
-            return f.read()
-
-    async def write_file(self, path: str, content: str) -> None:
-        full = self._safe_path(path)
-        os.makedirs(os.path.dirname(full), exist_ok=True)
-        with open(full, "w", encoding="utf-8") as f:  # noqa: ASYNC230
-            f.write(content)
 
     def _safe_path(self, relative_path: str) -> str:
         workspace = os.path.realpath(self.workspace_dir)

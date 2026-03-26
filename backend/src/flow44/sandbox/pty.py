@@ -5,7 +5,6 @@ import logging
 import os
 import signal
 from collections import deque
-from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -14,15 +13,22 @@ logger = logging.getLogger(__name__)
 SCROLLBACK_SIZE = 65536
 
 
-@dataclass(eq=False)
 class PtyHandle:
-    read_fd: int = -1
-    write_fd: int = -1
-    pid: int = -1
-    project_id: str = ""
-    winpty_process: Any | None = field(default=None, repr=False)  # pywinpty PtyProcess (optional dep)
-    _scrollback: deque[bytes] = field(default_factory=deque, repr=False)
-    _scrollback_bytes: int = field(default=0, repr=False)
+    def __init__(
+        self,
+        read_fd: int = -1,
+        write_fd: int = -1,
+        pid: int = -1,
+        project_id: str = "",
+        winpty_process: Any | None = None,
+    ) -> None:
+        self.read_fd = read_fd
+        self.write_fd = write_fd
+        self.pid = pid
+        self.project_id = project_id
+        self.winpty_process = winpty_process
+        self._scrollback: deque[bytes] = deque()
+        self._scrollback_bytes: int = 0
 
     @property
     def is_winpty(self) -> bool:

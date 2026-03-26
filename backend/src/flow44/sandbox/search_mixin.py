@@ -64,6 +64,9 @@ class SearchMixin(BaseSandbox, ABC):
         file_pattern: str | None = None,
         max_results: int | None = None,
         with_column: bool = False,  # Include column positions
+        case_sensitive: bool = True,  # Case sensitivity (default true for ripgrep)
+        word_match: bool = False,  # Match whole words only
+        fixed_strings: bool = False,  # Treat pattern as literal string (not regex)
     ) -> list[GrepMatch]:
         workspace = os.path.realpath(self.workspace_dir)  # noqa: ASYNC240
         search_path = self._safe_path(path)  # raises PermissionError on traversal
@@ -71,6 +74,12 @@ class SearchMixin(BaseSandbox, ABC):
         cmd = ["rg", "--no-heading", "--line-number"]
         if with_column:
             cmd.append("--column")  # Add column numbers to output
+        if not case_sensitive:
+            cmd.append("--ignore-case")  # -i flag for case-insensitive search
+        if word_match:
+            cmd.append("--word-regexp")  # -w flag for whole word matching
+        if fixed_strings:
+            cmd.append("--fixed-strings")  # -F flag for literal string search (not regex)
         for skip in _GREP_SKIP_GLOBS:
             cmd.extend(["--glob", skip])
         if max_results is not None:

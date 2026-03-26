@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -10,9 +9,8 @@ _DEFAULT_WORKSPACE = str(_BACKEND_ROOT / "data" / "workspaces")
 _DEFAULT_TEMPLATE = str(_BACKEND_ROOT / "pnpm-project-template")
 
 
+# TODO: split to smaller config classes, e.g. SandboxSettings, AIModelSettings, etc.
 class Settings(BaseSettings):
-    """Global application settings, loaded from environment variables."""
-
     WORKSPACE_BASE_DIR: str = _DEFAULT_WORKSPACE
     TEMPLATE_DIR: str = _DEFAULT_TEMPLATE
     SANDBOX_PORT_RANGE_START: int = 3101
@@ -28,6 +26,11 @@ class Settings(BaseSettings):
     PNPM_STORE_DIR: str = "/var/lib/ai-builder/workspaces/.pnpm-store"
     SANDBOX_MODE: str = "local"  # "local" or "namespaced"
 
+    # Search Index Settings
+    SEARCH_INDEX_MAX_FILE_SIZE_MB: int = 1  # Max size per file to index (MB)
+    SEARCH_INDEX_MAX_TOTAL_SIZE_MB: int = 20  # Max total indexed content per project (MB)
+    SEARCH_INDEX_CACHE_TTL_SECONDS: int = 5  # How long to cache index before rebuilding
+
     # External APIs
     # FLAPI base URL. In dev you can point to the local mock (default).
     FLAPI_BASE_URL: str = "http://localhost:4000"
@@ -36,12 +39,13 @@ class Settings(BaseSettings):
     EXPORT_API_BASE_URL: str = "http://localhost:8000"
 
     # S3 / Object Storage
-    S3_ENDPOINT_URL: str = Field(default="", validation_alias="S3_ENDPOINT_URL")
-    S3_ACCESS_KEY: str = Field(default="", validation_alias="S3_ACCESS_KEY")
-    S3_SECRET_KEY: str = Field(default="", validation_alias="S3_SECRET_KEY")
-    S3_BUCKET_NAME: str = Field(default="", validation_alias="S3_BUCKET_NAME")
-    S3_CACHE_TTL: int = Field(default=3600, validation_alias="S3_CACHE_TTL")
+    S3_ENDPOINT_URL: str = ""
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET_NAME: str = ""
+    S3_CACHE_TTL: int = 3600
 
+    # TODO: make | None instead of empty string?
     # Langfuse (optional — set public/secret key to enable)
     LANGFUSE_PUBLIC_KEY: str = ""
     LANGFUSE_SECRET_KEY: str = ""

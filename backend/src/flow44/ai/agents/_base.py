@@ -1,20 +1,24 @@
-from __future__ import annotations
-
 from typing import Any
 
 from langfuse.decorators import langfuse_context
 
 from flow44.db.events import emit_event
+from flow44.sandbox.main import PnpmSandbox
 
 
 class BaseAgent:
     def __init__(
         self,
         project_id: str,
+        sandbox: PnpmSandbox,
         model: str | None = None,
         trace_id: str | None = None,
     ) -> None:
+        if sandbox.project_id != project_id:
+            raise ValueError(f"Sandbox project_id '{sandbox.project_id}' doesn't match agent project_id '{project_id}'")
+
         self.project_id = project_id
+        self.sandbox = sandbox
         self.model = model
         self._trace_id = trace_id
 

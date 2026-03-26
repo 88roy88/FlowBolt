@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.sandbox.manager import sandbox_manager
+from flow44.api.deps import get_ws_sandbox
 from flow44.sandbox.pty import PtyHandle
 
 logger = logging.getLogger(__name__)
@@ -15,12 +15,11 @@ router = APIRouter()
 
 @router.websocket("/ws/terminal/{project_id}")
 async def terminal_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
-    await websocket.accept()
-
-    sandbox = sandbox_manager.get_sandbox(project_id)
+    sandbox = await get_ws_sandbox(websocket, project_id)
     if sandbox is None:
-        await websocket.close(code=1008, reason="No sandbox")
         return
+
+    await websocket.accept()
 
     pty: PtyHandle | None = None
     try:

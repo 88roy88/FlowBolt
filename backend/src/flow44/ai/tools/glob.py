@@ -1,31 +1,10 @@
-from __future__ import annotations
-
-import os
-from pathlib import Path
-
-from flow44.sandbox.manager import sandbox_manager
-
-# TODO: add support to gitignore instead of the hardcoded skip list
-SKIP_DIRS = {"node_modules", ".git", "dist", ".next", ".cache", "__pycache__"}
+from flow44.sandbox.main import SearchableSandbox
 
 
-async def glob(project_id: str, pattern: str) -> str:
-
-    sandbox = sandbox_manager.get_sandbox(project_id)
-    if sandbox is None:
-        return "Error: No sandbox found"
-
-    workspace = Path(os.path.realpath(sandbox.workspace_dir))  # noqa: ASYNC240
-
-    results = []
-    for p in workspace.glob(pattern):  # noqa: ASYNC240
-        if any(part in SKIP_DIRS for part in p.parts):
-            continue
-        rel = "/" + str(p.relative_to(workspace))
-        results.append(rel)
-        if len(results) >= 100:
-            break
-
+async def glob(sandbox: SearchableSandbox, pattern: str) -> str:
+    # TODO: move prompt here (shared pronpt)
+    # TODO: move formatting here, the sandbox should return raw results.
+    results = await sandbox.glob(pattern)
     if not results:
         return "No files found matching pattern."
-    return "\n".join(sorted(results))
+    return "\n".join(results)

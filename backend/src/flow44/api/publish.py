@@ -12,7 +12,6 @@ from fastapi.responses import HTMLResponse
 from flow44.config import settings
 from flow44.db.project import get_project, update_project_published_url
 from flow44.integrations.s3 import deploy_single_html
-from flow44.sandbox.manager import sandbox_manager
 from flow44.sandbox.operations import BuildError, build_single_html
 
 logger = logging.getLogger(__name__)
@@ -23,9 +22,6 @@ router = APIRouter(prefix="/api/export/{project_id}", tags=["publish"])
 @router.post("/publish")
 async def publish_to_s3(project_id: str) -> dict[str, str]:
     """Build the project and deploy to S3, returning the public URL."""
-    sandbox = sandbox_manager.get_sandbox(project_id)
-    if sandbox is None:
-        raise HTTPException(status_code=404, detail=f"No sandbox found for project {project_id}")
 
     # Ensure the bucket exists with public-read policy
     if settings.S3_BUCKET_NAME is None or settings.S3_BUCKET_NAME == "":

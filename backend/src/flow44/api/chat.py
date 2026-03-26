@@ -15,7 +15,7 @@ from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.project import get_project
 from flow44.integrations.flapi_api import data_source_client
-from flow44.sandbox.manager import sandbox_manager
+from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,13 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         return
 
     try:
+        sandbox = await sandbox_manager.get_sandbox(project_id)
         await sandbox_manager.ensure_ready(project_id)
+    except SandboxNotFoundError:
+        logger.error("[chat] Sandbox not found for session %s", project_id)
+        await websocket.send_json({"type": "error", "message": "Project sandbox not found"})
+        await websocket.close()
+        return
     except Exception:
         logger.exception("[chat] Failed to prepare sandbox for session %s", project_id)
         await websocket.send_json({"type": "error", "message": "Failed to prepare project sandbox"})
@@ -122,6 +128,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 if is_new:
                     build_agent = BuildAgent(
                         project_id=project_id,
+                        sandbox=sandbox,
                         model=selected_model,
                         data_source_authorization=data_source_authorization,
                     )
@@ -138,6 +145,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 else:
                     followup_agent = FollowUpAgent(
                         project_id=project_id,
+                        sandbox=sandbox,
                         model=selected_model,
                     )
                     register(project_id, followup_agent)
@@ -184,6 +192,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
 
                 fix_agent = FixErrorAgent(
                     project_id=project_id,
+                    sandbox=sandbox,
                     model=selected_model,
                 )
                 register(project_id, fix_agent)
