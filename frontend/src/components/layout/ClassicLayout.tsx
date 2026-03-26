@@ -5,7 +5,7 @@ import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
-import { useSessionStore } from '../../stores/session';
+
 
 type RightTab = 'preview' | 'code';
 

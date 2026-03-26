@@ -6,7 +6,6 @@ import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
-import { useSessionStore } from '../../stores/session';
 
 type PaneId = 'chat' | 'code' | 'preview';
 
@@ -45,7 +44,6 @@ export function FlexibleLayout() {
   const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>(initial.sizes);
   const panesContainerRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
-  const projectId = useSessionStore((s) => s.projectId);
 
   const messages = useChatStore((s) => s.messages);
   const historyLoaded = useChatStore((s) => s.historyLoaded);

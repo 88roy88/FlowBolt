@@ -33,7 +33,7 @@ export function useMonacoProjectModels(
     indexedFilesRef.current.clear();
 
     // Dispose models for previous project
-    const modelsToDispose = m.editor.getModels().filter((model) => {
+    const modelsToDispose = m.editor.getModels().filter((model: { uri: { toString(): string } }) => {
       const uri = model.uri.toString();
       return uri !== MONACO_REACT_VITE_DTS_URI && uri !== MONACO_REACT_VITE_JS_DTS_URI;
     });
