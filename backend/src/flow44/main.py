@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -38,15 +37,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
-        # set langfuse regular env-vars as the litellm callback cant read settings.
-        os.environ["LANGFUSE_PUBLIC_KEY"] = settings.LANGFUSE_PUBLIC_KEY
-        os.environ["LANGFUSE_SECRET_KEY"] = settings.LANGFUSE_SECRET_KEY
-        os.environ["LANGFUSE_HOST"] = settings.LANGFUSE_HOST
-
-        # Set langfuse as a callback, litellm will send the data to langfuse
+        # Credentials already in os.environ via LangfuseSettings.model_post_init
         litellm.success_callback = ["langfuse"]
         litellm.failure_callback = ["langfuse"]
-
         logger.info("Langfuse tracing enabled")
     else:
         logger.info("Langfuse tracing not enabled (missing keys)")
