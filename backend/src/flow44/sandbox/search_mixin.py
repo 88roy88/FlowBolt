@@ -9,7 +9,22 @@ from flow44.sandbox.base import BaseSandbox
 
 # Review TODO: This feels like we have it in 10 diffrent places, lets have a utils with it.
 _GLOB_SKIP_DIRS = {"node_modules", ".git", "dist", ".next", ".cache", "__pycache__"}
-_GREP_SKIP_GLOBS = ["!node_modules", "!.git", "!dist", "!.next"]
+_GREP_SKIP_GLOBS = [
+    "!node_modules",
+    "!.git",
+    "!dist",
+    "!.next",
+    "!pnpm-lock.yaml",
+    "!package-lock.json",
+    "!yarn.lock",
+    "!bun.lockb",
+    "!Cargo.lock",
+    "!poetry.lock",
+    "!Gemfile.lock",
+    "!composer.lock",
+    "!.cache",
+    "!__pycache__",
+]
 
 
 class GrepMatch(BaseModel):

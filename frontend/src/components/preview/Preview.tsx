@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useConsoleStore } from '../../stores/console';
-import { RefreshCw, ExternalLink, Globe, Download, ChevronDown, FileCode, Loader2 } from 'lucide-react';
+import { RefreshCw, ExternalLink, Globe, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
-import { downloadZip, downloadSingleHtml, publishToS3 } from '../../services/api';
+import { publishToS3 } from '../../services/api';
 import { PublishModal } from '../ui/PublishModal';
 
 export function Preview() {
@@ -19,8 +19,6 @@ export function Preview() {
   const [loading, setLoading] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const isPublished = !!currentProject?.published_url;
 
@@ -68,33 +66,6 @@ export function Preview() {
     }
   }, [projectId, isPublishing]);
 
-  const handleExportZip = () => {
-    if (projectId) {
-      downloadZip(projectId);
-      setExportMenuOpen(false);
-    }
-  };
-
-  const handleExportHtml = () => {
-    if (projectId) {
-      downloadSingleHtml(projectId);
-      setExportMenuOpen(false);
-    }
-  };
-
-  // Close export menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setExportMenuOpen(false);
-      }
-    };
-    if (exportMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [exportMenuOpen]);
-
   if (!projectId) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -121,43 +92,8 @@ export function Preview() {
           {previewUrl ?? t('preview.loading')}
         </span>
 
-        {/* Export/Publish Actions */}
+        {/* Publish Actions */}
         <div className="flex items-center gap-1.5">
-          {/* Export Dropdown */}
-          <div className="relative" ref={exportMenuRef}>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!projectId}
-              onClick={() => setExportMenuOpen(!exportMenuOpen)}
-              title={t('editor.exportZip')}
-            >
-              <Download size={14} />
-              <ChevronDown size={12} className={`transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
-            </Button>
-            {exportMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] rounded-md border border-border bg-popover shadow-lg">
-                <div className="p-1">
-                  <button
-                    onClick={handleExportZip}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent transition-colors text-left"
-                  >
-                    <Download size={14} className="text-muted-foreground" />
-                    <span>{t('editor.exportZip')}</span>
-                  </button>
-                  <button
-                    onClick={handleExportHtml}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent transition-colors text-left"
-                  >
-                    <FileCode size={14} className="text-muted-foreground" />
-                    <span>{t('editor.exportHtml')}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Publish Button - Primary Action */}
           {isPublished && projectId ? (
             <Button
               variant="outline"
