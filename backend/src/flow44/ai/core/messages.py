@@ -32,6 +32,7 @@ class ToolResultContent(ContentBlock):
 class Message(BaseModel):
     role: Literal["user", "assistant", "system", "tool"]
     content: str | Sequence[ContentBlock]
+    tool_call_id: str | None = None
 
     @classmethod
     def user(cls, text: str) -> Message:
@@ -48,8 +49,6 @@ class Message(BaseModel):
     @classmethod
     def tool_result(cls, tool_call_id: str, content: str) -> Message:
         return cls(role="tool", content=content, tool_call_id=tool_call_id)
-
-    tool_call_id: str | None = None
 
     # TODO: why not just model dump?
     def to_dict(self) -> dict[str, Any]:
