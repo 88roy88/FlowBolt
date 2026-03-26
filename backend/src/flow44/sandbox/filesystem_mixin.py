@@ -5,9 +5,7 @@ from pathlib import PurePosixPath
 from pydantic import BaseModel
 
 from flow44.sandbox.base import BaseSandbox
-
-# Review TODO: this is also common.
-SKIP_DIRS = {"node_modules", ".git", ".next", "dist", ".cache", "__pycache__", ".vite"}
+from flow44.sandbox.constants import SKIP_DIRS
 
 
 class FileEntry(BaseModel):

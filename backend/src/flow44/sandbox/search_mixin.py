@@ -1,30 +1,13 @@
-import asyncio
+import json
 import os
+import shlex
 from abc import ABC
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel
 
 from flow44.sandbox.base import BaseSandbox
-
-# Review TODO: This feels like we have it in 10 diffrent places, lets have a utils with it.
-_GLOB_SKIP_DIRS = {"node_modules", ".git", "dist", ".next", ".cache", "__pycache__"}
-_GREP_SKIP_GLOBS = [
-    "!node_modules",
-    "!.git",
-    "!dist",
-    "!.next",
-    "!pnpm-lock.yaml",
-    "!package-lock.json",
-    "!yarn.lock",
-    "!bun.lockb",
-    "!Cargo.lock",
-    "!poetry.lock",
-    "!Gemfile.lock",
-    "!composer.lock",
-    "!.cache",
-    "!__pycache__",
-]
+from flow44.sandbox.constants import GREP_SKIP_GLOBS, SKIP_DIRS
 
 
 class GrepMatch(BaseModel):
@@ -49,9 +32,10 @@ class SearchMixin(BaseSandbox, ABC):
         workspace = Path(os.path.realpath(self.workspace_dir))  # noqa: ASYNC240
         results = []
         for p in workspace.glob(pattern):  # noqa: ASYNC240
-            if any(part in _GLOB_SKIP_DIRS for part in p.parts):
+            if any(part in SKIP_DIRS for part in p.parts):
                 continue
-            results.append("/" + str(p.relative_to(workspace)))
+            # PurePosixPath.as_posix() normalises backslashes on Windows
+            results.append("/" + PurePosixPath(p.relative_to(workspace)).as_posix())
             if len(results) >= 100:
                 break
         return sorted(results)
@@ -63,79 +47,53 @@ class SearchMixin(BaseSandbox, ABC):
         path: str = "/",
         file_pattern: str | None = None,
         max_results: int | None = None,
-        with_column: bool = False,  # Include column positions
-        case_sensitive: bool = True,  # Case sensitivity (default true for ripgrep)
-        word_match: bool = False,  # Match whole words only
-        fixed_strings: bool = False,  # Treat pattern as literal string (not regex)
+        with_column: bool = False,
+        case_sensitive: bool = True,
+        word_match: bool = False,
+        fixed_strings: bool = False,
     ) -> list[GrepMatch]:
-        workspace = os.path.realpath(self.workspace_dir)  # noqa: ASYNC240
-        search_path = self._safe_path(path)  # raises PermissionError on traversal
+        # Validate path (raises PermissionError on traversal); compute workspace-relative search path
+        abs_search = self._safe_path(path)
+        rel_search = PurePosixPath(os.path.relpath(abs_search, self.workspace_dir)).as_posix()  # noqa: ASYNC240
 
-        cmd = ["rg", "--no-heading", "--line-number"]
-        if with_column:
-            cmd.append("--column")  # Add column numbers to output
+        # --json gives structured output: no colon-splitting, no drive-letter ambiguity on Windows
+        args: list[str] = ["rg", "--json"]
         if not case_sensitive:
-            cmd.append("--ignore-case")  # -i flag for case-insensitive search
+            args.append("--ignore-case")
         if word_match:
-            cmd.append("--word-regexp")  # -w flag for whole word matching
+            args.append("--word-regexp")
         if fixed_strings:
-            cmd.append("--fixed-strings")  # -F flag for literal string search (not regex)
-        for skip in _GREP_SKIP_GLOBS:
-            cmd.extend(["--glob", skip])
+            args.append("--fixed-strings")
+        for skip in GREP_SKIP_GLOBS:
+            args.extend(["--glob", skip])
         if max_results is not None:
-            cmd.extend(["--max-count", str(max_results)])
+            args.extend(["--max-count", str(max_results)])
         if file_pattern:
-            cmd.extend(["--glob", file_pattern])
-        cmd.extend([pattern, search_path])
+            args.extend(["--glob", file_pattern])
+        args.extend([pattern, rel_search])
 
+        # Run via self.exec() so rg runs inside the sandbox environment (nsjail, Windows cmd, etc.)
+        # and outputs workspace-relative paths — no absolute path stripping, no drive-letter issues.
+        cmd = " ".join(shlex.quote(a) for a in args)
         try:
-            # Review TODO: why not use sansbox exec
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
-        except TimeoutError:
-            return []
-        except FileNotFoundError:
+            lines: list[str] = []
+            async for line in self.exec(cmd):
+                lines.append(line)
+        except Exception:
             return []
 
-        output = stdout.decode("utf-8", errors="replace")
         matches: list[GrepMatch] = []
-        for raw_line in output.splitlines():
-            # rg output: /abs/workspace/path/to/file:42:content (without --column)
-            # rg output: /abs/workspace/path/to/file:42:10:content (with --column)
-            if raw_line.startswith(workspace):
-                raw_line = raw_line[len(workspace) :]  # noqa: PLW2901
-
-            if with_column:
-                # Format: /relative/path:42:10:content
-                parts = raw_line.split(":", 3)
-                if len(parts) < 4:
-                    continue
-                file_path, line_str, col_str, content = parts
-                try:
-                    line_num = int(line_str)
-                    col_num = int(col_str)
-                except ValueError:
-                    continue
-            else:
-                # Format: /relative/path:42:content
-                parts = raw_line.split(":", 2)
-                if len(parts) < 3:
-                    continue
-                file_path, line_str, content = parts
-                try:
-                    line_num = int(line_str)
-                except ValueError:
-                    continue
-                col_num = None
-
-            # Ensure consistent path format: always start with "/"
-            # This matches frontend expectations and file tree format
-            if not file_path.startswith("/"):
-                file_path = "/" + file_path
-
+        for raw_line in "".join(lines).splitlines():
+            try:
+                msg = json.loads(raw_line)
+            except json.JSONDecodeError:
+                continue
+            if msg.get("type") != "match":
+                continue
+            data = msg.get("data", {})
+            file_path = "/" + PurePosixPath(data["path"]["text"]).as_posix().lstrip("/")
+            line_num = data["line_number"]
+            content = data["lines"]["text"].rstrip("\n")
+            col_num = data["submatches"][0]["start"] + 1 if with_column and data.get("submatches") else None
             matches.append(GrepMatch(file=file_path, line=line_num, content=content, column=col_num))
         return matches
