@@ -45,13 +45,15 @@ export type SearchResult = { path: string; uri?: string; hits: SearchHit[] };
 export async function searchFiles(
   sessionId: string,
   query: string,
-  opts?: { caseSensitive?: boolean; maxResults?: number; maxHitsPerFile?: number }
+  opts?: { caseSensitive?: boolean; wordMatch?: boolean; useRegex?: boolean; maxResults?: number; maxHitsPerFile?: number }
 ): Promise<SearchResult[]> {
   const data = await request<{ query: string; results: SearchResult[] }>(`/files/${sessionId}/search`, {
     method: 'POST',
     body: JSON.stringify({
       query,
       case_sensitive: opts?.caseSensitive ?? false,
+      word_match: opts?.wordMatch ?? false,
+      use_regex: opts?.useRegex ?? false,
       max_results: opts?.maxResults ?? 2000,
       max_hits_per_file: opts?.maxHitsPerFile ?? 200,
     }),

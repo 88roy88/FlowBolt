@@ -19,6 +19,8 @@ export function useEditorPanelSearch(
   const [searchError, setSearchError] = useState<string | null>(null);
   const [collapsedSearchFiles, setCollapsedSearchFiles] = useState<Set<string>>(new Set());
   const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
+  const [searchWordMatch, setSearchWordMatch] = useState(false);
+  const [searchUseRegex, setSearchUseRegex] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchRequestIdRef = useRef(0);
   const searchHighlightDecorationIdsRef = useRef<string[]>([]);
@@ -47,6 +49,8 @@ export function useEditorPanelSearch(
     try {
       const results = await searchFiles(projectId, query, {
         caseSensitive: searchCaseSensitive,
+        wordMatch: searchWordMatch,
+        useRegex: searchUseRegex,
         maxResults: 2000,
         maxHitsPerFile: 200,
       });
@@ -59,7 +63,7 @@ export function useEditorPanelSearch(
     } finally {
       if (searchRequestIdRef.current === requestId) setSearchBusy(false);
     }
-  }, [searchCaseSensitive, searchQuery, projectId]);
+  }, [searchCaseSensitive, searchWordMatch, searchUseRegex, searchQuery, projectId]);
 
   // Auto-search with debounce when query changes
   useEffect(() => {
@@ -86,7 +90,7 @@ export function useEditorPanelSearch(
         clearTimeout(searchDebounceTimerRef.current);
       }
     };
-  }, [searchQuery, searchCaseSensitive, projectId, performSearch]);
+  }, [searchQuery, searchCaseSensitive, searchWordMatch, searchUseRegex, projectId, performSearch]);
 
   const toggleSearchFileCollapsed = useCallback((path: string) => {
     setCollapsedSearchFiles((prev) => {
@@ -177,6 +181,10 @@ export function useEditorPanelSearch(
     collapsedSearchFiles,
     searchCaseSensitive,
     setSearchCaseSensitive,
+    searchWordMatch,
+    setSearchWordMatch,
+    searchUseRegex,
+    setSearchUseRegex,
     performSearch,
     toggleSearchFileCollapsed,
     jumpToSearchHit,

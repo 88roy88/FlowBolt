@@ -74,6 +74,10 @@ export function EditorPanel() {
     collapsedSearchFiles,
     searchCaseSensitive,
     setSearchCaseSensitive,
+    searchWordMatch,
+    setSearchWordMatch,
+    searchUseRegex,
+    setSearchUseRegex,
     performSearch,
     toggleSearchFileCollapsed,
     jumpToSearchHit,
@@ -176,6 +180,10 @@ export function EditorPanel() {
             projectId={projectId}
             searchCaseSensitive={searchCaseSensitive}
             onSearchCaseSensitiveChange={setSearchCaseSensitive}
+            searchWordMatch={searchWordMatch}
+            onSearchWordMatchChange={setSearchWordMatch}
+            searchUseRegex={searchUseRegex}
+            onSearchUseRegexChange={setSearchUseRegex}
             searchResults={searchResults}
             searchError={searchError}
             collapsedSearchFiles={collapsedSearchFiles}

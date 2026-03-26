@@ -62,6 +62,10 @@ type Props = {
   projectId: string | null;
   searchCaseSensitive: boolean;
   onSearchCaseSensitiveChange: (checked: boolean) => void;
+  searchWordMatch: boolean;
+  onSearchWordMatchChange: (checked: boolean) => void;
+  searchUseRegex: boolean;
+  onSearchUseRegexChange: (checked: boolean) => void;
   searchResults: SearchResult[];
   searchError: string | null;
   collapsedSearchFiles: Set<string>;
@@ -82,6 +86,10 @@ export function EditorSearchPanel({
   projectId,
   searchCaseSensitive,
   onSearchCaseSensitiveChange,
+  searchWordMatch,
+  onSearchWordMatchChange,
+  searchUseRegex,
+  onSearchUseRegexChange,
   searchResults,
   searchError,
   collapsedSearchFiles,
@@ -186,34 +194,94 @@ export function EditorSearchPanel({
 
       {/* Compact Search Options & Stats */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'space-between', minHeight: 24 }}>
-        <label
-          style={{
-            display: 'flex',
-            gap: 4,
-            alignItems: 'center',
-            fontSize: 11,
-            color: 'var(--muted-foreground)',
-            cursor: 'pointer',
-            padding: '2px 6px',
-            borderRadius: 3,
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--muted)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-          }}
-          title={t('editor.caseSensitive')}
-        >
-          <input
-            type="checkbox"
-            checked={searchCaseSensitive}
-            onChange={(e) => onSearchCaseSensitiveChange(e.target.checked)}
-            style={{ cursor: 'pointer', width: 12, height: 12 }}
-          />
-          <span style={{ fontWeight: 600 }}>Aa</span>
-        </label>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <label
+            style={{
+              display: 'flex',
+              gap: 4,
+              alignItems: 'center',
+              fontSize: 11,
+              color: 'var(--muted-foreground)',
+              cursor: 'pointer',
+              padding: '2px 6px',
+              borderRadius: 3,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--muted)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            title={t('editor.caseSensitive')}
+          >
+            <input
+              type="checkbox"
+              checked={searchCaseSensitive}
+              onChange={(e) => onSearchCaseSensitiveChange(e.target.checked)}
+              style={{ cursor: 'pointer', width: 12, height: 12 }}
+            />
+            <span style={{ fontWeight: 600 }}>Aa</span>
+          </label>
+
+          <label
+            style={{
+              display: 'flex',
+              gap: 4,
+              alignItems: 'center',
+              fontSize: 11,
+              color: 'var(--muted-foreground)',
+              cursor: 'pointer',
+              padding: '2px 6px',
+              borderRadius: 3,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--muted)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            title="Match whole words"
+          >
+            <input
+              type="checkbox"
+              checked={searchWordMatch}
+              onChange={(e) => onSearchWordMatchChange(e.target.checked)}
+              style={{ cursor: 'pointer', width: 12, height: 12 }}
+            />
+            <span style={{ fontWeight: 600 }}>W</span>
+          </label>
+
+          <label
+            style={{
+              display: 'flex',
+              gap: 4,
+              alignItems: 'center',
+              fontSize: 11,
+              color: 'var(--muted-foreground)',
+              cursor: 'pointer',
+              padding: '2px 6px',
+              borderRadius: 3,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--muted)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            title="Use regular expression"
+          >
+            <input
+              type="checkbox"
+              checked={searchUseRegex}
+              onChange={(e) => onSearchUseRegexChange(e.target.checked)}
+              style={{ cursor: 'pointer', width: 12, height: 12 }}
+            />
+            <span style={{ fontWeight: 600 }}>.*</span>
+          </label>
+        </div>
 
         {totalMatches > 0 && (
           <div
