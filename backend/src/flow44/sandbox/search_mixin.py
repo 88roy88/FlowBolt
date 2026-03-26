@@ -57,7 +57,7 @@ class SearchMixin(BaseSandbox, ABC):
         return sorted(results)
 
     # TODO: take a look at the grep.py in code-validation-service for reference
-    async def grep(  # noqa: C901, PLR0912
+    async def grep(  # noqa: C901, PLR0912, PLR0913
         self,
         pattern: str,
         path: str = "/",

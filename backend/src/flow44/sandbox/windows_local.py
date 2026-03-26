@@ -8,7 +8,7 @@ from flow44.sandbox.pty import PtyHandle, _active_ptys
 
 if __import__("os").name == "nt":
     try:
-        from winpty import PtyProcess as WinPtyProcess  # type: ignore[import-not-found]
+        from winpty import PtyProcess as WinPtyProcess
     except ImportError as e:
         raise ImportError(
             "winpty package is required for Windows sandbox support. Install it with: pip install pywinpty"

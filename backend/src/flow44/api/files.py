@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from flow44.api.deps import SandboxDep
-from flow44.sandbox.base import BaseSandbox
+from flow44.sandbox.main import PnpmSandbox
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 
@@ -40,7 +40,7 @@ class SearchResponse(BaseModel):
 
 
 @router.get("/tree")
-async def get_file_tree(sandbox: Annotated[BaseSandbox, SandboxDep]) -> list[dict[str, Any]]:
+async def get_file_tree(sandbox: Annotated[PnpmSandbox, SandboxDep]) -> list[dict[str, Any]]:
     try:
         tree = await sandbox.list_files()
         return [entry.model_dump() for entry in tree]
@@ -49,7 +49,7 @@ async def get_file_tree(sandbox: Annotated[BaseSandbox, SandboxDep]) -> list[dic
 
 
 @router.get("/content")
-async def get_file_content(sandbox: Annotated[BaseSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
+async def get_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
     try:
         content = await sandbox.read_file(path)
         return {"path": path, "content": content}
@@ -60,7 +60,7 @@ async def get_file_content(sandbox: Annotated[BaseSandbox, SandboxDep], path: st
 
 
 @router.put("/content")
-async def put_file_content(sandbox: Annotated[BaseSandbox, SandboxDep], body: WriteFileRequest) -> dict[str, str]:
+async def put_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], body: WriteFileRequest) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
         return {"status": "ok", "path": body.path}
@@ -72,7 +72,7 @@ async def put_file_content(sandbox: Annotated[BaseSandbox, SandboxDep], body: Wr
 
 @router.get("/grep")
 async def get_grep(
-    sandbox: Annotated[BaseSandbox, SandboxDep],
+    sandbox: Annotated[PnpmSandbox, SandboxDep],
     pattern: str = Query(...),
     path: str = Query(default="/"),
     file_pattern: str | None = Query(default=None),
@@ -85,7 +85,7 @@ async def get_grep(
 
 
 @router.post("/search")
-async def post_search(sandbox: Annotated[BaseSandbox, SandboxDep], body: SearchRequest) -> SearchResponse:
+async def post_search(sandbox: Annotated[PnpmSandbox, SandboxDep], body: SearchRequest) -> SearchResponse:
     """Search using ripgrep with column positions for frontend integration."""
     try:
         # Use grep with column tracking

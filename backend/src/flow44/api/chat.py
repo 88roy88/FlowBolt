@@ -65,8 +65,8 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         return
 
     try:
-        sandbox = await sandbox_manager.get_sandbox(project_id)
-        await sandbox_manager.ensure_ready(project_id)
+        sandbox = sandbox_manager.get_sandbox(project_id)
+        await sandbox_manager.ensure_ready(sandbox)
     except SandboxNotFoundError:
         logger.error("[chat] Sandbox not found for session %s", project_id)
         await websocket.send_json({"type": "error", "message": "Project sandbox not found"})

@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import Response
 
 from flow44.api.deps import SandboxDep, get_ws_sandbox
-from flow44.sandbox.base import BaseSandbox
+from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 
 @router.get("/{project_id}/port")
-async def get_preview_port(project_id: str, sandbox: Annotated[BaseSandbox, SandboxDep]) -> dict[str, str | int]:
+async def get_preview_port(project_id: str, sandbox: Annotated[PnpmSandbox, SandboxDep]) -> dict[str, str | int]:
     """Return the allocated port for the sandbox's dev server."""
     return {"project_id": project_id, "port": sandbox.port}
 
@@ -38,7 +38,7 @@ async def get_preview_port(project_id: str, sandbox: Annotated[BaseSandbox, Sand
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
 async def proxy_to_sandbox(  # noqa: E501
-    project_id: str, path: str, request: Request, sandbox: Annotated[BaseSandbox, SandboxDep]
+    project_id: str, path: str, request: Request, sandbox: Annotated[PnpmSandbox, SandboxDep]
 ) -> Response:
     """Reverse proxy requests to the sandbox's dev server.
 
