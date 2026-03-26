@@ -1,7 +1,3 @@
-"""REST endpoint for publishing a project to S3."""
-
-from __future__ import annotations
-
 import asyncio
 import logging
 
