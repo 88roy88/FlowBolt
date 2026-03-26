@@ -24,7 +24,7 @@ async def publish_to_s3(project_id: str) -> dict[str, str]:
     """Build the project and deploy to S3, returning the public URL."""
 
     # Ensure the bucket exists with public-read policy
-    if settings.S3_BUCKET_NAME is None or settings.S3_BUCKET_NAME == "":
+    if settings.S3_BUCKET_NAME is None:
         logger.error("S3_BUCKET_NAME environment variable is not set")
         raise HTTPException(status_code=500, detail="S3_BUCKET_NAME is not set")
 
@@ -46,15 +46,10 @@ async def publish_to_s3(project_id: str) -> dict[str, str]:
 
     await update_project_published_url(project_id, s3_url)
 
-    base_url = settings.EXPORT_API_BASE_URL
-    proxy_url = f"{base_url}/api/export/{project_id}/published"
+    proxy_path = f"/api/export/{project_id}/published"
+    logger.info("Published project %s to %s (proxy: %s)", project_id, s3_url, proxy_path)
 
-    project = await get_project(project_id)
-    project_name = project.name if project else project_id
-
-    logger.info("Published project '%s' (id %s) to %s (proxy: %s)", project_name, project_id, s3_url, proxy_url)
-
-    return {"url": proxy_url, "project_name": project_name}
+    return {"url": proxy_path}
 
 
 @router.get("/published", response_class=HTMLResponse)
