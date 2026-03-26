@@ -1,4 +1,5 @@
 """Monkey-patches for benchmark mode. No production code is modified."""
+
 import asyncio
 import contextvars
 import logging
@@ -24,6 +25,7 @@ _current_project_id: contextvars.ContextVar[str] = contextvars.ContextVar("_curr
 # ---------------------------------------------------------------------------
 # Per-run metrics collector
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class LLMCall:
@@ -143,6 +145,7 @@ async def _patched_emit(self: BaseAgent, event: dict[str, Any]) -> None:
 # Patch 2 — Replace emit_event (skip DB)
 # ---------------------------------------------------------------------------
 
+
 async def _patched_emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
     if project_id in _metrics:
         _metrics[project_id].events.append({**event, "_ts": time.time()})
@@ -152,18 +155,10 @@ async def _patched_emit_event(project_id: str, event: dict[str, Any], *, notify:
 # Patch 3 — Redirect write_file
 # ---------------------------------------------------------------------------
 
-async def _patched_write_file(project_id: str, path: str, content: str) -> None:
-    workspace = _workspace_dirs.get(project_id)
-    if workspace is None:
-        raise FileNotFoundError(f"No benchmark workspace for {project_id}")
-    full = workspace / path.lstrip("/")
-    full.parent.mkdir(parents=True, exist_ok=True)
-    full.write_text(content, encoding="utf-8")
-
-
 # ---------------------------------------------------------------------------
 # Patch 4 — Skip typecheck and build
 # ---------------------------------------------------------------------------
+
 
 async def _patched_typecheck(self: BuildAgent) -> str:
     workspace = _workspace_dirs.get(self.project_id)
@@ -172,8 +167,11 @@ async def _patched_typecheck(self: BuildAgent) -> str:
     # Need pnpm install first for tsc to work
     await _ensure_installed(workspace)
     proc = await asyncio.create_subprocess_exec(
-        "bash", "-c", f"cd {workspace} && npx tsc --noEmit 2>&1",
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+        "bash",
+        "-c",
+        f"cd {workspace} && npx tsc --noEmit 2>&1",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
     )
     stdout, _ = await proc.communicate()
     return stdout.decode(errors="replace").strip() if stdout else ""
@@ -185,8 +183,11 @@ async def _patched_build(self: BuildAgent) -> str:
         return ""
     await _ensure_installed(workspace)
     proc = await asyncio.create_subprocess_exec(
-        "bash", "-c", f"cd {workspace} && pnpm build 2>&1",
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+        "bash",
+        "-c",
+        f"cd {workspace} && pnpm build 2>&1",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
     )
     stdout, _ = await proc.communicate()
     output = stdout.decode(errors="replace").strip() if stdout else ""
@@ -204,8 +205,11 @@ async def _ensure_installed(workspace: Path) -> None:
     # Remove .npmrc (Docker-only pnpm store path)
     (workspace / ".npmrc").unlink(missing_ok=True)
     proc = await asyncio.create_subprocess_exec(
-        "bash", "-c", f"cd {workspace} && pnpm install 2>&1",
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+        "bash",
+        "-c",
+        f"cd {workspace} && pnpm install 2>&1",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
     )
     await proc.communicate()
     _installed.add(key)
@@ -215,6 +219,7 @@ async def _ensure_installed(workspace: Path) -> None:
 # Patch 5 — Capture LLM metrics
 # ---------------------------------------------------------------------------
 
+
 def _calc_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
     """Compute cost using litellm's pricing table."""
     try:
@@ -222,8 +227,11 @@ def _calc_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
         from litellm.utils import Usage  # noqa: PLC0415
 
         resp = ModelResponse()
-        resp.usage = Usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
-                           total_tokens=prompt_tokens + completion_tokens)
+        resp.usage = Usage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+        )
         return litellm.completion_cost(completion_response=resp, model=model)
     except Exception:
         return 0.0
@@ -267,7 +275,8 @@ async def _patched_acompletion(*args: Any, **kwargs: Any) -> Any:
         except Exception:
             call.cost_usd = _calc_cost(
                 kwargs.get("model", "") or (args[0] if args else ""),
-                call.prompt_tokens, call.completion_tokens,
+                call.prompt_tokens,
+                call.completion_tokens,
             )
 
     if project_id in _metrics:
@@ -338,22 +347,6 @@ def apply() -> None:
     import flow44.db.events as events_mod  # noqa: PLC0415
 
     events_mod.emit_event = _patched_emit_event  # type: ignore[assignment]
-
-    # Patch 3 — Redirect file writes (patch _resolve_safe since write_file is decorator-wrapped)
-    import flow44.sandbox.filesystem as fs_mod  # noqa: PLC0415
-
-    def _patched_resolve_safe(project_id: str, relative_path: str) -> tuple[str, str]:
-        workspace = _workspace_dirs.get(project_id)
-        if workspace is None:
-            raise FileNotFoundError(f"No benchmark workspace for {project_id}")
-        cleaned = relative_path.lstrip("/")
-        full = str(workspace / cleaned)
-        # Track files written by the agent
-        if project_id in _metrics:
-            _metrics[project_id].files_written.append(cleaned)
-        return full, str(workspace)
-
-    fs_mod._resolve_safe = _patched_resolve_safe  # type: ignore[assignment]
 
     # Patch 4 — Skip typecheck/build
     BuildAgent._typecheck = _patched_typecheck  # type: ignore[assignment]
