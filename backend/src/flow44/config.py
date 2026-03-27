@@ -13,6 +13,8 @@ _DEFAULT_TEMPLATE = str(_BACKEND_ROOT / "pnpm-project-template")
 
 class Flow44BaseSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AIB_", env_file=".env", extra="ignore")
+    # Browser localStorage key for the auth session JSON (`auth_token`, etc.); match frontend VITE_AUTH_STORAGE_KEY.
+    AUTH_STORAGE_KEY: str = "Auth"
 
 
 class SandboxSettings(Flow44BaseSettings):

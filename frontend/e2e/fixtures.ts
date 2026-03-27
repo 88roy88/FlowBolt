@@ -29,6 +29,14 @@ export const test = base.extend<{
           for (const k of Object.keys(localStorage)) {
             if (k.startsWith('project-has-messages:')) localStorage.removeItem(k);
           }
+          localStorage.setItem(
+            'Auth',
+            JSON.stringify({
+              auth_token: 'e2e-flapi-token',
+              userId: 'e2e-user',
+              userName: 'E2E User',
+            }),
+          );
         } catch {
           /* ignore */
         }

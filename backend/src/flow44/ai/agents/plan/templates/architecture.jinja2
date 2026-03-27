@@ -39,6 +39,6 @@ Sample data:
 ```json
 {{ ctx.sample_data_json }}
 ```
-Endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run` (import API_BASE from src/config.ts) with `Authorization` header from localStorage key `flowbolt.dataSourceApiToken`
+Endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run` (import API_BASE from src/config.ts). The host app stores the session in `localStorage` as JSON under key `{{ auth_storage_key }}`; read `auth_token` from that object and send it as the `Authorization` header value.
 {% endfor %}
 {% endif %}

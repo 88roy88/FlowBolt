@@ -16,6 +16,12 @@
     "sendMessage": "Send message"
   },
   "app": {
+    "authenticating": "Signing in…",
+    "signInPrompt": "Continue to open your organization sign-in in a new window.",
+    "openSignIn": "Continue to sign in",
+    "popupBlockedHint": "The browser blocked the sign-in window. Allow pop-ups for this site, then try again.",
+    "authConfigurationError": "Sign-in could not be completed. Check authentication settings (or enable mock mode for local development), then try again.",
+    "retryAuth": "Retry sign-in",
     "selectProjectFirst": "Select a project first",
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",

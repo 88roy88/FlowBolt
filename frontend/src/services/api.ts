@@ -1,5 +1,5 @@
 import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
-import { readDataSourceAuthorization } from './dataSourceAuth';
+import { authorizedFetch } from './authorizedFetch';
 
 const BASE = '/api';
 
@@ -9,9 +9,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (options?.body) {
     headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch(`${BASE}${path}`, {
-    headers,
+  const res = await authorizedFetch(`${BASE}${path}`, {
     ...options,
+    headers: { ...headers, ...(options?.headers as Record<string, string> | undefined) },
   });
   const text = await res.text();
   if (!res.ok) {
@@ -113,10 +113,7 @@ export async function fetchDefaultModel(): Promise<string> {
 }
 
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
-  const headers: Record<string, string> = {};
-  const auth = readDataSourceAuthorization();
-  if (auth) headers.Authorization = auth;
-  const res = await fetch(`${BASE}/data-source/search/${encodeURIComponent(queryOrId)}`, { headers });
+  const res = await authorizedFetch(`${BASE}/data-source/search/${encodeURIComponent(queryOrId)}`, {});
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${text}`);

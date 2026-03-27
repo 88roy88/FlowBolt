@@ -13,9 +13,9 @@ class TestDatabaseHelpers:
         monkeypatch.setattr(
             flow44.config.settings,
             "DATABASE_URL",
-            "sqlite:///tmp/flowbolt.db",
+            "sqlite:///tmp/flow44_db_helpers_test.db",
         )
-        assert _get_async_url() == "sqlite+aiosqlite:///tmp/flowbolt.db"
+        assert _get_async_url() == "sqlite+aiosqlite:///tmp/flow44_db_helpers_test.db"
 
     async def test_get_engine_sets_sqlite_foreign_keys_pragma(self) -> None:
         engine = get_engine("sqlite+aiosqlite:///:memory:")

@@ -12,6 +12,7 @@ import { pollFileTree } from './utils/pollFileTree';
 import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
+import { authSession, PopupBlockedError } from './auth/authSession';
 
 function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
@@ -62,6 +63,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const [checkingBackend, setCheckingBackend] = useState(true);
+  const [authPhase, setAuthPhase] = useState<'loading' | 'needs_sign_in' | 'ready' | 'config_error'>('loading');
+  const [signInError, setSignInError] = useState<string | null>(null);
   const hasCache = hasProjectsCache();
 
   const selectProject = useCallback((project: typeof projects[number]) => {
@@ -72,17 +75,26 @@ export default function App() {
     loadFileTree();
   }, [setCurrentProject, resetFiles, loadHistory, loadFileTree]);
 
-  // Initialize data source token on mount
   useEffect(() => {
-    // TODO: remove this when real Flapi auth was added
-    // Set default data source API token if not already set
-    if (!window.localStorage.getItem('flowbolt.dataSourceApiToken')) {
-      window.localStorage.setItem('flowbolt.dataSourceApiToken', 'maz-default-value');
-    }
+    let cancelled = false;
+    authSession
+      .ensureInitialSession()
+      .then((result) => {
+        if (cancelled) return;
+        setAuthPhase(result === 'ready' ? 'ready' : 'needs_sign_in');
+      })
+      .catch((e) => {
+        console.error('Authentication bootstrap failed:', e);
+        if (!cancelled) setAuthPhase('config_error');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Check backend availability on mount
   useEffect(() => {
+    if (authPhase !== 'ready') return;
     async function checkBackend() {
       const isAvailable = await api.checkBackendHealth();
       setBackendAvailable(isAvailable);
@@ -96,9 +108,10 @@ export default function App() {
       }
     }
     checkBackend();
-  }, [t]);
+  }, [authPhase, t]);
 
   useEffect(() => {
+    if (authPhase !== 'ready') return;
     loadProjects()
       .then(() => {
         const hasProjects = useSessionStore.getState().projects.length > 0;
@@ -113,7 +126,7 @@ export default function App() {
         });
       })
       .finally(() => setLoading(false));
-  }, [loadProjects, t]);
+  }, [authPhase, loadProjects, t]);
 
   // On load: match URL hash to a project, or auto-select first
   useEffect(() => {
@@ -177,6 +190,73 @@ export default function App() {
       pollFileTree();
     }
   };
+
+  if (authPhase === 'loading') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
+        <FlowBrand size="lg" />
+        <Loader2 size={20} className="animate-spin text-[#2bbcc4]" />
+        <p className="text-sm text-[var(--text-dim)]">{t('app.authenticating')}</p>
+      </div>
+    );
+  }
+
+  if (authPhase === 'needs_sign_in') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 select-none px-6 text-center max-w-lg mx-auto">
+        <FlowBrand size="lg" />
+        <p className="text-[var(--text-dim)]">{t('app.signInPrompt')}</p>
+        {signInError ? (
+          <p className="text-sm text-[var(--danger)]">{signInError}</p>
+        ) : null}
+        <button
+          type="button"
+          className="px-4 py-2 rounded-md font-semibold bg-[var(--accent)] text-[var(--bg)]"
+          onClick={() => {
+            setSignInError(null);
+            authSession
+              .signInInteractive()
+              .then(() => setAuthPhase('ready'))
+              .catch((e) => {
+                console.error(e);
+                setSignInError(
+                  e instanceof PopupBlockedError ? t('app.popupBlockedHint') : t('app.authConfigurationError'),
+                );
+              });
+          }}
+        >
+          {t('app.openSignIn')}
+        </button>
+      </div>
+    );
+  }
+
+  if (authPhase === 'config_error') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 select-none px-6 text-center">
+        <FlowBrand size="lg" />
+        <p className="text-[var(--text-dim)] max-w-md">{t('app.authConfigurationError')}</p>
+        <button
+          type="button"
+          className="px-4 py-2 rounded-md font-semibold bg-[var(--accent)] text-[var(--bg)]"
+          onClick={() => {
+            setAuthPhase('loading');
+            authSession
+              .ensureInitialSession()
+              .then((result) => {
+                setAuthPhase(result === 'ready' ? 'ready' : 'needs_sign_in');
+              })
+              .catch((e) => {
+                console.error(e);
+                setAuthPhase('config_error');
+              });
+          }}
+        >
+          {t('app.retryAuth')}
+        </button>
+      </div>
+    );
+  }
 
   // Only show loading screen if no cache exists
   if ((loading || checkingBackend) && !hasCache) {

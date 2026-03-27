@@ -5,7 +5,7 @@ from __future__ import annotations
 from flow44.ai.agents.execute.prompts import render_codegen, render_merge, render_summary
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
-
+from flow44.config import settings
 
 class TestPromptRendering:
     def test_architecture_basic(self) -> None:
@@ -31,6 +31,8 @@ class TestPromptRendering:
         assert "following data sources" in result
         assert "123" in result
         assert "api/data-source" in result
+        assert "auth_token" in result
+        assert settings.AUTH_STORAGE_KEY in result
 
     def test_architecture_without_data_sources(self) -> None:
         result = render_architecture(data_source_contexts=None)
@@ -43,6 +45,7 @@ class TestPromptRendering:
     def test_merge_with_data_sources(self) -> None:
         result = render_merge(has_data_sources=True)
         assert "Data Source Integration Tasks" in result
+        assert f"localStorage.getItem('{settings.AUTH_STORAGE_KEY}')" in result
 
     def test_user_plan_basic(self) -> None:
         result = render_user_plan()
@@ -112,3 +115,6 @@ class TestPromptRendering:
         )
         assert "Analytics" in result
         assert "/api/data-source/456/run" in result
+        assert "readHostAuthToken" in result
+        assert f"localStorage.getItem('{settings.AUTH_STORAGE_KEY}')" in result
+

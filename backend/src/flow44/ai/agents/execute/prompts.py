@@ -7,6 +7,8 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from flow44.config import settings
+
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
     loader=FileSystemLoader(str(_templates_dir)), trim_blocks=True, lstrip_blocks=True
@@ -17,8 +19,34 @@ def render(template_name: str, **kwargs: Any) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
+def render_classify() -> str:
+    return render("classify.jinja2")
+
+
+def render_architecture(*, data_source_contexts: list[dict[str, Any]] | None = None) -> str:
+    prepared = None
+    if data_source_contexts:
+        prepared = [
+            {**ctx, "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000]}
+            for ctx in data_source_contexts
+        ]
+    return render(
+        "architecture.jinja2",
+        data_source_contexts=prepared,
+        auth_storage_key=settings.AUTH_STORAGE_KEY,
+    )
+
+
+def render_ux_design() -> str:
+    return render("ux_design.jinja2")
+
+
 def render_merge(*, has_data_sources: bool = False) -> str:
-    return render("merge.jinja2", has_data_sources=has_data_sources)
+    return render(
+        "merge.jinja2",
+        has_data_sources=has_data_sources,
+        auth_storage_key=settings.AUTH_STORAGE_KEY,
+    )
 
 
 def render_summary() -> str:
@@ -71,6 +99,7 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
+        auth_storage_key=settings.AUTH_STORAGE_KEY,
     )
 
 
