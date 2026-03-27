@@ -22,18 +22,13 @@ export async function authorizedFetch(input: string, init?: RequestInit): Promis
   try {
     await authSession.reauthenticateAfterUnauthorized();
   } catch {
-    authSession.navigateToLoginFallback();
+    // Opening a login popup from async fetch is usually blocked; do not navigate away —
+    // that looked like a full re-login even though the token may still be in storage.
     return first;
   }
 
-  const second = await fetch(input, {
+  return fetch(input, {
     ...init,
     headers: headersWithAuth(init?.headers),
   });
-
-  if (second.status === 401) {
-    authSession.navigateToLoginFallback();
-  }
-
-  return second;
 }

@@ -20,8 +20,14 @@ class TestAuthHeader:
     def test_valid_token(self) -> None:
         assert FlapiClient._auth_header("Bearer abc") == {"Authorization": "Bearer abc"}
 
-    def test_strips_whitespace(self) -> None:
-        assert FlapiClient._auth_header("  admin  ") == {"Authorization": "admin"}
+    def test_strips_whitespace_and_adds_bearer(self) -> None:
+        assert FlapiClient._auth_header("  admin  ") == {"Authorization": "Bearer admin"}
+
+    def test_bearer_prefix_skipped_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import flow44.integrations.flapi_api as flapi_mod
+
+        monkeypatch.setattr(flapi_mod.settings, "FLAPI_ADD_BEARER_PREFIX", False)
+        assert FlapiClient._auth_header("admin") == {"Authorization": "admin"}
 
 
 class TestGetDisplayName:

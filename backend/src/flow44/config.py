@@ -50,6 +50,9 @@ class FlapiSettings(Flow44BaseSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
     FLAPI_BASE_URL: str = "http://localhost:6000"
     FLAPI_VERIFY_SSL: bool = True
+    # When True, forward Authorization as "Bearer <token>" unless the browser already sent a Bearer/… value.
+    # Many Flapi/SAML setups expect Bearer; SSO postMessage often supplies only the raw token string.
+    FLAPI_ADD_BEARER_PREFIX: bool = True
 
 
 class S3Settings(Flow44BaseSettings):

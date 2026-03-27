@@ -16,12 +16,12 @@ function parseJson(raw: string): AuthCredentials | null {
 }
 
 function pickExpiryIso(c: AuthCredentials): number | null {
-  const raw =
-    (typeof c.expiresAt === 'string' && c.expiresAt) ||
-    (typeof c.expiration === 'string' && c.expiration) ||
-    (typeof c.tokenExpiry === 'string' && c.tokenExpiry);
-  if (!raw?.trim()) return null;
-  const ms = Date.parse(raw.trim());
+  let raw: string | undefined;
+  if (typeof c.expiresAt === 'string' && c.expiresAt.trim()) raw = c.expiresAt.trim();
+  else if (typeof c.expiration === 'string' && c.expiration.trim()) raw = c.expiration.trim();
+  else if (typeof c.tokenExpiry === 'string' && c.tokenExpiry.trim()) raw = c.tokenExpiry.trim();
+  if (!raw) return null;
+  const ms = Date.parse(raw);
   return Number.isFinite(ms) ? ms : null;
 }
 
