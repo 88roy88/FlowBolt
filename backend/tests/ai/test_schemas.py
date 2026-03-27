@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from flow44.ai.schemas import (
+from flow44.ai.agents.execute.models import ProjectSummary
+from flow44.ai.agents.plan.models import (
     ArchitectureDesign,
     DataSourceAnalysis,
-    ProjectSummary,
     UserPlanOverview,
     UXDesign,
 )

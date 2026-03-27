@@ -6,7 +6,7 @@ from typing import Any
 from langfuse.decorators import observe
 from pydantic_ai import Agent
 
-from flow44.ai.parser import ActionParser
+from flow44.ai.agents.execute.parser import ActionParser
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
 
 from flow44.ai.agents._base import BaseAgent, resolve_model

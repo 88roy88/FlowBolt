@@ -7,11 +7,10 @@ from typing import Any
 from langfuse.decorators import langfuse_context, observe
 from pydantic_ai import Agent
 
-from flow44.ai.parser import ActionParser
+from flow44.ai.agents.execute.parser import ActionParser
 from flow44.ai.agents.execute.prompts import SUMMARY_PROMPT, render_codegen, render_fix_errors, render_merge
-from flow44.ai.schemas import ProjectSummary
-from flow44.ai.state import BuildState
-from flow44.ai.task_tree import Task, WorkPlan
+from flow44.ai.agents.execute.models import ProjectSummary, Task, WorkPlan
+from flow44.ai.agents.plan.models import BuildState
 from flow44.db.project import update_project_summary
 from flow44.sandbox.main import PnpmSandbox
 

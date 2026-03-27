@@ -13,8 +13,7 @@ from flow44.ai.agents.plan.prompts import (
     render_data_source_analysis,
     render_user_plan,
 )
-from flow44.ai.schemas import ArchitectureDesign, DataSourceAnalysis, UserPlanOverview, UXDesign
-from flow44.ai.state import BuildState
+from flow44.ai.agents.plan.models import ArchitectureDesign, BuildState, DataSourceAnalysis, UserPlanOverview, UXDesign
 from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.main import PnpmSandbox
 

@@ -14,11 +14,18 @@ def resolve_model(model: str | None) -> Model:
     """Create a pydantic-ai Model for the given model string.
 
     Supports:
-      - ``bedrock:model-id``  → AWS Bedrock (native provider)
-      - anything else         → OpenAI-compatible endpoint (vLLM, Ollama, OpenRouter)
-                                configured via AI_BASE_URL / AI_API_KEY
+      - ``anthropic:model-id`` → Anthropic API (direct, uses ANTHROPIC_API_KEY env var)
+      - ``bedrock:model-id``   → AWS Bedrock (native provider)
+      - anything else          → OpenAI-compatible endpoint (vLLM, Ollama, OpenRouter)
+                                 configured via AI_BASE_URL / AI_API_KEY
     """
     name = model or settings.AI_MODEL
+    print(f"Resolving model '{name}'")
+
+    if name.startswith("anthropic:"):
+        from pydantic_ai.models.anthropic import AnthropicModel  # noqa: PLC0415
+
+        return AnthropicModel(name.removeprefix("anthropic:"))
 
     if name.startswith("bedrock:"):
         from pydantic_ai.models.bedrock import BedrockConverseModel  # noqa: PLC0415

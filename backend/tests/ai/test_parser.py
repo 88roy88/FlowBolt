@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flow44.ai.parser import ActionParser
+from flow44.ai.agents.execute.parser import ActionParser
 
 
 class TestActionParserBasic:

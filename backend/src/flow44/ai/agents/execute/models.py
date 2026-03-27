@@ -1,27 +1,28 @@
+"""Pydantic models for the execute agent: work plan, tasks, project summary."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from typing import Literal
 
-from flow44.ai.schemas import ArchitectureDesign, UXDesign
+from pydantic import BaseModel, Field
+
+from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign
 
 
-# TODO: why dataclass instead of pydantic?
-@dataclass
-class Task:
+# --- Task & WorkPlan ---
+
+
+class Task(BaseModel):
     id: str
     title: str
     description: str
     files: list[str]
-    depends_on: list[str] = field(default_factory=list)
-    # TODO: use literal
-    status: str = "pending"  # pending | running | completed | failed
+    depends_on: list[str] = Field(default_factory=list)
+    status: Literal["pending", "running", "completed", "failed"] = "pending"
     error: str | None = None
 
 
-# TODO: why is this even dataclass?
-# TODO: is there a more elegant way to do this? also, move to utils
-@dataclass
-class WorkPlan:
+class WorkPlan(BaseModel):
     id: str
     summary: str
     architecture: ArchitectureDesign
@@ -43,3 +44,13 @@ class WorkPlan:
             remaining = [t for t in remaining if t.id not in completed_ids]
 
         return layers
+
+
+# --- Project summary ---
+
+
+class ProjectSummary(BaseModel):
+    summary: str = ""
+    tech_stack: list[str] = Field(default_factory=list)
+    features: list[str] = Field(default_factory=list)
+    file_overview: dict[str, str] = Field(default_factory=dict)
