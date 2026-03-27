@@ -31,6 +31,7 @@ export function Preview() {
     const url = `/api/preview/${projectId}/proxy/`;
     setPreviewUrl(url);
     setLoading(false);
+    console.debug('[Preview] refresh — reason: project changed', { projectId, refreshKey });
   }, [projectId, refreshKey]);
 
   // Auto-refresh preview when files are saved (by user or AI).
@@ -39,12 +40,17 @@ export function Preview() {
   useEffect(() => {
     if (saveVersion === saveVersionRef.current) return;
     saveVersionRef.current = saveVersion;
-    const timer = setTimeout(() => { clearConsole(); setRefreshKey((k) => k + 1); }, 800);
+    const timer = setTimeout(() => {
+      console.debug('[Preview] refresh — reason: files saved', { saveVersion });
+      clearConsole();
+      setRefreshKey((k) => k + 1);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [saveVersion]);
 
   const clearConsole = useConsoleStore((s) => s.clear);
   const handleRefresh = () => {
+    console.debug('[Preview] refresh — reason: manual');
     clearConsole();
     setRefreshKey((k) => k + 1);
   };
