@@ -1,19 +1,37 @@
 from typing import Any
 
 from langfuse.decorators import langfuse_context
+from pydantic_ai.models import Model
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
+from flow44.config import settings
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
 
 
-def resolve_model(model: str | None) -> str | None:
-    """Convert litellm model string to pydantic-ai format.
+def resolve_model(model: str | None) -> Model:
+    """Create a pydantic-ai Model for the given model string.
 
-    litellm uses 'bedrock/model-name', pydantic-ai uses 'bedrock:model-name'.
+    Supports:
+      - ``bedrock:model-id``  → AWS Bedrock (native provider)
+      - anything else         → OpenAI-compatible endpoint (vLLM, Ollama, OpenRouter)
+                                configured via AI_BASE_URL / AI_API_KEY
     """
-    if model is None:
-        return None
-    return model.replace("/", ":", 1)
+    name = model or settings.AI_MODEL
+
+    if name.startswith("bedrock:"):
+        from pydantic_ai.models.bedrock import BedrockConverseModel  # noqa: PLC0415
+
+        return BedrockConverseModel(name.removeprefix("bedrock:"))
+
+    return OpenAIChatModel(
+        name,
+        provider=OpenAIProvider(
+            base_url=settings.AI_BASE_URL,
+            api_key=settings.AI_API_KEY,
+        ),
+    )
 
 
 class BaseAgent:

@@ -32,9 +32,10 @@ class SandboxSettings(Flow44BaseSettings):
 
 
 class AIModelSettings(Flow44BaseSettings):
-    AI_MODEL: str = "bedrock/us.anthropic.claude-sonnet-4-6"
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    # TODO: maybe add other AI services related envs here...
+    AI_MODEL: str = "qwen/qwen3-coder-30b-a3b-instruct"
+    # Base URL for OpenAI-compatible endpoints (vLLM, Ollama, OpenRouter, etc.)
+    AI_BASE_URL: str = "http://ai-builder-models.com/openai/v1"
+    AI_API_KEY: str = "default"
 
 
 class SearchIndexSettings(Flow44BaseSettings):
