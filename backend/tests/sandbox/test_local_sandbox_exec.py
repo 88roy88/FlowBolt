@@ -1,6 +1,7 @@
 """Tests for UnixSandbox.exec() — real subprocess in tmp workspace."""
 
 import os
+import sys
 
 import pytest
 
@@ -20,6 +21,7 @@ async def _collect(gen) -> list[str]:  # type: ignore[type-arg]
     return [line async for line in gen]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="UnixSandbox uses bash/POSIX shell")
 @pytest.mark.asyncio
 class TestUnixSandboxExec:
     async def test_echo(self, sandbox: UnixSandbox) -> None:

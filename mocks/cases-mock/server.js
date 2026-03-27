@@ -193,7 +193,10 @@ const buildMockModelPromptText = (body) => {
 };
 
 // ——— 2. Flapi proxy (mock) ———
-// Real Server proxies to FLAPI_URL/package/v1/search/{q} and FLAPI_URL/package/{id}, so mock must expose those too
+// FlowBolt backend calls this base URL (AIB_FLAPI_BASE_URL, default http://localhost:4000), paths:
+//   GET  /package/v1/search/:partial  — same as FlapiClient.search()
+//   POST /package/v3/:packageId      — same as FlapiClient.run_data_source()
+// If the UI shows “FLAPI unreachable” / 502, the backend cannot reach this process — run: pnpm start (MOCK_PORT=4000).
 function handlePackageSearch(query) {
   const q = (query || '').trim();
   if (!q) {
