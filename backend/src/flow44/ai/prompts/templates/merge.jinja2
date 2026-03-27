@@ -46,7 +46,7 @@ Rules:
 
 When data_source_integrations is present in the input, you MUST create tasks for each data source:
 1. TypeScript interfaces for each data source's data structure
-2. A custom hook (e.g., useDataSource) that fetches data using `API_BASE` from `src/config.ts`: ```${API_BASE}/api/data-source/${dataSourceId}/run``` with `Authorization` header read from `window.localStorage.getItem('flowbolt.dataSourceApiToken')`
+2. A custom hook (e.g., useDataSource) that fetches data using `API_BASE` from `src/config.ts`: ```${API_BASE}/api/data-source/${dataSourceId}/run``` with `Authorization` set from the host auth blob: `JSON.parse(localStorage.getItem('{{ auth_storage_key }}') ?? '{}').auth_token` (guard for missing/invalid JSON)
 3. Components that display and interact with the data source
 
 Ensure proper dependency ordering: types → hooks → components → App integration.

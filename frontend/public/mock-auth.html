@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mock auth provider</title>
+  </head>
+  <body>
+    <p style="font-family: system-ui, sans-serif; padding: 1rem">
+      Mock identity provider. This window should close automatically after login.
+    </p>
+    <script>
+      (function () {
+        function deliver(evOrigin) {
+          if (!window.opener) return;
+          var params = new URLSearchParams(window.location.search);
+          var token = params.get('token') || 'mock-saml-token';
+          var target = evOrigin || window.location.origin;
+          window.opener.postMessage(
+            {
+              message: 'deliverCredentials',
+              auth_token: token,
+              userId: params.get('userId') || 'mock-user',
+              userName: params.get('userName') || 'Mock SAML user',
+            },
+            target,
+          );
+          window.close();
+        }
+        window.addEventListener('message', function (ev) {
+          var d = ev.data || {};
+          var t = d.type || d.Type;
+          if (typeof t !== 'string') return;
+          if (t.toLowerCase() !== 'requestcredentials') return;
+          deliver(ev.origin);
+        });
+      })();
+    </script>
+  </body>
+</html>
