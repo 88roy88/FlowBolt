@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from flow44.ai.prompts import (
-    render_architecture,
-    render_codegen,
-    render_followup,
-    render_merge,
-    render_summary,
-    render_user_plan,
-)
+from flow44.ai.agents.execute.prompts import render_codegen, render_merge, render_summary
+from flow44.ai.agents.followup.prompts import render_followup
+from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
 
 
 class TestPromptRendering:

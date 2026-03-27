@@ -6,7 +6,7 @@ from typing import Any
 from langfuse.decorators import langfuse_context, observe
 from pydantic_ai import Agent
 
-from flow44.ai.prompts import (
+from flow44.ai.agents.plan.prompts import (
     USER_PLAN_PROMPT,
     UX_DESIGN_PROMPT,
     render_architecture,
@@ -18,7 +18,7 @@ from flow44.ai.state import BuildState
 from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.main import PnpmSandbox
 
-from ._base import BaseAgent, resolve_model
+from flow44.ai.agents._base import BaseAgent, resolve_model
 
 logger = logging.getLogger(__name__)
 
