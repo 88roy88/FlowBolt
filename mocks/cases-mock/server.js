@@ -10,7 +10,7 @@ app.use(cors());
 // Allow any valid JSON (including primitives), because Swagger/UI often defaults to `"string"`.
 app.use(express.json({ limit: '10mb', strict: false }));
 
-const PORT = Number(process.env.MOCK_PORT) || 4000;
+const PORT = Number(process.env.MOCK_PORT) || 6000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const IFRAME_DATA_EVENT = process.env.IFRAME_DATA_EVENT || 'IFRAME_DATA';
 

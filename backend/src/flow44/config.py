@@ -46,7 +46,7 @@ class SearchIndexSettings(Flow44BaseSettings):
 
 class FlapiSettings(Flow44BaseSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
-    FLAPI_BASE_URL: str = "http://localhost:4000"
+    FLAPI_BASE_URL: str = "http://localhost:6000"
     FLAPI_VERIFY_SSL: bool = True
 
 
