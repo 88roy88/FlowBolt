@@ -4,21 +4,19 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from langfuse.decorators import observe
+from pydantic_ai import Agent
 
-from flow44.ai.core.messages import Message
 from flow44.ai.parser import ActionParser
 from flow44.ai.prompts import render_fix_error_direct, render_fix_errors
-from flow44.ai.provider import stream_chat
 
-from ._base import BaseAgent
+from ._base import BaseAgent, resolve_model
 
 logger = logging.getLogger(__name__)
 
+_fix_agent: Agent[None, str] = Agent()
 
-# TODO: we will probably make this into a ReAct agent like the follow up one.
+
 class FixErrorAgent(BaseAgent):
-    # TODO: make run abstract in the base class so all agents will be the same.
-    # TODO: I like it that the run is the last function of the class and not the first :)
     @observe(name="fix-error-agent-run")  # type: ignore[untyped-decorator]
     async def run(
         self,
@@ -27,6 +25,7 @@ class FixErrorAgent(BaseAgent):
         error_line: int | None = None,
         error_stack: str | None = None,
     ) -> None:
+        model = resolve_model(self.model)
         await self.emit({"type": "phase", "phase": "fixing"})
         fix_steps: list[dict[str, Any]] = []
 
@@ -53,14 +52,14 @@ class FixErrorAgent(BaseAgent):
         full_text: list[str] = []
 
         try:
-            async for chunk in stream_chat(
-                [Message.user("Fix the error.")],
-                prompt,
-                model=self.model,
-                metadata=self._llm_metadata("fix_error_direct"),
-            ):
-                full_text.append(chunk)
-                parser.feed(chunk)
+            async with _fix_agent.run_stream(
+                "Fix the error.",
+                instructions=prompt,
+                model=model,
+            ) as stream:
+                async for chunk in stream.stream_text(delta=True):
+                    full_text.append(chunk)
+                    parser.feed(chunk)
             parser.flush()
         except Exception:
             logger.exception("[fix-error] Generation failed")
@@ -90,7 +89,7 @@ class FixErrorAgent(BaseAgent):
             if errors:
                 await self._send_step(fix_steps, "validate", "failed", "Validation found issues")
                 await self._send_step(fix_steps, "retry", "running", "Attempting auto-fix...")
-                await self._retry_fix(errors, dict(generated_files))
+                await self._retry_fix(errors, dict(generated_files), model)
                 await self._send_step(fix_steps, "retry", "completed", "Auto-fix applied")
             else:
                 await self._send_step(fix_steps, "validate", "completed", "Fix validated successfully!")
@@ -98,7 +97,6 @@ class FixErrorAgent(BaseAgent):
         await self.emit({"type": "action_complete"})
         await self.emit({"type": "phase", "phase": "idle"})
 
-    # TODO: this is probably redundant now. we can use the emit.
     async def _send_step(self, steps: list[dict[str, Any]], step: str, status: str, message: str) -> None:
         await self.emit({"type": "fix_step", "step": step, "status": status, "message": message})
         for s in steps:
@@ -108,8 +106,6 @@ class FixErrorAgent(BaseAgent):
                 return
         steps.append({"id": str(uuid.uuid4()), "step": step, "status": status, "message": message})
 
-    # TODO: add the some AI magic to this function if the file is not clear or need more?
-    # TODO: should ignore stuff from node_models? and stuff like that?
     async def _discover_files(self, error_file: str | None) -> dict[str, str]:  # noqa: C901, PLR0912
         files_to_read: list[str] = []
 
@@ -148,19 +144,14 @@ class FixErrorAgent(BaseAgent):
                         logger.debug("Fallback file tree listing failed")
         return file_contents
 
-    # TODO: we might want genral utils outside of the agent. also, me might want to move this to the sandbox manager.
-    # TODO: or even to the frontend
     def _normalize_path(self, path: str) -> str:
         """Extract a workspace-relative path from an absolute or mangled error path."""
-        # Normalize to posix (error messages may contain either separator)
         parts = PurePosixPath(path.replace("\\", "/")).parts
 
-        # Strip workspace prefix: /var/lib/.../project_id/src/App.tsx → src/App.tsx
         if self.project_id in parts:
             idx = parts.index(self.project_id)
             parts = parts[idx + 1 :]
 
-        # Extract from src/ onward
         if "src" in parts:
             idx = parts.index("src")
             return str(PurePosixPath(*parts[idx:]))
@@ -171,18 +162,18 @@ class FixErrorAgent(BaseAgent):
         result = await self.sandbox.run_build_command("pnpm build")
         return result.errors
 
-    async def _retry_fix(self, errors: str, completed_files: dict[str, str]) -> None:
+    async def _retry_fix(self, errors: str, completed_files: dict[str, str], model: str | None) -> None:
         prompt = render_fix_errors(errors=errors, files=completed_files)
         generated: list[tuple[str, str]] = []
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
         try:
-            async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")],
-                prompt,
-                model=self.model,
-                metadata=self._llm_metadata("fix_error_retry"),
-            ):
-                parser.feed(chunk)
+            async with _fix_agent.run_stream(
+                "Fix the TypeScript errors.",
+                instructions=prompt,
+                model=model,
+            ) as stream:
+                async for chunk in stream.stream_text(delta=True):
+                    parser.feed(chunk)
             parser.flush()
             for path, content in generated:
                 await self.sandbox.write_file(path, content)

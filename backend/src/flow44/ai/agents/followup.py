@@ -20,7 +20,7 @@ from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
 
-from ._base import BaseAgent
+from ._base import BaseAgent, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ async def grep(ctx: RunContext[FollowUpDeps], pattern: str, file_pattern: str | 
 
     Args:
         pattern: Text or regex pattern to search for (e.g., "useState", "import.*axios", "className=")
-        file_pattern: Optional file glob to narrow search (e.g., "*.tsx", "*.css")
+        file_pattern: Optional file glob to narrow search (e.g., "*.tsx", "*.css", /src/components/*)
 
     Returns:
         Matching lines with file paths and line numbers
@@ -214,16 +214,6 @@ def _to_pydantic_ai_history(
     return messages
 
 
-def _resolve_model(model: str | None) -> str | None:
-    """Convert litellm model string to pydantic-ai format.
-
-    litellm uses 'bedrock/model-name', pydantic-ai uses 'bedrock:model-name'.
-    """
-    if model is None:
-        return None
-    return model.replace("/", ":", 1)
-
-
 # ---------------------------------------------------------------------------
 # Agent class (thin wrapper for lifecycle & SSE)
 # ---------------------------------------------------------------------------
@@ -264,7 +254,7 @@ class FollowUpAgent(BaseAgent):
             content,
             deps=deps,
             message_history=message_history,
-            model=_resolve_model(self.model),
+            model=resolve_model(self.model),
             usage_limits=UsageLimits(request_limit=MAX_ITERATIONS),
         )
 

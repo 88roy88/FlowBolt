@@ -6,6 +6,16 @@ from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
 
 
+def resolve_model(model: str | None) -> str | None:
+    """Convert litellm model string to pydantic-ai format.
+
+    litellm uses 'bedrock/model-name', pydantic-ai uses 'bedrock:model-name'.
+    """
+    if model is None:
+        return None
+    return model.replace("/", ":", 1)
+
+
 class BaseAgent:
     def __init__(
         self,
