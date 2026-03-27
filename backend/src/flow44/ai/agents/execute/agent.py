@@ -2,9 +2,8 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
 
-from langfuse.decorators import langfuse_context, observe
+from langfuse import observe
 from pydantic_ai import Agent
 
 from flow44.ai.agents.execute.parser import ActionParser
@@ -39,19 +38,11 @@ class ExecuteAgent(BaseAgent):
         model: str | None = None,
         trace_id: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, model=model)
         self._state = state
 
     @observe(name="execute-agent-run")  # type: ignore[untyped-decorator]
     async def run(self) -> None:
-        self._trace_id = langfuse_context.get_current_trace_id()
-        langfuse_context.update_current_trace(
-            session_id=self.project_id,
-            user_id=self.project_id,
-            metadata={"model": self.model or "default"},
-            tags=["execute-agent"],
-        )
-
         model = resolve_model(self.model)
 
         await self.emit({"type": "plan_accepted", "overview": self._state.user_overview.model_dump()})
@@ -110,8 +101,9 @@ class ExecuteAgent(BaseAgent):
             instructions=render_merge(has_data_sources=bool(self._state.data_source_contexts)),
             model=model,
         )
+        print("Plan agent output:\n", result.output)
 
-        plan_data = json.loads(result.output) if isinstance(result.output, str) else {}
+        plan_data = json.loads(result.output.removeprefix("```json").removesuffix("```")) if isinstance(result.output, str) else {}
 
         tasks = [
             Task(

@@ -6,7 +6,7 @@ import logging
 import os
 import re
 
-from langfuse.decorators import observe
+from langfuse import observe
 
 from flow44.config import settings
 from flow44.sandbox.manager import sandbox_manager

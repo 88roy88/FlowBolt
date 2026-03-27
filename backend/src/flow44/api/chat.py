@@ -8,8 +8,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from flow44.ai.agents import ExecuteAgent, FixErrorAgent, FollowUpAgent, PlanAgent
+from flow44.ai.agents.plan.models import BuildState
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
+from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.db.project import get_project
 from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
@@ -17,9 +19,6 @@ from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Pending plans awaiting user approval, keyed by project_id.
-_pending_plans: dict[str, PlanAgent] = {}
 
 
 async def _is_new_project(project_id: str) -> bool:
@@ -129,7 +128,6 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                         model=selected_model,
                         data_source_authorization=data_source_authorization,
                     )
-                    _pending_plans[project_id] = plan_agent
                     asyncio.create_task(
                         _run_agent_safe(
                             project_id,
@@ -150,28 +148,38 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
             elif msg_type == "plan_response":
                 action = data.get("action", "reject")
                 feedback = data.get("feedback")
+                selected_model = data.get("model")
 
-                pending = _pending_plans.get(project_id)
-                if pending is None:
-                    await websocket.send_json({"type": "error", "message": "No active build session"})
+                state_json = await get_pending_plan(project_id)
+                if state_json is None:
+                    await websocket.send_json({"type": "error", "message": "No pending plan found"})
                     continue
 
+                state = BuildState.model_validate_json(state_json)
+
                 if action == "accept":
-                    state = pending.state
-                    _pending_plans.pop(project_id, None)
+                    await delete_pending_plan(project_id)
                     execute_agent = ExecuteAgent(
                         project_id=project_id,
                         sandbox=sandbox,
                         state=state,
-                        model=pending.model,
+                        model=selected_model or state.model,
                     )
                     asyncio.create_task(_run_agent_safe(project_id, execute_agent.run()))
 
                 elif action == "modify" and feedback:
-                    asyncio.create_task(_run_agent_safe(project_id, pending.rebuild_with_feedback(feedback)))
+                    plan_agent = PlanAgent(
+                        project_id=project_id,
+                        sandbox=sandbox,
+                        model=selected_model or state.model,
+                    )
+                    plan_agent.state = state
+                    asyncio.create_task(
+                        _run_agent_safe(project_id, plan_agent.rebuild_with_feedback(feedback))
+                    )
 
                 elif action == "reject":
-                    _pending_plans.pop(project_id, None)
+                    await delete_pending_plan(project_id)
                     await emit_event(project_id, {"type": "plan_rejected"})
                     await emit_event(project_id, {"type": "phase", "phase": "idle"})
 
@@ -240,4 +248,3 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         except asyncio.CancelledError:
             pass
         unsubscribe(project_id, queue)
-        _pending_plans.pop(project_id, None)

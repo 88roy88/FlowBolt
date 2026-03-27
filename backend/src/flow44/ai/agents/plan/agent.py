@@ -3,9 +3,11 @@ import json
 import logging
 from typing import Any
 
-from langfuse.decorators import langfuse_context, observe
+from langfuse import observe
 from pydantic_ai import Agent
 
+from flow44.ai.agents._base import BaseAgent, resolve_model
+from flow44.ai.agents.plan.models import ArchitectureDesign, BuildState, DataSourceAnalysis, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.prompts import (
     USER_PLAN_PROMPT,
     UX_DESIGN_PROMPT,
@@ -13,11 +15,9 @@ from flow44.ai.agents.plan.prompts import (
     render_data_source_analysis,
     render_user_plan,
 )
-from flow44.ai.agents.plan.models import ArchitectureDesign, BuildState, DataSourceAnalysis, UserPlanOverview, UXDesign
+from flow44.db.pending_plan import save_pending_plan
 from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.main import PnpmSandbox
-
-from flow44.ai.agents._base import BaseAgent, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,13 @@ _overview_agent: Agent[None, UserPlanOverview] = Agent(output_type=UserPlanOverv
 _ds_analysis_agent: Agent[None, DataSourceAnalysis] = Agent(output_type=DataSourceAnalysis)
 
 
+async def _persist_state(state: BuildState) -> None:
+    """Save BuildState to DB so it survives server restarts."""
+    await save_pending_plan(state.project_id, state.model_dump_json())
+
+
 class PlanAgent(BaseAgent):
-    """Handles design and planning phases. Returns state for ExecuteAgent."""
+    """Handles design and planning phases. Persists state to DB for ExecuteAgent."""
 
     def __init__(
         self,
@@ -40,10 +45,9 @@ class PlanAgent(BaseAgent):
         sandbox: PnpmSandbox,
         *,
         model: str | None = None,
-        trace_id: str | None = None,
         data_source_authorization: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, model=model)
         self.state = BuildState(project_id=self.project_id, model=self.model)
         self._data_source_authorization = data_source_authorization
 
@@ -51,14 +55,6 @@ class PlanAgent(BaseAgent):
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self.state.user_content = content
         self.state.data_source_ids = data_source_ids or []
-        self._trace_id = langfuse_context.get_current_trace_id()
-
-        langfuse_context.update_current_trace(
-            session_id=self.project_id,
-            user_id=self.project_id,
-            metadata={"model": self.model or "default"},
-            tags=["plan-agent"],
-        )
 
         model = resolve_model(self.model)
 
@@ -107,13 +103,14 @@ class PlanAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "planning"})
         self.state.user_overview = await self._build_user_overview(model)
 
-        # Present for approval
+        # Persist to DB and present for approval
         self.state.phase = "awaiting_approval"
+        await _persist_state(self.state)
         await self.emit({"type": "phase", "phase": "awaiting_approval"})
         await self.emit({"type": "plan_overview", "overview": self.state.user_overview.model_dump()})
 
     async def rebuild_with_feedback(self, feedback: str) -> None:
-        """Rebuild the user overview incorporating feedback."""
+        """Rebuild the user overview incorporating feedback, then persist."""
         model = resolve_model(self.model)
         await self.emit({"type": "phase", "phase": "planning"})
 
@@ -135,6 +132,7 @@ class PlanAgent(BaseAgent):
         self.state.user_overview = result.output
 
         self.state.phase = "awaiting_approval"
+        await _persist_state(self.state)
         await self.emit({"type": "phase", "phase": "awaiting_approval"})
         await self.emit({"type": "plan_overview", "overview": self.state.user_overview.model_dump()})
 

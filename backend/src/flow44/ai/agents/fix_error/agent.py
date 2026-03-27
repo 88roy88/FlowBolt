@@ -3,7 +3,7 @@ import uuid
 from pathlib import PurePosixPath
 from typing import Any
 
-from langfuse.decorators import observe
+from langfuse import observe
 from pydantic_ai import Agent
 
 from flow44.ai.agents.execute.parser import ActionParser

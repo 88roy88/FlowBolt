@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from langfuse.decorators import langfuse_context, observe
+from langfuse import observe
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.usage import UsageLimits
@@ -227,15 +227,13 @@ class FollowUpAgent(BaseAgent):
         model: str | None = None,
         trace_id: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, model=model)
         self._steps: list[dict[str, Any]] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
 
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str) -> None:
-        langfuse_context.update_current_observation(tags=["follow-up-agent"])
-
         await self.emit({"type": "phase", "phase": "exploring"})
 
         history = await get_messages(self.project_id)

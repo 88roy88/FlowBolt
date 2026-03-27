@@ -1,6 +1,5 @@
 from typing import Any
 
-from langfuse.decorators import langfuse_context
 from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -47,7 +46,6 @@ class BaseAgent:
         project_id: str,
         sandbox: PnpmSandbox,
         model: str | None = None,
-        trace_id: str | None = None,
     ) -> None:
         if sandbox.project_id != project_id:
             raise ValueError(f"Sandbox project_id '{sandbox.project_id}' doesn't match agent project_id '{project_id}'")
@@ -55,16 +53,15 @@ class BaseAgent:
         self.project_id = project_id
         self.sandbox = sandbox
         self.model = model
-        self._trace_id = trace_id
 
     async def emit(self, event: dict[str, Any]) -> None:
         await emit_event(self.project_id, event)
 
     def _llm_metadata(self, generation_name: str) -> dict[str, Any]:
-        trace_id = self._trace_id or langfuse_context.get_current_trace_id()
-        observation_id = langfuse_context.get_current_observation_id()
+        # trace_id = self._trace_id or langfuse_context.get_current_trace_id()
+        # observation_id = langfuse_context.get_current_observation_id()
         return {
-            "existing_trace_id": trace_id,
-            "parent_observation_id": observation_id,
+            # "existing_trace_id": trace_id,
+            # "parent_observation_id": observation_id,
             "generation_name": generation_name,
         }
