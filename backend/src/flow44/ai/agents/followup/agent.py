@@ -8,11 +8,6 @@ from langfuse.decorators import langfuse_context, observe
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.followup.prompts import render_followup
-from flow44.ai.agents.followup.tools.edit_file import edit_file_with_context
-from flow44.ai.agents.followup.tools.glob import glob as glob_tool  # TODO: do we even need this? call glob from the sandbox directly?
-from flow44.ai.agents.followup.tools.grep import grep as grep_tool  # TODO: do we even need this? The idea was to have shared prompt.
-from flow44.ai.agents.followup.tools.read_file import read_file_with_lines
-from flow44.ai.agents.followup.tools.write_file import write_file_with_diff
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat_with_tools
 from flow44.ai.core.tools import ToolExecutor, tool
@@ -49,10 +44,7 @@ class FollowUpAgent(BaseAgent):
     def _build_tool_executor(self) -> ToolExecutor:
         sandbox = self.sandbox
 
-        # TODO: why we stopped supporting path?
-        # TODO: we might want a better prompt for the llm to understand how to use grep patterns.
-        # TODO: @roym: Think in general if there's a smart way to work with it like skills -
-        #               and load the full instructions on how to use only if chose it
+        # Inline tool implementations - thin wrappers around sandbox
         @tool
         async def grep(pattern: str, file_pattern: str | None = None) -> str:
             """Search the entire codebase for a text or regex pattern using grep.
@@ -67,42 +59,99 @@ class FollowUpAgent(BaseAgent):
             Returns:
                 Matching lines with file paths and line numbers
             """
-
-            return await grep_tool(sandbox, pattern, "/", file_pattern)
+            try:
+                matches = await sandbox.grep(pattern, "/", file_pattern, max_results=50)
+            except PermissionError as e:
+                return f"Error: {e}"
+            if not matches:
+                return "No matches found."
+            return "\n".join(f"{m.file}:{m.line}:{m.content}" for m in matches)
 
         @tool
         async def glob(pattern: str) -> str:
             """Find files matching a glob pattern. Returns file paths."""
-
-            return await glob_tool(sandbox, pattern)
+            results = await sandbox.glob(pattern)
+            if not results:
+                return "No files found matching pattern."
+            return "\n".join(results)
 
         @tool
         async def read_file(path: str) -> str:
             """Read the full content of a file with line numbers. Always read a file before editing it."""
-            return await read_file_with_lines(sandbox, path)
+            try:
+                content = await sandbox.read_file(path)
+            except (FileNotFoundError, PermissionError) as e:
+                return f"Error: {e}"
+            lines = content.splitlines()
+            if len(lines) > 500:
+                numbered = [f"{i + 1:4d} | {line}" for i, line in enumerate(lines[:500])]
+                numbered.append(f"\n... (truncated at 500 lines, file has {len(lines)} total)")
+                return "\n".join(numbered)
+            return "\n".join(f"{i + 1:4d} | {line}" for i, line in enumerate(lines))
 
         @tool
         async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
-            status, diff_str = await write_file_with_diff(sandbox, path, content)
+            import difflib
+
+            try:
+                old_content = await sandbox.read_file(path)
+            except FileNotFoundError:
+                old_content = ""
+            await sandbox.write_file(path, content)
+
+            # Generate diff
+            old_lines = old_content.splitlines(keepends=True)
+            new_lines = content.splitlines(keepends=True)
+            diff_str = "".join(
+                difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm="")
+            )
+
             await self.emit({"type": "file", "path": path, "content": content})
             if diff_str:
                 self._diffs.append(FileDiff(path=path, diff=diff_str))
             if path not in self._files_changed:
                 self._files_changed.append(path)
-            return status
+            return f"OK — wrote {path} ({len(content.splitlines())} lines)"
 
         @tool
         async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
-            status, diff_str = await edit_file_with_context(sandbox, path, search, replace)
+            import difflib
+
+            try:
+                current = await sandbox.read_file(path)
+            except FileNotFoundError:
+                return f"Error: File not found: {path}"
+
+            try:
+                await sandbox.edit_file(path, search, replace)
+            except ValueError:
+                lines = current.splitlines()
+                snippet = "\n".join(lines[:40])
+                if len(lines) > 40:
+                    snippet += f"\n... ({len(lines)} lines total)"
+                return (
+                    f"Error: search string not found in {path}. "
+                    f"The search must match exactly (including whitespace).\n\n"
+                    f"Current file content:\n```\n{snippet}\n```"
+                )
+
+            new_content = await sandbox.read_file(path)
+
+            # Generate diff
+            old_lines = current.splitlines(keepends=True)
+            new_lines = new_content.splitlines(keepends=True)
+            diff_str = "".join(
+                difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm="")
+            )
+
+            await self.emit({"type": "file", "path": path, "content": new_content})
             if diff_str:
-                new_content = await sandbox.read_file(path)
-                await self.emit({"type": "file", "path": path, "content": new_content})
                 self._diffs.append(FileDiff(path=path, diff=diff_str))
             if path not in self._files_changed:
                 self._files_changed.append(path)
-            return status
+            return f"OK — edited {path}"
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 

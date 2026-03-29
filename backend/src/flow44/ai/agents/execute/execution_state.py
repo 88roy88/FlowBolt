@@ -18,11 +18,13 @@ class ExecutionState(BaseModel):
     trace_id: str | None = None
     observation_id: str | None = None
     langfuse_client: Any = None  # Hold reference
+    llm_metadata_fn: Any = None  # Function to generate metadata
 
     # Validation results
     typecheck_errors: str = ""
     build_errors: str = ""
-    has_errors: bool = False
+    all_errors: str = ""
+    fix_attempts: int = 0
 
     class Config:
         arbitrary_types_allowed = True
