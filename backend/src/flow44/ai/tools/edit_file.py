@@ -1,4 +1,4 @@
-from flow44.ai.agents.followup.tools.write_file import _make_diff
+from flow44.ai.tools.write_file import _make_diff
 from flow44.sandbox.main import FileSystemSandbox
 
 

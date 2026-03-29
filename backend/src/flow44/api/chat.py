@@ -7,12 +7,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from flow44.ai.agents import FixErrorAgent, FollowUpAgent
-from flow44.ai.agents.plan.models import BuildState
-from flow44.ai.workflows import BuildWorkflow
+from flow44.ai.agents import BuildAgent, FixErrorAgent, FollowUpAgent
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
-from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.db.project import get_project
 from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
@@ -20,6 +17,9 @@ from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Store active build agents for plan approval signaling
+_active_build_agents: dict[str, BuildAgent] = {}
 
 
 async def _is_new_project(project_id: str) -> bool:
@@ -123,23 +123,25 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 is_new = await _is_new_project(project_id)
 
                 if is_new:
-                    # Use BuildWorkflow for orchestration
-                    workflow = BuildWorkflow(
+                    # Use BuildAgent for full build orchestration
+                    build_agent = BuildAgent(
                         project_id=project_id,
                         sandbox=sandbox,
-                        emit=lambda event: emit_event(project_id, event),
                         model=selected_model,
                         data_source_authorization=data_source_authorization,
                     )
-                    asyncio.create_task(
-                        _run_agent_safe(
-                            project_id,
-                            workflow.run_design_and_plan(
+                    _active_build_agents[project_id] = build_agent  # Store for plan approval signaling
+
+                    async def run_build_and_cleanup() -> None:
+                        try:
+                            await build_agent.run(
                                 user_content,
                                 data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                            ),
-                        )
-                    )
+                            )
+                        finally:
+                            _active_build_agents.pop(project_id, None)
+
+                    asyncio.create_task(_run_agent_safe(project_id, run_build_and_cleanup()))
                 else:
                     followup_agent = FollowUpAgent(
                         project_id=project_id,
@@ -151,41 +153,14 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
             elif msg_type == "plan_response":
                 action = data.get("action", "reject")
                 feedback = data.get("feedback")
-                selected_model = data.get("model")
 
-                state_json = await get_pending_plan(project_id)
-                if state_json is None:
-                    await websocket.send_json({"type": "error", "message": "No pending plan found"})
+                # Find the active build agent and signal it
+                build_agent = _active_build_agents.get(project_id)
+                if build_agent is None:
+                    await websocket.send_json({"type": "error", "message": "No active build agent found"})
                     continue
 
-                state = BuildState.model_validate_json(state_json)
-
-                if action == "accept":
-                    # Resume workflow: ExecuteNode → ValidateNode → FixErrorsNode → SummarizeNode
-                    workflow = BuildWorkflow(
-                        project_id=project_id,
-                        sandbox=sandbox,
-                        emit=lambda event: emit_event(project_id, event),
-                        model=selected_model or state.model,
-                    )
-                    asyncio.create_task(_run_agent_safe(project_id, workflow.run_execution(state)))
-
-                elif action == "modify" and feedback:
-                    # Rebuild plan with feedback
-                    workflow = BuildWorkflow(
-                        project_id=project_id,
-                        sandbox=sandbox,
-                        emit=lambda event: emit_event(project_id, event),
-                        model=selected_model or state.model,
-                    )
-                    asyncio.create_task(
-                        _run_agent_safe(project_id, workflow.rebuild_plan_with_feedback(state, feedback))
-                    )
-
-                elif action == "reject":
-                    await delete_pending_plan(project_id)
-                    await emit_event(project_id, {"type": "plan_rejected"})
-                    await emit_event(project_id, {"type": "phase", "phase": "idle"})
+                build_agent.signal_plan_response(action, feedback)
 
             elif msg_type == "fix_error":
                 error_message = data.get("error_message", "")

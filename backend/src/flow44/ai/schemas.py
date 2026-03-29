@@ -1,11 +1,8 @@
-"""Pydantic models for the plan agent: design schemas, build state."""
+"""Pydantic models for structured LLM responses."""
 
 from __future__ import annotations
 
-from typing import Any, Literal
-
 from pydantic import BaseModel, Field
-
 
 # --- Architecture design ---
 
@@ -64,6 +61,23 @@ class UserPlanOverview(BaseModel):
     decisions: list[PlanDecision] = Field(default_factory=list)
 
 
+# --- Project summary ---
+
+
+class ProjectSummary(BaseModel):
+    summary: str = ""
+    tech_stack: list[str] = Field(default_factory=list)
+    features: list[str] = Field(default_factory=list)
+    file_overview: dict[str, str] = Field(default_factory=dict)
+
+
+# --- Classification ---
+
+
+class ClassificationResult(BaseModel):
+    classification: str  # "new_project" or "follow_up"
+
+
 # --- Data source analysis ---
 
 
@@ -72,23 +86,3 @@ class DataSourceAnalysis(BaseModel):
     relevant_fields: str = ""
     data_characteristics: str = ""
     integration_notes: str = ""
-
-
-# --- Build state (handoff from PlanAgent → ExecuteAgent) ---
-
-
-class BuildState(BaseModel):
-    project_id: str
-    model: str | None = None
-    user_content: str = ""
-    data_source_ids: list[str] = Field(default_factory=list)
-    data_source_contexts: list[dict[str, Any]] = Field(default_factory=list)
-    architecture: ArchitectureDesign = Field(default_factory=ArchitectureDesign)
-    ux_design: UXDesign = Field(default_factory=UXDesign)
-    user_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)
-    work_plan: Any = None  # WorkPlan (from execute/models) — typed as Any to avoid circular import
-    completed_files: dict[str, str] = Field(default_factory=dict)
-    task_files: dict[str, list[str]] = Field(default_factory=dict)
-    validation_errors: str = ""
-    fix_attempts: int = 0
-    phase: Literal["idle", "designing", "planning", "awaiting_approval", "executing", "fixing", "complete"] = "idle"
