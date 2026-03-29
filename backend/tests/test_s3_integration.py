@@ -58,6 +58,6 @@ def test_deploy_single_html():
                     Body=html_content.encode("utf-8"),
                     ContentType="text/html",
                     ACL="public-read",
-                    StorageClass="STANDARD_IA",
+                    StorageClass=settings.S3_STORAGE_CLASS,
                 )
                 assert url == f"http://s3.local/my-bucket/{expected_key}"

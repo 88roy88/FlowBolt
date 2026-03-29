@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     NSJAIL_BIN: str = "/usr/bin/nsjail"
     AI_MODEL: str = "bedrock/us.anthropic.claude-sonnet-4-6"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    DATABASE_URL: str = ""
+    DATABASE_URL: str
     MAX_COMMAND_TIMEOUT: int = 60
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256
@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: str = Field(default="", validation_alias="S3_SECRET_KEY")
     S3_BUCKET_NAME: str = Field(default="", validation_alias="S3_BUCKET_NAME")
     S3_CACHE_TTL: int = Field(default=3600, validation_alias="S3_CACHE_TTL")
+    S3_STORAGE_CLASS: str = Field(default="STANDARD_IA", validation_alias="S3_STORAGE_CLASS")
 
     # Langfuse (optional — set public/secret key to enable)
     LANGFUSE_PUBLIC_KEY: str = ""
