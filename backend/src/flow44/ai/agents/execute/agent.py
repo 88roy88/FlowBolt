@@ -9,6 +9,7 @@ from langfuse.decorators import langfuse_context, observe
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
+from flow44.ai.agents.execute.models import Task, WorkPlan
 from flow44.ai.agents.execute.prompts import (
     SUMMARY_PROMPT,
     render_codegen,
@@ -21,7 +22,6 @@ from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
 from flow44.ai.state import BuildState
-from flow44.ai.task_tree import Task, WorkPlan
 from flow44.db.project import update_project_summary
 from flow44.sandbox.main import PnpmSandbox
 

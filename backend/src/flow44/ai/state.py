@@ -1,12 +1,16 @@
+"""Build state that flows between PlanAgent and ExecuteAgent."""
+
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
-from flow44.ai.task_tree import WorkPlan
+from flow44.ai.agents.execute.models import WorkPlan
+from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign, UserPlanOverview
 
 
 class BuildState(BaseModel):
+    """State that persists across plan and execute phases."""
+
     project_id: str
     model: str | None = None
     user_content: str = ""
@@ -23,5 +27,3 @@ class BuildState(BaseModel):
 
     # Flow control
     phase: str = "idle"
-
-    model_config = {"arbitrary_types_allowed": True}

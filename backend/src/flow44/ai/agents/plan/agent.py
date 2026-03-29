@@ -6,6 +6,7 @@ from typing import Any
 from langfuse.decorators import langfuse_context, observe
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign, UserPlanOverview
 from flow44.ai.agents.plan.prompts import (
     UX_DESIGN_PROMPT,
     render_architecture,
@@ -15,7 +16,6 @@ from flow44.ai.agents.plan.prompts import (
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
-from flow44.ai.schemas import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.state import BuildState
 from flow44.db.pending_plan import save_pending_plan
 from flow44.integrations.flapi_api import data_source_client

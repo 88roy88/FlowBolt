@@ -1,8 +1,7 @@
-"""Pydantic models for structured LLM responses."""
-
-from __future__ import annotations
+"""Pydantic models for PlanAgent: architecture, UX, and user plan overview."""
 
 from pydantic import BaseModel, Field
+
 
 # --- Architecture design ---
 
@@ -59,23 +58,6 @@ class UserPlanOverview(BaseModel):
     summary: str = ""
     features: list[PlanFeature] = Field(default_factory=list)
     decisions: list[PlanDecision] = Field(default_factory=list)
-
-
-# --- Project summary ---
-
-
-class ProjectSummary(BaseModel):
-    summary: str = ""
-    tech_stack: list[str] = Field(default_factory=list)
-    features: list[str] = Field(default_factory=list)
-    file_overview: dict[str, str] = Field(default_factory=dict)
-
-
-# --- Classification ---
-
-
-class ClassificationResult(BaseModel):
-    classification: str  # "new_project" or "follow_up"
 
 
 # --- Data source analysis ---
