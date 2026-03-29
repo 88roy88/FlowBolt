@@ -10,12 +10,8 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.usage import UsageLimits
 
-from flow44.ai.agents.followup.prompts import render_followup
-from flow44.ai.agents.followup.tools.edit_file import edit_file_with_context
-from flow44.ai.agents.followup.tools.glob import glob as glob_tool
-from flow44.ai.agents.followup.tools.grep import grep as grep_tool
-from flow44.ai.agents.followup.tools.read_file import read_file_with_lines
-from flow44.ai.agents.followup.tools.write_file import write_file_with_diff
+from .prompts import render_followup
+from .tools import (glob as glob_tool, grep as grep_tool, edit_file_with_context, read_file_with_lines, write_file_with_diff)
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
@@ -24,7 +20,7 @@ from flow44.ai.agents._base import BaseAgent, resolve_model
 
 logger = logging.getLogger(__name__)
 
-MAX_ITERATIONS = 15
+MAX_ITERATIONS = 35
 
 
 @dataclass
