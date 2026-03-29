@@ -1,6 +1,7 @@
 import json
 import os
 import shlex
+import subprocess
 from abc import ABC
 from pathlib import Path, PurePosixPath
 
@@ -74,7 +75,12 @@ class SearchMixin(BaseSandbox, ABC):
 
         # Run via self.exec() so rg runs inside the sandbox environment (nsjail, Windows cmd, etc.)
         # and outputs workspace-relative paths — no absolute path stripping, no drive-letter issues.
-        cmd = " ".join(shlex.quote(a) for a in args)
+        if os.name == "nt":
+            # Windows: subprocess.list2cmdline handles cmd.exe quoting (double quotes, ^ escaping)
+            cmd = subprocess.list2cmdline(args)
+        else:
+            # Unix: shlex.quote handles POSIX shell quoting (single quotes)
+            cmd = " ".join(shlex.quote(a) for a in args)
         try:
             lines: list[str] = []
             async for line in self.exec(cmd):
