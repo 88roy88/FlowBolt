@@ -5,12 +5,11 @@ from typing import Any
 
 from langfuse.decorators import observe
 
+from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
 from flow44.ai.core.messages import Message
+from flow44.ai.core.provider import stream_chat
 from flow44.ai.parser import ActionParser
-from flow44.ai.prompts import render_fix_error_direct, render_fix_errors
-from flow44.ai.provider import stream_chat
-
-from ._base import BaseAgent
 
 logger = logging.getLogger(__name__)
 

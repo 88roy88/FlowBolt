@@ -6,20 +6,19 @@ from typing import Any
 
 from langfuse.decorators import langfuse_context, observe
 
+from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.followup.prompts import render_followup
+from flow44.ai.agents.followup.tools.edit_file import edit_file_with_context
+from flow44.ai.agents.followup.tools.glob import glob as glob_tool  # TODO: do we even need this? call glob from the sandbox directly?
+from flow44.ai.agents.followup.tools.grep import grep as grep_tool  # TODO: do we even need this? The idea was to have shared prompt.
+from flow44.ai.agents.followup.tools.read_file import read_file_with_lines
+from flow44.ai.agents.followup.tools.write_file import write_file_with_diff
 from flow44.ai.core.messages import Message
+from flow44.ai.core.provider import complete_chat_with_tools
 from flow44.ai.core.tools import ToolExecutor, tool
-from flow44.ai.prompts import render_followup
-from flow44.ai.provider import complete_chat_with_tools
-from flow44.ai.tools.edit_file import edit_file_with_context
-from flow44.ai.tools.glob import glob as glob_tool  # TODO: do we even need this? call glob from the sandbox directly?
-from flow44.ai.tools.grep import grep as grep_tool  # TODO: do we even need this? The idea was to have shared prompt.
-from flow44.ai.tools.read_file import read_file_with_lines
-from flow44.ai.tools.write_file import write_file_with_diff
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
-
-from ._base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
