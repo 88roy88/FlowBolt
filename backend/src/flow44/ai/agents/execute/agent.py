@@ -2,9 +2,11 @@ import asyncio
 import json
 import logging
 import uuid
+from typing import Any
 
 from langfuse import observe
 from pydantic_ai import Agent
+from pydantic_ai.models import Model
 
 from flow44.ai.agents.execute.parser import ActionParser
 from flow44.ai.agents.execute.prompts import SUMMARY_PROMPT, render_codegen, render_fix_errors, render_merge
@@ -17,13 +19,7 @@ from flow44.ai.agents._base import BaseAgent, resolve_model
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# pydantic-ai agents
-# ---------------------------------------------------------------------------
-
-_plan_agent: Agent[None, None] = Agent()  # raw text for work plan JSON
-_codegen_agent: Agent[None, str] = Agent()
-_summary_agent: Agent[None, ProjectSummary] = Agent(output_type=ProjectSummary)
+# No global state needed - Agent instances created inline where used
 
 
 class ExecuteAgent(BaseAgent):
@@ -41,7 +37,7 @@ class ExecuteAgent(BaseAgent):
         super().__init__(project_id, sandbox, model=model)
         self._state = state
 
-    @observe(name="execute-agent-run")  # type: ignore[untyped-decorator]
+    @observe(name="execute-agent-run")
     async def run(self) -> None:
         model = resolve_model(self.model)
 
@@ -72,8 +68,8 @@ class ExecuteAgent(BaseAgent):
 
     # -- Planning --
 
-    @observe(name="build-technical-plan")  # type: ignore[untyped-decorator]
-    async def _build_technical_plan(self, model: str | None) -> WorkPlan:
+    @observe(name="build-technical-plan")
+    async def _build_technical_plan(self, model: Model) -> WorkPlan:
         merge_data: dict[str, object] = {
             "user_request": self._state.user_content,
             "architecture": self._state.architecture.model_dump(),
@@ -96,14 +92,15 @@ class ExecuteAgent(BaseAgent):
                 for ctx in self._state.data_source_contexts
             ]
 
-        result = await _plan_agent.run(
+        agent = Agent[None, str]()
+        result = await agent.run(
             json.dumps(merge_data, indent=2),
             instructions=render_merge(has_data_sources=bool(self._state.data_source_contexts)),
             model=model,
         )
         print("Plan agent output:\n", result.output)
 
-        plan_data = json.loads(result.output.removeprefix("```json").removesuffix("```")) if isinstance(result.output, str) else {}
+        plan_data: dict[str, Any] = json.loads(result.output.removeprefix("```json").removesuffix("```")) if isinstance(result.output, str) else {}
 
         tasks = [
             Task(
@@ -126,7 +123,7 @@ class ExecuteAgent(BaseAgent):
 
     # -- Execution --
 
-    async def _execute(self, model: str | None) -> None:
+    async def _execute(self, model: Model) -> None:
         if self._state.work_plan is None:
             raise RuntimeError("No work plan available")
 
@@ -149,7 +146,7 @@ class ExecuteAgent(BaseAgent):
         if all_errors:
             await self._fix_errors("\n\n".join(all_errors), model)
 
-    async def _execute_task(self, task: Task, model: str | None) -> None:
+    async def _execute_task(self, task: Task, model: Model) -> None:
         if self._state.work_plan is None:
             raise RuntimeError("No work plan available")
 
@@ -175,7 +172,8 @@ class ExecuteAgent(BaseAgent):
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
-            async with _codegen_agent.run_stream(
+            agent = Agent[None, str]()
+            async with agent.run_stream(
                 "Generate the code.",
                 instructions=prompt,
                 model=model,
@@ -209,15 +207,16 @@ class ExecuteAgent(BaseAgent):
         result = await self.sandbox.run_build_command("pnpm build")
         return result.errors
 
-    @observe(name="fix-errors-auto")  # type: ignore[untyped-decorator]
-    async def _fix_errors(self, errors: str, model: str | None) -> None:
+    @observe(name="fix-errors-auto")
+    async def _fix_errors(self, errors: str, model: Model) -> None:
         await self.emit({"type": "phase", "phase": "fixing"})
         prompt = render_fix_errors(errors=errors, files=self._state.completed_files)
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
-            async with _codegen_agent.run_stream(
+            agent = Agent[None, str]()
+            async with agent.run_stream(
                 "Fix the TypeScript errors.",
                 instructions=prompt,
                 model=model,
@@ -235,7 +234,7 @@ class ExecuteAgent(BaseAgent):
 
     # -- Summary --
 
-    async def _generate_summary(self, model: str | None) -> None:
+    async def _generate_summary(self, model: Model) -> None:
         try:
             summary_input = json.dumps(
                 {
@@ -245,7 +244,8 @@ class ExecuteAgent(BaseAgent):
                 },
                 indent=2,
             )
-            result = await _summary_agent.run(
+            agent = Agent(output_type=ProjectSummary)
+            result = await agent.run(
                 summary_input,
                 instructions=SUMMARY_PROMPT,
                 model=model,

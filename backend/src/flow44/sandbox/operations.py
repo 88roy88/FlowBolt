@@ -114,7 +114,7 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
     )
 
 
-@observe(name="build-single-html")  # type: ignore[untyped-decorator]
+@observe(name="build-single-html")
 async def build_single_html(project_id: str) -> str:
     """Build the project and return a single self-contained HTML string."""
     sandbox = sandbox_manager.get_sandbox(project_id)

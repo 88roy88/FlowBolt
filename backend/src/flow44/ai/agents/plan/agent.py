@@ -5,6 +5,7 @@ from typing import Any
 
 from langfuse import observe
 from pydantic_ai import Agent
+from pydantic_ai.models import Model
 
 from flow44.ai.agents._base import BaseAgent, resolve_model
 from flow44.ai.agents.plan.models import ArchitectureDesign, BuildState, DataSourceAnalysis, UserPlanOverview, UXDesign
@@ -21,14 +22,7 @@ from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# pydantic-ai agents for structured output
-# ---------------------------------------------------------------------------
-
-_architecture_agent: Agent[None, ArchitectureDesign] = Agent(output_type=ArchitectureDesign)
-_ux_agent: Agent[None, UXDesign] = Agent(output_type=UXDesign)
-_overview_agent: Agent[None, UserPlanOverview] = Agent(output_type=UserPlanOverview)
-_ds_analysis_agent: Agent[None, DataSourceAnalysis] = Agent(output_type=DataSourceAnalysis)
+# No global state needed - Agent instances created inline where used
 
 
 async def _persist_state(state: BuildState) -> None:
@@ -51,7 +45,7 @@ class PlanAgent(BaseAgent):
         self.state = BuildState(project_id=self.project_id, model=self.model)
         self._data_source_authorization = data_source_authorization
 
-    @observe(name="plan-agent-run")  # type: ignore[untyped-decorator]
+    @observe(name="plan-agent-run")
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self.state.user_content = content
         self.state.data_source_ids = data_source_ids or []
@@ -124,7 +118,8 @@ class PlanAgent(BaseAgent):
             },
             indent=2,
         )
-        result = await _overview_agent.run(
+        agent = Agent(output_type=UserPlanOverview)
+        result = await agent.run(
             plan_input,
             instructions=render_user_plan(has_feedback=True),
             model=model,
@@ -138,7 +133,7 @@ class PlanAgent(BaseAgent):
 
     # -- Design --
 
-    async def _fetch_and_analyze_data_source(self, data_source_id: str, model: str | None) -> dict[str, Any]:
+    async def _fetch_and_analyze_data_source(self, data_source_id: str, model: Model) -> dict[str, Any]:
         ds_name, sample_data = await data_source_client.fetch_data_source(
             data_source_id,
             authorization=self._data_source_authorization,
@@ -151,14 +146,15 @@ class PlanAgent(BaseAgent):
             **analysis,
         }
 
-    async def _analyze_data_source(self, ds_name: str, sample_data: Any, model: str | None) -> dict[str, Any]:
+    async def _analyze_data_source(self, ds_name: str, sample_data: Any, model: Model) -> dict[str, Any]:
         prompt = render_data_source_analysis(
             user_content=self.state.user_content,
             data_source_name=ds_name,
             sample_data=sample_data,
         )
         try:
-            result = await _ds_analysis_agent.run(
+            agent = Agent(output_type=DataSourceAnalysis)
+            result = await agent.run(
                 "Analyze this data source.",
                 instructions=prompt,
                 model=model,
@@ -173,11 +169,12 @@ class PlanAgent(BaseAgent):
                 "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
             }
 
-    @observe(name="design-architecture")  # type: ignore[untyped-decorator]
-    async def _design_architecture(self, model: str | None) -> ArchitectureDesign:
+    @observe(name="design-architecture")
+    async def _design_architecture(self, model: Model) -> ArchitectureDesign:
         prompt = render_architecture(data_source_contexts=self.state.data_source_contexts or None)
         try:
-            result = await _architecture_agent.run(
+            agent = Agent(output_type=ArchitectureDesign)
+            result = await agent.run(
                 self.state.user_content,
                 instructions=prompt,
                 model=model,
@@ -189,10 +186,11 @@ class PlanAgent(BaseAgent):
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "failed"})
             return ArchitectureDesign()
 
-    @observe(name="design-ux")  # type: ignore[untyped-decorator]
-    async def _design_ux(self, model: str | None) -> UXDesign:
+    @observe(name="design-ux")
+    async def _design_ux(self, model: Model) -> UXDesign:
         try:
-            result = await _ux_agent.run(
+            agent = Agent(output_type=UXDesign)
+            result = await agent.run(
                 self.state.user_content,
                 instructions=UX_DESIGN_PROMPT,
                 model=model,
@@ -204,8 +202,8 @@ class PlanAgent(BaseAgent):
             await self.emit({"type": "design_progress", "stream": "ux", "content": "failed"})
             return UXDesign()
 
-    @observe(name="build-user-overview")  # type: ignore[untyped-decorator]
-    async def _build_user_overview(self, model: str | None) -> UserPlanOverview:
+    @observe(name="build-user-overview")
+    async def _build_user_overview(self, model: Model) -> UserPlanOverview:
         plan_input = json.dumps(
             {
                 "user_request": self.state.user_content,
@@ -214,7 +212,8 @@ class PlanAgent(BaseAgent):
             },
             indent=2,
         )
-        result = await _overview_agent.run(
+        agent = Agent(output_type=UserPlanOverview)
+        result = await agent.run(
             plan_input,
             instructions=USER_PLAN_PROMPT,
             model=model,

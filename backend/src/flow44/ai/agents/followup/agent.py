@@ -228,7 +228,7 @@ class FollowUpAgent(BaseAgent):
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
 
-    @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
+    @observe(name="followup-agent-run")
     async def run(self, content: str) -> None:
         await self.emit({"type": "phase", "phase": "exploring"})
 

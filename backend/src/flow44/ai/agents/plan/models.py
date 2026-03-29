@@ -89,4 +89,6 @@ class BuildState(BaseModel):
     work_plan: Any = None  # WorkPlan (from execute/models) — typed as Any to avoid circular import
     completed_files: dict[str, str] = Field(default_factory=dict)
     task_files: dict[str, list[str]] = Field(default_factory=dict)
+    validation_errors: str = ""
+    fix_attempts: int = 0
     phase: Literal["idle", "designing", "planning", "awaiting_approval", "executing", "fixing", "complete"] = "idle"

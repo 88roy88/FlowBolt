@@ -5,6 +5,7 @@ from typing import Any
 
 from langfuse import observe
 from pydantic_ai import Agent
+from pydantic_ai.models import Model
 
 from flow44.ai.agents.execute.parser import ActionParser
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
@@ -13,11 +14,11 @@ from flow44.ai.agents._base import BaseAgent, resolve_model
 
 logger = logging.getLogger(__name__)
 
-_fix_agent: Agent[None, str] = Agent()
+# No global state needed - Agent instances created inline where used
 
 
 class FixErrorAgent(BaseAgent):
-    @observe(name="fix-error-agent-run")  # type: ignore[untyped-decorator]
+    @observe(name="fix-error-agent-run")
     async def run(
         self,
         error_message: str,
@@ -52,7 +53,8 @@ class FixErrorAgent(BaseAgent):
         full_text: list[str] = []
 
         try:
-            async with _fix_agent.run_stream(
+            agent = Agent[None, str]()
+            async with agent.run_stream(
                 "Fix the error.",
                 instructions=prompt,
                 model=model,
@@ -162,12 +164,13 @@ class FixErrorAgent(BaseAgent):
         result = await self.sandbox.run_build_command("pnpm build")
         return result.errors
 
-    async def _retry_fix(self, errors: str, completed_files: dict[str, str], model: str | None) -> None:
+    async def _retry_fix(self, errors: str, completed_files: dict[str, str], model: Model) -> None:
         prompt = render_fix_errors(errors=errors, files=completed_files)
         generated: list[tuple[str, str]] = []
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
         try:
-            async with _fix_agent.run_stream(
+            agent = Agent[None, str]()
+            async with agent.run_stream(
                 "Fix the TypeScript errors.",
                 instructions=prompt,
                 model=model,

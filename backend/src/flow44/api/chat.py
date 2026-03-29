@@ -7,8 +7,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from flow44.ai.agents import ExecuteAgent, FixErrorAgent, FollowUpAgent, PlanAgent
+from flow44.ai.agents import FixErrorAgent, FollowUpAgent
 from flow44.ai.agents.plan.models import BuildState
+from flow44.ai.workflows import BuildWorkflow
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -122,16 +123,18 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 is_new = await _is_new_project(project_id)
 
                 if is_new:
-                    plan_agent = PlanAgent(
+                    # Use BuildWorkflow for orchestration
+                    workflow = BuildWorkflow(
                         project_id=project_id,
                         sandbox=sandbox,
+                        emit=lambda event: emit_event(project_id, event),
                         model=selected_model,
                         data_source_authorization=data_source_authorization,
                     )
                     asyncio.create_task(
                         _run_agent_safe(
                             project_id,
-                            plan_agent.run(
+                            workflow.run_design_and_plan(
                                 user_content,
                                 data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
                             ),
@@ -158,24 +161,25 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 state = BuildState.model_validate_json(state_json)
 
                 if action == "accept":
-                    await delete_pending_plan(project_id)
-                    execute_agent = ExecuteAgent(
+                    # Resume workflow: ExecuteNode → ValidateNode → FixErrorsNode → SummarizeNode
+                    workflow = BuildWorkflow(
                         project_id=project_id,
                         sandbox=sandbox,
-                        state=state,
+                        emit=lambda event: emit_event(project_id, event),
                         model=selected_model or state.model,
                     )
-                    asyncio.create_task(_run_agent_safe(project_id, execute_agent.run()))
+                    asyncio.create_task(_run_agent_safe(project_id, workflow.run_execution(state)))
 
                 elif action == "modify" and feedback:
-                    plan_agent = PlanAgent(
+                    # Rebuild plan with feedback
+                    workflow = BuildWorkflow(
                         project_id=project_id,
                         sandbox=sandbox,
+                        emit=lambda event: emit_event(project_id, event),
                         model=selected_model or state.model,
                     )
-                    plan_agent.state = state
                     asyncio.create_task(
-                        _run_agent_safe(project_id, plan_agent.rebuild_with_feedback(feedback))
+                        _run_agent_safe(project_id, workflow.rebuild_plan_with_feedback(state, feedback))
                     )
 
                 elif action == "reject":
