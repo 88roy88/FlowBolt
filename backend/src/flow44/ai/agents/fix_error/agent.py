@@ -1,23 +1,59 @@
 import logging
-import uuid
 from pathlib import PurePosixPath
-from typing import Any
 
 from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
+from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
 from flow44.ai.parser import ActionParser
+from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: we will probably make this into a ReAct agent like the follow up one.
+MAX_RETRY_ATTEMPTS = 1
+
+
 class FixErrorAgent(BaseAgent):
-    # TODO: make run abstract in the base class so all agents will be the same.
-    # TODO: I like it that the run is the last function of the class and not the first :)
+    def __init__(
+        self,
+        project_id: str,
+        sandbox: PnpmSandbox,
+        *,
+        model: str | None = None,
+        trace_id: str | None = None,
+    ) -> None:
+        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        self._flow = self._build_flow()
+
+    def _build_flow(self) -> Flow[FixErrorState]:
+        """Build the fix error flow with explicit steps and routing."""
+        flow = Flow[FixErrorState]("fix_error")
+
+        flow.add_step("discover", self._step_discover, next_step="generate")
+        flow.add_step("generate", self._step_generate, next_step="write")
+        flow.add_step("write", self._step_write, next_step="validate")
+        flow.add_step("validate", self._step_validate, next_step=self._route_after_validate)
+        flow.add_step("retry", self._step_retry, next_step="validate")
+        flow.add_step("complete", self._step_complete, next_step=None)
+
+        return flow
+
+    def _route_after_validate(self, state: FixErrorState) -> str | None:
+        """Route after validation: retry, or complete."""
+        if not state.validation_errors:
+            return "complete"
+
+        if state.retry_count >= MAX_RETRY_ATTEMPTS:
+            logger.warning("[fix-error] Max retry attempts reached")
+            return "complete"
+
+        return "retry"
+
     @observe(name="fix-error-agent-run")  # type: ignore[untyped-decorator]
     async def run(
         self,
@@ -27,85 +63,179 @@ class FixErrorAgent(BaseAgent):
         error_stack: str | None = None,
     ) -> None:
         await self.emit({"type": "phase", "phase": "fixing"})
-        fix_steps: list[dict[str, Any]] = []
 
-        await self._send_step(fix_steps, "discover", "running", "Discovering files to fix...")
-        file_contents = await self._discover_files(error_file)
-        await self._send_step(fix_steps, "discover", "completed", f"Found {len(file_contents)} file(s) to analyze")
-
-        if not file_contents:
-            await self.emit({"type": "error", "message": "Could not read source files to fix error"})
-            return
-
-        await self._send_step(fix_steps, "generate", "running", "Generating fix with AI...")
-
-        prompt = render_fix_error_direct(
+        # Initialize fix error state for Flow
+        fix_state = FixErrorState(
+            project_id=self.project_id,
+            sandbox_ref=self.sandbox,
+            emit_fn=self.emit,
+            model=self.model,
+            llm_metadata_fn=self._llm_metadata,
             error_message=error_message,
             error_file=error_file,
             error_line=error_line,
             error_stack=error_stack,
-            files=file_contents,
         )
 
-        generated_files: list[tuple[str, str]] = []
-        parser = ActionParser(on_file_action=lambda p, c: generated_files.append((p, c)))
+        # Run the flow
+        await self._flow.run(fix_state, start="discover")
+
+    # -- Flow Steps --
+
+    async def _step_discover(self, state: FixErrorState) -> FixErrorState:
+        """Step: Discover files to fix."""
+        await state.emit_fn({"type": "fix_step", "step": "discover", "status": "running", "message": "Discovering files to fix..."})
+
+        state.discovered_files = await self._discover_files(state.error_file)
+
+        if not state.discovered_files:
+            await state.emit_fn({"type": "error", "message": "Could not read source files to fix error"})
+            await state.emit_fn({"type": "phase", "phase": "idle"})
+            raise RuntimeError("No files discovered")
+
+        await state.emit_fn(
+            {
+                "type": "fix_step",
+                "step": "discover",
+                "status": "completed",
+                "message": f"Found {len(state.discovered_files)} file(s) to analyze",
+            }
+        )
+
+        return state
+
+    async def _step_generate(self, state: FixErrorState) -> FixErrorState:
+        """Step: Generate fix with AI."""
+        await state.emit_fn({"type": "fix_step", "step": "generate", "status": "running", "message": "Generating fix with AI..."})
+
+        prompt = render_fix_error_direct(
+            error_message=state.error_message,
+            error_file=state.error_file,
+            error_line=state.error_line,
+            error_stack=state.error_stack,
+            files=state.discovered_files,
+        )
+
+        parser = ActionParser(on_file_action=lambda p, c: state.generated_files.append((p, c)))
         full_text: list[str] = []
 
         try:
             async for chunk in stream_chat(
                 [Message.user("Fix the error.")],
                 prompt,
-                model=self.model,
-                metadata=self._llm_metadata("fix_error_direct"),
+                model=state.model,
+                metadata=state.llm_metadata_fn("fix_error_direct"),
             ):
                 full_text.append(chunk)
                 parser.feed(chunk)
             parser.flush()
         except Exception:
             logger.exception("[fix-error] Generation failed")
-            await self.emit({"type": "error", "message": "Failed to fix error"})
-            await self.emit({"type": "phase", "phase": "idle"})
-            return
+            await state.emit_fn({"type": "error", "message": "Failed to fix error"})
+            await state.emit_fn({"type": "phase", "phase": "idle"})
+            raise
 
-        full_response = "".join(full_text)
-        artifact_start = full_response.find("<flowArtifact")
-        cut = artifact_start if artifact_start != -1 else len(full_response)
-        explanation = full_response[:cut].strip()
+        state.full_response = "".join(full_text)
+        artifact_start = state.full_response.find("<flowArtifact")
+        cut = artifact_start if artifact_start != -1 else len(state.full_response)
+        explanation = state.full_response[:cut].strip()
         if explanation:
-            await self.emit({"type": "text", "content": explanation + "\n\n"})
+            await state.emit_fn({"type": "text", "content": explanation + "\n\n"})
 
-        await self._send_step(fix_steps, "generate", "completed", f"Generated fix for {len(generated_files)} file(s)")
+        await state.emit_fn(
+            {
+                "type": "fix_step",
+                "step": "generate",
+                "status": "completed",
+                "message": f"Generated fix for {len(state.generated_files)} file(s)",
+            }
+        )
 
-        if generated_files:
-            await self._send_step(fix_steps, "write", "running", "Writing fixed files...")
-            for path, content in generated_files:
-                await self.sandbox.write_file(path, content)
-                await self.emit({"type": "file", "path": path, "content": content})
-            await self._send_step(fix_steps, "write", "completed", f"Wrote {len(generated_files)} file(s)")
+        return state
 
-            await self._send_step(fix_steps, "validate", "running", "Validating fix...")
-            errors = await self._build()
+    async def _step_write(self, state: FixErrorState) -> FixErrorState:
+        """Step: Write generated files."""
+        if not state.generated_files:
+            return state
 
-            if errors:
-                await self._send_step(fix_steps, "validate", "failed", "Validation found issues")
-                await self._send_step(fix_steps, "retry", "running", "Attempting auto-fix...")
-                await self._retry_fix(errors, dict(generated_files))
-                await self._send_step(fix_steps, "retry", "completed", "Auto-fix applied")
-            else:
-                await self._send_step(fix_steps, "validate", "completed", "Fix validated successfully!")
+        await state.emit_fn({"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."})
 
-        await self.emit({"type": "action_complete"})
-        await self.emit({"type": "phase", "phase": "idle"})
+        for path, content in state.generated_files:
+            await state.sandbox_ref.write_file(path, content)
+            await state.emit_fn({"type": "file", "path": path, "content": content})
 
-    # TODO: this is probably redundant now. we can use the emit.
-    async def _send_step(self, steps: list[dict[str, Any]], step: str, status: str, message: str) -> None:
-        await self.emit({"type": "fix_step", "step": step, "status": status, "message": message})
-        for s in steps:
-            if s["step"] == step:
-                s["status"] = status
-                s["message"] = message
-                return
-        steps.append({"id": str(uuid.uuid4()), "step": step, "status": status, "message": message})
+        await state.emit_fn(
+            {
+                "type": "fix_step",
+                "step": "write",
+                "status": "completed",
+                "message": f"Wrote {len(state.generated_files)} file(s)",
+            }
+        )
+
+        return state
+
+    async def _step_validate(self, state: FixErrorState) -> FixErrorState:
+        """Step: Validate the fix."""
+        if not state.generated_files:
+            return state
+
+        await state.emit_fn({"type": "fix_step", "step": "validate", "status": "running", "message": "Validating fix..."})
+
+        state.validation_errors = await self._build()
+
+        if state.validation_errors:
+            await state.emit_fn(
+                {"type": "fix_step", "step": "validate", "status": "failed", "message": "Validation found issues"}
+            )
+        else:
+            await state.emit_fn(
+                {"type": "fix_step", "step": "validate", "status": "completed", "message": "Fix validated successfully!"}
+            )
+
+        return state
+
+    async def _step_retry(self, state: FixErrorState) -> FixErrorState:
+        """Step: Retry fix with errors."""
+        state.retry_count += 1
+
+        await state.emit_fn({"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."})
+
+        prompt = render_fix_errors(errors=state.validation_errors, files=dict(state.generated_files))
+        generated: list[tuple[str, str]] = []
+        parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
+
+        try:
+            async for chunk in stream_chat(
+                [Message.user("Fix the TypeScript errors.")],
+                prompt,
+                model=state.model,
+                metadata=state.llm_metadata_fn("fix_error_retry"),
+            ):
+                parser.feed(chunk)
+            parser.flush()
+
+            for path, content in generated:
+                await state.sandbox_ref.write_file(path, content)
+                await state.emit_fn({"type": "file", "path": path, "content": content})
+
+            # Update generated files list
+            state.generated_files = generated
+
+            await state.emit_fn({"type": "fix_step", "step": "retry", "status": "completed", "message": "Auto-fix applied"})
+        except Exception:
+            logger.exception("[fix-error] Retry fix failed")
+            await state.emit_fn({"type": "fix_step", "step": "retry", "status": "failed", "message": "Auto-fix failed"})
+
+        return state
+
+    async def _step_complete(self, state: FixErrorState) -> FixErrorState:
+        """Step: Complete the fix process."""
+        await state.emit_fn({"type": "action_complete"})
+        await state.emit_fn({"type": "phase", "phase": "idle"})
+        return state
+
+    # -- Helper Methods --
 
     # TODO: add the some AI magic to this function if the file is not clear or need more?
     # TODO: should ignore stuff from node_models? and stuff like that?
@@ -169,22 +299,3 @@ class FixErrorAgent(BaseAgent):
     async def _build(self) -> str:
         result = await self.sandbox.run_build_command("pnpm build")
         return result.errors
-
-    async def _retry_fix(self, errors: str, completed_files: dict[str, str]) -> None:
-        prompt = render_fix_errors(errors=errors, files=completed_files)
-        generated: list[tuple[str, str]] = []
-        parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
-        try:
-            async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")],
-                prompt,
-                model=self.model,
-                metadata=self._llm_metadata("fix_error_retry"),
-            ):
-                parser.feed(chunk)
-            parser.flush()
-            for path, content in generated:
-                await self.sandbox.write_file(path, content)
-                await self.emit({"type": "file", "path": path, "content": content})
-        except Exception:
-            logger.exception("[fix-error] Retry fix failed")

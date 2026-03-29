@@ -9,7 +9,7 @@ from langfuse.decorators import langfuse_context, observe
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
-from flow44.ai.core.provider import complete_chat_with_tools
+from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
@@ -176,7 +176,16 @@ class FollowUpAgent(BaseAgent):
             project_summary=context["summary"],
             file_tree=context["file_tree"],
         )
-        answer = await self._react_loop(messages, system_prompt)
+
+        react_flow = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
+        answer = await react_flow.react_loop(
+            messages=messages,
+            system_prompt=system_prompt,
+            tools=self._executor,
+            model=self.model,
+            metadata_fn=lambda step: self._llm_metadata(f"followup-{step}"),
+            emit_fn=self._emit_react_step,
+        )
 
         if answer:
             await self.emit({"type": "text", "content": answer})
@@ -216,6 +225,30 @@ class FollowUpAgent(BaseAgent):
 
         return {"summary": summary, "file_tree": file_tree}
 
+    async def _emit_react_step(self, event: dict[str, Any]) -> None:
+        """Emit ReAct step events and track state for followup agent."""
+        if event["type"] == "react_step":
+            self._iteration = event["iteration"]
+            step_data = {
+                "tool": event["tool"],
+                "args": event.get("args", {}),
+                "status": event["status"],
+                "iteration": self._iteration,
+            }
+            if event["status"] == "completed":
+                step_data["result_preview"] = event.get("result_preview", "")
+                self._steps.append(
+                    {
+                        "id": str(uuid.uuid4()),
+                        "tool": event["tool"],
+                        "args": event.get("args", {}),
+                        "status": "completed",
+                        "resultPreview": event.get("result_preview", ""),
+                        "iteration": self._iteration,
+                    }
+                )
+            await self.emit({"type": "followup_step", **step_data})
+
     # TODO: feels like a general utils that should go out.
     def _format_file_tree(self, entries: list[Any], indent: int = 0) -> str:
         lines = []
@@ -228,78 +261,6 @@ class FollowUpAgent(BaseAgent):
             else:
                 lines.append(f"{prefix}{entry.name}")
         return "\n".join(lines)
-
-    # TODO: switch here to use Flow? We can create a subclass of Flow ReActFlow  # noqa: E501
-    # if needed something specific for general ReAct Flows.
-    async def _react_loop(self, messages: list[Message], system_prompt: str) -> str:
-        working_messages: list[dict[str, Any]] = [m.to_dict() for m in messages]
-        tool_schemas = self._executor.get_schemas()
-        last_content = ""
-
-        # TODO: use my tricks of also sending warning messages when getting close or hitting max.
-        # TODO: use max tools instead of max iterations? or maybe a combination of both?
-        for self._iteration in range(MAX_ITERATIONS):
-            response = await complete_chat_with_tools(
-                messages=working_messages,  # type: ignore[arg-type]
-                system_prompt=system_prompt,
-                tools=tool_schemas,
-                model=self.model,
-                metadata=self._llm_metadata(f"followup-react-{self._iteration}"),
-            )
-
-            choice = response.choices[0]
-            message = choice.message
-            last_content = message.content or ""
-
-            if not message.tool_calls:
-                return last_content
-
-            working_messages.append(message.model_dump())
-
-            for tool_call in message.tool_calls:
-                tool_name = tool_call.function.name
-                try:
-                    args = json.loads(tool_call.function.arguments)
-                except json.JSONDecodeError:
-                    args = {}
-
-                step_data = {
-                    "tool": tool_name,
-                    "args": {k: v for k, v in args.items() if k != "content"},
-                    "status": "running",
-                    "iteration": self._iteration,
-                }
-                await self.emit({"type": "followup_step", **step_data})
-
-                result = await self._executor.execute(tool_name, tool_use_id=tool_call.id, **args)
-                result_str = str(result.value) if not result.is_error else f"Error: {result.value}"
-
-                preview = result_str[:200] + "..." if len(result_str) > 200 else result_str
-                step_data["status"] = "completed"
-                step_data["result_preview"] = preview
-                await self.emit({"type": "followup_step", **step_data})
-
-                self._steps.append(
-                    {
-                        "id": str(uuid.uuid4()),
-                        "tool": tool_name,
-                        "args": {k: v for k, v in args.items() if k != "content"},
-                        "status": "completed",
-                        "resultPreview": preview,
-                        "iteration": self._iteration,
-                    }
-                )
-
-                working_messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": result_str,
-                    }
-                )
-
-        logger.warning("[followup-agent] Hit max iterations (%d)", MAX_ITERATIONS)
-        return last_content
 
     # TODO: should we add a step to update the summary?
     # TODO: think about cases where the follow up is a big request that requires maybe recall the build agent.
