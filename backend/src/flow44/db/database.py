@@ -13,7 +13,7 @@ def build_db_url(config: flow44.config.Settings, async_db: bool) -> str:
         # SQLite: use aiosqlite for async, standard sqlite driver otherwise
         adapter = "sqlite+aiosqlite" if async_db else "sqlite"
         return f"{adapter}:///{config.DB_NAME}"
-    
+
     # Postgres: use asyncpg for async, psycopg2 for sync (per user's hint)
     db_adapter = "postgresql+asyncpg" if async_db else "postgresql+psycopg2"
     url = f"{db_adapter}://{config.DB_USER}:{config.DB_PASSWORD}@{config.DB_HOST}:{config.DB_PORT}"
