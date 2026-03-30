@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
 
-    model_config = SettingsConfigDict(env_prefix="AIB_", env_file=(".env"), extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="AIB_", env_file=".env", extra="ignore")
 
 
 settings = Settings()
