@@ -62,10 +62,6 @@ async def reset() -> None:
 
 async def init_db() -> None:
     """Initialize database connection. Metadata creation is now handled by Alembic."""
-    import flow44.db.chat  # noqa: F401, PLC0415
-    import flow44.db.events  # noqa: F401, PLC0415
-    import flow44.db.project  # noqa: F401, PLC0415
-
     # We just ping the engine to ensure connectivity
     async with get_engine().begin() as conn:
         await conn.execute(text("SELECT 1"))

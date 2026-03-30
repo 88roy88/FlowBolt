@@ -21,7 +21,7 @@ async def setup_test_db(tmp_path_factory: pytest.TempPathFactory):
     db_path = tmp_path_factory.mktemp("db") / "test.db"
     os.environ["AIB_DATABASE_URL"] = f"sqlite:///{db_path}"
 
-    flow44.config.settings = Settings()
+    flow44.config.settings = Settings(_env_file="test.env")
     await reset()
     await init_db()
     
