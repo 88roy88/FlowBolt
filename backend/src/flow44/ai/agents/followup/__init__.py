@@ -1,3 +1,1 @@
-from flow44.ai.agents.followup.agent import FollowUpAgent
-
-__all__ = ["FollowUpAgent"]
+# Import FollowUpAgent directly from .agent to avoid circular imports

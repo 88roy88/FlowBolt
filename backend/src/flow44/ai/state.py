@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from flow44.ai.agents.execute.models import WorkPlan
-from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign, UserPlanOverview
+from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 
 
 class BuildState(BaseModel):

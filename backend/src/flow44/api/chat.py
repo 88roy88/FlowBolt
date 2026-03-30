@@ -7,7 +7,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from flow44.ai.agents import ExecuteAgent, FixErrorAgent, FollowUpAgent, PlanAgent
+from flow44.ai.agents.execute.agent import ExecuteAgent
+from flow44.ai.agents.fix_error.agent import FixErrorAgent
+from flow44.ai.agents.followup.agent import FollowUpAgent
+from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
@@ -177,9 +180,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                         sandbox=sandbox,
                         model=selected_model or state.model,
                     )
-                    asyncio.create_task(
-                        _run_agent_safe(project_id, plan_agent.rebuild_with_feedback(state, feedback))
-                    )
+                    asyncio.create_task(_run_agent_safe(project_id, plan_agent.rebuild_with_feedback(state, feedback)))
 
                 elif action == "reject":
                     await delete_pending_plan(project_id)
