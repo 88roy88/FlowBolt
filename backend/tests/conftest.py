@@ -1,5 +1,9 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load test.env to satisfy required environment variables in tests
+load_dotenv(Path(__file__).parent.parent / "test.env")
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
