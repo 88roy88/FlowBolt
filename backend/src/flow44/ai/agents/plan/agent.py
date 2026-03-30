@@ -6,7 +6,7 @@ from typing import Any
 from langfuse.decorators import langfuse_context, observe
 
 from flow44.ai.agents._base import BaseAgent
-from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign, UserPlanOverview
+from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
     UX_DESIGN_PROMPT,

@@ -84,7 +84,9 @@ class FixErrorAgent(BaseAgent):
 
     async def _step_discover(self, state: FixErrorState) -> FixErrorState:
         """Step: Discover files to fix."""
-        await state.emit_fn({"type": "fix_step", "step": "discover", "status": "running", "message": "Discovering files to fix..."})
+        await state.emit_fn(
+            {"type": "fix_step", "step": "discover", "status": "running", "message": "Discovering files to fix..."}
+        )
 
         state.discovered_files = await self._discover_files(state.error_file)
 
@@ -106,7 +108,9 @@ class FixErrorAgent(BaseAgent):
 
     async def _step_generate(self, state: FixErrorState) -> FixErrorState:
         """Step: Generate fix with AI."""
-        await state.emit_fn({"type": "fix_step", "step": "generate", "status": "running", "message": "Generating fix with AI..."})
+        await state.emit_fn(
+            {"type": "fix_step", "step": "generate", "status": "running", "message": "Generating fix with AI..."}
+        )
 
         prompt = render_fix_error_direct(
             error_message=state.error_message,
@@ -158,7 +162,9 @@ class FixErrorAgent(BaseAgent):
         if not state.generated_files:
             return state
 
-        await state.emit_fn({"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."})
+        await state.emit_fn(
+            {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
+        )
 
         for path, content in state.generated_files:
             await state.sandbox_ref.write_file(path, content)
@@ -180,7 +186,9 @@ class FixErrorAgent(BaseAgent):
         if not state.generated_files:
             return state
 
-        await state.emit_fn({"type": "fix_step", "step": "validate", "status": "running", "message": "Validating fix..."})
+        await state.emit_fn(
+            {"type": "fix_step", "step": "validate", "status": "running", "message": "Validating fix..."}
+        )
 
         state.validation_errors = await self._build()
 
@@ -190,7 +198,12 @@ class FixErrorAgent(BaseAgent):
             )
         else:
             await state.emit_fn(
-                {"type": "fix_step", "step": "validate", "status": "completed", "message": "Fix validated successfully!"}
+                {
+                    "type": "fix_step",
+                    "step": "validate",
+                    "status": "completed",
+                    "message": "Fix validated successfully!",
+                }
             )
 
         return state
@@ -199,7 +212,9 @@ class FixErrorAgent(BaseAgent):
         """Step: Retry fix with errors."""
         state.retry_count += 1
 
-        await state.emit_fn({"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."})
+        await state.emit_fn(
+            {"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."}
+        )
 
         prompt = render_fix_errors(errors=state.validation_errors, files=dict(state.generated_files))
         generated: list[tuple[str, str]] = []
@@ -222,7 +237,9 @@ class FixErrorAgent(BaseAgent):
             # Update generated files list
             state.generated_files = generated
 
-            await state.emit_fn({"type": "fix_step", "step": "retry", "status": "completed", "message": "Auto-fix applied"})
+            await state.emit_fn(
+                {"type": "fix_step", "step": "retry", "status": "completed", "message": "Auto-fix applied"}
+            )
         except Exception:
             logger.exception("[fix-error] Retry fix failed")
             await state.emit_fn({"type": "fix_step", "step": "retry", "status": "failed", "message": "Auto-fix failed"})

@@ -34,9 +34,7 @@ def render_user_plan(*, has_feedback: bool = False) -> str:
     return render("user_plan.jinja2", has_feedback=has_feedback)
 
 
-def render_data_source_analysis(
-    *, user_content: str, data_source_name: str, sample_data: Any
-) -> str:
+def render_data_source_analysis(*, user_content: str, data_source_name: str, sample_data: Any) -> str:
     sample_json = json.dumps(sample_data, indent=2)[:2000] if sample_data else "{}"
     return render(
         "data_source_analysis.jinja2",
