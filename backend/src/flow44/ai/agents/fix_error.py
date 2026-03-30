@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import uuid
 from pathlib import PurePosixPath
@@ -11,8 +9,6 @@ from flow44.ai.core.messages import Message
 from flow44.ai.parser import ActionParser
 from flow44.ai.prompts import render_fix_error_direct, render_fix_errors
 from flow44.ai.provider import stream_chat
-from flow44.sandbox.filesystem import list_files, read_file, write_file
-from flow44.sandbox.manager import sandbox_manager
 
 from ._base import BaseAgent
 
@@ -84,7 +80,7 @@ class FixErrorAgent(BaseAgent):
         if generated_files:
             await self._send_step(fix_steps, "write", "running", "Writing fixed files...")
             for path, content in generated_files:
-                await write_file(self.project_id, path, content)
+                await self.sandbox.write_file(path, content)
                 await self.emit({"type": "file", "path": path, "content": content})
             await self._send_step(fix_steps, "write", "completed", f"Wrote {len(generated_files)} file(s)")
 
@@ -121,7 +117,7 @@ class FixErrorAgent(BaseAgent):
             files_to_read.append(self._normalize_path(error_file))
         else:
             try:
-                tree = await list_files(self.project_id)
+                tree = await self.sandbox.list_files()
                 for entry in tree:
                     if entry.name == "src" and entry.children:
                         for child in entry.children:
@@ -133,18 +129,18 @@ class FixErrorAgent(BaseAgent):
         file_contents: dict[str, str] = {}
         for path in files_to_read[:10]:
             try:
-                file_contents[path] = await read_file(self.project_id, path)
+                file_contents[path] = await self.sandbox.read_file(path)
             except Exception:
                 logger.warning("[fix-error] Could not read %s", path)
                 if not file_contents and error_file:
                     try:
-                        tree = await list_files(self.project_id)
+                        tree = await self.sandbox.list_files()
                         for entry in tree:
                             if entry.name == "src" and entry.children:
                                 for child in entry.children:
                                     if child.path.endswith((".tsx", ".ts", ".jsx", ".js", ".css")):
                                         try:
-                                            file_contents[child.path] = await read_file(self.project_id, child.path)
+                                            file_contents[child.path] = await self.sandbox.read_file(child.path)
                                         except Exception:
                                             logger.debug("Could not read fallback file %s", child.path)
                                 break
@@ -171,20 +167,9 @@ class FixErrorAgent(BaseAgent):
 
         return str(PurePosixPath("src", *parts))
 
-    # TODO: seems like a repeating function? make common?
     async def _build(self) -> str:
-        try:
-            sandbox = sandbox_manager.get_sandbox(self.project_id)
-            if sandbox is None:
-                return ""
-            lines: list[str] = []
-            async for line in sandbox.exec("pnpm build 2>&1"):
-                lines.append(line.rstrip())
-            output = "\n".join(lines).strip()
-            return output if output and ("error" in output.lower() or "failed" in output.lower()) else ""
-        except Exception:
-            logger.exception("[fix-error] Build failed")
-            return ""
+        result = await self.sandbox.run_build_command("pnpm build")
+        return result.errors
 
     async def _retry_fix(self, errors: str, completed_files: dict[str, str]) -> None:
         prompt = render_fix_errors(errors=errors, files=completed_files)
@@ -200,7 +185,7 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
             for path, content in generated:
-                await write_file(self.project_id, path, content)
+                await self.sandbox.write_file(path, content)
                 await self.emit({"type": "file", "path": path, "content": content})
         except Exception:
             logger.exception("[fix-error] Retry fix failed")

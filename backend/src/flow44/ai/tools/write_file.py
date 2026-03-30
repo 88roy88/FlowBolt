@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import difflib
 
-from flow44.sandbox.filesystem import read_file, write_file
+from flow44.sandbox.main import FileSystemSandbox
 
 
 # TODO: maybe when switching to using git it will be easier to just use git diff for this instead of difflib.
@@ -20,14 +18,14 @@ def _make_diff(path: str, old: str, new: str) -> str:
     )
 
 
-async def write_file_with_diff(project_id: str, path: str, content: str) -> tuple[str, str]:
+async def write_file_with_diff(sandbox: FileSystemSandbox, path: str, content: str) -> tuple[str, str]:
     """Write file and return (status_message, diff_string)."""
     try:
-        old_content = await read_file(project_id, path)
+        old_content = await sandbox.read_file(path)
     except FileNotFoundError:
         old_content = ""
 
-    await write_file(project_id, path, content)
+    await sandbox.write_file(path, content)
 
     diff_str = _make_diff(path, old_content, content)
     status = f"OK — wrote {path} ({len(content.splitlines())} lines)"

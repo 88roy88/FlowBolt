@@ -1,11 +1,9 @@
-from __future__ import annotations
-
-from flow44.sandbox.filesystem import read_file
+from flow44.sandbox.main import FileSystemSandbox
 
 
-async def read_file_with_lines(project_id: str, path: str) -> str:
+async def read_file_with_lines(sandbox: FileSystemSandbox, path: str) -> str:
     try:
-        content = await read_file(project_id, path)
+        content = await sandbox.read_file(path)
     except (FileNotFoundError, PermissionError) as e:
         return f"Error: {e}"
 

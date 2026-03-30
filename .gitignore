@@ -41,7 +41,7 @@ docker-compose.override.yml
 
 # Scratch / review notes
 CODE_REVIEW*.md
-BACKLOG.md
+BACKLOG*.md
 
 # Test harnesses
 nsjail-repro/

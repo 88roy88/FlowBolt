@@ -1,13 +1,19 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 import os
 import subprocess
 from collections.abc import AsyncIterator
 
-from flow44.sandbox.base import Sandbox, _ensure_bashrc
-from flow44.sandbox.pty import PtyHandle, _active_ptys
+from flow44.sandbox.base import BaseSandbox
+from flow44.sandbox.pty import WinPTY
+
+if os.name == "nt":
+    try:
+        from winpty import PtyProcess as WinPtyProcess
+    except ImportError as e:
+        raise ImportError(
+            "winpty package is required for Windows sandbox support. Install it with: pip install pywinpty"
+        ) from e
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +40,7 @@ class _PopenWrapper:
         return await loop.run_in_executor(None, self._proc.wait)
 
 
-class WindowsLocalSandbox(Sandbox):
+class WindowsLocalSandbox(BaseSandbox):
     async def exec(self, command: str) -> AsyncIterator[str]:
         loop = asyncio.get_running_loop()
         cmd = f"cd /d {self.workspace_dir} && {command}"
@@ -54,18 +60,13 @@ class WindowsLocalSandbox(Sandbox):
         for line in result.stdout.splitlines():
             yield line + "\n"
 
-    async def start_dev_server(self) -> None:
-        await self.stop_dev_server()
-
-        env = os.environ.copy()
-        env["FORCE_COLOR"] = "1"
-
-        log_path = os.path.join(self.workspace_dir, ".dev-server.log")
+    async def _spawn_background(self, name: str, command: str, env: dict[str, str]) -> None:
+        log_path = self.get_background_log_path(name)
         log_file = open(log_path, "wb")  # noqa: ASYNC230, SIM115
 
-        dev_cmd = f"cd /d {self.workspace_dir} && pnpm dev --port {self.port} --strictPort --host 0.0.0.0"
+        cmd = f"cd /d {self.workspace_dir} && {command}"
         proc = subprocess.Popen(  # noqa: ASYNC220
-            ["cmd", "/c", dev_cmd],  # noqa: S607
+            ["cmd", "/c", cmd],  # noqa: S607
             stdout=log_file,
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
@@ -74,34 +75,53 @@ class WindowsLocalSandbox(Sandbox):
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]  # Windows-only
         )
 
-        self._dev_log_file = log_file
-        self._dev_process = _PopenWrapper(proc)  # type: ignore[assignment]
-        logger.info(
-            "Dev server started for session %s on port %d (pid %s)",
-            self.project_id,
-            self.port,
-            proc.pid,
-        )
+        self._bg_processes[name] = _PopenWrapper(proc)  # type: ignore[assignment]
+        self._bg_log_files[name] = log_file
+        logger.debug("Background process '%s' started (pid %s)", name, proc.pid)
 
-    async def stop_dev_server(self) -> None:
-        if self._dev_process is not None:
-            self._dev_process.kill()
-            await self._dev_process.wait()
-            self._dev_process = None
-        if self._dev_log_file is not None:
-            try:
-                self._dev_log_file.close()
-            except Exception:
-                logger.debug("Failed to close dev log file", exc_info=True)
-            self._dev_log_file = None
+    @classmethod
+    def find_pids_in_port_range(cls, port_start: int, port_end: int) -> list[tuple[int, int]]:
+        """Return (pid, port) pairs via netstat -ano (Windows)."""
+        try:
+            result = subprocess.run(  # noqa: PLW1510
+                ["netstat", "-ano"],  # noqa: S607
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            pairs: list[tuple[int, int]] = []
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                # netstat -ano: Proto  Local  Foreign  State  PID
+                if len(parts) < 5 or parts[3] != "LISTENING":
+                    continue
+                try:
+                    port = int(parts[1].rsplit(":", 1)[1])
+                    pid = int(parts[4])
+                    if port_start <= port <= port_end:
+                        pairs.append((pid, port))
+                except (ValueError, IndexError):
+                    continue
+            return pairs
+        except FileNotFoundError:
+            return []
+        except Exception:
+            logger.debug("Failed to find pids in port range on Windows", exc_info=True)
+            return []
 
-    def create_pty(self) -> PtyHandle:
-        # TODO: move to top and have try/except ImportError to raise a clear error about missing dependency on Windows
-        from winpty import PtyProcess as WinPtyProcess  # noqa: PLC0415
+    @classmethod
+    def kill_pid(cls, pid: int) -> None:
+        """Terminate a process tree via taskkill (Windows)."""
+        try:
+            subprocess.run(  # noqa: PLW1510, S603
+                ["taskkill", "/PID", str(pid), "/T", "/F"],  # noqa: S607
+                capture_output=True,
+                timeout=5,
+            )
+        except Exception:  # noqa: S110
+            pass
 
-        _ensure_bashrc(self.workspace_dir)
+    def create_pty(self) -> WinPTY:
         proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)
-
-        handle = PtyHandle(pid=proc.pid, project_id=self.project_id, winpty_process=proc)
-        _active_ptys.add(handle)
-        return handle
+        pty = WinPTY(winpty_process=proc)
+        return pty

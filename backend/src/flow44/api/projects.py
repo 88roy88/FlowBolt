@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import shutil
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -20,7 +19,7 @@ from flow44.db.project import (
     update_project_model,
 )
 from flow44.db.session import project_registry
-from flow44.sandbox.manager import sandbox_manager, stamp_vite_config
+from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
@@ -57,23 +56,14 @@ async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
 
         try:
             logger.info("[projects] Scaffolding project for session %s", project.id)
-            shutil.copytree(settings.TEMPLATE_DIR, sandbox.workspace_dir, dirs_exist_ok=True)
-            stamp_vite_config(project.id, sandbox.workspace_dir)
-
-            try:
-                async for line in sandbox.exec("pnpm install 2>&1"):
-                    logger.info("[scaffold] %s", line.rstrip())
-            except Exception:
-                logger.exception("[projects] pnpm install failed for session %s", project.id)
-                await emit_event(project.id, {"type": "error", "message": "Project setup failed (pnpm install)"})
-                return
-
+            await sandbox.scaffold(settings.TEMPLATE_DIR)
             logger.info("[projects] Starting dev server for session %s", project.id)
             await sandbox.start_dev_server()
         except Exception:
             logger.exception("[projects] Scaffolding failed for session %s", project.id)
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
+    # TODO: shouldnt we use the fastapi background-task for this?
     asyncio.create_task(_scaffold_and_start())
     return project.model_dump()
 

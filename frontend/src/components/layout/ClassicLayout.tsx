@@ -1,15 +1,11 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe, Loader2 } from 'lucide-react';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
-import { useSessionStore } from '../../stores/session';
-import { publishToS3 } from '../../services/api';
-import { PublishModal } from '../ui/PublishModal';
-import { ExternalLink } from 'lucide-react';
+
 
 type RightTab = 'preview' | 'code';
 
@@ -22,32 +18,10 @@ export function ClassicLayout() {
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
-  const projectId = useSessionStore((s) => s.projectId);
-  const currentProject = useSessionStore((s) => s.currentProject);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
-  
+
   const messages = useChatStore((s) => s.messages);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
   const isNewProject = !historyLoaded || messages.length === 0;
-  const isPublished = !!currentProject?.published_url;
-
-  const handlePublish = useCallback(async () => {
-    if (!projectId || isPublishing) return;
-    setIsPublishing(true);
-    try {
-      const result = await publishToS3(projectId);
-      const current = useSessionStore.getState().currentProject;
-      if (current) {
-        useSessionStore.getState().setProjectPublishedUrl(current.id, result.url);
-      }
-      setPublishModalState({ open: true, url: result.url });
-    } catch (err) {
-      setPublishModalState({ open: true, error: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [projectId, isPublishing]);
 
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
@@ -96,46 +70,11 @@ export function ClassicLayout() {
               {tab === 'preview' ? t('preview.title') : t('preview.code')}
             </button>
           ))}
-
-          <div className="ms-auto pe-2 flex items-center gap-2">
-            {isPublished && projectId && (
-              <a
-                href={`/api/export/${projectId}/published`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 text-primary border border-primary/20 hover:bg-primary/10 shadow-sm"
-                title={t('preview.viewPublishedApp')}
-              >
-                <ExternalLink size={13} />
-                {t('preview.viewLive')}
-              </a>
-            )}
-            <button
-          title={isPublished ? t('preview.republish') : t('preview.publishToS3')}
-          disabled={!projectId || isPublishing}
-              onClick={handlePublish}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-150 ${
-                projectId && !isPublishing
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-sm'
-                  : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
-              }`}
-            >
-              {isPublishing ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
-              {isPublishing ? t('preview.publishing') : isPublished ? t('preview.republish') : t('preview.publish')}
-            </button>
-          </div>
         </div>
         <div className="flex-1 overflow-hidden">
           {rightTab === 'preview' ? <Preview /> : <EditorPanel />}
         </div>
       </div>
-      
-      <PublishModal 
-        open={publishModalState.open} 
-        onOpenChange={(open) => setPublishModalState(s => ({ ...s, open }))}
-        url={publishModalState.url}
-        errorMessage={publishModalState.error}
-      />
     </div>
   );
 }

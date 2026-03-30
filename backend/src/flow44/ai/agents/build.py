@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
@@ -29,8 +27,7 @@ from flow44.ai.state import BuildState
 from flow44.ai.task_tree import Task, WorkPlan
 from flow44.db.project import update_project_summary
 from flow44.integrations.flapi_api import data_source_client
-from flow44.sandbox.filesystem import write_file
-from flow44.sandbox.manager import sandbox_manager
+from flow44.sandbox.main import PnpmSandbox
 
 from ._base import BaseAgent
 
@@ -42,11 +39,14 @@ logger = logging.getLogger(__name__)
 class BuildAgent(BaseAgent):
     def __init__(
         self,
+        project_id: str,
+        sandbox: PnpmSandbox,
         *,
+        model: str | None = None,
+        trace_id: str | None = None,
         data_source_authorization: str | None = None,
-        **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
         self._state = BuildState(project_id=self.project_id, model=self.model)
         self._observation_id: str | None = None
         # Pause/resume for plan approval
@@ -432,7 +432,7 @@ class BuildAgent(BaseAgent):
 
             paths: list[str] = []
             for path, content in generated:
-                await write_file(self.project_id, path, content)
+                await self.sandbox.write_file(path, content)
                 self._state.completed_files[path] = content
                 paths.append(path)
                 await self.emit({"type": "task_update", "taskId": task.id, "status": "running", "file": path})
@@ -448,31 +448,12 @@ class BuildAgent(BaseAgent):
             await self.emit({"type": "task_update", "taskId": task.id, "status": "failed"})
 
     async def _typecheck(self) -> str:
-        try:
-            sandbox = sandbox_manager.get_sandbox(self.project_id)
-            if sandbox is None:
-                return ""
-            lines: list[str] = []
-            async for line in sandbox.exec("npx tsc --noEmit 2>&1"):
-                lines.append(line.rstrip())
-            return "\n".join(lines).strip()
-        except Exception:
-            logger.exception("[build] Typecheck failed")
-            return ""
+        result = await self.sandbox.run_build_command("npx tsc --noEmit")
+        return result.errors
 
     async def _build(self) -> str:
-        try:
-            sandbox = sandbox_manager.get_sandbox(self.project_id)
-            if sandbox is None:
-                return ""
-            lines: list[str] = []
-            async for line in sandbox.exec("pnpm build 2>&1"):
-                lines.append(line.rstrip())
-            output = "\n".join(lines).strip()
-            return output if output and ("error" in output.lower() or "failed" in output.lower()) else ""
-        except Exception:
-            logger.exception("[build] Build failed")
-            return ""
+        result = await self.sandbox.run_build_command("pnpm build")
+        return result.errors
 
     @observe(name="fix-errors-auto")  # type: ignore[untyped-decorator]
     async def _fix_errors(self, errors: str) -> None:
@@ -491,7 +472,7 @@ class BuildAgent(BaseAgent):
             parser.flush()
 
             for path, content in generated:
-                await write_file(self.project_id, path, content)
+                await self.sandbox.write_file(path, content)
                 self._state.completed_files[path] = content
                 await self.emit({"type": "file", "path": path, "content": content})
         except Exception:

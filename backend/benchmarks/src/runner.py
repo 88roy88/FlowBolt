@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -118,10 +118,12 @@ async def _run_single(
             dur = phase_events[i + 1]["_ts"] - pe["_ts"]
         else:
             dur = 0.0  # last phase ("complete") has no meaningful duration
-        phases.append({
-            "phase": pe.get("phase"),
-            "duration_s": round(dur, 1),
-        })
+        phases.append(
+            {
+                "phase": pe.get("phase"),
+                "duration_s": round(dur, 1),
+            }
+        )
 
     metadata: dict[str, Any] = {
         "prompt_name": prompt_name,
@@ -201,10 +203,18 @@ def _generate_single_html(workspace: Path) -> str | None:
             return f"<style>{css_path.read_text(encoding='utf-8', errors='replace')}</style>"
         return match.group(0)
 
-    html = re.sub(r'<link\s[^>]*?href=["\']([^"\']+)["\'][^>]*?rel=["\']stylesheet["\'][^>]*/?>',
-                  _inline_css, html, flags=re.IGNORECASE)
-    html = re.sub(r'<link\s[^>]*?rel=["\']stylesheet["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
-                  _inline_css, html, flags=re.IGNORECASE)
+    html = re.sub(
+        r'<link\s[^>]*?href=["\']([^"\']+)["\'][^>]*?rel=["\']stylesheet["\'][^>]*/?>',
+        _inline_css,
+        html,
+        flags=re.IGNORECASE,
+    )
+    html = re.sub(
+        r'<link\s[^>]*?rel=["\']stylesheet["\'][^>]*?href=["\']([^"\']+)["\'][^>]*/?>',
+        _inline_css,
+        html,
+        flags=re.IGNORECASE,
+    )
 
     # Inline JS
     def _inline_js(match: re.Match[str]) -> str:
@@ -217,12 +227,12 @@ def _generate_single_html(workspace: Path) -> str | None:
             return f"<script{type_attr}>{js}</script>"
         return match.group(0)
 
-    html = re.sub(r'<script\s[^>]*?src=["\']([^"\']+)["\'][^>]*?>\s*</script>',
-                  _inline_js, html, flags=re.IGNORECASE)
+    html = re.sub(r'<script\s[^>]*?src=["\']([^"\']+)["\'][^>]*?>\s*</script>', _inline_js, html, flags=re.IGNORECASE)
 
     # Strip error reporter script
-    html = re.sub(r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*',
-                  "", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(
+        r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*', "", html, flags=re.DOTALL | re.IGNORECASE
+    )
 
     return html
 

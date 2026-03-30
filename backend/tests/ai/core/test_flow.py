@@ -123,3 +123,77 @@ class TestFlowErrors:
 
         result = await flow.run(CounterState(), start="step")
         assert result.steps_run == ["step"]
+
+    @pytest.mark.asyncio
+    async def test_step_exception_propagates(self) -> None:
+        async def faulty(state: CounterState) -> CounterState:
+            raise RuntimeError("Intentional error")
+
+        flow: Flow[CounterState] = Flow(name="test")
+        flow.add_step("faulty", faulty)
+
+        with pytest.raises(RuntimeError, match="Intentional error"):
+            await flow.run(CounterState(), start="faulty")
+
+    @pytest.mark.asyncio
+    async def test_multi_level_routing(self) -> None:
+        def router1(state: CounterState) -> str:
+            return "even" if state.value % 2 == 0 else "odd"
+
+        def router2(state: CounterState) -> str:
+            return "big" if state.value > 10 else "small"
+
+        async def even(state: CounterState) -> CounterState:
+            state.steps_run.append("even")
+            return state
+
+        async def odd(state: CounterState) -> CounterState:
+            state.steps_run.append("odd")
+            return state
+
+        async def big(state: CounterState) -> CounterState:
+            state.steps_run.append("big")
+            return state
+
+        async def small(state: CounterState) -> CounterState:
+            state.steps_run.append("small")
+            return state
+
+        async def passthrough(state: CounterState) -> CounterState:
+            return state
+
+        flow: Flow[CounterState] = Flow(name="multi-route")
+        flow.add_step("start", passthrough, next_step=router1)
+        flow.add_step("even", even, next_step=router2)
+        flow.add_step("odd", odd, next_step=router2)
+        flow.add_step("big", big)
+        flow.add_step("small", small)
+
+        result = await flow.run(CounterState(value=12), start="start")
+        assert result.steps_run == ["even", "big"]
+
+        result = await flow.run(CounterState(value=7), start="start")
+        assert result.steps_run == ["odd", "small"]
+
+    @pytest.mark.asyncio
+    async def test_generation_validation_loop(self) -> None:
+        async def generate(state: CounterState) -> CounterState:
+            state.steps_run.append("generate")
+            return state
+
+        async def validate(state: CounterState) -> CounterState:
+            state.value += 1
+            state.steps_run.append("validate")
+            return state
+
+        def router(state: CounterState) -> str | None:
+            return "generate" if state.value < 3 else None
+
+        flow: Flow[CounterState] = Flow(name="gen-val-loop")
+        flow.add_step("generate", generate, next_step="validate")
+        flow.add_step("validate", validate, next_step=router)
+
+        result = await flow.run(CounterState(value=0), start="generate")
+        assert result.value == 3
+        assert result.steps_run.count("generate") == 3
+        assert result.steps_run.count("validate") == 3

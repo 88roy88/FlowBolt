@@ -1,15 +1,15 @@
-from __future__ import annotations
-
 import asyncio
-import fcntl
 import logging
 import os
 import subprocess
 from collections.abc import AsyncIterator
 
+if os.name == "posix":
+    import fcntl
+
 from flow44.config import settings
-from flow44.sandbox.base import Sandbox, _ensure_bashrc
-from flow44.sandbox.pty import PtyHandle, _active_ptys
+from flow44.sandbox.pty import UnixPTY
+from flow44.sandbox.unix_local import UnixSandbox, _ensure_bashrc
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def _can_use_cgroupv2() -> bool:
         return False
 
 
-_CGROUPV2_AVAILABLE = _can_use_cgroupv2() if not os.environ.get("AIB_SANDBOX_DISABLE_CGROUPS") else False
+_CGROUPV2_AVAILABLE = _can_use_cgroupv2() if not settings.SANDBOX_DISABLE_CGROUPS else False
 
 
 def _build_nsjail_args(
@@ -121,13 +121,13 @@ def _build_nsjail_args(
     return args
 
 
-class NamespacedSandbox(Sandbox):
-    async def start(self) -> None:
-        await super().start()
-        # Append pnpm store dir — nsjail mounts the shared store at /pnpm-store
-        npmrc = os.path.join(self.workspace_dir, ".npmrc")
-        with open(npmrc, "a", encoding="utf-8") as f:  # noqa: ASYNC230
-            f.write("store-dir=/pnpm-store\n")
+class NamespacedSandbox(UnixSandbox):
+    # TODO: override find_pids_in_port_range with a nsjail-aware approach:
+    #   pgrep -f nsjail would find ALL orphaned nsjail processes regardless of port,
+    #   including ones spawned via the terminal that never bound a port.
+    #   In namespaced mode we own every nsjail process on the host, so killing all of
+    #   them is safe and complete. Port-based detection (lsof) misses terminal-spawned
+    #   processes and can have false positives from unrelated services.
 
     async def exec(self, command: str) -> AsyncIterator[str]:
         cmd = _build_nsjail_args(self.project_id, self.workspace_dir, self.port, command=command)
@@ -147,38 +147,31 @@ class NamespacedSandbox(Sandbox):
 
         await proc.wait()
 
-    async def start_dev_server(self) -> None:
-        await self.stop_dev_server()
-
-        log_path = os.path.join(self.workspace_dir, ".dev-server.log")
-        self._dev_log_file = open(log_path, "wb")  # noqa: ASYNC230, SIM115
+    async def _spawn_background(self, name: str, command: str, env: dict[str, str]) -> None:
+        log_path = self.get_background_log_path(name)
+        log_file = open(log_path, "wb")  # noqa: ASYNC230, SIM115
 
         cmd = _build_nsjail_args(
             self.project_id,
             self.workspace_dir,
             self.port,
-            command=f"pnpm dev --port {self.port} --strictPort --host 0.0.0.0",
+            command=command,
             time_limit=0,
         )
 
-        env = os.environ.copy()
-        env["FORCE_COLOR"] = "1"
-
-        self._dev_process = await asyncio.create_subprocess_exec(
+        proc = await asyncio.create_subprocess_exec(
             *cmd,
-            stdout=self._dev_log_file,
+            stdout=log_file,
             stderr=asyncio.subprocess.STDOUT,
             env=env,
             start_new_session=True,
         )
-        logger.info(
-            "Dev server started for session %s on port %d (pid %s)",
-            self.project_id,
-            self.port,
-            self._dev_process.pid,
-        )
 
-    def create_pty(self) -> PtyHandle:
+        self._bg_processes[name] = proc
+        self._bg_log_files[name] = log_file
+        logger.debug("Background process '%s' started (pid %s)", name, proc.pid)
+
+    def create_pty(self) -> UnixPTY:
         master_fd, slave_fd = os.openpty()
 
         env = os.environ.copy()
@@ -204,6 +197,5 @@ class NamespacedSandbox(Sandbox):
         flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
         fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-        handle = PtyHandle(read_fd=master_fd, write_fd=master_fd, pid=proc.pid, project_id=self.project_id)
-        _active_ptys.add(handle)
-        return handle
+        pty = UnixPTY(read_fd=master_fd, write_fd=master_fd, pid=proc.pid)
+        return pty

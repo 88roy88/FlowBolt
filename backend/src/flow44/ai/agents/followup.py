@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import uuid
@@ -9,17 +7,17 @@ from typing import Any
 from langfuse.decorators import langfuse_context, observe
 
 from flow44.ai.core.messages import Message
-from flow44.ai.core.tools import FunctionTool, ToolExecutor
+from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.ai.prompts import render_followup
 from flow44.ai.provider import complete_chat_with_tools
 from flow44.ai.tools.edit_file import edit_file_with_context
-from flow44.ai.tools.glob import glob
-from flow44.ai.tools.grep import grep
+from flow44.ai.tools.glob import glob as glob_tool  # TODO: do we even need this? call glob from the sandbox directly?
+from flow44.ai.tools.grep import grep as grep_tool  # TODO: do we even need this? The idea was to have shared prompt.
 from flow44.ai.tools.read_file import read_file_with_lines
 from flow44.ai.tools.write_file import write_file_with_diff
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
-from flow44.sandbox.filesystem import list_files, read_file
+from flow44.sandbox.main import PnpmSandbox
 
 from ._base import BaseAgent
 
@@ -35,8 +33,14 @@ class FileDiff:
 
 
 class FollowUpAgent(BaseAgent):
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        project_id: str,
+        sandbox: PnpmSandbox,
+        model: str | None = None,
+        trace_id: str | None = None,
+    ) -> None:
+        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
         self._steps: list[dict[str, Any]] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
@@ -44,13 +48,14 @@ class FollowUpAgent(BaseAgent):
         self._executor = self._build_tool_executor()
 
     def _build_tool_executor(self) -> ToolExecutor:
-        sid = self.project_id
+        sandbox = self.sandbox
 
         # TODO: why we stopped supporting path?
         # TODO: we might want a better prompt for the llm to understand how to use grep patterns.
         # TODO: @roym: Think in general if there's a smart way to work with it like skills -
         #               and load the full instructions on how to use only if chose it
-        async def _grep(pattern: str, file_pattern: str | None = None) -> str:
+        @tool
+        async def grep(pattern: str, file_pattern: str | None = None) -> str:
             """Search the entire codebase for a text or regex pattern using grep.
 
             Use this to find all occurrences of functions, classes, variables, imports, or any text pattern.
@@ -63,19 +68,24 @@ class FollowUpAgent(BaseAgent):
             Returns:
                 Matching lines with file paths and line numbers
             """
-            return await grep(sid, pattern, "/", file_pattern)
 
-        async def _glob(pattern: str) -> str:
+            return await grep_tool(sandbox, pattern, "/", file_pattern)
+
+        @tool
+        async def glob(pattern: str) -> str:
             """Find files matching a glob pattern. Returns file paths."""
-            return await glob(sid, pattern)
 
-        async def _read_file(path: str) -> str:
+            return await glob_tool(sandbox, pattern)
+
+        @tool
+        async def read_file(path: str) -> str:
             """Read the full content of a file with line numbers. Always read a file before editing it."""
-            return await read_file_with_lines(sid, path)
+            return await read_file_with_lines(sandbox, path)
 
-        async def _write_file(path: str, content: str) -> str:
+        @tool
+        async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
-            status, diff_str = await write_file_with_diff(sid, path, content)
+            status, diff_str = await write_file_with_diff(sandbox, path, content)
             await self.emit({"type": "file", "path": path, "content": content})
             if diff_str:
                 self._diffs.append(FileDiff(path=path, diff=diff_str))
@@ -83,26 +93,19 @@ class FollowUpAgent(BaseAgent):
                 self._files_changed.append(path)
             return status
 
-        async def _edit_file(path: str, search: str, replace: str) -> str:
+        @tool
+        async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
-            status, diff_str = await edit_file_with_context(sid, path, search, replace)
+            status, diff_str = await edit_file_with_context(sandbox, path, search, replace)
             if diff_str:
-                new_content = await read_file(sid, path)
+                new_content = await sandbox.read_file(path)
                 await self.emit({"type": "file", "path": path, "content": new_content})
                 self._diffs.append(FileDiff(path=path, diff=diff_str))
             if path not in self._files_changed:
                 self._files_changed.append(path)
             return status
 
-        return ToolExecutor(
-            [
-                FunctionTool(_grep, name="grep"),
-                FunctionTool(_glob, name="glob"),
-                FunctionTool(_read_file, name="read_file"),
-                FunctionTool(_write_file, name="write_file"),
-                FunctionTool(_edit_file, name="edit_file"),
-            ]
-        )
+        return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str) -> None:
@@ -158,7 +161,7 @@ class FollowUpAgent(BaseAgent):
                 summary = "(no project summary available)"
 
         try:
-            file_entries = await list_files(self.project_id)
+            file_entries = await self.sandbox.list_files()
             file_tree = self._format_file_tree(file_entries)
         except Exception:
             file_tree = "(unable to list files)"

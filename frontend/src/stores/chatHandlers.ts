@@ -28,6 +28,11 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+function refreshFileTreeAfterAgentWrite() {
+  if (_skipMessages) return;
+  void useFilesStore.getState().loadFileTree();
+}
+
 function handleFileUpdate(msg: { path: string; content: string }, set: SetState) {
   set((state) => ({
     actions: [
@@ -39,6 +44,8 @@ function handleFileUpdate(msg: { path: string; content: string }, set: SetState)
   if (filesStore.openFiles.has(msg.path)) {
     filesStore.updateFileContent(msg.path, msg.content);
   }
+  // New files on disk (e.g. fix pass) — keep explorer in sync before action_complete.
+  refreshFileTreeAfterAgentWrite();
 }
 
 function handleText(msg: { content: string }, set: SetState) {
@@ -313,11 +320,18 @@ function handleTaskUpdate(
     ),
   }));
   if (msg.file) {
-    // Update content if file is open — tree refresh happens on action_complete
     const filesStore = useFilesStore.getState();
     if (filesStore.openFiles.has(msg.file)) {
       filesStore.refreshOpenFiles();
     }
+  }
+  // Task progress UI updates per task; refresh tree here so new files appear before the whole run ends.
+  if (
+    msg.status === 'completed' ||
+    msg.status === 'failed' ||
+    (msg.status === 'running' && msg.file)
+  ) {
+    refreshFileTreeAfterAgentWrite();
   }
 }
 

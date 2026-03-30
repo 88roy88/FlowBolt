@@ -3,8 +3,10 @@ import zipfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from flow44.api.deps import get_sandbox
 from flow44.main import app
 from flow44.config import settings
 
@@ -29,32 +31,39 @@ async def test_export_zip(tmp_path):
     mock_project = AsyncMock()
     mock_project.name = "Test Project"
 
-    with (
-        patch("flow44.api.export.sandbox_manager.get_sandbox", return_value=mock_sandbox),
-        patch("flow44.api.export.get_project", return_value=mock_project),
-    ):
-        response = client.get(f"/api/export/{project_id}/zip")
+    app.dependency_overrides[get_sandbox] = lambda project_id: mock_sandbox
+    try:
+        with patch("flow44.api.export.get_project", return_value=mock_project):
+            response = client.get(f"/api/export/{project_id}/zip")
 
-        assert response.status_code == 200
-        assert response.headers["Content-Type"] == "application/zip"
-        assert 'attachment; filename="Test Project.zip"' in response.headers["Content-Disposition"]
+            assert response.status_code == 200
+            assert response.headers["Content-Type"] == "application/zip"
+            assert 'attachment; filename="Test Project.zip"' in response.headers["Content-Disposition"]
 
-        # Verify ZIP content
-        with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
-            files = zf.namelist()
-            assert "file1.txt" in files
-            assert "subdir/file2.txt" in files
-            assert "node_modules/secret.txt" not in files
-            assert zf.read("file1.txt") == b"content1"
+            with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+                files = zf.namelist()
+                assert "file1.txt" in files
+                assert "subdir/file2.txt" in files
+                assert "node_modules/secret.txt" not in files
+                assert zf.read("file1.txt") == b"content1"
+    finally:
+        app.dependency_overrides.pop(get_sandbox, None)
 
 
 @pytest.mark.asyncio
 async def test_export_zip_no_sandbox():
     project_id = "no-sandbox"
-    with patch("flow44.api.export.sandbox_manager.get_sandbox", return_value=None):
+
+    def _raise(project_id: str) -> None:
+        raise HTTPException(status_code=404, detail=f"No sandbox found for project {project_id}")
+
+    app.dependency_overrides[get_sandbox] = _raise
+    try:
         response = client.get(f"/api/export/{project_id}/zip")
         assert response.status_code == 404
         assert "No sandbox found" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(get_sandbox, None)
 
 
 @pytest.mark.asyncio
@@ -64,10 +73,13 @@ async def test_export_zip_missing_workspace(tmp_path):
     mock_sandbox = MagicMock()
     mock_sandbox.workspace_dir = str(workspace_dir)
 
-    with patch("flow44.api.export.sandbox_manager.get_sandbox", return_value=mock_sandbox):
+    app.dependency_overrides[get_sandbox] = lambda project_id: mock_sandbox
+    try:
         response = client.get(f"/api/export/{project_id}/zip")
         assert response.status_code == 404
         assert response.json()["detail"] == "Workspace directory not found"
+    finally:
+        app.dependency_overrides.pop(get_sandbox, None)
 
 
 @pytest.mark.asyncio

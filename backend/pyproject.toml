@@ -10,7 +10,7 @@ dependencies = [
     "greenlet>=3.3.2",
     "httpx>=0.28.0",
     "jinja2>=3.1.0",
-    "langfuse==2.59.7",
+    "langfuse==2.59.7",     # using langfuse 2.59.7 compatible with litellm
     "litellm>=1.55.10,<1.82.3",
     "pydantic-settings>=2.7.1",
     "python-multipart>=0.0.19",

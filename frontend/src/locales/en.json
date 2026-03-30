@@ -59,7 +59,22 @@
     "noProjectSelected": "No project selected",
     "noFileSelected": "No file selected",
     "selectFile": "Select a file from the tree to view its contents",
-    "closeTab": "Close"
+    "closeTab": "Close",
+    "searchTab": "Search",
+    "searchInFilesPlaceholder": "Search in files...",
+    "clearSearch": "Clear search",
+    "runSearch": "Search",
+    "searching": "Searching…",
+    "caseSensitive": "Case sensitive",
+    "matchesCount": "{{count}} matches",
+    "searchFailedPrefix": "Search failed",
+    "noSearchResults": "No results. Try another query.",
+    "showMatches": "Show matches in this file",
+    "hideMatches": "Hide matches in this file",
+    "jumpToMatch": "Jump to match",
+    "quickOpenPlaceholder": "Type a file name (Ctrl+P)",
+    "noMatchingFiles": "No matching files",
+    "searchShortcutTitle": "Search in files (Ctrl+Shift+F)"
   },
   "terminal": {
     "terminal": "Terminal",
