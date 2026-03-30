@@ -131,9 +131,12 @@ def _fetch_models_from_base_url() -> list[dict[str, str]]:
             # Extract friendly name if available, otherwise use ID
             name = entry.get("name", model_id)
 
+            # Prepend openai/ for OpenAI-compatible models (testing if this works with api_base)
+            full_model_id = f"openai/{model_id}"
+
             models.append(
                 {
-                    "id": model_id,
+                    "id": full_model_id,
                     "name": name,
                     "provider": provider_name,
                 }
