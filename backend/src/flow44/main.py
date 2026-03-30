@@ -86,6 +86,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker/K8s."""
+    return {"status": "ok", "version": "0.1.0"}
+
+
 # CORS — allow all origins in development
 app.add_middleware(
     CORSMiddleware,

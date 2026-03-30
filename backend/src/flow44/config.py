@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from pydantic import Field
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -20,7 +21,12 @@ class Settings(BaseSettings):
     NSJAIL_BIN: str = "/usr/bin/nsjail"
     AI_MODEL: str = "bedrock/us.anthropic.claude-sonnet-4-6"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    DATABASE_URL: str
+    DB_SCHEME: str
+    DB_USER: str
+    DB_PASSWORD: str
+    DB_HOST: str
+    DB_PORT: int
+    DB_NAME: str
     MAX_COMMAND_TIMEOUT: int = 60
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256

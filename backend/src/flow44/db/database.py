@@ -7,13 +7,24 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 import flow44.config
 
 
-def _get_async_url() -> str:
-    url = flow44.config.settings.DATABASE_URL
-    if url.startswith("sqlite:///"):
-        return url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+def build_db_url(config: flow44.config.Settings, async_db: bool) -> str:
+    """Builds a database URL string from components, supporting both SQLite and Postgres."""
+    if config.DB_SCHEME == "sqlite":
+        # SQLite: use aiosqlite for async, standard sqlite driver otherwise
+        adapter = "sqlite+aiosqlite" if async_db else "sqlite"
+        return f"{adapter}:///{config.DB_NAME}"
+    
+    # Postgres: use asyncpg for async, psycopg2 for sync (per user's hint)
+    db_adapter = "postgresql+asyncpg" if async_db else "postgresql+psycopg2"
+    url = f"{db_adapter}://{config.DB_USER}:{config.DB_PASSWORD}@{config.DB_HOST}:{config.DB_PORT}"
+    if config.DB_NAME:
+        url += f"/{config.DB_NAME}"
     return url
+
+
+def _get_async_url() -> str:
+    """Provides the asynchronous database connection string for engines."""
+    return build_db_url(flow44.config.settings, async_db=True)
 
 
 @functools.lru_cache
