@@ -76,13 +76,9 @@ class SearchMixin(BaseSandbox, ABC):
             args.extend(["--glob", file_pattern])
         args.extend([pattern, rel_search])
 
-        # Run via self.exec() so rg runs inside the sandbox environment (nsjail, Windows cmd, etc.)
-        # and outputs workspace-relative paths — no absolute path stripping, no drive-letter issues.
         if os.name == "nt":  # noqa: SIM108
-            # Windows: subprocess.list2cmdline handles cmd.exe quoting (double quotes, ^ escaping)
             cmd = subprocess.list2cmdline(args)
         else:
-            # Unix: shlex.quote handles POSIX shell quoting (single quotes)
             cmd = " ".join(shlex.quote(a) for a in args)
         try:
             lines: list[str] = []
@@ -94,7 +90,6 @@ class SearchMixin(BaseSandbox, ABC):
 
         output = "".join(lines)
 
-        # Check if ripgrep produced any output
         if not output.strip():
             logger.warning("Ripgrep returned no output. Command: %s", cmd)
             logger.warning("Ripgrep may not be installed or accessible in PATH")
