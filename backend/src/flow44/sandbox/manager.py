@@ -100,7 +100,7 @@ class SandboxManager:
         if not await sandbox.is_scaffolded():
             await sandbox.scaffold(settings.TEMPLATE_DIR)
 
-        sandbox.configure_pnpm_store()
+        sandbox.configure_npmrc()
 
         if not sandbox.is_dev_server_running():
             logger.info("Starting sandbox dev server for %s", sandbox.project_id)

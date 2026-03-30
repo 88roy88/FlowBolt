@@ -50,6 +50,7 @@ async def init_db() -> None:
 
     import flow44.db.chat  # noqa: F401, PLC0415
     import flow44.db.events  # noqa: F401, PLC0415
+    import flow44.db.pending_plan  # noqa: F401, PLC0415
     import flow44.db.project  # noqa: F401, PLC0415
 
     async with get_engine().begin() as conn:

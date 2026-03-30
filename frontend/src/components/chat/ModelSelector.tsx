@@ -21,6 +21,14 @@ export function ModelSelector() {
 
   const current = models.find((m) => m.id === selectedModel) ?? models[0];
 
+  // If the selected model is no longer available, sync the store to the fallback
+  useEffect(() => {
+    if (models.length === 0) return;
+    if (!models.find((m) => m.id === selectedModel)) {
+      setSelectedModel(models[0].id);
+    }
+  }, [models, selectedModel, setSelectedModel]);
+
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {

@@ -32,6 +32,8 @@ async def complete_chat(
     response = await litellm.acompletion(
         model=resolved_model,
         messages=full_messages,
+        api_base=settings.AI_BASE_URL,
+        api_key=settings.AI_API_KEY,
         stream=False,
         metadata=metadata or {},
     )
@@ -59,6 +61,8 @@ async def complete_chat_with_tools(
     return await litellm.acompletion(
         model=resolved_model,
         messages=full_messages,
+        api_base=settings.AI_BASE_URL,
+        api_key=settings.AI_API_KEY,
         tools=tools,
         tool_choice=tool_choice,
         stream=False,
@@ -81,6 +85,8 @@ async def stream_chat(
     response = await litellm.acompletion(
         model=resolved_model,
         messages=full_messages,
+        api_base=settings.AI_BASE_URL,
+        api_key=settings.AI_API_KEY,
         stream=True,
         metadata=metadata or {},
     )

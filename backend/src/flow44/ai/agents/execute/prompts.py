@@ -17,38 +17,12 @@ def render(template_name: str, **kwargs: Any) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_classify() -> str:
-    return render("classify.jinja2")
-
-
-def render_architecture(*, data_source_contexts: list[dict[str, Any]] | None = None) -> str:
-    prepared = None
-    if data_source_contexts:
-        prepared = [
-            {**ctx, "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000]}
-            for ctx in data_source_contexts
-        ]
-    return render("architecture.jinja2", data_source_contexts=prepared)
-
-
-def render_ux_design() -> str:
-    return render("ux_design.jinja2")
-
-
 def render_merge(*, has_data_sources: bool = False) -> str:
     return render("merge.jinja2", has_data_sources=has_data_sources)
 
 
-def render_user_plan(*, has_feedback: bool = False) -> str:
-    return render("user_plan.jinja2", has_feedback=has_feedback)
-
-
 def render_summary() -> str:
     return render("summary.jinja2")
-
-
-def render_followup(*, project_summary: str, file_tree: str) -> str:
-    return render("followup.jinja2", project_summary=project_summary, file_tree=file_tree)
 
 
 def render_codegen(  # noqa: PLR0913
@@ -100,50 +74,8 @@ def render_codegen(  # noqa: PLR0913
     )
 
 
-def render_data_source_analysis(
-    *,
-    user_content: str,
-    data_source_name: str,
-    sample_data: Any,
-) -> str:
-    return render(
-        "data_source_analysis.jinja2",
-        user_content=user_content,
-        data_source_name=data_source_name,
-        sample_data_json=json.dumps(sample_data, indent=2)[:2000],
-    )
-
-
 def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
     return render("fix_errors.jinja2", errors=errors, files=files)
-
-
-def render_fix_error_direct(
-    *,
-    error_message: str,
-    error_file: str | None = None,
-    error_line: int | None = None,
-    error_stack: str | None = None,
-    files: dict[str, str],
-) -> str:
-    return render(
-        "fix_error_direct.jinja2",
-        error_message=error_message,
-        error_file=error_file,
-        error_line=error_line,
-        error_stack=error_stack,
-        files=files,
-    )
-
-
-# Backward-compatible exports used by agent.py until fully migrated
-CLASSIFY_PROMPT = render_classify()
-ARCHITECTURE_PROMPT = render_architecture()
-UX_DESIGN_PROMPT = render_ux_design()
-MERGE_PROMPT = render_merge()
-USER_PLAN_PROMPT = render_user_plan()
-SUMMARY_PROMPT = render_summary()
-get_codegen_prompt = render_codegen
 
 
 def _extract_exports(content: str) -> str:
@@ -160,16 +92,20 @@ def _extract_exports(content: str) -> str:
                     result.append(line)
                     i += 1
                     continue
-                depth = stripped.count("{") - stripped.count("}")
                 i += 1
-                while i < len(lines) and depth > 0:
+                brace_count = 1
+                while i < len(lines) and brace_count > 0:
                     block.append(lines[i])
-                    depth += lines[i].count("{") - lines[i].count("}")
+                    brace_count += lines[i].count("{") - lines[i].count("}")
                     i += 1
                 result.extend(block)
-                continue
-            result.append(line)
+            else:
+                result.append(line)
+                i += 1
+        else:
             i += 1
-            continue
-        i += 1
-    return "\n".join(result)
+    return "\n".join(result) if result else ""
+
+
+# Constants
+SUMMARY_PROMPT = render_summary()

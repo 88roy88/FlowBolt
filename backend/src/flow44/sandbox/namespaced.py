@@ -63,7 +63,7 @@ def _build_nsjail_args(
         "-B",
         f"{workspace_dir}:/home/project",
         "-B",
-        f"{settings.PNPM_STORE_DIR}:/pnpm-store",
+        f"{settings.PNPM_STORE_DIR}:/.pnpm-store",
         "--mount",
         "none:/home/appuser:tmpfs:rw",
         "--cwd",

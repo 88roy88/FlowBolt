@@ -5,6 +5,7 @@ from abc import ABC
 
 from pydantic import BaseModel
 
+from flow44.config import settings
 from flow44.sandbox.base import BaseSandbox
 
 logger = logging.getLogger(__name__)
@@ -18,10 +19,11 @@ class BuildCommandResult(BaseModel):
 
 class PnpmMixin(BaseSandbox, ABC):
     # TODO: change to configure_npmrc
-    def configure_pnpm_store(self, store_mount_path: str = "/pnpm-store") -> None:
+    def configure_npmrc(self) -> None:
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
-        with open(npmrc, "a", encoding="utf-8") as f:
-            f.write(f"store-dir={store_mount_path}\n")
+        with open(npmrc, "w", encoding="utf-8") as f:
+            if settings.SANDBOX_MODE == "namespaced":
+                f.write("store-dir=/.pnpm-store\n")
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)
