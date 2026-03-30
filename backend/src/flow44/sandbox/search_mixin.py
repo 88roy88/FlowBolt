@@ -75,7 +75,7 @@ class SearchMixin(BaseSandbox, ABC):
 
         # Run via self.exec() so rg runs inside the sandbox environment (nsjail, Windows cmd, etc.)
         # and outputs workspace-relative paths — no absolute path stripping, no drive-letter issues.
-        if os.name == "nt":
+        if os.name == "nt":  # noqa: SIM108
             # Windows: subprocess.list2cmdline handles cmd.exe quoting (double quotes, ^ escaping)
             cmd = subprocess.list2cmdline(args)
         else:

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from langfuse.decorators import langfuse_context, observe
+from pydantic import BaseModel
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.followup.prompts import render_followup
@@ -41,7 +42,7 @@ class FollowUpAgent(BaseAgent):
         self._iteration = 0
         self._executor = self._build_tool_executor()
 
-    def _build_tool_executor(self) -> ToolExecutor:
+    def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901, PLR0915
         sandbox = self.sandbox
 
         # Inline tool implementations - thin wrappers around sandbox
@@ -92,7 +93,7 @@ class FollowUpAgent(BaseAgent):
         @tool
         async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
-            import difflib
+            import difflib  # noqa: PLC0415
 
             try:
                 old_content = await sandbox.read_file(path)
@@ -117,7 +118,7 @@ class FollowUpAgent(BaseAgent):
         @tool
         async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
-            import difflib
+            import difflib  # noqa: PLC0415
 
             try:
                 current = await sandbox.read_file(path)
@@ -177,7 +178,7 @@ class FollowUpAgent(BaseAgent):
             file_tree=context["file_tree"],
         )
 
-        react_flow = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
+        react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
         answer = await react_flow.react_loop(
             messages=messages,
             system_prompt=system_prompt,

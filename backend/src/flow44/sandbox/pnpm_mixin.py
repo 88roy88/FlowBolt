@@ -23,7 +23,7 @@ class PnpmMixin(BaseSandbox, ABC):
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
         with open(npmrc, "w", encoding="utf-8") as f:
             if settings.SANDBOX_MODE == "namespaced":
-                f.write(f"store-dir={settings.stroe}\n")
+                f.write("store-dir=/.pnpm-store\n")
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)

@@ -6,7 +6,7 @@ import logging
 import os
 import re
 
-from langfuse import observe
+from langfuse.decorators import observe
 
 from flow44.config import settings
 from flow44.sandbox.manager import sandbox_manager
@@ -114,7 +114,7 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
     )
 
 
-@observe(name="build-single-html")
+@observe(name="build-single-html")  # type: ignore[untyped-decorator]
 async def build_single_html(project_id: str) -> str:
     """Build the project and return a single self-contained HTML string."""
     sandbox = sandbox_manager.get_sandbox(project_id)

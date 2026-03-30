@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
 
 from langfuse import Langfuse
 from langfuse.decorators import langfuse_context, observe
@@ -120,8 +119,7 @@ class ExecuteAgent(BaseAgent):
                 {
                     "type": "task_list",
                     "tasks": [
-                        {"id": t.id, "title": t.title, "status": t.status}
-                        for t in state.build_state.work_plan.tasks
+                        {"id": t.id, "title": t.title, "status": t.status} for t in state.build_state.work_plan.tasks
                     ],
                 }
             )
@@ -312,8 +310,7 @@ class ExecuteAgent(BaseAgent):
                 task_files=task.files,
                 architecture=state.build_state.work_plan.architecture.model_dump(),
                 ux_design=state.build_state.work_plan.ux_design.model_dump(),
-                dependency_files={p: c for p, c in state.build_state.completed_files.items() if p in dep_paths}
-                or None,
+                dependency_files={p: c for p, c in state.build_state.completed_files.items() if p in dep_paths} or None,
                 other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
@@ -353,9 +350,9 @@ class ExecuteAgent(BaseAgent):
     async def _typecheck(self, state: ExecutionState) -> str:
         """Run TypeScript typecheck."""
         result = await state.sandbox_ref.run_build_command("npx tsc --noEmit")
-        return result.errors
+        return str(result.errors)
 
     async def _build(self, state: ExecutionState) -> str:
         """Run build command."""
         result = await state.sandbox_ref.run_build_command("pnpm build")
-        return result.errors
+        return str(result.errors)
