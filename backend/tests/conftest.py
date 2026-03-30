@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import flow44.config
 import flow44.db.database
-from flow44.config import Settings
 from flow44.db.database import get_engine, init_db, reset
 
 
@@ -20,12 +19,9 @@ def tmp_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
-async def setup_test_db(tmp_path_factory: pytest.TempPathFactory):
+async def setup_test_db():
     """Session-scoped: create engine and tables once for all tests."""
-    db_path = tmp_path_factory.mktemp("db") / "test.db"
-    os.environ["AIB_DATABASE_URL"] = f"sqlite:///{db_path}"
 
-    flow44.config.settings = Settings()
     await reset()
     await init_db()
     
@@ -34,10 +30,9 @@ async def setup_test_db(tmp_path_factory: pytest.TempPathFactory):
     async with get_engine().begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
-    yield db_path
+    yield
 
     await reset()
-    db_path.unlink(missing_ok=True)
 
 
 @pytest.fixture
