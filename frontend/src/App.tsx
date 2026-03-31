@@ -12,6 +12,7 @@ import { pollFileTree } from './utils/pollFileTree';
 import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
+import { authSession, PopupBlockedError } from './auth';
 
 function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
@@ -62,6 +63,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const [checkingBackend, setCheckingBackend] = useState(true);
+  const [authState, setAuthState] = useState<'loading' | 'ready' | 'needs_sign_in' | 'error'>('loading');
+  const [authError, setAuthError] = useState<string | null>(null);
   const hasCache = hasProjectsCache();
 
   const selectProject = useCallback((project: typeof projects[number]) => {
@@ -72,17 +75,45 @@ export default function App() {
     loadFileTree();
   }, [setCurrentProject, resetFiles, loadHistory, loadFileTree]);
 
-  // Initialize data source token on mount
+  // Bootstrap auth session on mount
   useEffect(() => {
-    // TODO: remove this when real Flapi auth was added
-    // Set default data source API token if not already set
-    if (!window.localStorage.getItem('flowbolt.dataSourceApiToken')) {
-      window.localStorage.setItem('flowbolt.dataSourceApiToken', 'maz-default-value');
-    }
+    let cancelled = false;
+    authSession
+      .bootstrap()
+      .then((result) => {
+        if (cancelled) return;
+        setAuthState(result === 'ready' ? 'ready' : 'needs_sign_in');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Auth bootstrap failed:', err);
+        setAuthState('error');
+        setAuthError(err instanceof Error ? err.message : 'Authentication failed');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Check backend availability on mount
+  // Handle interactive sign-in
+  const handleSignIn = async () => {
+    try {
+      setAuthError(null);
+      await authSession.signIn();
+      setAuthState('ready');
+    } catch (err) {
+      console.error('Sign in failed:', err);
+      if (err instanceof PopupBlockedError) {
+        setAuthError('Popup was blocked. Please allow popups and try again.');
+      } else {
+        setAuthError(err instanceof Error ? err.message : 'Sign in failed');
+      }
+    }
+  };
+
+  // Check backend availability on mount (only after auth is ready)
   useEffect(() => {
+    if (authState !== 'ready') return;
     async function checkBackend() {
       const isAvailable = await api.checkBackendHealth();
       setBackendAvailable(isAvailable);
@@ -96,9 +127,10 @@ export default function App() {
       }
     }
     checkBackend();
-  }, [t]);
+  }, [t, authState]);
 
   useEffect(() => {
+    if (authState !== 'ready') return;
     loadProjects()
       .then(() => {
         const hasProjects = useSessionStore.getState().projects.length > 0;
@@ -113,7 +145,7 @@ export default function App() {
         });
       })
       .finally(() => setLoading(false));
-  }, [loadProjects, t]);
+  }, [loadProjects, t, authState]);
 
   // On load: match URL hash to a project, or auto-select first
   useEffect(() => {
@@ -177,6 +209,95 @@ export default function App() {
       pollFileTree();
     }
   };
+
+  // Auth loading
+  if (authState === 'loading') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
+        <FlowBrand size="lg" />
+        <Loader2 size={20} className="animate-spin text-[#2bbcc4]" />
+      </div>
+    );
+  }
+
+  // Auth error
+  if (authState === 'error') {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        gap: '16px',
+      }}>
+        <FlowBrand size="lg" />
+        <div style={{
+          padding: '16px 24px',
+          background: 'var(--surface)',
+          border: '2px solid var(--danger)',
+          borderRadius: '8px',
+          maxWidth: '500px',
+          textAlign: 'center',
+        }}>
+          <p style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' }}>
+            Authentication Error
+          </p>
+          <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>
+            {authError || 'Failed to initialize authentication'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Need to sign in
+  if (authState === 'needs_sign_in') {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        gap: '16px',
+      }}>
+        <FlowBrand size="lg" />
+        <p style={{ color: 'var(--text-dim)', marginBottom: '8px' }}>
+          Sign in to continue
+        </p>
+        {authError && (
+          <div style={{
+            padding: '12px 16px',
+            background: 'var(--danger-dim)',
+            border: '1px solid var(--danger)',
+            borderRadius: '6px',
+            maxWidth: '400px',
+            textAlign: 'center',
+            marginBottom: '8px',
+          }}>
+            <p style={{ color: 'var(--danger)', fontSize: '14px' }}>
+              {authError}
+            </p>
+          </div>
+        )}
+        <button
+          onClick={handleSignIn}
+          style={{
+            padding: '10px 24px',
+            background: 'var(--accent)',
+            color: 'var(--bg)',
+            borderRadius: '6px',
+            fontWeight: 600,
+            fontSize: '16px',
+            cursor: 'pointer',
+          }}
+        >
+          Sign In
+        </button>
+      </div>
+    );
+  }
 
   // Only show loading screen if no cache exists
   if ((loading || checkingBackend) && !hasCache) {
