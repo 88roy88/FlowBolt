@@ -14,8 +14,8 @@ def build_db_url(config: flow44.config.Settings, async_db: bool) -> str:
         adapter = "sqlite+aiosqlite" if async_db else "sqlite"
         return f"{adapter}:///{config.DB_NAME}"
 
-    # Postgres: use asyncpg for async, psycopg2 for sync (per user's hint)
-    db_adapter = "postgresql+asyncpg" if async_db else "postgresql+psycopg2"
+    # Postgres: use asyncpg (we only use async connections)
+    db_adapter = "postgresql+asyncpg" if async_db else "postgresql"
     url = f"{db_adapter}://{config.DB_USER}:{config.DB_PASSWORD}@{config.DB_HOST}:{config.DB_PORT}"
     if config.DB_NAME:
         url += f"/{config.DB_NAME}"
@@ -44,7 +44,7 @@ def get_engine(url: str | None = None) -> AsyncEngine:
 
     eng = create_async_engine(async_url, echo=False, **kwargs)
 
-    # TODO: this is specific for SQLite, remove when migrating to Postgres
+    # Enable foreign keys for SQLite (SQLite-specific pragma)
     @event.listens_for(eng.sync_engine, "connect")
     def _enable_foreign_keys(dbapi_conn: Any, _connection_record: Any) -> None:
         if eng.dialect.name == "sqlite":

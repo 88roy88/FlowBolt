@@ -76,7 +76,7 @@ class FlapiClient:
     async def get_display_name(self, data_source_id: int | str, *, authorization: str | None = None) -> str:
         results = await self.search(str(data_source_id), authorization=authorization)
         if not results or not isinstance(results[0], dict) or "Name" not in results[0]:
-            raise LookupError("Failed To get display name for data source %s: not found", data_source_id)
+            raise LookupError("Failed to get display name for data source %s: not found", data_source_id)
         name: str = results[0]["Name"].strip()
         return name
 

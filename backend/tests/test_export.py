@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from flow44.main import app
 from flow44.config import settings
+from flow44.main import app
 
 client = TestClient(app)
 

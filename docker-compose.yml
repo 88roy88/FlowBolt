@@ -28,7 +28,12 @@ services:
       - ./backend/.env
     environment:
       - AIB_WORKSPACE_BASE_DIR=/var/lib/ai-builder/workspaces
-      - AIB_DATABASE_URL=sqlite:////app/data/ai_builder.db
+      - AIB_DB_SCHEME=postgresql
+      - AIB_DB_NAME=flowbolt
+      - AIB_DB_USER=postgres
+      - AIB_DB_PASSWORD=postgres
+      - AIB_DB_HOST=postgres
+      - AIB_DB_PORT=5432
       - AIB_FLAPI_BASE_URL=http://cases-mock:4000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

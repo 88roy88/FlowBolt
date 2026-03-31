@@ -14,7 +14,6 @@ dependencies = [
     "jinja2>=3.1.0",
     "langfuse==2.59.7",
     "litellm>=1.55.10,<1.82.3",
-    "psycopg2-binary>=2.9.11",
     "pydantic-settings>=2.7.1",
     "python-multipart>=0.0.19",
     "pywinpty>=2.0.0; sys_platform == 'win32'",

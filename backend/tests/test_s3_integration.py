@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from flow44.integrations.s3 import connect_to_s3, setup_bucket, deploy_single_html
+
+import pytest
+
 from flow44.config import settings
+from flow44.integrations.s3 import connect_to_s3, deploy_single_html, setup_bucket
 
 
 @pytest.fixture(autouse=True)
