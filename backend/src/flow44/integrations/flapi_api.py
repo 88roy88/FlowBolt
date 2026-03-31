@@ -25,16 +25,29 @@ class FlapiClient:
         )
 
     @staticmethod
-    def _auth_header(authorization: str | None) -> dict[str, str]:
+    def _build_auth_header(authorization: str | None) -> dict[str, str]:
+        """Build Authorization header for FLAPI requests.
+
+        Adds "Bearer " prefix to raw tokens from SSO if not already present.
+        """
         token = (authorization.strip() or None) if authorization else None
-        return {"Authorization": token} if token else {}
+        if not token:
+            return {}
+        # Add "Bearer " prefix if not already present
+        if not token.lower().startswith("bearer "):
+            token = f"Bearer {token}"
+        return {"Authorization": token}
 
     async def _request(self, method: str, path: str, *, authorization: str | None = None, **kwargs: Any) -> Any:
         try:
-            resp = await self._http.request(method, path, headers=self._auth_header(authorization), **kwargs)
+            resp = await self._http.request(method, path, headers=self._build_auth_header(authorization), **kwargs)
         except httpx.HTTPError as exc:
             logger.warning("FLAPI %s %s failed: %s", method, path, exc)
-            raise FlapiUpstreamError("FLAPI unreachable") from exc
+            hint = (
+                f"Cannot connect to FLAPI at {self.base_url} ({type(exc).__name__}: {exc}). "
+                "For local dev, start the mock: cd mocks/flapi-mock && pnpm start (port 6001 by default)."
+            )
+            raise FlapiUpstreamError(hint) from exc
 
         if resp.status_code >= 400:
             raise FlapiUpstreamError(f"FLAPI error ({resp.status_code})", status_code=resp.status_code)

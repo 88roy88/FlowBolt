@@ -15,6 +15,7 @@ dependencies = [
     "langfuse==2.59.7",     # using langfuse 2.59.7 compatible with litellm
     "litellm>=1.55.10,<1.82.3",
     "pydantic-settings>=2.7.1",
+    "pyjwt>=2.12.1",
     "python-multipart>=0.0.19",
     "pywinpty>=2.0.0; sys_platform == 'win32'",
     "sqlmodel>=0.0.37",
