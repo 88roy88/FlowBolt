@@ -1,7 +1,8 @@
+import time
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, Header, WebSocket
+from fastapi import Depends, Header, HTTPException, WebSocket
 
 from flow44.config import settings
 from flow44.sandbox.main import PnpmSandbox
@@ -44,11 +45,8 @@ def get_authorization(authorization: str | None = Header(None, alias="Authorizat
             else:
                 payload = jwt.decode(token, options={"verify_signature": False})
 
-            if not settings.AUTH_JWT_SECRET and "exp" in payload:
-                import time
-
-                if payload["exp"] < time.time():
-                    raise HTTPException(status_code=401, detail="Token expired")
+            if not settings.AUTH_JWT_SECRET and "exp" in payload and payload["exp"] < time.time():
+                raise HTTPException(status_code=401, detail="Token expired")
 
         except jwt.ExpiredSignatureError:
             raise HTTPException(status_code=401, detail="Token expired") from None

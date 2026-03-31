@@ -9,19 +9,25 @@ from flow44.integrations.flapi_api import FlapiClient
 
 class TestAuthHeader:
     def test_none(self) -> None:
-        assert FlapiClient._auth_header(None) == {}
+        assert FlapiClient._build_auth_header(None) == {}
 
     def test_empty(self) -> None:
-        assert FlapiClient._auth_header("") == {}
+        assert FlapiClient._build_auth_header("") == {}
 
     def test_whitespace_only(self) -> None:
-        assert FlapiClient._auth_header("   ") == {}
+        assert FlapiClient._build_auth_header("   ") == {}
 
     def test_valid_token(self) -> None:
-        assert FlapiClient._auth_header("Bearer abc") == {"Authorization": "Bearer abc"}
+        assert FlapiClient._build_auth_header("Bearer abc") == {"Authorization": "Bearer abc"}
 
     def test_strips_whitespace(self) -> None:
-        assert FlapiClient._auth_header("  admin  ") == {"Authorization": "admin"}
+        assert FlapiClient._build_auth_header("  admin  ") == {"Authorization": "Bearer admin"}
+
+    def test_adds_bearer_prefix(self) -> None:
+        assert FlapiClient._build_auth_header("raw-token") == {"Authorization": "Bearer raw-token"}
+
+    def test_bearer_prefix_case_insensitive(self) -> None:
+        assert FlapiClient._build_auth_header("BEARER token") == {"Authorization": "BEARER token"}
 
 
 class TestGetDisplayName:
