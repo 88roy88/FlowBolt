@@ -21,6 +21,7 @@ from sqlmodel import SQLModel
 
 import flow44.db.chat  # noqa
 import flow44.db.events  # noqa
+import flow44.db.pending_plan  # noqa
 import flow44.db.project  # noqa
 
 target_metadata = SQLModel.metadata
