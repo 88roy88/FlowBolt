@@ -29,6 +29,8 @@ export const test = base.extend<{
           for (const k of Object.keys(localStorage)) {
             if (k.startsWith('project-has-messages:')) localStorage.removeItem(k);
           }
+          // Seed auth token so tests skip the sign-in screen
+          localStorage.setItem('Auth', JSON.stringify({ auth_token: 'e2e-test-token' }));
         } catch {
           /* ignore */
         }
