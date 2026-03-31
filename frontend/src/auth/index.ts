@@ -2,7 +2,7 @@
  * Authentication module - production only, no mock code.
  *
  * For local development:
- * - Set VITE_AUTH_PROVIDER_URL=http://localhost:6000/sso in .env
+ * - Set VITE_AUTH_PROVIDER_URL=http://localhost:6001/sso in .env
  * - Start mock server: cd mocks/cases-mock && pnpm start
  */
 
