@@ -75,7 +75,6 @@ export default function App() {
     loadFileTree();
   }, [setCurrentProject, resetFiles, loadHistory, loadFileTree]);
 
-  // Bootstrap auth session on mount
   useEffect(() => {
     let cancelled = false;
     authSession
@@ -95,7 +94,6 @@ export default function App() {
     };
   }, []);
 
-  // Handle interactive sign-in
   const handleSignIn = async () => {
     try {
       setAuthError(null);
@@ -111,9 +109,7 @@ export default function App() {
     }
   };
 
-  // Check backend availability on mount (only after auth is ready)
   useEffect(() => {
-    if (authState !== 'ready') return;
     async function checkBackend() {
       const isAvailable = await api.checkBackendHealth();
       setBackendAvailable(isAvailable);
@@ -127,7 +123,7 @@ export default function App() {
       }
     }
     checkBackend();
-  }, [t, authState]);
+  }, [t]);
 
   useEffect(() => {
     if (authState !== 'ready') return;

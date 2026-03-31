@@ -1,14 +1,5 @@
-/**
- * Credentials storage in localStorage.
- *
- * Stores the full AuthCredentials JSON blob. Only auth_token is used for requests.
- */
-
 import { authConfig } from './config';
 import type { AuthCredentials } from './types';
-
-/** Legacy token key from older builds - migrated once into authConfig.storageKey */
-const LEGACY_TOKEN_KEY = 'flowbolt.dataSourceApiToken';
 
 function parseStoredCredentials(raw: string): AuthCredentials | null {
   try {
@@ -32,23 +23,7 @@ function parseExpiryTimestamp(creds: AuthCredentials): number | null {
   return null;
 }
 
-function migrateLegacyToken(): AuthCredentials | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const legacy = window.localStorage.getItem(LEGACY_TOKEN_KEY)?.trim();
-    if (!legacy) return null;
-
-    const creds: AuthCredentials = { auth_token: legacy };
-    window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds));
-    window.localStorage.removeItem(LEGACY_TOKEN_KEY);
-    return creds;
-  } catch {
-    return null;
-  }
-}
-
 export const credentialsStore = {
-  /** Read stored credentials from localStorage */
   read(): AuthCredentials | null {
     if (typeof window === 'undefined') return null;
     try {
@@ -57,41 +32,28 @@ export const credentialsStore = {
         const parsed = parseStoredCredentials(raw);
         if (parsed?.auth_token) return parsed;
       }
-      return migrateLegacyToken();
+      return null;
     } catch {
       return null;
     }
   },
 
-  /** Save credentials to localStorage */
   save(credentials: AuthCredentials): void {
     try {
       window.localStorage.setItem(authConfig.storageKey, JSON.stringify(credentials));
-      try {
-        window.localStorage.removeItem(LEGACY_TOKEN_KEY);
-      } catch {
-        /* ignore */
-      }
     } catch {
       throw new Error('Failed to persist auth credentials');
     }
   },
 
-  /** Clear stored credentials */
   clear(): void {
     try {
       window.localStorage.removeItem(authConfig.storageKey);
-      window.localStorage.removeItem(LEGACY_TOKEN_KEY);
     } catch {
       /* ignore */
     }
   },
 
-  /**
-   * Get the access token if valid (not expired).
-   *
-   * This is the only value sent to the backend via Authorization header.
-   */
   getValidToken(): string | undefined {
     if (typeof window === 'undefined') return undefined;
     try {

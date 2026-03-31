@@ -141,10 +141,9 @@ export async function publishToS3(projectId: string): Promise<{ url: string }> {
 
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    await request<Project[]>('/projects');
-    return true;
-  } catch (error) {
-    console.error('Backend health check failed:', error);
+    const res = await fetch('/health');
+    return res.ok;
+  } catch {
     return false;
   }
 }

@@ -1,10 +1,3 @@
-/**
- * Popup-based SSO authenticator.
- *
- * Opens a popup window and polls for credentials via postMessage.
- * MUST be called from a user gesture (click) to avoid popup blockers.
- */
-
 import type { AuthConfig } from './config';
 import type { AuthCredentials } from './types';
 import { extractCredentials, isCredentialsMessage } from './types';
@@ -21,11 +14,6 @@ export class PopupBlockedError extends Error {
 export class PopupAuthenticator {
   constructor(private readonly config: AuthConfig) {}
 
-  /**
-   * Acquire credentials via popup + postMessage flow.
-   *
-   * MUST be called from a user gesture (e.g., button click) or popup will be blocked.
-   */
   async acquireCredentials(): Promise<AuthCredentials> {
     if (!this.config.providerUrl) {
       throw new Error(
