@@ -7,10 +7,30 @@
 import { test, expect } from './fixtures';
 import { MOCK_PROJECT } from './mocks/data';
 
+function isProjectsListGet(url: string): boolean {
+  try {
+    return new URL(url).pathname === '/api/projects';
+  } catch {
+    return false;
+  }
+}
+
+/** Home navigation + wait until the app has fetched projects (avoids white-screen races under parallel load). */
+async function gotoHomeReady(page: import('@playwright/test').Page) {
+  const projectsList = page.waitForResponse(
+    (r) => r.request().method() === 'GET' && isProjectsListGet(r.url()) && r.ok(),
+    { timeout: 60_000 }
+  );
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await projectsList;
+}
+
 /** Wait for projects to load, expand sidebar if collapsed. */
 async function ensureSidebar(page: import('@playwright/test').Page) {
-  // Wait for the project avatar button (visible even when collapsed)
-  await expect(page.getByRole('button', { name: 'ET' })).toBeVisible({ timeout: 10_000 });
+  // Icon rail uses a button with initials; full sidebar uses a non-button row.
+  const rail = page.getByRole('button', { name: 'ET' });
+  const row = page.getByTestId(`project-item-${MOCK_PROJECT.id}`);
+  await expect(rail.or(row)).toBeVisible({ timeout: 30_000 });
   // Expand if collapsed
   const expandBtn = page.getByRole('button', { name: 'Expand sidebar' });
   if (await expandBtn.isVisible()) {
@@ -20,8 +40,10 @@ async function ensureSidebar(page: import('@playwright/test').Page) {
 }
 
 test.describe('Happy path', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test('app loads and shows project in sidebar', async ({ page }) => {
-    await page.goto('/');
+    await gotoHomeReady(page);
     await ensureSidebar(page);
     await expect(page.getByText(MOCK_PROJECT.name)).toBeAttached();
   });
@@ -40,7 +62,7 @@ test.describe('Happy path', () => {
   });
 
   test('chat input is functional', async ({ page }) => {
-    await page.goto('/');
+    await gotoHomeReady(page);
     await ensureSidebar(page);
 
     // The chat textarea should be ready
@@ -57,14 +79,14 @@ test.describe('Happy path', () => {
   });
 
   test('model selector shows mock model', async ({ page }) => {
-    await page.goto('/');
+    await gotoHomeReady(page);
     // The model selector should display our mock model
-    await expect(page.getByText('Test Model')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Test Model')).toBeVisible({ timeout: 30_000 });
   });
 
   test('suggestion buttons are visible', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('button', { name: /todo app/i })).toBeVisible({ timeout: 10_000 });
+    await gotoHomeReady(page);
+    await expect(page.getByRole('button', { name: /todo app/i })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: /dashboard/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /landing page/i })).toBeVisible();
   });

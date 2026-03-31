@@ -8,12 +8,14 @@ passthrough — no response rewriting required.
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 
-from flow44.sandbox.manager import sandbox_manager
+from flow44.api.deps import SandboxDep, get_ws_sandbox
+from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +23,8 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 
 @router.get("/{project_id}/port")
-async def get_preview_port(project_id: str) -> dict[str, str | int]:
+async def get_preview_port(project_id: str, sandbox: Annotated[PnpmSandbox, SandboxDep]) -> dict[str, str | int]:
     """Return the allocated port for the sandbox's dev server."""
-    sandbox = sandbox_manager.get_sandbox(project_id)
-    if sandbox is None:
-        raise HTTPException(status_code=404, detail="No sandbox found for this session")
     return {"project_id": project_id, "port": sandbox.port}
 
 
@@ -38,15 +37,14 @@ async def get_preview_port(project_id: str) -> dict[str, str | int]:
     "/{project_id}/proxy/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
-async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Response:
+async def proxy_to_sandbox(  # noqa: E501
+    project_id: str, path: str, request: Request, sandbox: Annotated[PnpmSandbox, SandboxDep]
+) -> Response:
     """Reverse proxy requests to the sandbox's dev server.
 
     Vite serves content under its ``base`` path, so the proxy forwards the
     full prefixed path to the upstream server.
     """
-    sandbox = sandbox_manager.get_sandbox(project_id)
-    if sandbox is None:
-        raise HTTPException(status_code=404, detail="No sandbox found for this session")
 
     proxy_prefix = f"/api/preview/{project_id}/proxy"
     target_url = f"http://127.0.0.1:{sandbox.port}{proxy_prefix}/{path}"
@@ -102,9 +100,8 @@ async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Resp
 @router.websocket("/{project_id}/proxy")
 async def proxy_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
     """Proxy WebSocket connections for Vite HMR."""
-    sandbox = sandbox_manager.get_sandbox(project_id)
+    sandbox = await get_ws_sandbox(websocket, project_id)
     if sandbox is None:
-        await websocket.close(code=1008, reason="No sandbox")
         return
 
     await websocket.accept()

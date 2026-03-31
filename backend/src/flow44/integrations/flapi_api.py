@@ -21,7 +21,7 @@ class FlapiClient:
         self._http = httpx.AsyncClient(
             base_url=self.base_url.rstrip("/"),
             timeout=timeout_s,
-            verify=settings.VERIFY_FLAPI_SSL,
+            verify=settings.FLAPI_VERIFY_SSL,
         )
 
     @staticmethod

@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import litellm
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from langfuse import Langfuse
+from fastapi.responses import JSONResponse
 
 from flow44.api import (
     chat,
@@ -27,8 +26,9 @@ from flow44.api import (
 )
 from flow44.config import settings
 from flow44.db.database import init_db
+from flow44.db.project import list_projects
 from flow44.integrations.s3 import setup_bucket
-from flow44.sandbox.manager import sandbox_manager
+from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -36,39 +36,30 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application lifespan: initialise DB on startup, clean up sandboxes on shutdown."""
-    # Langfuse observability (optional) — using langfuse 2.59.7 (compatible with litellm)
-    if settings.LANGFUSE_PUBLIC_KEY:
-        os.environ["LANGFUSE_PUBLIC_KEY"] = settings.LANGFUSE_PUBLIC_KEY
-        os.environ["LANGFUSE_SECRET_KEY"] = settings.LANGFUSE_SECRET_KEY
-        os.environ["LANGFUSE_HOST"] = settings.LANGFUSE_HOST
-
-        # Initialize Langfuse client for decorator usage
-        Langfuse()
-
-        # Set langfuse as a callback, litellm will send the data to langfuse
+    if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
+        # Credentials already in os.environ via LangfuseSettings.model_post_init
         litellm.success_callback = ["langfuse"]
         litellm.failure_callback = ["langfuse"]
-        logger.info("Langfuse tracing enabled (host=%s)", settings.LANGFUSE_HOST)
+        logger.info("Langfuse tracing enabled")
     else:
-        logger.info("Langfuse tracing disabled (no LANGFUSE_PUBLIC_KEY set)")
+        logger.info("Langfuse tracing not enabled (missing keys)")
 
     logger.info("Initialising database...")
     await init_db()
     logger.info("Database ready.")
 
     logger.info("Restoring existing sandbox workspaces...")
-    from flow44.db.project import list_projects  # noqa: PLC0415
 
     live_projects = await list_projects()
 
     live_project_ids = {p.id for p in live_projects}
-    await sandbox_manager.restore_existing_workspaces(live_project_ids)
+    await sandbox_manager.reconcile_workspaces(live_project_ids)
     logger.info("Sandbox restoration complete.")
 
     if settings.S3_BUCKET_NAME:
         logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
         try:
+            # TODO: if we keep this here, we should add check_bucket_exists and only call create if not.
             setup_bucket(settings.S3_BUCKET_NAME)
             logger.info("S3 bucket setup complete.")
         except Exception as exc:
@@ -91,6 +82,11 @@ app = FastAPI(
 async def health_check() -> dict[str, str]:
     """Health check endpoint for Docker/K8s."""
     return {"status": "ok", "version": "0.1.0"}
+
+
+@app.exception_handler(SandboxNotFoundError)
+async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 # CORS — allow all origins in development

@@ -8,7 +8,7 @@ import os
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.sandbox.manager import sandbox_manager
+from flow44.api.deps import get_ws_sandbox
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,8 @@ async def server_log_ws(websocket: WebSocket, project_id: str) -> None:  # noqa:
     Reads the file in binary mode so ANSI color codes are preserved.
     The xterm frontend renders them natively.
     """
-    sandbox = sandbox_manager.get_sandbox(project_id)
+    sandbox = await get_ws_sandbox(websocket, project_id)
     if sandbox is None:
-        await websocket.close(code=1008, reason="No sandbox")
         return
 
     log_path = os.path.join(sandbox.workspace_dir, ".dev-server.log")

@@ -1,15 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageSquare, Code2, Eye, Globe, Loader2 } from 'lucide-react';
+import { MessageSquare, Code2, Eye } from 'lucide-react';
 import { Resizer } from './Resizer';
 import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
-import { useSessionStore } from '../../stores/session';
-import { publishToS3 } from '../../services/api';
-import { PublishModal } from '../ui/PublishModal';
-import { ExternalLink } from 'lucide-react';
 
 type PaneId = 'chat' | 'code' | 'preview';
 
@@ -48,32 +44,10 @@ export function FlexibleLayout() {
   const [paneSizes, setPaneSizes] = useState<Record<PaneId, number>>(initial.sizes);
   const panesContainerRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
-  const projectId = useSessionStore((s) => s.projectId);
-  const currentProject = useSessionStore((s) => s.currentProject);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
-  
+
   const messages = useChatStore((s) => s.messages);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
   const isNewProject = !historyLoaded || messages.length === 0;
-  const isPublished = !!currentProject?.published_url;
-
-  const handlePublish = useCallback(async () => {
-    if (!projectId || isPublishing) return;
-    setIsPublishing(true);
-    try {
-      const result = await publishToS3(projectId);
-      const current = useSessionStore.getState().currentProject;
-      if (current) {
-        useSessionStore.getState().setProjectPublishedUrl(current.id, result.url);
-      }
-      setPublishModalState({ open: true, url: result.url });
-    } catch (err) {
-      setPublishModalState({ open: true, error: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [projectId, isPublishing]);
 
   const togglePane = (pane: PaneId) => {
     setVisiblePanes(prev => {
@@ -180,41 +154,7 @@ export function FlexibleLayout() {
             </button>
           );
         })}
-
-        <div className="w-9 h-px bg-border/40 my-1 mx-auto" />
-
-        {isPublished && projectId && (
-          <a
-            title={t('preview.viewPublishedApp')}
-            href={`/api/export/${projectId}/published`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 text-secondary-foreground bg-secondary/70 hover:bg-secondary/90 shadow-sm"
-          >
-            <ExternalLink size={16} />
-          </a>
-        )}
-
-        <button
-          title={isPublished ? "Republish" : "Publish to S3"}
-          disabled={!projectId || isPublishing}
-          onClick={handlePublish}
-          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 ${
-            projectId && !isPublishing
-              ? 'text-primary bg-primary/10 hover:bg-primary hover:text-primary-foreground shadow-sm cursor-pointer'
-              : 'text-muted-foreground/30 bg-muted/20 cursor-not-allowed'
-          }`}
-        >
-          {isPublishing ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
-        </button>
       </div>
-      
-      <PublishModal 
-        open={publishModalState.open} 
-        onOpenChange={(open) => setPublishModalState(s => ({ ...s, open }))}
-        url={publishModalState.url}
-        errorMessage={publishModalState.error}
-      />
     </div>
   );
 }

@@ -97,30 +97,55 @@ def _fetch_bedrock_models() -> list[dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 
-def _fetch_ollama_models() -> list[dict[str, str]]:
-    """Query the local Ollama instance for available models."""
-    url = f"{settings.OLLAMA_BASE_URL}/api/tags"
+def _fetch_models_from_base_url() -> list[dict[str, str]]:
+    """Query AI_BASE_URL/models endpoint for available models (OpenAI-compatible)."""
+    if not settings.AI_BASE_URL or not settings.AI_API_KEY:
+        return []
+
+    # Construct the /models endpoint URL
+    base_url = settings.AI_BASE_URL.rstrip("/")
+    models_url = f"{base_url}/models"
+
+    # Extract provider name from hostname (e.g., "openrouter.ai" -> "openrouter")
     try:
-        resp = httpx.get(url, timeout=5)
+        from urllib.parse import urlparse  # noqa: PLC0415
+
+        parsed = urlparse(base_url)
+        hostname = parsed.hostname or "custom"
+        provider_name = hostname.split(".")[0] if "." in hostname else hostname
+    except Exception:
+        provider_name = "custom"
+
+    try:
+        headers = {"Authorization": f"Bearer {settings.AI_API_KEY}"}
+        resp = httpx.get(models_url, headers=headers, timeout=10)
         resp.raise_for_status()
         data = resp.json()
+
         models: list[dict[str, str]] = []
-        for entry in data.get("models", []):
-            name: str = entry.get("name", "")
-            if not name:
+        for entry in data.get("data", []):
+            model_id: str = entry.get("id", "")
+            if not model_id:
                 continue
+
+            # Extract friendly name if available, otherwise use ID
+            name = entry.get("name", model_id)
+
+            # Prepend openai/ for OpenAI-compatible models (testing if this works with api_base)
+            full_model_id = f"openai/{model_id}"
+
             models.append(
                 {
-                    "id": f"ollama/{name}",
-                    "name": f"ollama/{name}",
-                    "provider": "ollama",
+                    "id": full_model_id,
+                    "name": name,
+                    "provider": provider_name,
                 }
             )
+
+        logger.info("Fetched %d models from %s", len(models), models_url)
         return models
     except Exception:
-        logger.warning(
-            "Failed to list Ollama models (is Ollama running at %s?)", settings.OLLAMA_BASE_URL, exc_info=True
-        )
+        logger.warning("Failed to list models from %s (check AI_BASE_URL and AI_API_KEY)", models_url, exc_info=True)
         return []
 
 
@@ -158,9 +183,13 @@ def _get_openrouter_models() -> list[dict[str, str]]:
 def _refresh_models() -> list[dict[str, str]]:
     """Fetch models from all providers and update the cache."""
     all_models: list[dict[str, str]] = []
-    # all_models.extend(_fetch_bedrock_models())
-    # all_models.extend(_fetch_ollama_models())
-    # all_models.extend(_get_openrouter_models())
+
+    # If using Bedrock, fetch Bedrock models; otherwise fetch from AI_BASE_URL
+    if settings.AI_MODEL.startswith("bedrock"):
+        all_models.extend(_fetch_bedrock_models())
+    else:
+        all_models.extend(_fetch_models_from_base_url())
+
     _cache["models"] = all_models
     _cache["ts"] = time.monotonic()
     return all_models

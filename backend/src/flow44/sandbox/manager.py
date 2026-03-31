@@ -1,36 +1,31 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 import os
 import shutil
-import signal
 import socket
 
 from flow44.config import settings
-from flow44.sandbox.base import Sandbox, SandboxInfo
+from flow44.sandbox.base import SandboxInfo
+from flow44.sandbox.main import PnpmSandbox, PnpmSandboxNamespace, PnpmSandboxUnix, PnpmSandboxWindows
 
 logger = logging.getLogger(__name__)
 
 
-def stamp_vite_config(project_id: str, workspace_dir: str) -> None:
-    """Read vite.config.ts from the template and replace the project ID placeholder."""
-    template_path = os.path.join(settings.TEMPLATE_DIR, "vite.config.ts")
-    with open(template_path, encoding="utf-8") as f:
-        content = f.read()
-    dest_path = os.path.join(workspace_dir, "vite.config.ts")
-    with open(dest_path, "w", encoding="utf-8") as f:
-        f.write(content.replace("{{PROJECT_ID}}", project_id))
+class SandboxError(Exception):
+    pass
+
+
+class SandboxNotFoundError(SandboxError):
+    pass
 
 
 class SandboxManager:
     def __init__(self) -> None:
-        self._sandboxes: dict[str, Sandbox] = {}
+        self._sandboxes: dict[str, PnpmSandbox] = {}
         self._available_ports: set[int] = set(
             range(settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END + 1)
         )
         self._lock = asyncio.Lock()
-        self._ensure_pnpm_store()
 
     @staticmethod
     def _port_is_available(port: int) -> bool:
@@ -52,33 +47,18 @@ class SandboxManager:
         raise RuntimeError("No available ports in the sandbox pool")
 
     @staticmethod
-    def _ensure_pnpm_store() -> None:
-        if settings.SANDBOX_MODE != "namespaced":
-            return
-        try:
-            os.makedirs(settings.PNPM_STORE_DIR, exist_ok=True)
-        except OSError:
-            logger.warning("Could not create pnpm store dir: %s", settings.PNPM_STORE_DIR)
-
-    def _create_sandbox_instance(self, info: SandboxInfo) -> Sandbox:
-        # TODO: why the imports are here and not top level?
+    def _get_sandbox_class() -> type[PnpmSandbox]:
         if settings.SANDBOX_MODE == "namespaced":
-            from flow44.sandbox.namespaced import NamespacedSandbox  # noqa: PLC0415
-
-            return NamespacedSandbox(info)
+            return PnpmSandboxNamespace
         if os.name == "nt":
-            from flow44.sandbox.windows_local import WindowsLocalSandbox  # noqa: PLC0415
+            return PnpmSandboxWindows
+        return PnpmSandboxUnix
 
-            return WindowsLocalSandbox(info)
-        from flow44.sandbox.local import LocalSandbox  # noqa: PLC0415
+    def _create_sandbox_instance(self, info: SandboxInfo) -> PnpmSandbox:
+        return self._get_sandbox_class()(info)
 
-        return LocalSandbox(info)
-
-    async def create_sandbox(self, project_id: str) -> Sandbox:
+    async def create_sandbox(self, project_id: str) -> PnpmSandbox:
         async with self._lock:
-            if project_id in self._sandboxes:
-                return self._sandboxes[project_id]
-
             port = self._take_available_port()
 
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
@@ -102,85 +82,52 @@ class SandboxManager:
         async with self._lock:
             self._available_ports.add(sandbox.port)
 
-    def get_sandbox(self, project_id: str) -> Sandbox | None:
-        return self._sandboxes.get(project_id)
-
-    async def ensure_ready(self, project_id: str) -> Sandbox:
-        """Ensure sandbox exists, has template files, and dev server is running."""
-        sandbox = self.get_sandbox(project_id)
+    def get_sandbox(self, project_id: str) -> PnpmSandbox:
+        sandbox = self._sandboxes.get(project_id)
         if sandbox is None:
+            raise SandboxNotFoundError(f"No sandbox found for project_id {project_id}")
+        return sandbox
+
+    async def get_or_create_sandbox(self, project_id: str) -> PnpmSandbox:
+        try:
+            sandbox = self.get_sandbox(project_id)
+        except SandboxNotFoundError:
             sandbox = await self.create_sandbox(project_id)
-
-        package_json = os.path.join(sandbox.workspace_dir, "package.json")
-        if not os.path.isfile(package_json):  # noqa: ASYNC240
-            logger.info("Bootstrapping sandbox workspace for session %s", project_id)
-            shutil.copytree(settings.TEMPLATE_DIR, sandbox.workspace_dir, dirs_exist_ok=True)
-            stamp_vite_config(project_id, sandbox.workspace_dir)
-
-            async for line in sandbox.exec("pnpm install 2>&1"):
-                logger.info("[sandbox-bootstrap] %s", line.rstrip())
-
-        if not sandbox.dev_server_running():
-            logger.info("Starting sandbox dev server for session %s", project_id)
-            await sandbox.start_dev_server()
-
         return sandbox
 
     @staticmethod
-    def _kill_stale_dev_servers() -> None:  # noqa: C901
-        """Find orphan pnpm dev processes in our port range and kill them."""
-        import subprocess as _sp  # noqa: PLC0415
+    async def ensure_ready(sandbox: PnpmSandbox) -> None:
+        if not await sandbox.is_scaffolded():
+            await sandbox.scaffold(settings.TEMPLATE_DIR)
 
-        port_start = settings.SANDBOX_PORT_RANGE_START
-        port_end = settings.SANDBOX_PORT_RANGE_END
-        try:
-            result = _sp.run(  # noqa: PLW1510
-                ["pgrep", "-f", "pnpm dev --port"],  # noqa: S607
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode != 0:
-                return
-            for pid_str in result.stdout.strip().splitlines():
-                pid = int(pid_str.strip())
-                try:
-                    cmdline = _sp.run(  # noqa: PLW1510
-                        ["ps", "-p", str(pid), "-o", "args="],  # noqa: S607
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                    ).stdout.strip()
-                except Exception:  # noqa: S112
-                    continue
-                for part in cmdline.split():
-                    try:
-                        port = int(part)
-                        if port_start <= port <= port_end:
-                            try:
-                                os.killpg(os.getpgid(pid), signal.SIGTERM)
-                            except (ProcessLookupError, PermissionError, OSError):
-                                try:
-                                    os.kill(pid, signal.SIGTERM)
-                                except (ProcessLookupError, PermissionError):
-                                    pass
-                            logger.info("Killed stale dev server pid %d (port %d)", pid, port)
-                            break
-                    except ValueError:
-                        continue
-        except FileNotFoundError:
-            pass
-        except Exception:
-            logger.debug("Failed to clean stale dev servers", exc_info=True)
+        sandbox.configure_npmrc()
 
-    async def restore_existing_workspaces(self, live_project_ids: set[str]) -> None:  # noqa: C901
-        """Re-register sandboxes for workspaces that survived a restart.
+        if not sandbox.is_dev_server_running():
+            logger.info("Starting sandbox dev server for %s", sandbox.project_id)
+            await sandbox.start_dev_server()
 
-        Orphan directories (not in live_project_ids) are deleted.
+    async def reconcile_workspaces(self, live_project_ids: set[str]) -> None:
+        """Reconcile workspace state: restore live sandboxes, kill stale processes, delete orphans.
+
+        - Kills orphan dev server processes
+        - Deletes workspace directories not in live_project_ids
+        - Restores sandboxes for workspaces that survived restart
+        - Restarts dev servers for scaffolded sandboxes
         """
-        if os.name != "nt":
-            self._kill_stale_dev_servers()
+        port_start, port_end = settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END
+        self._kill_orphan_processes(port_start, port_end)
+        await self._restore_workspaces(live_project_ids)
+        await self._restart_dev_servers()
 
+    def _kill_orphan_processes(self, port_start: int, port_end: int) -> None:
+        """Kill any processes occupying the sandbox port range from a previous run."""
+        sandbox_cls = self._get_sandbox_class()
+        for pid, port in sandbox_cls.find_pids_in_port_range(port_start, port_end):
+            logger.info("Killing orphan process pid %d (port %d)", pid, port)
+            sandbox_cls.kill_pid(pid)
+
+    async def _restore_workspaces(self, live_project_ids: set[str]) -> None:
+        """Scan workspace base dir, delete orphans, restore live sandboxes."""
         base = settings.WORKSPACE_BASE_DIR
         if not os.path.isdir(base):  # noqa: ASYNC240
             return
@@ -199,25 +146,30 @@ class SandboxManager:
                 shutil.rmtree(workspace_dir, ignore_errors=True)
                 continue
 
-            async with self._lock:
-                if not self._available_ports:
-                    logger.warning("No ports left to restore sandbox %s", name)
-                    continue
-                try:
-                    port = self._take_available_port()
-                except RuntimeError:
-                    logger.warning("No free ports to restore sandbox %s", name)
-                    continue
+            await self._restore_one(name, workspace_dir)
 
-            info = SandboxInfo(project_id=name, workspace_dir=workspace_dir, port=port)
-            sandbox = self._create_sandbox_instance(info)
-            self._sandboxes[name] = sandbox
-            logger.info("Restored sandbox for session %s (port %d)", name, port)
+    async def _restore_one(self, project_id: str, workspace_dir: str) -> None:
+        """Restore a single sandbox from an existing workspace directory."""
+        async with self._lock:
+            if not self._available_ports:
+                logger.warning("No ports left to restore sandbox %s", project_id)
+                return
+            try:
+                port = self._take_available_port()
+            except RuntimeError:
+                logger.warning("No free ports to restore sandbox %s", project_id)
+                return
 
-        # Rewrite vite config (session-specific base path) and restart dev servers
-        for name, sandbox in self._sandboxes.items():
-            if os.path.isfile(os.path.join(sandbox.workspace_dir, "package.json")):  # noqa: ASYNC240
-                stamp_vite_config(name, sandbox.workspace_dir)
+        info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
+        sandbox = self._create_sandbox_instance(info)
+        self._sandboxes[project_id] = sandbox
+        logger.info("Restored sandbox for session %s (port %d)", project_id, port)
+
+    async def _restart_dev_servers(self) -> None:
+        """Re-stamp vite configs and restart dev servers for all scaffolded sandboxes."""
+        for sandbox in self._sandboxes.values():
+            if await sandbox.is_scaffolded():
+                sandbox._stamp_vite_config(settings.TEMPLATE_DIR)  # Re-stamp after restart
                 asyncio.create_task(sandbox.start_dev_server())
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:

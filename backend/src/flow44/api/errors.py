@@ -9,8 +9,8 @@ import os
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from flow44.api.deps import get_ws_sandbox
 from flow44.errors.parser import BuildError, is_error_line, parse_error_block, should_ignore, strip_ansi
-from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,8 @@ router = APIRouter()
 @router.websocket("/ws/errors/{project_id}")
 async def errors_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901, PLR0915
     """Watch ``.dev-server.log`` for error patterns and send structured events."""
-    sandbox = sandbox_manager.get_sandbox(project_id)
+    sandbox = await get_ws_sandbox(websocket, project_id)
     if sandbox is None:
-        await websocket.close(code=1008, reason="No sandbox")
         return
 
     log_path = os.path.join(sandbox.workspace_dir, ".dev-server.log")

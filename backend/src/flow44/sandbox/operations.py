@@ -1,3 +1,4 @@
+# Review TODO: rename this file. import it in the pnpm mixin and expose from there.
 from __future__ import annotations
 
 import base64
@@ -15,61 +16,6 @@ logger = logging.getLogger(__name__)
 
 class BuildError(Exception):
     """Raised when the build process fails."""
-
-
-@observe(name="build-single-html")  # type: ignore[untyped-decorator]
-async def build_single_html(project_id: str) -> str:
-    """Build the project and return a single self-contained HTML string."""
-    sandbox = sandbox_manager.get_sandbox(project_id)
-    if sandbox is None:
-        raise ValueError(f"No sandbox found for project {project_id}")
-
-    workspace_dir = sandbox.workspace_dir
-
-    # Write a temporary .env.production.local so vite picks up overrides
-    api_base = settings.EXPORT_API_BASE_URL
-    env_file = os.path.join(workspace_dir, ".env.production.local")
-    try:
-        with open(env_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
-            f.write(f"VITE_BASE=/\nVITE_API_BASE={api_base}\n")
-
-        build_output_lines: list[str] = []
-        async for line in sandbox.exec("pnpm build"):
-            build_output_lines.append(line)
-        build_output = "".join(build_output_lines)
-    finally:
-        try:
-            os.remove(env_file)
-        except OSError:
-            pass
-
-    dist_dir = os.path.join(workspace_dir, "dist")
-    index_path = os.path.join(dist_dir, "index.html")
-
-    if not os.path.isfile(index_path):  # noqa: ASYNC240
-        raise BuildError(f"Build failed or dist/index.html not found.\n\n{build_output}")
-
-    with open(index_path, encoding="utf-8", errors="replace") as f:  # noqa: ASYNC230
-        html = f.read()
-
-    # --- Inline CSS ---
-    html = _inline_css_assets(html, dist_dir)
-
-    # --- Inline JS ---
-    html = _inline_js_assets(html, dist_dir)
-
-    # --- Inline favicon as data URI ---
-    html = _inline_favicon(html, dist_dir, workspace_dir)
-
-    # --- Strip the error reporter script (only useful inside the builder iframe) ---
-    html = re.sub(
-        r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*',
-        "",
-        html,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
-
-    return html
 
 
 def _inline_css_assets(html: str, dist_dir: str) -> str:
@@ -166,3 +112,58 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
         html,
         flags=re.IGNORECASE,
     )
+
+
+@observe(name="build-single-html")  # type: ignore[untyped-decorator]
+async def build_single_html(project_id: str) -> str:
+    """Build the project and return a single self-contained HTML string."""
+    sandbox = sandbox_manager.get_sandbox(project_id)
+    if sandbox is None:
+        raise ValueError(f"No sandbox found for project {project_id}")
+
+    workspace_dir = sandbox.workspace_dir
+
+    # Write a temporary .env.production.local so vite picks up overrides
+    api_base = settings.EXPORT_API_BASE_URL
+    env_file = os.path.join(workspace_dir, ".env.production.local")
+    try:
+        with open(env_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
+            f.write(f"VITE_BASE=/\nVITE_API_BASE={api_base}\n")
+
+        build_output_lines: list[str] = []
+        async for line in sandbox.exec("pnpm build"):
+            build_output_lines.append(line)
+        build_output = "".join(build_output_lines)
+    finally:
+        try:
+            os.remove(env_file)
+        except OSError:
+            pass
+
+    dist_dir = os.path.join(workspace_dir, "dist")
+    index_path = os.path.join(dist_dir, "index.html")
+
+    if not os.path.isfile(index_path):  # noqa: ASYNC240
+        raise BuildError(f"Build failed or dist/index.html not found.\n\n{build_output}")
+
+    with open(index_path, encoding="utf-8", errors="replace") as f:  # noqa: ASYNC230
+        html = f.read()
+
+    # --- Inline CSS ---
+    html = _inline_css_assets(html, dist_dir)
+
+    # --- Inline JS ---
+    html = _inline_js_assets(html, dist_dir)
+
+    # --- Inline favicon as data URI ---
+    html = _inline_favicon(html, dist_dir, workspace_dir)
+
+    # --- Strip the error reporter script (only useful inside the builder iframe) ---
+    html = re.sub(
+        r'<script\s+id=["\']__ERROR_REPORTER__["\']>.*?</script>\s*',
+        "",
+        html,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+    return html
