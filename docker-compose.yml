@@ -1,7 +1,7 @@
 x-db-shared: &db-shared
   POSTGRES_USER: &db-user postgres
   POSTGRES_PASSWORD: &db-pass postgres
-  POSTGRES_DB: &db-name flowbolt
+  POSTGRES_DB: &db-name flow44
   DB_HOST: &db-host postgres
   DB_PORT: &db-port 5432
   DB_SCHEME: &db-scheme postgresql
@@ -12,7 +12,7 @@ x-minio-shared: &minio-shared
   S3_ACCESS_KEY: *s3-user
   S3_SECRET_KEY: *s3-pass
   S3_ENDPOINT_URL: &s3-url http://minio:9000
-  S3_BUCKET_NAME: &s3-bucket flowbolt
+  S3_BUCKET_NAME: &s3-bucket flow44
 
 services:
   frontend:
@@ -51,7 +51,7 @@ services:
       AIB_DB_PORT: *db-port
       AIB_DB_SCHEME: *db-scheme
       AIB_WORKSPACE_BASE_DIR: /var/lib/ai-builder/workspaces
-      AIB_FLAPI_BASE_URL: http://cases-mock:4000
+      AIB_FLAPI_BASE_URL: http://flapi-mock:6001
       S3_ENDPOINT_URL: *s3-url
       S3_BUCKET_NAME: *s3-bucket
     healthcheck:
@@ -67,16 +67,16 @@ services:
       - minio
     restart: unless-stopped
 
-  cases-mock:
+  flapi-mock:
     image: node:20-alpine
     working_dir: /app
     volumes:
-      - ./mocks/cases-mock:/app
+      - ./mocks/flapi-mock:/app
     command: sh -c "npm install && node server.js"
     expose:
-      - "4000"
+      - "6001"
     environment:
-      MOCK_PORT: "4000"
+      MOCK_PORT: "6001"
     networks:
       - internal
     restart: unless-stopped
@@ -96,7 +96,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: flowbolt-postgres
+    container_name: flow44-postgres
     environment: *db-shared
     ports:
       - "5432:5432"

@@ -40,13 +40,14 @@ Sample data structure:
 **Integration Notes:** {{ ctx.integration_notes }}
 
 Fetch data from the endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run`
-(import `API_BASE` from `src/config.ts`) and include `Authorization` header from localStorage key `flowbolt.dataSourceApiToken`.
+(import `API_BASE` from `src/config.ts`) and include `Authorization` header from `credentialsStore.getValidToken()` (import from `src/auth`).
 {% endfor %}
 
 When implementing components that use data source data:
 - **IMPORTANT**: `src/config.ts` is a pre-existing file — do NOT create or modify it. Just import from it:
   `import { API_BASE } from '../config';`
-  `const token = window.localStorage.getItem('flowbolt.dataSourceApiToken')?.trim();`
+  `import { credentialsStore } from '../auth';`
+  `const token = credentialsStore.getValidToken();`
   `fetch(`${API_BASE}/api/data-source/${dataSourceId}/run`, { headers: token ? { Authorization: token } : undefined })`
 - Use the fetch API or create a custom hook to handle the API calls
 - Include proper loading and error states

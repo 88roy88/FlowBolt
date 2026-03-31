@@ -1,27 +1,17 @@
-"""Backend routes that proxy data-source search and execution.
+from typing import Any
 
-These routes are what the frontend calls. The upstream implementation lives
-in the integrations layer.
-"""
+from fastapi import APIRouter, HTTPException
 
-from __future__ import annotations
-
-from typing import Annotated, Any
-
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import APIKeyHeader
-
+from flow44.api.deps import AuthDep
 from flow44.integrations.flapi_api import FlapiUpstreamError, data_source_client
 
 router = APIRouter(prefix="/api/data-source", tags=["data-source"])
-
-_data_source_authorization = APIKeyHeader(name="Authorization", auto_error=False)
 
 
 @router.get("/search/{query_or_id}")
 async def search_data_source(
     query_or_id: str,
-    authorization: Annotated[str | None, Depends(_data_source_authorization)] = None,
+    authorization: AuthDep,
 ) -> list[Any]:
     try:
         return await data_source_client.search(query_or_id, authorization=authorization)
@@ -33,7 +23,7 @@ async def search_data_source(
 @router.get("/{data_source_id}/run")
 async def run_data_source(
     data_source_id: str,
-    authorization: Annotated[str | None, Depends(_data_source_authorization)] = None,
+    authorization: AuthDep,
 ) -> Any:
     try:
         return await data_source_client.run_data_source(

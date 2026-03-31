@@ -10,7 +10,7 @@ app.use(cors());
 // Allow any valid JSON (including primitives), because Swagger/UI often defaults to `"string"`.
 app.use(express.json({ limit: '10mb', strict: false }));
 
-const PORT = Number(process.env.MOCK_PORT) || 6000;
+const PORT = Number(process.env.MOCK_PORT) || 6001;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const IFRAME_DATA_EVENT = process.env.IFRAME_DATA_EVENT || 'IFRAME_DATA';
 
@@ -19,6 +19,10 @@ const __dirname = path.dirname(__filename);
 const libsRoot =
   process.env.LIBS_ROOT || path.join(__dirname, '..', 'libs');
 app.use('/libs', express.static(libsRoot));
+
+// Serve static files from public directory (mock SSO page, etc.)
+const publicRoot = path.join(__dirname, 'public');
+app.use(express.static(publicRoot));
 
 /** Minimal stub for flapi package search autocomplete. Server-spec §2.1: filter to Type === "Package". */
 const stubSearchResultsRaw = [
@@ -492,6 +496,11 @@ app.get('/api/snippets/:runId.html', (req, res) => {
 // Health for CLI test
 app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, mock: true });
+});
+
+// Mock SSO endpoint
+app.get('/sso', (_req, res) => {
+  res.sendFile(path.join(publicRoot, 'sso-login.html'));
 });
 
 app.listen(PORT, () => {

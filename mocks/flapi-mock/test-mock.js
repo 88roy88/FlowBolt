@@ -2,9 +2,9 @@
 /**
  * Command-line test for mock server. Start server in another terminal or run against a running mock.
  * Usage: node test-mock.js [baseUrl]
- * Default baseUrl: http://localhost:6000
+ * Default baseUrl: http://localhost:6001
  */
-const baseUrl = process.argv[2] || 'http://localhost:6000';
+const baseUrl = process.argv[2] || 'http://localhost:6001';
 
 const parseBody = async (response) => {
   const text = await response.text();

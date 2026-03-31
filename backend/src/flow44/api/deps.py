@@ -1,11 +1,15 @@
-from fastapi import Depends, HTTPException, WebSocket
+import time
+from typing import Annotated
 
+import jwt
+from fastapi import Depends, Header, HTTPException, WebSocket
+
+from flow44.config import settings
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
 
 def get_sandbox(project_id: str) -> PnpmSandbox:
-    """HTTP dependency: resolves sandbox from path param, raises 404 if not found."""
     try:
         return sandbox_manager.get_sandbox(project_id)
     except SandboxNotFoundError:
@@ -13,7 +17,6 @@ def get_sandbox(project_id: str) -> PnpmSandbox:
 
 
 async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox | None:
-    """WebSocket helper: returns sandbox or closes socket with 1008 and returns None."""
     try:
         return sandbox_manager.get_sandbox(project_id)
     except SandboxNotFoundError:
@@ -22,3 +25,38 @@ async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox |
 
 
 SandboxDep = Depends(get_sandbox)
+
+
+def get_authorization(authorization: str | None = Header(None, alias="Authorization")) -> str:
+    if not authorization or not authorization.strip():
+        raise HTTPException(status_code=401, detail="Authorization required")
+
+    token = authorization.strip()
+    is_jwt = token.count(".") == 2
+
+    if is_jwt:
+        try:
+            if settings.AUTH_JWT_SECRET:
+                payload = jwt.decode(
+                    token,
+                    settings.AUTH_JWT_SECRET,
+                    algorithms=[settings.AUTH_JWT_ALGORITHM],
+                )
+            else:
+                payload = jwt.decode(token, options={"verify_signature": False})
+
+            if not settings.AUTH_JWT_SECRET and "exp" in payload and payload["exp"] < time.time():
+                raise HTTPException(status_code=401, detail="Token expired")
+
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token expired") from None
+        except jwt.InvalidTokenError as e:
+            raise HTTPException(status_code=401, detail=f"Invalid token: {e}") from None
+
+    elif settings.AUTH_REQUIRE_JWT:
+        raise HTTPException(status_code=401, detail="JWT token required")
+
+    return token
+
+
+AuthDep = Annotated[str, Depends(get_authorization)]

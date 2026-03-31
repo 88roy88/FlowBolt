@@ -57,9 +57,18 @@ class SearchIndexSettings(Flow44BaseSettings):
     SEARCH_INDEX_CACHE_TTL_SECONDS: int = 5  # How long to cache index before rebuilding
 
 
+class AuthSettings(Flow44BaseSettings):
+    # JWT public key or secret for token validation (optional - if not set, only checks structure/expiry)
+    AUTH_JWT_SECRET: str | None = None
+    # JWT algorithm (default: HS256 for HMAC, use RS256 for RSA)
+    AUTH_JWT_ALGORITHM: str = "HS256"
+    # Require JWT format (vs allowing opaque tokens)
+    AUTH_REQUIRE_JWT: bool = False
+
+
 class FlapiSettings(Flow44BaseSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
-    FLAPI_BASE_URL: str = "http://localhost:6000"
+    FLAPI_BASE_URL: str = "http://localhost:6001"
     FLAPI_VERIFY_SSL: bool = True
 
 
@@ -91,6 +100,7 @@ class Settings(
     DatabaseSettings,
     AIModelSettings,
     SearchIndexSettings,
+    AuthSettings,
     FlapiSettings,
     S3Settings,
     LangfuseSettings,

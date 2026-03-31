@@ -2,16 +2,16 @@
 # Usage: docker compose -f mocks/docker-compose.yaml up -d
 
 services:
-  cases-mock:
+  flapi-mock:
     image: node:20-alpine
     working_dir: /app
     volumes:
-      - ./cases-mock:/app
+      - ./flapi-mock:/app
     command: sh -c "npm install && node server.js"
     ports:
-      - "4000:4000"
+      - "6001:6001"
     environment:
-      MOCK_PORT: "4000"
+      MOCK_PORT: "6001"
 
   minio:
     image: minio/minio:latest

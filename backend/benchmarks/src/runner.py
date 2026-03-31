@@ -246,7 +246,7 @@ async def _take_screenshot(html_path: Path, output_path: Path) -> None:
             browser = await p.chromium.launch()
             page = await browser.new_page(viewport={"width": 1280, "height": 720})
             await page.goto(f"file://{html_path.resolve()}")
-            await page.evaluate("window.localStorage.setItem('flowbolt.dataSourceApiToken', 'admin')")
+            await page.evaluate("window.localStorage.setItem('Auth', JSON.stringify({auth_token: 'benchmark-token'}))")
             await page.reload()
             await page.wait_for_load_state("networkidle")
             await page.screenshot(path=str(output_path))

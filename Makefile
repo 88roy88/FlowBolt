@@ -1,6 +1,6 @@
 .PHONY: dev dev-backend dev-frontend dev-mocks kill-ports build run install stop
 
-# Local dev: mock (cases-mock), FastAPI, Vite — free these before (re)starting
+# Local dev: mock (flapi-mock), FastAPI, Vite — free these before (re)starting
 DEV_PORTS := 4000 8000 5173
 
 # All three at once: backend blocks forever if run sequentially, so we use parallel sub-makes (GNU Make).
@@ -31,9 +31,9 @@ dev-backend: kill-ports
 dev-frontend: kill-ports
 	cd frontend && pnpm dev
 
-# server.js lives under mocks/cases-mock (FLAPI / package mock)
+# server.js lives under mocks/flapi-mock (FLAPI / package mock)
 dev-mocks: kill-ports
-	cd mocks/cases-mock && pnpm install && pnpm dev
+	cd mocks/flapi-mock && pnpm install && pnpm dev
 
 # Install dependencies
 install:
