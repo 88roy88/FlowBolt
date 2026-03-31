@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from flow44.integrations.s3 import connect_to_s3, setup_bucket, deploy_single_html
+
+import pytest
+
 from flow44.config import settings
+from flow44.integrations.s3 import connect_to_s3, deploy_single_html, setup_bucket
 
 
 @pytest.fixture(autouse=True)
@@ -58,6 +60,6 @@ def test_deploy_single_html():
                     Body=html_content.encode("utf-8"),
                     ContentType="text/html",
                     ACL="public-read",
-                    StorageClass="STANDARD_IA",
+                    StorageClass=settings.S3_STORAGE_CLASS,
                 )
                 assert url == f"http://s3.local/my-bucket/{expected_key}"

@@ -1,30 +1,56 @@
 import functools
 from typing import Any
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 import flow44.config
 
 
-def _get_async_url() -> str:
-    url = flow44.config.settings.DATABASE_URL
-    if url.startswith("sqlite:///"):
-        return url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+def build_db_url(config: flow44.config.Settings, async_db: bool) -> str:
+    """Builds a database URL string from components, supporting both SQLite and Postgres."""
+    if config.DB_SCHEME == "sqlite":
+        # SQLite: use aiosqlite for async, standard sqlite driver otherwise
+        adapter = "sqlite+aiosqlite" if async_db else "sqlite"
+        return f"{adapter}:///{config.DB_NAME}"
+
+    # Postgres: use asyncpg (we only use async connections)
+    db_adapter = "postgresql+asyncpg" if async_db else "postgresql"
+    url = f"{db_adapter}://{config.DB_USER}:{config.DB_PASSWORD}@{config.DB_HOST}:{config.DB_PORT}"
+    if config.DB_NAME:
+        url += f"/{config.DB_NAME}"
     return url
+
+
+def _get_async_url() -> str:
+    """Provides the asynchronous database connection string for engines."""
+    return build_db_url(flow44.config.settings, async_db=True)
 
 
 @functools.lru_cache
 def get_engine(url: str | None = None) -> AsyncEngine:
     async_url = url or _get_async_url()
-    eng = create_async_engine(async_url, echo=False)
 
-    # TODO: this is specific for SQLite, remove when migrating to Postgres
+    kwargs = {}
+    if not async_url.startswith("sqlite"):
+        kwargs.update(
+            {
+                "pool_size": flow44.config.settings.DB_POOL_SIZE,
+                "max_overflow": flow44.config.settings.DB_MAX_OVERFLOW,
+                "pool_recycle": flow44.config.settings.DB_POOL_RECYCLE,
+                "pool_pre_ping": flow44.config.settings.DB_POOL_PRE_PING,
+            }
+        )
+
+    eng = create_async_engine(async_url, echo=False, **kwargs)
+
+    # Enable foreign keys for SQLite (SQLite-specific pragma)
     @event.listens_for(eng.sync_engine, "connect")
     def _enable_foreign_keys(dbapi_conn: Any, _connection_record: Any) -> None:
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys = ON")
-        cursor.close()
+        if eng.dialect.name == "sqlite":
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON")
+            cursor.close()
 
     return eng
 
@@ -46,12 +72,7 @@ async def reset() -> None:
 
 
 async def init_db() -> None:
-    from sqlmodel import SQLModel  # noqa: PLC0415
-
-    import flow44.db.chat  # noqa: F401, PLC0415
-    import flow44.db.events  # noqa: F401, PLC0415
-    import flow44.db.pending_plan  # noqa: F401, PLC0415
-    import flow44.db.project  # noqa: F401, PLC0415
-
+    """Initialize database connection. Metadata creation is now handled by Alembic."""
+    # Ping the engine to ensure connectivity
     async with get_engine().begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.execute(text("SELECT 1"))

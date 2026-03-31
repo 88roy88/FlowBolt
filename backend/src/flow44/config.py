@@ -31,6 +31,19 @@ class SandboxSettings(Flow44BaseSettings):
     EXPORT_API_BASE_URL: str = "http://localhost:8000"
 
 
+class DatabaseSettings(Flow44BaseSettings):
+    DB_SCHEME: str
+    DB_USER: str
+    DB_PASSWORD: str
+    DB_HOST: str
+    DB_PORT: int
+    DB_NAME: str
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE: int = 3600
+    DB_POOL_PRE_PING: bool = True
+
+
 class AIModelSettings(Flow44BaseSettings):
     AI_MODEL: str = "qwen/qwen3-coder-30b-a3b-instruct"
     # Base URL for OpenAI-compatible endpoints (vLLM, Ollama, OpenRouter, etc.)
@@ -56,6 +69,7 @@ class S3Settings(Flow44BaseSettings):
     S3_SECRET_KEY: str | None = None
     S3_BUCKET_NAME: str | None = None
     S3_CACHE_TTL: int = 3600
+    S3_STORAGE_CLASS: str = "STANDARD_IA"
 
 
 class LangfuseSettings(Flow44BaseSettings):
@@ -74,6 +88,7 @@ class LangfuseSettings(Flow44BaseSettings):
 
 class Settings(
     SandboxSettings,
+    DatabaseSettings,
     AIModelSettings,
     SearchIndexSettings,
     FlapiSettings,
@@ -81,7 +96,7 @@ class Settings(
     LangfuseSettings,
     Flow44BaseSettings,
 ):
-    DATABASE_URL: str = "sqlite:///./ai_builder.db"
+    pass
 
 
 settings = Settings()

@@ -78,6 +78,12 @@ app = FastAPI(
 )
 
 
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    """Health check endpoint for Docker/K8s."""
+    return {"status": "ok", "version": "0.1.0"}
+
+
 @app.exception_handler(SandboxNotFoundError)
 async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError) -> JSONResponse:
     return JSONResponse(status_code=404, content={"detail": str(exc)})
