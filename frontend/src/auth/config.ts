@@ -15,6 +15,7 @@ export type AuthConfig = {
   postMessageTarget: string;
   pollIntervalMs: number;
   popupTimeoutMs: number;
+  useIframe: boolean;
 };
 
 function readConfig(): AuthConfig {
@@ -36,6 +37,7 @@ function readConfig(): AuthConfig {
     postMessageTarget: explicitOrigin || derivedOrigin || '*',
     pollIntervalMs: envInt(import.meta.env.VITE_AUTH_POLL_INTERVAL_MS as string | undefined, 500),
     popupTimeoutMs: envInt(import.meta.env.VITE_AUTH_POPUP_TIMEOUT_MS as string | undefined, 300_000),
+    useIframe: envBool(import.meta.env.VITE_AUTH_USE_IFRAME as string | undefined, false),
   };
 }
 

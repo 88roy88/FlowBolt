@@ -183,17 +183,13 @@
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
         credentials.expiresAt = expiresAt;
 
-        // Send to opener
-        if (window.opener) {
+        const target = window.opener || (window.parent !== window ? window.parent : null);
+        if (target) {
           const targetOrigin = pendingRequest?.origin || '*';
-          window.opener.postMessage(credentials, targetOrigin);
-
-          // Close popup after short delay
-          setTimeout(() => {
-            window.close();
-          }, 100);
+          target.postMessage(credentials, targetOrigin);
+          setTimeout(() => window.close(), 100);
         } else {
-          alert('No parent window found. This page must be opened as a popup.');
+          alert('No parent window found.');
         }
       });
 

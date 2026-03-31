@@ -2,7 +2,7 @@ import type { AuthConfig } from './config';
 import type { AuthCredentials } from './types';
 import { extractCredentials, isCredentialsMessage } from './types';
 
-const POPUP_FEATURES = 'popup=yes,width=520,height=720,menubar=no,toolbar=no';
+const POPUP_FEATURES = 'width=520,height=720,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes';
 
 export class PopupBlockedError extends Error {
   constructor() {
@@ -22,14 +22,14 @@ export class PopupAuthenticator {
     }
 
     const popup = globalThis.window.open(this.config.providerUrl, 'sso_auth', POPUP_FEATURES);
-    if (!popup) {
+    if (!popup || popup.closed) {
       throw new PopupBlockedError();
     }
 
     try {
       popup.focus();
     } catch {
-      /* ignore */
+      throw new PopupBlockedError();
     }
 
     return await this.waitForCredentials(popup);

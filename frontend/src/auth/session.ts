@@ -1,14 +1,19 @@
 import { authConfig, isProviderConfigured } from './config';
 import { credentialsStore } from './storage';
 import { PopupAuthenticator, PopupBlockedError } from './popup';
+import { IframeAuthenticator } from './iframeAuth';
 
 export { PopupBlockedError };
 
-let authenticator: PopupAuthenticator | null = null;
+type Authenticator = { acquireCredentials(): Promise<import('./types').AuthCredentials> };
 
-function getAuthenticator(): PopupAuthenticator {
+let authenticator: Authenticator | null = null;
+
+function getAuthenticator(): Authenticator {
   if (!authenticator) {
-    authenticator = new PopupAuthenticator(authConfig);
+    authenticator = authConfig.useIframe
+      ? new IframeAuthenticator(authConfig)
+      : new PopupAuthenticator(authConfig);
   }
   return authenticator;
 }
