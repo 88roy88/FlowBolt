@@ -9,9 +9,9 @@ services:
       - ./cases-mock:/app
     command: sh -c "npm install && node server.js"
     ports:
-      - "4000:4000"
+      - "6000:6000"
     environment:
-      MOCK_PORT: "4000"
+      MOCK_PORT: "6000"
 
   minio:
     image: minio/minio:latest
