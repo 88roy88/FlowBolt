@@ -22,12 +22,11 @@ exclude = [
     "node_modules",
     "venv",
     "tests",
-    "alembic",
-    "client",
+    "benchmarks",
     "src/alembic",
+    "client",
     "src/client",
     "*.ipynb",
-    "*/_preprocess/"
 ]
 
 fix = true
