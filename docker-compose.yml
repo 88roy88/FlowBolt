@@ -1,3 +1,19 @@
+x-db-shared: &db-shared
+  POSTGRES_USER: &db-user postgres
+  POSTGRES_PASSWORD: &db-pass postgres
+  POSTGRES_DB: &db-name flowbolt
+  DB_HOST: &db-host postgres
+  DB_PORT: &db-port 5432
+  DB_SCHEME: &db-scheme postgresql
+
+x-minio-shared: &minio-shared
+  MINIO_ROOT_USER: &s3-user minioadmin
+  MINIO_ROOT_PASSWORD: &s3-pass minioadminpassword
+  S3_ACCESS_KEY: *s3-user
+  S3_SECRET_KEY: *s3-pass
+  S3_ENDPOINT_URL: &s3-url http://minio:9000
+  S3_BUCKET_NAME: &s3-bucket flowbolt
+
 services:
   frontend:
     build:
@@ -27,14 +43,17 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - AIB_WORKSPACE_BASE_DIR=/var/lib/ai-builder/workspaces
-      - AIB_DB_SCHEME=postgresql
-      - AIB_DB_NAME=flowbolt
-      - AIB_DB_USER=postgres
-      - AIB_DB_PASSWORD=postgres
-      - AIB_DB_HOST=postgres
-      - AIB_DB_PORT=5432
-      - AIB_FLAPI_BASE_URL=http://cases-mock:4000
+      <<: [*db-shared, *minio-shared]
+      AIB_DB_USER: *db-user
+      AIB_DB_PASSWORD: *db-pass
+      AIB_DB_NAME: *db-name
+      AIB_DB_HOST: *db-host
+      AIB_DB_PORT: *db-port
+      AIB_DB_SCHEME: *db-scheme
+      AIB_WORKSPACE_BASE_DIR: /var/lib/ai-builder/workspaces
+      AIB_FLAPI_BASE_URL: http://cases-mock:4000
+      S3_ENDPOINT_URL: *s3-url
+      S3_BUCKET_NAME: *s3-bucket
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -45,6 +64,7 @@ services:
       - internal
     depends_on:
       - postgres
+      - minio
     restart: unless-stopped
 
   cases-mock:
@@ -77,10 +97,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: flowbolt-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: flowbolt
+    environment: *db-shared
     ports:
       - "5432:5432"
     volumes:
@@ -90,6 +107,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment: *minio-shared
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - internal
+    restart: unless-stopped
 
 networks:
   internal:
@@ -98,3 +130,4 @@ volumes:
   workspaces:
   db-data:
   postgres_data:
+  minio-data:
