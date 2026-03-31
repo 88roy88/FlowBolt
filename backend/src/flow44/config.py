@@ -69,6 +69,7 @@ class S3Settings(Flow44BaseSettings):
     S3_SECRET_KEY: str | None = None
     S3_BUCKET_NAME: str | None = None
     S3_CACHE_TTL: int = 3600
+    S3_STORAGE_CLASS: str = "STANDARD_IA"
 
 
 class LangfuseSettings(Flow44BaseSettings):
