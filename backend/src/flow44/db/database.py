@@ -50,6 +50,11 @@ def get_engine(url: str | None = None) -> AsyncEngine:
         if eng.dialect.name == "sqlite":
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys = ON")
+            # WAL mode gives much better concurrency and avoids "database or disk
+            # is full" errors from journal bloat during heavy write workloads.
+            cursor.execute("PRAGMA journal_mode = WAL")
+            # Reclaim space freed by DELETE/UPDATE automatically.
+            cursor.execute("PRAGMA auto_vacuum = INCREMENTAL")
             cursor.close()
 
     return eng

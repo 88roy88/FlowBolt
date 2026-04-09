@@ -1,0 +1,138 @@
+name: E2E v2
+
+# Integration gate — runs the full flow test against a real backend + mock LLM.
+# Any failure blocks production deployment.
+#
+# Matrix:
+#   Linux  · local       (standard hosted runner)
+#   Linux  · namespaced  (requires nsjail; works on ubuntu-latest since Actions 2.312+)
+#   Windows· local       (nsjail is Linux-only, so Windows only runs local)
+
+on:
+  # Only run after a merge lands on main — not on every PR.
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E · ${{ matrix.os-label }} · ${{ matrix.sandbox_mode }}
+    timeout-minutes: ${{ matrix.sandbox_mode == 'namespaced' && 30 || 20 }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os-label: Linux
+            sandbox_mode: local
+          - runner: ubuntu-latest
+            os-label: Linux
+            sandbox_mode: namespaced
+          - runner: windows-latest
+            os-label: Windows
+            sandbox_mode: local
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            mocks/flapi-mock/pnpm-lock.yaml
+            e2e-v2/pnpm-lock.yaml
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Cache uv virtualenv
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: uv-venv-${{ runner.os }}-${{ hashFiles('backend/uv.lock') }}
+          restore-keys: uv-venv-${{ runner.os }}-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/AppData/Local/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('e2e-v2/pnpm-lock.yaml') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      # ── nsjail (Linux · namespaced only) ──────────────────────────────────
+      - name: Cache nsjail binary
+        if: matrix.sandbox_mode == 'namespaced'
+        id: nsjail-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/nsjail-bin
+          key: nsjail-${{ hashFiles('.github/workflows/e2e-v2.yaml') }}
+
+      - name: Build nsjail
+        if: matrix.sandbox_mode == 'namespaced' && steps.nsjail-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            bison flex libprotobuf-dev protobuf-compiler \
+            libnl-route-3-dev libcap-dev build-essential pkg-config
+          git clone --depth=1 https://github.com/google/nsjail /tmp/nsjail-src
+          make -C /tmp/nsjail-src -j$(nproc)
+          mkdir -p /tmp/nsjail-bin && cp /tmp/nsjail-src/nsjail /tmp/nsjail-bin/
+
+      - name: Install nsjail
+        if: matrix.sandbox_mode == 'namespaced'
+        run: |
+          sudo cp /tmp/nsjail-bin/nsjail /usr/bin/nsjail
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true
+          nsjail --version
+
+      # ── Install project dependencies ──────────────────────────────────────
+      - name: Install dependencies (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          (cd frontend         && pnpm install --frozen-lockfile)
+          (cd backend          && uv sync --frozen)
+          (cd mocks/flapi-mock && pnpm install --frozen-lockfile)
+          (cd e2e-v2           && pnpm install --frozen-lockfile)
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-Location frontend;            pnpm install --frozen-lockfile
+          Set-Location ..\backend;          uv sync --frozen
+          Set-Location ..\mocks\flapi-mock; pnpm install --frozen-lockfile
+          Set-Location ..\..\e2e-v2;        pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: cd e2e-v2 && pnpm exec playwright install chromium --with-deps
+
+      # ── Run the tests ──────────────────────────────────────────────────────
+      - name: Run E2E tests
+        env:
+          AIB_SANDBOX_MODE: ${{ matrix.sandbox_mode }}
+        run: cd e2e-v2 && pnpm test
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.os-label }}-${{ matrix.sandbox_mode }}-results
+          path: e2e-v2/test-results/
+          retention-days: 7
