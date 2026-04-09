@@ -20,7 +20,10 @@ def render_architecture(*, data_source_contexts: list[dict[str, Any]] | None = N
     prepared = None
     if data_source_contexts:
         prepared = [
-            {**ctx, "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000]}
+            {
+                **ctx,
+                "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000],
+            }
             for ctx in data_source_contexts
         ]
     return render("architecture.jinja2", data_source_contexts=prepared)

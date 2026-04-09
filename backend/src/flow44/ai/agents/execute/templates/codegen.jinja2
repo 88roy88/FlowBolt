@@ -23,14 +23,18 @@ as part of a larger project.
 
 ## Data Source Integration
 
-You are integrating data from the following data sources:
+The following data sources have **pre-generated** hooks and types that you should import — do NOT recreate them.
 
 {% for ctx in data_source_contexts %}
-### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }})
+### Data Source: {{ ctx.data_source_name }}
 
-**Data Schema:** {{ ctx.data_schema }}
 **Relevant Fields:** {{ ctx.relevant_fields }}
 **Data Characteristics:** {{ ctx.data_characteristics }}
+
+Pre-generated hook: `import { useDataSource{{ ctx.sanitized_name }} } from '../hooks/useDataSource{{ ctx.sanitized_name }}';`
+Pre-generated types: `import type { {{ ctx.sanitized_name }}Response } from '../types/dataSource{{ ctx.sanitized_name }}';`
+
+The hook returns `{ data, isLoading, error, refetch }`.
 
 Sample data structure:
 ```json
@@ -38,21 +42,13 @@ Sample data structure:
 ```
 
 **Integration Notes:** {{ ctx.integration_notes }}
-
-Fetch data from the endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run`
-(import `API_BASE` from `src/config.ts`) and include `Authorization` header from `credentialsStore.getValidToken()` (import from `src/auth`).
 {% endfor %}
 
 When implementing components that use data source data:
-- **IMPORTANT**: `src/config.ts` is a pre-existing file — do NOT create or modify it. Just import from it:
-  `import { API_BASE } from '../config';`
-  `import { credentialsStore } from '../auth';`
-  `const token = credentialsStore.getValidToken();`
-  `fetch(`${API_BASE}/api/data-source/${dataSourceId}/run`, { headers: token ? { Authorization: token } : undefined })`
-- Use the fetch API or create a custom hook to handle the API calls
-- Include proper loading and error states
-- Focus on the relevant fields identified above for the user's use case
-- Transform the raw API response according to the data schema and characteristics described above
+- **IMPORTANT**: Import the pre-built hooks — do NOT create custom fetch logic or hooks for data sources.
+- `src/auth/` and `src/config.ts` are pre-existing — do NOT create or modify them.
+- Include proper loading and error states using the hook's `isLoading` and `error` fields.
+- Transform the data as needed for display.
 {% endif %}
 {% if dependency_files %}
 
@@ -95,7 +91,7 @@ Rules:
 2. Use TypeScript, React 18+, and Tailwind CSS v3.
 3. Tailwind CSS is pre-configured - use utility classes extensively for styling.
 4. Write clean, production-quality code with modern, polished UI/UX.
-5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/config.ts` — it is pre-configured.
+5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/config.ts` or `src/main.tsx` — they are pre-configured.
 6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
 7. Import from already-completed files using their exact export names.
 8. Do NOT include shell actions — only file actions.

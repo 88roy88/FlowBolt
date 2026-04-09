@@ -42,12 +42,19 @@ Rules:
 - Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
 {% if has_data_sources %}
 
-## Data Source Integration Tasks
+## Data Source Integration — Pre-Generated Files
 
-When data_source_integrations is present in the input, you MUST create tasks for each data source:
-1. TypeScript interfaces for each data source's data structure
-2. A custom hook (e.g., useDataSource) that fetches data using `API_BASE` from `src/config.ts`: ```${API_BASE}/api/data-source/${dataSourceId}/run``` with `Authorization` header from `credentialsStore.getValidToken()` (import from `src/auth`)
-3. Components that display and interact with the data source
+TypeScript types and custom hooks for all data sources have ALREADY been generated and written
+to the project. Do NOT create tasks for:
+- Data source TypeScript interfaces/types (already in `src/types/`)
+- Data source fetch hooks (already in `src/hooks/`)
+- The `src/auth/` module (pre-configured in the project template)
 
-Ensure proper dependency ordering: types → hooks → components → App integration.
+Instead, create tasks for:
+1. Components that DISPLAY and INTERACT with the data (import the pre-built hooks)
+2. App integration that wires the data source components into the layout
+
+The hooks are already importable. Example usage in components:
+`import { useDataSourceMyApi } from '../hooks/useDataSourceMyApi';`
+`const { data, isLoading, error, refetch } = useDataSourceMyApi();`
 {% endif %}
