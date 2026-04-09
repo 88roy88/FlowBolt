@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { authSession, PopupBlockedError } from './session';
 import { authConfig, isProviderConfigured } from './config';
 import { IframeModal } from './IframeModal';
@@ -6,7 +6,13 @@ import type { SessionBootstrapResult } from './session';
 
 type AuthState = 'loading' | 'ready' | 'needs_sign_in' | 'signing_in' | 'error';
 
-export function AuthGate({ children }: { children: React.ReactNode }) {
+type Props = {
+  children: React.ReactNode;
+  /** Rendered during auth loading state */
+  loader?: React.ReactNode;
+};
+
+export function AuthGate({ children, loader }: Props) {
   const [state, setState] = useState<AuthState>('loading');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -40,7 +46,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('auth:credentials-cleared', onCleared);
   }, [state]);
 
-  const handleSignIn = async () => {
+  const handleSignIn = useCallback(async () => {
     if (authConfig.useIframe) {
       setErrorMsg(null);
       setState('signing_in');
@@ -57,39 +63,80 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         setErrorMsg(err instanceof Error ? err.message : 'Sign in failed');
       }
     }
-  };
+  }, []);
 
   if (state === 'loading') {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <div style={{ textAlign: 'center', color: '#888' }}>Loading...</div>
-      </div>
-    );
+    return <>{loader ?? null}</>;
   }
 
   if (state === 'error') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '12px' }}>
-        <p style={{ color: '#e55', fontWeight: 600 }}>Authentication Error</p>
-        <p style={{ color: '#888', fontSize: '14px' }}>{errorMsg}</p>
-        <button
-          onClick={() => { setState('loading'); window.location.reload(); }}
-          style={{ padding: '8px 20px', background: '#333', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-        >
-          Retry
-        </button>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        gap: '16px',
+      }}>
+        <div style={{
+          padding: '16px 24px',
+          background: 'var(--surface)',
+          border: '2px solid var(--danger)',
+          borderRadius: '8px',
+          maxWidth: '500px',
+          textAlign: 'center',
+        }}>
+          <p style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' }}>
+            Authentication Error
+          </p>
+          <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>
+            {errorMsg || 'Failed to initialize authentication'}
+          </p>
+        </div>
       </div>
     );
   }
 
   if (state === 'needs_sign_in' || state === 'signing_in') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '12px' }}>
-        <p style={{ color: '#888' }}>Sign in to continue</p>
-        {errorMsg && <p style={{ color: '#e55', fontSize: '14px' }}>{errorMsg}</p>}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        gap: '16px',
+      }}>
+        <p style={{ color: 'var(--text-dim)', marginBottom: '8px' }}>
+          Sign in to continue
+        </p>
+        {errorMsg && (
+          <div style={{
+            padding: '12px 16px',
+            background: 'var(--danger-dim)',
+            border: '1px solid var(--danger)',
+            borderRadius: '6px',
+            maxWidth: '400px',
+            textAlign: 'center',
+            marginBottom: '8px',
+          }}>
+            <p style={{ color: 'var(--danger)', fontSize: '14px' }}>
+              {errorMsg}
+            </p>
+          </div>
+        )}
         <button
           onClick={handleSignIn}
-          style={{ padding: '10px 28px', background: '#2bbcc4', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}
+          style={{
+            padding: '10px 24px',
+            background: 'var(--accent)',
+            color: 'var(--bg)',
+            borderRadius: '6px',
+            fontWeight: 600,
+            fontSize: '16px',
+            cursor: 'pointer',
+          }}
         >
           Sign In
         </button>

@@ -49,6 +49,7 @@ export const credentialsStore = {
   clear(): void {
     try {
       window.localStorage.removeItem(authConfig.storageKey);
+      window.dispatchEvent(new Event('auth:credentials-cleared'));
     } catch {
       /* ignore */
     }
