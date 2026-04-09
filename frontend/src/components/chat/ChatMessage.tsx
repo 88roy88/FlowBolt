@@ -28,6 +28,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
     case 'design_complete':
       return <DesignCompleteCard architecture={card.architecture} ux={card.ux} />;
     case 'plan_overview':
+      // overview can be undefined when plan_rejected fires without a payload
+      if (!card.overview) return null;
       return <PlanOverviewCard overview={card.overview} accepted={card.accepted} />;
     case 'task_progress':
       return <TaskProgressCard tasks={card.tasks} />;

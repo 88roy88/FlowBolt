@@ -112,8 +112,12 @@ export function useEditorPanelSearch(
         const activePath = useFilesStore.getState().activeFilePath;
         const normalizedActivePath = activePath ? normalizeProjectPath(activePath) : '';
         const model = editor?.getModel();
+        // Also verify Monaco's current model has switched to the target file, not just
+        // the files-store activeFilePath. Without this, decorations land on the previous
+        // model (e.g. index.css) before React re-renders the editor with the new path.
+        const modelPath = model ? normalizeProjectPath(decodeURIComponent(model.uri.path)) : '';
 
-        if (!editor || !m || !model || normalizedActivePath !== normalizedTargetPath) {
+        if (!editor || !m || !model || normalizedActivePath !== normalizedTargetPath || modelPath !== normalizedTargetPath) {
           if (attempt < 12) {
             setTimeout(() => tryReveal(attempt + 1), 40);
           }
