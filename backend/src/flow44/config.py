@@ -29,6 +29,10 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
     # Public base URL of this backend, used in HTML exports so API calls work standalone.
     EXPORT_API_BASE_URL: str = "http://localhost:8000"
+    # SSO config injected into generated apps' vite.config.ts at scaffold time
+    SANDBOX_AUTH_PROVIDER_URL: str = "http://localhost:6001/sso"
+    SANDBOX_AUTH_STORAGE_KEY: str = "Auth"
+    SANDBOX_AUTH_USE_IFRAME: bool = True
 
 
 class DatabaseSettings(Flow44BaseSettings):

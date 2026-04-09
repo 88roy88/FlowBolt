@@ -38,9 +38,15 @@ class PnpmMixin(BaseSandbox, ABC):
         template_path = os.path.join(template_dir, "vite.config.ts")
         with open(template_path, encoding="utf-8") as f:
             content = f.read()
+        content = (
+            content.replace("{{PROJECT_ID}}", self.project_id)
+            .replace("{{AUTH_PROVIDER_URL}}", settings.SANDBOX_AUTH_PROVIDER_URL)
+            .replace("{{AUTH_STORAGE_KEY}}", settings.SANDBOX_AUTH_STORAGE_KEY)
+            .replace("{{AUTH_USE_IFRAME}}", str(settings.SANDBOX_AUTH_USE_IFRAME).lower())
+        )
         dest_path = os.path.join(self.workspace_dir, "vite.config.ts")
         with open(dest_path, "w", encoding="utf-8") as f:
-            f.write(content.replace("{{PROJECT_ID}}", self.project_id))
+            f.write(content)
 
     # TODO: rename is_scaffold_complete or something?
     async def is_scaffolded(self) -> bool:
