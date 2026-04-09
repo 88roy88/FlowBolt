@@ -87,9 +87,7 @@ def _generate_from_dict(data: dict[str, Any], base_name: str, interfaces: list[s
     _build_interface(data, f"{base_name}Response", interfaces, depth=0)
 
 
-def _generate_cubes_wrapper(
-    data: dict[str, Any], cubes_key: str, base_name: str, interfaces: list[str]
-) -> None:
+def _generate_cubes_wrapper(data: dict[str, Any], cubes_key: str, base_name: str, interfaces: list[str]) -> None:
     """Generate types for { results: { cube_name: rows[], ... } } pattern."""
     cubes = data[cubes_key]
     results_fields: list[str] = []
@@ -107,9 +105,7 @@ def _generate_cubes_wrapper(
     interfaces.append(f"\nexport interface {base_name}Response {{\n" + "\n".join(wrapper_fields) + "\n}\n")
 
 
-def _generate_array_wrapper(
-    data: dict[str, Any], data_key: str, base_name: str, interfaces: list[str]
-) -> None:
+def _generate_array_wrapper(data: dict[str, Any], data_key: str, base_name: str, interfaces: list[str]) -> None:
     """Generate types for { data: [...], meta: {...} } pattern."""
     arr = data[data_key]
     if arr and isinstance(arr[0], dict):
