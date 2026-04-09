@@ -1,22 +1,8 @@
 import { authConfig, isProviderConfigured } from './config';
 import { credentialsStore } from './storage';
 import { PopupAuthenticator, PopupBlockedError } from './popup';
-import { IframeAuthenticator } from './iframeAuth';
 
 export { PopupBlockedError };
-
-type Authenticator = { acquireCredentials(): Promise<import('./types').AuthCredentials> };
-
-let authenticator: Authenticator | null = null;
-
-function getAuthenticator(): Authenticator {
-  if (!authenticator) {
-    authenticator = authConfig.useIframe
-      ? new IframeAuthenticator(authConfig)
-      : new PopupAuthenticator(authConfig);
-  }
-  return authenticator;
-}
 
 export type SessionBootstrapResult = 'ready' | 'needs_interactive_sign_in';
 
@@ -35,13 +21,20 @@ export const authSession = {
     return 'needs_interactive_sign_in';
   },
 
+  /** Sign in via popup. For iframe sign-in, use <IframeModal> directly. */
   async signIn(): Promise<void> {
-    const creds = await getAuthenticator().acquireCredentials();
+    const creds = await new PopupAuthenticator(authConfig).acquireCredentials();
     credentialsStore.save(creds);
   },
 
   async refreshAfter401(): Promise<void> {
-    const creds = await getAuthenticator().acquireCredentials();
+    if (authConfig.useIframe) {
+      // Iframe refresh must be driven by the React layer — clear token so
+      // the UI shows the sign-in state again.
+      credentialsStore.clear();
+      return;
+    }
+    const creds = await new PopupAuthenticator(authConfig).acquireCredentials();
     credentialsStore.save(creds);
   },
 
