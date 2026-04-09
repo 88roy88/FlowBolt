@@ -33,9 +33,6 @@ class FlapiClient:
         token = (authorization.strip() or None) if authorization else None
         if not token:
             return {}
-        # Add "Bearer " prefix if not already present
-        if not token.lower().startswith("bearer "):
-            token = f"Bearer {token}"
         return {"Authorization": token}
 
     async def _request(self, method: str, path: str, *, authorization: str | None = None, **kwargs: Any) -> Any:

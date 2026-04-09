@@ -117,7 +117,7 @@ def _fetch_models_from_base_url() -> list[dict[str, str]]:
         provider_name = "custom"
 
     try:
-        headers = {"Authorization": f"Bearer {settings.AI_API_KEY}"}
+        headers = {"Authorization": settings.AI_API_KEY}
         resp = httpx.get(models_url, headers=headers, timeout=10)
         resp.raise_for_status()
         data = resp.json()
