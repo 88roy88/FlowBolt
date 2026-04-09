@@ -11,7 +11,7 @@ class TestGenerateDataSourceHook:
         # Imports
         assert "import { useState, useEffect, useCallback } from 'react';" in result
         assert "import { API_BASE } from '../config';" in result
-        assert "import { credentialsStore } from '../auth';" in result
+        assert "import { credentialsStore, authSession } from '../auth';" in result
         assert "import type { SalesResponse } from '../types/dataSourceSales';" in result
         # Function
         assert "export function useDataSourceSales()" in result
@@ -19,6 +19,9 @@ class TestGenerateDataSourceHook:
         assert "/api/data-source/42/run" in result
         # Auth
         assert "credentialsStore.getValidToken()" in result
+        # 401 retry
+        assert "res.status === 401" in result
+        assert "refreshAfter401" in result
         # Return shape
         assert "return { data, isLoading, error, refetch: fetchData };" in result
 
