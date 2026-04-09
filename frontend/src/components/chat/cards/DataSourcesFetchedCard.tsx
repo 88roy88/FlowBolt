@@ -30,8 +30,9 @@ export function DataSourcesFetchedCard({ dataSources }: { dataSources: DataSourc
             </div>
           )}
           {ds.relevantFields && (
-            <div className="text-xs text-muted-foreground leading-normal">
-              <strong>Relevant fields:</strong> {ds.relevantFields}
+            <div className="text-xs text-muted-foreground leading-normal whitespace-pre-line">
+              <strong>Relevant fields:</strong><br/>
+                {ds.relevantFields}
             </div>
           )}
         </div>
