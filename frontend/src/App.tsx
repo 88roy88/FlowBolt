@@ -13,6 +13,7 @@ import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
 import { authSession, PopupBlockedError } from './auth';
+import { getAppName } from './utils/easterEgg';
 
 function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
@@ -66,6 +67,11 @@ export default function App() {
   const [authState, setAuthState] = useState<'loading' | 'ready' | 'needs_sign_in' | 'error'>('loading');
   const [authError, setAuthError] = useState<string | null>(null);
   const hasCache = hasProjectsCache();
+
+  // Easter egg: update document title for special users
+  useEffect(() => {
+    document.title = getAppName();
+  }, []);
 
   const selectProject = useCallback((project: typeof projects[number]) => {
     setCurrentProject(project);
