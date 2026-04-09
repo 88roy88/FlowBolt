@@ -351,6 +351,7 @@ export default function App() {
             <p style={{ color: 'var(--text-dim)' }}>{t('app.createFirstProject')}</p>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
+                data-testid="initial-project-input"
                 type="text"
                 placeholder={t('common.projectName')}
                 value={newProjectName}
@@ -365,6 +366,7 @@ export default function App() {
                 }}
               />
               <button
+                data-testid="initial-create-button"
                 onClick={handleCreate}
                 style={{
                   padding: '8px 16px',

@@ -92,15 +92,15 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
 
       {/* Action buttons */}
       <div className="flex gap-2">
-        <Button variant="success" onClick={() => respondToPlan('accept')} className="hover:-translate-y-0.5 transition-transform duration-150">
+        <Button data-testid="plan-approve-button" variant="success" onClick={() => respondToPlan('accept')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Check size={14} />
           {t('chat.plan.looksGood')}
         </Button>
-        <Button variant="warning" onClick={handleModify} className="hover:-translate-y-0.5 transition-transform duration-150">
+        <Button data-testid="plan-modify-button" variant="warning" onClick={handleModify} className="hover:-translate-y-0.5 transition-transform duration-150">
           <Pencil size={14} />
           {modifyMode ? t('chat.plan.sendFeedback') : t('chat.plan.changeSomething')}
         </Button>
-        <Button variant="outline" onClick={() => respondToPlan('reject')} className="hover:-translate-y-0.5 transition-transform duration-150">
+        <Button data-testid="plan-reject-button" variant="outline" onClick={() => respondToPlan('reject')} className="hover:-translate-y-0.5 transition-transform duration-150">
           <X size={14} />
           {t('chat.plan.startOver')}
         </Button>

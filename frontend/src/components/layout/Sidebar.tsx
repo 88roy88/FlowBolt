@@ -172,6 +172,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
         {showInput ? (
           <div className="flex gap-1">
             <Input
+              data-testid="new-project-input"
               autoFocus
               placeholder={t('common.projectName')}
               value={newName}
@@ -181,10 +182,11 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                 if (e.key === 'Escape') setShowInput(false);
               }}
             />
-            <Button size="sm" onClick={handleCreate}>{t('common.add')}</Button>
+            <Button data-testid="create-project-add-button" size="sm" onClick={handleCreate}>{t('common.add')}</Button>
           </div>
         ) : (
           <Button
+            data-testid="new-project-button"
             variant="outline"
             size="sm"
             onClick={() => setShowInput(true)}
@@ -225,6 +227,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                 </div>
                 {renamingId === project.id ? (
                   <input
+                    data-testid="rename-project-input"
                     autoFocus
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
@@ -240,6 +243,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                   <span className="flex-1 text-[13px] truncate">{project.name}</span>
                 )}
                 <Button
+                  data-testid={`project-menu-button-${project.id}`}
                   variant="ghost"
                   size="icon-sm"
                   onClick={(e) => {
@@ -267,6 +271,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                   </button>
                   {project.summary && (
                     <button
+                      data-testid={`summary-project-button-${project.id}`}
                       onClick={() => handleShowSummary(project)}
                       className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
                     >
@@ -275,6 +280,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                     </button>
                   )}
                   <button
+                    data-testid={`delete-project-button-${project.id}`}
                     onClick={() => handleDelete(project.id)}
                     className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
                       pendingDeleteId === project.id

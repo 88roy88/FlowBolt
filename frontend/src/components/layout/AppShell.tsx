@@ -235,6 +235,7 @@ export function AppShell() {
         </div>
       ) : (
         <div
+          data-testid="sidebar-container"
           className="relative shrink-0"
           onMouseEnter={() => { if (!hoverLockRef.current) setSidebarHover(true); }}
           onMouseLeave={() => { if (!sidebarBusy) closeSidebar(); }}
