@@ -18,16 +18,13 @@ class TestAuthHeader:
         assert FlapiClient._build_auth_header("   ") == {}
 
     def test_valid_token(self) -> None:
-        assert FlapiClient._build_auth_header("Bearer abc") == {"Authorization": "Bearer abc"}
+        assert FlapiClient._build_auth_header("my-token") == {"Authorization": "my-token"}
 
     def test_strips_whitespace(self) -> None:
-        assert FlapiClient._build_auth_header("  admin  ") == {"Authorization": "Bearer admin"}
+        assert FlapiClient._build_auth_header("  admin  ") == {"Authorization": "admin"}
 
-    def test_adds_bearer_prefix(self) -> None:
-        assert FlapiClient._build_auth_header("raw-token") == {"Authorization": "Bearer raw-token"}
-
-    def test_bearer_prefix_case_insensitive(self) -> None:
-        assert FlapiClient._build_auth_header("BEARER token") == {"Authorization": "BEARER token"}
+    def test_returns_raw_token_as_is(self) -> None:
+        assert FlapiClient._build_auth_header("any-string") == {"Authorization": "any-string"}
 
 
 class TestGetDisplayName:
@@ -35,9 +32,9 @@ class TestGetDisplayName:
         client = FlapiClient("http://fake")
         client.search = AsyncMock(return_value=[{"Name": "  Sales Overview  "}])  # type: ignore[method-assign]
 
-        result = await client.get_display_name(42, authorization="Bearer x")
+        result = await client.get_display_name(42, authorization="test-token")
         assert result == "Sales Overview"
-        client.search.assert_called_once_with("42", authorization="Bearer x")
+        client.search.assert_called_once_with("42", authorization="test-token")
 
     async def test_raises_when_empty_results(self) -> None:
         client = FlapiClient("http://fake")

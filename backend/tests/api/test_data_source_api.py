@@ -17,7 +17,7 @@ class TestDataSourceAPI:
         monkeypatch.setattr(data_source_api.data_source_client, "run_data_source", _fake_run)
 
         with pytest.raises(HTTPException) as exc:
-            await data_source_api.run_data_source("42", authorization="Bearer test")
+            await data_source_api.run_data_source("42", authorization="test-token")
         assert exc.value.status_code == 401
 
     async def test_search_maps_500_to_502(self, monkeypatch: pytest.MonkeyPatch) -> None:

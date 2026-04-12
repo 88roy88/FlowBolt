@@ -28,7 +28,7 @@ class FlapiClient:
     def _build_auth_header(authorization: str | None) -> dict[str, str]:
         """Build Authorization header for FLAPI requests.
 
-        Adds "Bearer " prefix to raw tokens from SSO if not already present.
+        Strips whitespace and returns a dict with the Authorization header.
         """
         token = (authorization.strip() or None) if authorization else None
         if not token:
