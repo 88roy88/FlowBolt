@@ -11,7 +11,7 @@ AI-powered web app builder. The backend is a FastAPI service; the frontend is a 
 | [uv](https://docs.astral.sh/uv/) | Python package/environment manager (backend) |
 | [pnpm](https://pnpm.io/) | Node package manager (frontend & mocks) |
 | [Docker](https://www.docker.com/) + Compose | Full-stack / production mode |
-| GNU Make | Dev shortcuts (`make dev`, etc.) |
+| GNU Make | Dev shortcuts (`make dev`, etc.) — optional on Windows (see below) |
 
 ---
 
@@ -21,6 +21,12 @@ AI-powered web app builder. The backend is a FastAPI service; the frontend is a 
 
 ```bash
 make install
+```
+
+**Windows (no Make):** run the two commands separately:
+```powershell
+cd frontend; pnpm install; cd ..
+cd backend; uv sync; cd ..
 ```
 
 This runs `pnpm install` in `frontend/` and `uv sync` in `backend/`.
@@ -65,6 +71,27 @@ make dev-mocks      # flapi-mock only
 ```
 
 > `make dev` (and each individual target) automatically kills any processes occupying ports **4000**, **8000**, and **5173** before starting.
+
+**Windows (no Make):** open three separate terminals and run one command in each:
+
+```powershell
+# Terminal 1 — Backend
+cd backend
+uv run --no-sync python -m uvicorn --app-dir src flow44.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src/flow44 --log-level info
+```
+
+```powershell
+# Terminal 2 — Frontend
+cd frontend
+pnpm dev
+```
+
+```powershell
+# Terminal 3 — Mock server
+cd mocks/flapi-mock
+pnpm install
+pnpm dev
+```
 
 ---
 
