@@ -69,8 +69,13 @@ class FollowUpAgent(BaseAgent):
             return "\n".join(f"{m.file}:{m.line}:{m.content}" for m in matches)
 
         @tool
-        async def glob(pattern: str) -> str:
-            """Find files matching a glob pattern. Returns file paths."""
+        async def glob(pattern: str = "*") -> str:
+            """Find files matching a glob pattern.
+
+            Args: pattern: A glob pattern to match files (e.g., "*.tsx", "src/**/*.js"). Defaults to "*".
+
+            Returns: A list of file paths matching the pattern, or a message if no files found.
+            """
             results = await sandbox.glob(pattern)
             if not results:
                 return "No files found matching pattern."
