@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -7,6 +8,8 @@ import litellm
 
 from flow44.ai.core.messages import Message
 from flow44.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: when will messages be dicts?
@@ -58,16 +61,28 @@ async def complete_chat_with_tools(
         *_to_dicts(messages),
     ]
 
-    return await litellm.acompletion(
-        model=resolved_model,
-        messages=full_messages,
-        api_base=settings.AI_BASE_URL,
-        api_key=settings.AI_API_KEY,
-        tools=tools,
-        tool_choice=tool_choice,
-        stream=False,
-        metadata=metadata or {},
-    )
+    try:
+        return await litellm.acompletion(
+            model=resolved_model,
+            messages=full_messages,
+            api_base=settings.AI_BASE_URL,
+            api_key=settings.AI_API_KEY,
+            tools=tools,
+            tool_choice=tool_choice,
+            stream=False,
+            metadata=metadata or {},
+        )
+    except litellm.InternalServerError as exc:
+        logger.error(
+            "[provider] LiteLLM InternalServerError | model=%s status=%s message=%s",
+            resolved_model,
+            getattr(exc, "status_code", "?"),
+            getattr(exc, "message", str(exc)),
+        )
+        raise
+    except Exception:
+        logger.exception("[provider] Unexpected error calling LiteLLM | model=%s", resolved_model)
+        raise
 
 
 async def stream_chat(

@@ -72,13 +72,24 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         for iteration in range(self.max_iterations):
             # Call LLM with tools
             metadata = metadata_fn(f"react-{iteration}") if metadata_fn else None
-            response = await complete_chat_with_tools(
-                messages=working_messages,  # type: ignore[arg-type]
-                system_prompt=system_prompt,
-                tools=tool_schemas,
-                model=model,
-                metadata=metadata,
-            )
+
+            try:
+                response = await complete_chat_with_tools(
+                    messages=working_messages,  # type: ignore[arg-type]
+                    system_prompt=system_prompt,
+                    tools=tool_schemas,
+                    model=model,
+                    metadata=metadata,
+                )
+            except Exception:
+                logger.exception(
+                    "[react_loop:%s] LLM call failed | iteration=%d msgs=%d last_role=%s",
+                    self.name,
+                    iteration,
+                    len(working_messages),
+                    working_messages[-1].get("role") if working_messages else "none",
+                )
+                raise
 
             choice = response.choices[0]
             message = choice.message
