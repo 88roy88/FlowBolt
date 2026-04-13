@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "langfuse.fullname" . }}-web
+  labels:
+    {{- include "langfuse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "langfuse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "langfuse.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+    spec:
+      securityContext:
+        {{- include "langfuse.podSecurityContextWithUser" . | nindent 8 }}
+      containers:
+        - name: web
+          image: {{ include "langfuse.image" .Values.images.langfuseWeb }}
+          imagePullPolicy: {{ .Values.images.langfuseWeb.pullPolicy }}
+          securityContext:
+            {{- include "langfuse.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.langfuseWeb | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            {{- include "langfuse.commonEnv" . | nindent 12 }}
+            - name: NEXTAUTH_URL
+              value: {{ include "langfuse.nextauthUrl" . | quote }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: nextauth-secret
+          readinessProbe:
+            httpGet:
+              path: /api/public/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /api/public/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
