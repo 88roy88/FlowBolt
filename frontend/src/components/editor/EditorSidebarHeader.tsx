@@ -108,6 +108,7 @@ export function EditorSidebarHeader({
       {/* Export Dropdown */}
       <div className="relative ms-auto" ref={exportMenuRef}>
         <button
+          data-testid="export-dropdown-toggle"
           type="button"
           disabled={!projectId}
           onClick={() => setExportMenuOpen(!exportMenuOpen)}
@@ -127,6 +128,7 @@ export function EditorSidebarHeader({
           <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] rounded-md border border-border bg-popover shadow-lg">
             <div className="p-1">
               <button
+                data-testid="export-zip-button"
                 onClick={handleExportZip}
                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-[11px] hover:bg-accent transition-colors text-left"
               >

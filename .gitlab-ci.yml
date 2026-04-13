@@ -1,6 +1,7 @@
 stages:
   - lint
   - test
+  - e2e
 
 # ---------------------------------------------------------------------------
 # Backend
@@ -83,3 +84,60 @@ frontend:e2e:
   rules:
     - changes:
         - frontend/**/*
+
+# ---------------------------------------------------------------------------
+# E2E v2 — full-stack integration test (runs on every push to main)
+#
+# Uses a Node 20 + Python 3.12 image with uv, pnpm, and Playwright pre-installed.
+# Two jobs: local sandbox mode (always) and namespaced/nsjail mode (Linux only).
+# ---------------------------------------------------------------------------
+
+.e2e-v2-base: &e2e-v2-base
+  stage: e2e
+  # mcr.microsoft.com/playwright has Node + Playwright; we add Python/uv on top.
+  # Switch to a custom pre-built image once one exists (see GitHub issue TODO).
+  image: mcr.microsoft.com/playwright:v1.50.0-noble
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends python3.12 python3-pip curl
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    - corepack enable && corepack prepare pnpm@10 --activate
+    # Install all project dependencies
+    - (cd frontend         && pnpm install --frozen-lockfile)
+    - (cd backend          && uv sync --frozen)
+    - (cd mocks/flapi-mock && pnpm install --frozen-lockfile)
+    - (cd e2e-v2           && pnpm install --frozen-lockfile)
+  artifacts:
+    when: on_failure
+    paths:
+      - e2e-v2/test-results/
+    expire_in: 7 days
+  # Only run on the merge train — not on regular MR pipelines.
+  # $CI_MERGE_REQUEST_EVENT_TYPE is "merge_train" when GitLab Merge Trains are used.
+  # Falls back to "push to default branch" for simpler setups without merge trains.
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
+e2e-v2:linux-local:
+  <<: *e2e-v2-base
+  variables:
+    AIB_SANDBOX_MODE: local
+  script:
+    - cd e2e-v2 && pnpm test
+
+e2e-v2:linux-namespaced:
+  <<: *e2e-v2-base
+  variables:
+    AIB_SANDBOX_MODE: namespaced
+  before_script:
+    - !reference [.e2e-v2-base, before_script]
+    - apt-get install -y --no-install-recommends
+        bison flex libprotobuf-dev protobuf-compiler
+        libnl-route-3-dev libcap-dev build-essential pkg-config git
+    - git clone --depth=1 https://github.com/google/nsjail /tmp/nsjail-src
+    - make -C /tmp/nsjail-src -j$(nproc)
+    - cp /tmp/nsjail-src/nsjail /usr/local/bin/nsjail
+    - sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true
+  script:
+    - cd e2e-v2 && pnpm test

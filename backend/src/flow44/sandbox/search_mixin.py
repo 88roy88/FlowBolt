@@ -58,7 +58,7 @@ class SearchMixin(BaseSandbox, ABC):
     ) -> list[GrepMatch]:
         # Validate path (raises PermissionError on traversal); compute workspace-relative search path
         abs_search = self._safe_path(path)
-        rel_search = PurePosixPath(os.path.relpath(abs_search, self.workspace_dir)).as_posix()  # noqa: ASYNC240
+        rel_search = PurePosixPath(os.path.relpath(abs_search, os.path.realpath(self.workspace_dir))).as_posix()  # noqa: ASYNC240
 
         # --json gives structured output: no colon-splitting, no drive-letter ambiguity on Windows
         args: list[str] = ["rg", "--json"]

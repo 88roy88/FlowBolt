@@ -41,6 +41,7 @@ export function ModelSelector() {
   return (
     <div ref={dropdownRef} className="relative">
       <button
+        data-testid="model-selector-button"
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 px-2.5 py-1 bg-background border border-border rounded-full text-xs cursor-pointer max-w-[260px]"
@@ -63,6 +64,7 @@ export function ModelSelector() {
                 return (
                   <button
                     key={m.id}
+                    data-testid={`model-option-${m.id}`}
                     type="button"
                     onClick={() => { setSelectedModel(m.id); setOpen(false); }}
                     className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left cursor-pointer border-b border-[var(--dropdown-divider)] ${
