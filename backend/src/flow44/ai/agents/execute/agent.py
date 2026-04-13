@@ -146,7 +146,8 @@ class ExecuteAgent(BaseAgent):
         try:
             await state.emit_fn({"type": "phase", "phase": "executing"})
 
-            state.build_state.completed_files = {}
+            # Pre-populate with deterministically generated data source files
+            state.build_state.completed_files = dict(state.build_state.generated_data_source_files)
             state.build_state.task_files = {}
 
             for layer in state.build_state.work_plan.execution_layers():
@@ -248,11 +249,12 @@ class ExecuteAgent(BaseAgent):
                     for k in (
                         "data_source_id",
                         "data_source_name",
-                        "data_schema",
+                        "sanitized_name",
                         "relevant_fields",
                         "data_characteristics",
                         "integration_notes",
                     )
+                    if k in ctx
                 }
                 for ctx in state.build_state.data_source_contexts
             ]

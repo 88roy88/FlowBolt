@@ -14,6 +14,8 @@ from flow44.ai.agents.plan.prompts import (
     render_data_source_analysis,
     render_user_plan,
 )
+from flow44.ai.codegen.hook_template import generate_data_source_hook
+from flow44.ai.codegen.ts_types import generate_ts_interfaces, sanitize_to_pascal_case
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
@@ -101,6 +103,14 @@ class PlanAgent(BaseAgent):
             raise
 
         state.build_state.data_source_contexts = [ctx for ctx in results if ctx is not None]
+
+        # Generate deterministic hook + type files and write to sandbox
+        for ctx in state.build_state.data_source_contexts:
+            generated = self._generate_data_source_files(ctx)
+            ctx["generated_files"] = generated
+            for path, content in generated.items():
+                await state.sandbox_ref.write_file(path, content)
+            state.build_state.generated_data_source_files.update(generated)
 
         if state.build_state.data_source_contexts:
             from flow44.db.project import update_project_data_sources  # noqa: PLC0415
@@ -191,12 +201,29 @@ class PlanAgent(BaseAgent):
             authorization=self._data_source_authorization,
         )
         analysis = await self._analyze_data_source(ds_name, sample_data)
+        sanitized = sanitize_to_pascal_case(ds_name) or f"DataSource{data_source_id}"
         return {
             "data_source_id": data_source_id,
             "data_source_name": ds_name,
+            "sanitized_name": sanitized,
             "sample_data": sample_data,
             **analysis,
         }
+
+    @staticmethod
+    def _generate_data_source_files(ctx: dict[str, Any]) -> dict[str, str]:
+        """Generate TypeScript types + React hook for a data source."""
+        sanitized = ctx["sanitized_name"]
+        types_path = f"src/types/dataSource{sanitized}.ts"
+        hook_path = f"src/hooks/useDataSource{sanitized}.ts"
+
+        types_content = generate_ts_interfaces(ctx["sample_data"], sanitized)
+        hook_content = generate_data_source_hook(
+            data_source_id=ctx["data_source_id"],
+            sanitized_name=sanitized,
+            types_import_path=f"../types/dataSource{sanitized}",
+        )
+        return {types_path: types_content, hook_path: hook_content}
 
     async def _analyze_data_source(self, ds_name: str, sample_data: Any) -> dict[str, Any]:
         prompt = render_data_source_analysis(
@@ -215,7 +242,7 @@ class PlanAgent(BaseAgent):
         except Exception:
             logger.exception("[plan] Data source analysis failed, using degraded result")
             return {
-                "data_schema": "Unable to analyze — see raw sample data",
+                "data_schema": "Unknown — analysis failed",
                 "relevant_fields": "See raw data",
                 "data_characteristics": "Fetched from API",
                 "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",

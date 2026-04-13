@@ -26,16 +26,9 @@ class FlapiClient:
 
     @staticmethod
     def _build_auth_header(authorization: str | None) -> dict[str, str]:
-        """Build Authorization header for FLAPI requests.
-
-        Adds "Bearer " prefix to raw tokens from SSO if not already present.
-        """
         token = (authorization.strip() or None) if authorization else None
         if not token:
             return {}
-        # Add "Bearer " prefix if not already present
-        if not token.lower().startswith("bearer "):
-            token = f"Bearer {token}"
         return {"Authorization": token}
 
     async def _request(self, method: str, path: str, *, authorization: str | None = None, **kwargs: Any) -> Any:

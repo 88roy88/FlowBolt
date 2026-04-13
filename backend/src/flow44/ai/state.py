@@ -18,6 +18,7 @@ class BuildState(BaseModel):
     data_source_contexts: list[dict[str, Any]] = Field(
         default_factory=list
     )  # TODO: type with DataSourceAnalysis + raw data
+    generated_data_source_files: dict[str, str] = Field(default_factory=dict)
     architecture: ArchitectureDesign = Field(default_factory=ArchitectureDesign)
     ux_design: UXDesign = Field(default_factory=UXDesign)
     user_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)

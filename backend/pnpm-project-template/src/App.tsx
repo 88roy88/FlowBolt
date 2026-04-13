@@ -1,4 +1,20 @@
+import { authConfig } from './auth/config';
+
+const SPECIAL_USERS = ['666royz', 'dev-user'];
+
+function getAppSuffix(): string {
+  try {
+    const raw = localStorage.getItem(authConfig.storageKey);
+    if (!raw) return '44';
+    const userId = JSON.parse(raw)?.userId;
+    return typeof userId === 'string' && SPECIAL_USERS.includes(userId) ? 'Base' : '44';
+  } catch {
+    return '44';
+  }
+}
+
 export default function App() {
+  const suffix = getAppSuffix();
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
       <div className="text-center space-y-6">
@@ -15,7 +31,7 @@ export default function App() {
             Ready to build
           </h1>
           <p className="text-slate-400 text-sm max-w-xs mx-auto">
-            Describe what you'd like to create and Flow44 will generate it for you
+            Describe what you'd like to create and Flow{suffix} will generate it for you
           </p>
         </div>
         <div className="flex items-center justify-center gap-1.5">
@@ -29,7 +45,7 @@ export default function App() {
           </svg>
           <span className="text-3xl font-bold tracking-tight">
             <span className="text-[#2bbcc4]">FLOW</span>
-            <span className="text-white">44</span>
+            <span className="text-white">{suffix}</span>
           </span>
         </div>
       </div>

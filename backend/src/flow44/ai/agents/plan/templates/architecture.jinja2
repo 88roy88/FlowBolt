@@ -28,17 +28,28 @@ Rules:
 - **CRITICAL**: ONLY use the pre-installed packages (react, react-dom, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss). Do NOT suggest adding other packages or dependencies. All functionality must be implemented using built-in browser APIs and these pre-configured packages only.
 {% if data_source_contexts %}
 
-The user's request includes the following data sources. Your architecture MUST include
-components that fetch, display, and interact with this data.
+The user's request includes the following data sources. Pre-built hooks and TypeScript types
+have ALREADY been generated for each one. Your architecture MUST use these existing files.
+Do NOT design new hooks or types for data sources — they are ready to import.
 
 {% for ctx in data_source_contexts %}
 ### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }})
-Data Schema: {{ ctx.data_schema }}
 Relevant Fields: {{ ctx.relevant_fields }}
-Sample data:
+Data Characteristics: {{ ctx.data_characteristics }}
+
+**Pre-generated files (already exist — do NOT include in file_structure):**
+{% for path in ctx.generated_files.keys() %}
+- `{{ path }}`
+{% endfor %}
+
+Usage: `import { useDataSource{{ ctx.sanitized_name }} } from './hooks/useDataSource{{ ctx.sanitized_name }}';`
+The hook returns `{ data, isLoading, error, refetch }`.
+
+Sample data structure:
 ```json
 {{ ctx.sample_data_json }}
 ```
-Endpoint: `${API_BASE}/api/data-source/{{ ctx.data_source_id }}/run` (import API_BASE from src/config.ts) with `Authorization` header from `credentialsStore.getValidToken()` (import from src/auth)
 {% endfor %}
+
+IMPORTANT: `src/auth/` is a pre-existing module — do NOT include it in file_structure. Do NOT include the data source hooks or types files in file_structure either — they already exist.
 {% endif %}

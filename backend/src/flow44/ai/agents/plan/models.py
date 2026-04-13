@@ -16,7 +16,7 @@ class ArchitectureDesign(BaseModel):
     data_flow: str = ""
     file_structure: list[str] = Field(default_factory=list)
     state_management: str = ""
-    key_dependencies: str = ""
+    key_dependencies: str | list[str] = ""
     notes: str = ""
 
 

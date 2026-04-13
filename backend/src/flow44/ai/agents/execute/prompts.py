@@ -38,14 +38,13 @@ def render_codegen(  # noqa: PLR0913
 ) -> str:
     prepared_sources = None
     if data_source_contexts:
-        prepared_sources = []
-        for ctx in data_source_contexts:
-            prepared_sources.append(
-                {
-                    **ctx,
-                    "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000],
-                }
-            )
+        prepared_sources = [
+            {
+                **ctx,
+                "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000],
+            }
+            for ctx in data_source_contexts
+        ]
 
     other_exports = None
     if other_completed_files:

@@ -11,4 +11,4 @@ Sample API Response:
 ```
 
 Respond with ONLY a JSON object:
-{"data_schema": "...", "relevant_fields": "...", "data_characteristics": "...", "integration_notes": "..."}
+{"data_schema": "Brief human-readable description of the data shape and key fields", "relevant_fields": "Newline-separated list of relevant fields, each formatted as: field_name — why it matters. Use \\n between entries.", "data_characteristics": "Nature of the data: is it a list, paginated, real-time, static, etc.", "integration_notes": "Any special considerations for displaying or transforming this data"}

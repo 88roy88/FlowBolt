@@ -2,10 +2,6 @@ import type { AuthConfig } from './config';
 import type { AuthCredentials } from './types';
 import { extractCredentials, isCredentialsMessage } from './types';
 
-/**
- * Listen for credentials from an iframe via postMessage.
- * Pure logic — no DOM manipulation. The React component renders the iframe.
- */
 export function listenForIframeCredentials(
   iframe: HTMLIFrameElement,
   config: AuthConfig,
@@ -14,7 +10,6 @@ export function listenForIframeCredentials(
   return new Promise<AuthCredentials>((resolve, reject) => {
     const requestPayload = { type: 'requestCredentials', doesTokenHaveExpirationDate: true };
     let pollTimer: ReturnType<typeof setInterval> | undefined;
-
     const cleanup = () => {
       clearInterval(pollTimer);
       clearTimeout(timeoutTimer);

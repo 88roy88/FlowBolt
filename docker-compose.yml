@@ -77,6 +77,8 @@ services:
       - "6001"
     environment:
       MOCK_PORT: "6001"
+    ports:
+      - "6001:6001"
     networks:
       - internal
     restart: unless-stopped

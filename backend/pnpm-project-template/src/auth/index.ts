@@ -1,9 +1,8 @@
 /**
- * Authentication module
+ * Authentication module — SSO via popup or iframe.
  *
- * For local development:
- * - Set VITE_AUTH_PROVIDER_URL=http://localhost:6001/sso in .env
- * - Start mock server: cd mocks/cases-mock && pnpm start
+ * Reads configuration from VITE_AUTH_* environment variables.
+ * Provides credentialsStore for token management and authSession for sign-in flow.
  */
 
 export { AuthGate } from './AuthGate';
