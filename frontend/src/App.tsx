@@ -125,8 +125,8 @@ export default function App() {
     const match = hashProjectId
       ? projects.find((p) => p.id === hashProjectId)
       : null;
-    const target = match ?? projects[0];
-    selectProject(target);
+    if (!match) return;
+    selectProject(match);
   }, [loading, projects, currentProject, selectProject]);
 
   // Listen for hash changes (back/forward)
