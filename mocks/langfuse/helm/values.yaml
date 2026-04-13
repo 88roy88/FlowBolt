@@ -1,0 +1,171 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# ──────────────────────────────────────────────────────────────────────────────
+# IMAGES — all container images in one place; edit tags / repositories here
+# ──────────────────────────────────────────────────────────────────────────────
+images:
+  langfuseWeb:
+    repository: langfuse/langfuse
+    tag: "3"
+    pullPolicy: IfNotPresent
+
+  langfuseWorker:
+    repository: langfuse/langfuse-worker
+    tag: "3"
+    pullPolicy: IfNotPresent
+
+  postgres:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+
+  clickhouse:
+    repository: clickhouse/clickhouse-server
+    tag: "24.3"
+    pullPolicy: IfNotPresent
+
+  redis:
+    repository: redis
+    tag: "7.2"
+    pullPolicy: IfNotPresent
+
+  minio:
+    repository: minio/minio
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+# ──────────────────────────────────────────────────────────────────────────────
+# OPENSHIFT SECURITY CONTEXT
+# Managed OpenShift disallows root.  fsGroup ensures every PVC mount is
+# group-writable by the given GID.  runAsUser is applied to services that
+# tolerate an arbitrary UID (clickhouse, minio, langfuse-web, langfuse-worker).
+# postgres and redis use their own internal user-switching entrypoints.
+# ──────────────────────────────────────────────────────────────────────────────
+securityContext:
+  # GID applied to all pod volume mounts
+  fsGroup: 1004970000
+  # UID used for services that support arbitrary non-root UIDs
+  runAsUser: 1004970000
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PERSISTENCE — PersistentVolumeClaim sizes
+# storageClass: "" uses the cluster default StorageClass
+# ──────────────────────────────────────────────────────────────────────────────
+persistence:
+  storageClass: ""
+
+  postgres:
+    size: 10Gi
+
+  clickhouse:
+    data:
+      size: 20Gi
+    logs:
+      size: 2Gi
+
+  redis:
+    size: 2Gi
+
+  minio:
+    size: 20Gi
+
+# ──────────────────────────────────────────────────────────────────────────────
+# OPENSHIFT ROUTE (langfuse-web)
+# ──────────────────────────────────────────────────────────────────────────────
+route:
+  # Change this to your cluster's wildcard domain, e.g.:
+  #   langfuse.apps.ocp.example.com
+  host: langfuse.apps.example.com
+  tls:
+    enabled: true
+    termination: edge                   # edge | passthrough | reencrypt
+    insecureEdgeTerminationPolicy: Redirect  # Redirect | Allow | None
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LANGFUSE APPLICATION CONFIG
+# ──────────────────────────────────────────────────────────────────────────────
+langfuse:
+  # Generate a strong random value for production:  openssl rand -hex 32
+  salt: "local-dev-salt"
+  encryptionKey: "c0743fd065aeea84ec110acce9f1c7315dd7ce45b6051b16d1f11ef11bad2d59"
+  nextauthSecret: "local-dev-secret"
+
+  # If left empty, defaults to https://<route.host>
+  nextauthUrl: ""
+
+  telemetryEnabled: "false"
+  enableExperimentalFeatures: "true"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# INFRASTRUCTURE CREDENTIALS (plaintext — use sealed-secrets / vault in prod)
+# ──────────────────────────────────────────────────────────────────────────────
+postgres:
+  user: langfuse
+  password: langfuse
+  db: langfuse
+
+clickhouse:
+  user: clickhouse
+  password: clickhouse
+
+redis:
+  password: langfuse-redis-secret
+
+minio:
+  rootUser: minio
+  rootPassword: miniosecret
+  # Bucket created on first start
+  bucket: langfuse
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RESOURCES — CPU/Memory requests and limits
+# ──────────────────────────────────────────────────────────────────────────────
+resources:
+  langfuseWeb:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  langfuseWorker:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  postgres:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  clickhouse:
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+  redis:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  minio:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 1Gi

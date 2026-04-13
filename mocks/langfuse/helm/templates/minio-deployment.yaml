@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "langfuse.fullname" . }}-minio
+  labels:
+    {{- include "langfuse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "langfuse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "langfuse.labels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      # MinIO runs filesystem commands (mkdir) and the server as the same UID.
+      # Setting runAsUser + fsGroup ensures the PVC at /data is fully owned
+      # by the process without requiring root.
+      securityContext:
+        {{- include "langfuse.podSecurityContextWithUser" . | nindent 8 }}
+      containers:
+        - name: minio
+          image: {{ include "langfuse.image" .Values.images.minio }}
+          imagePullPolicy: {{ .Values.images.minio.pullPolicy }}
+          securityContext:
+            {{- include "langfuse.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.minio | nindent 12 }}
+          # Create the required bucket directory then start the server.
+          # This mirrors the docker-compose entrypoint/command pattern.
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              mkdir -p /data/{{ .Values.minio.bucket }} && \
+              minio server --address ":9000" --console-address ":9001" /data
+          ports:
+            - name: api
+              containerPort: 9000
+              protocol: TCP
+            - name: console
+              containerPort: 9001
+              protocol: TCP
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: minio-root-user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: minio-root-password
+          readinessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "langfuse.fullname" . }}-minio

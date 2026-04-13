@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "langfuse.fullname" . }}-postgres
+  labels:
+    {{- include "langfuse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  # Recreate so the PVC (RWO) is released before the new pod claims it
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "langfuse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "langfuse.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      # postgres:alpine entrypoint starts as root, drops to the postgres user,
+      # then initialises PGDATA.  fsGroup ensures the PVC is group-writable so
+      # the postgres user (uid 70) can write to it.  runAsUser is intentionally
+      # omitted so the image's own USER directive takes effect.
+      securityContext:
+        {{- include "langfuse.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: postgres
+          image: {{ include "langfuse.image" .Values.images.postgres }}
+          imagePullPolicy: {{ .Values.images.postgres.pullPolicy }}
+          securityContext:
+            {{- include "langfuse.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.postgres | nindent 12 }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: postgres-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: postgres-db
+            # Let postgres write temp files to an emptyDir so the container
+            # root filesystem does not need to be writable
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "langfuse.fullname" . }}-postgres

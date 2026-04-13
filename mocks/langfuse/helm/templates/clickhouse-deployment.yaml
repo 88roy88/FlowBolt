@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "langfuse.fullname" . }}-clickhouse
+  labels:
+    {{- include "langfuse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "langfuse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: clickhouse
+  template:
+    metadata:
+      labels:
+        {{- include "langfuse.labels" . | nindent 8 }}
+        app.kubernetes.io/component: clickhouse
+    spec:
+      # Run as the OpenShift project UID so the process owns the PVC mounts.
+      # ClickHouse 24.x does not require a specific fixed UID.
+      securityContext:
+        {{- include "langfuse.podSecurityContextWithUser" . | nindent 8 }}
+      containers:
+        - name: clickhouse
+          image: {{ include "langfuse.image" .Values.images.clickhouse }}
+          imagePullPolicy: {{ .Values.images.clickhouse.pullPolicy }}
+          securityContext:
+            {{- include "langfuse.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.clickhouse | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8123
+              protocol: TCP
+            - name: native
+              containerPort: 9000
+              protocol: TCP
+          env:
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: clickhouse-user
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langfuse.secretName" . }}
+                  key: clickhouse-password
+            - name: CLICKHOUSE_DB
+              value: default
+            - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+              value: "1"
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8123
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8123
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            - name: logs
+              mountPath: /var/log/clickhouse-server
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "langfuse.fullname" . }}-clickhouse-data
+        - name: logs
+          persistentVolumeClaim:
+            claimName: {{ include "langfuse.fullname" . }}-clickhouse-logs
