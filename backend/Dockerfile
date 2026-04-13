@@ -47,8 +47,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser \
-    && mkdir -p /var/lib/ai-builder/workspaces \
-    && chown -R appuser:appuser /var/lib/ai-builder
+    && mkdir -p /var/lib/flow-44/workspaces \
+    && chown -R appuser:appuser /var/lib/flow-44
 
 # Create data directory for runtime database
 RUN mkdir -p /app/data && chown appuser:appuser /app/data

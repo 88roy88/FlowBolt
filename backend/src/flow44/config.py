@@ -25,7 +25,7 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256
     SANDBOX_DISABLE_CGROUPS: bool = False
-    PNPM_STORE_DIR: str = "/var/lib/ai-builder/workspaces/.pnpm-store"
+    PNPM_STORE_DIR: str = "/var/lib/flow-44/workspaces/.pnpm-store"
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
     # Public base URL of this backend, used in HTML exports so API calls work standalone.
     EXPORT_API_BASE_URL: str = "http://localhost:8000"
@@ -51,7 +51,7 @@ class DatabaseSettings(Flow44BaseSettings):
 class AIModelSettings(Flow44BaseSettings):
     AI_MODEL: str = "qwen/qwen3-coder-30b-a3b-instruct"
     # Base URL for OpenAI-compatible endpoints (vLLM, Ollama, OpenRouter, etc.)
-    AI_BASE_URL: str = "http://ai-builder-models.com/openai/v1"
+    AI_BASE_URL: str = "http://flow-44-models.com/openai/v1"
     AI_API_KEY: str = "default"
 
 
