@@ -10,8 +10,6 @@ export function listenForIframeCredentials(
   return new Promise<AuthCredentials>((resolve, reject) => {
     const requestPayload = { type: 'requestCredentials', doesTokenHaveExpirationDate: true };
     let pollTimer: ReturnType<typeof setInterval> | undefined;
-    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
-
     const cleanup = () => {
       clearInterval(pollTimer);
       clearTimeout(timeoutTimer);
@@ -40,7 +38,7 @@ export function listenForIframeCredentials(
     window.addEventListener('message', onMessage);
     signal?.addEventListener('abort', onAbort);
 
-    timeoutTimer = setTimeout(() => {
+    const timeoutTimer = setTimeout(() => {
       cleanup();
       reject(new Error('Login timed out. Please try again.'));
     }, config.popupTimeoutMs);

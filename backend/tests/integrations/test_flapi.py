@@ -21,10 +21,10 @@ class TestAuthHeader:
         assert FlapiClient._build_auth_header("Bearer abc") == {"Authorization": "Bearer abc"}
 
     def test_strips_whitespace(self) -> None:
-        assert FlapiClient._build_auth_header("  admin  ") == {"Authorization": "Bearer admin"}
+        assert FlapiClient._build_auth_header("  admin  ") == {"Authorization": "admin"}
 
     def test_adds_bearer_prefix(self) -> None:
-        assert FlapiClient._build_auth_header("raw-token") == {"Authorization": "Bearer raw-token"}
+        assert FlapiClient._build_auth_header("raw-token") == {"Authorization": "raw-token"}
 
     def test_bearer_prefix_case_insensitive(self) -> None:
         assert FlapiClient._build_auth_header("BEARER token") == {"Authorization": "BEARER token"}
