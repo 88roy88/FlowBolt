@@ -184,36 +184,14 @@ class FollowUpAgent(BaseAgent):
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
-
-        try:
-            answer = await react_flow.react_loop(
-                messages=messages,
-                system_prompt=system_prompt,
-                tools=self._executor,
-                model=self.model,
-                metadata_fn=lambda step: self._llm_metadata(f"followup-{step}"),
-                emit_fn=self._emit_react_step,
-            )
-        except Exception as exc:
-            langfuse_context.update_current_observation(
-                level="ERROR",
-                status_message=str(exc),
-                metadata={
-                    "error_type": type(exc).__name__,
-                    "litellm_status_code": getattr(exc, "status_code", None),
-                    "litellm_message": getattr(exc, "message", None),
-                    "model": self.model,
-                    "history_len": len(history),
-                    "system_prompt_len": len(system_prompt),
-                },
-            )
-            logger.exception(
-                "[FollowUpAgent] react_loop failed | project_id=%s model=%s history=%d",
-                self.project_id,
-                self.model or "(default)",
-                len(history),
-            )
-            raise
+        answer = await react_flow.react_loop(
+            messages=messages,
+            system_prompt=system_prompt,
+            tools=self._executor,
+            model=self.model,
+            metadata_fn=lambda step: self._llm_metadata(f"followup-{step}"),
+            emit_fn=self._emit_react_step,
+        )
 
         if answer:
             await self.emit({"type": "text", "content": answer})
