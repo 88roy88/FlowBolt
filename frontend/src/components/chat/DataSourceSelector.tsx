@@ -21,6 +21,7 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -38,8 +39,9 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
 
   if (!isOpen) return null;
 
-  const handleSearch = async (searchQuery: string) => {
+  const handleSearch = (searchQuery: string) => {
     setQuery(searchQuery);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!searchQuery.trim()) {
       setResults([]);
       setShowDropdown(false);
@@ -47,15 +49,17 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
     }
     setIsLoading(true);
     setShowDropdown(true);
-    try {
-      const sources = await searchDataSources(searchQuery);
-      setResults(sources.slice(0, 10));
-    } catch (err) {
-      console.error('Failed to search data sources:', err);
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const sources = await searchDataSources(searchQuery);
+        setResults(sources.slice(0, 10));
+      } catch (err) {
+        console.error('Failed to search data sources:', err);
+        setResults([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 300);
   };
 
   const handleSelect = (pkg: DataSourceSearchRecord) => {
