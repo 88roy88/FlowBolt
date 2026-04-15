@@ -26,7 +26,7 @@ endif
 # --no-sync avoids uv reinstalling entry points (dev.exe) on every run — fixes Windows file-in-use (os error 32)
 # Use --app-dir src because backend uses src-layout (flow44 package lives under backend/src).
 dev-backend: kill-ports
-	cd backend && uv run --no-sync --python 3.12 python -m uvicorn --app-dir src flow44.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src/flow44 --log-level info
+	cd backend && uv run --no-sync python -m uvicorn --app-dir src flow44.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src/flow44 --log-level info
 
 dev-frontend: kill-ports
 	cd frontend && pnpm dev
