@@ -6,6 +6,7 @@ import * as monaco from 'monaco-editor';
 loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
+import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
@@ -41,6 +42,9 @@ export function EditorPanel() {
     openFile,
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
+  const messages = useChatStore((s) => s.messages);
+  const hasInitialAiResponse = useMemo(() => messages.some((m) => m.role === 'assistant'), [messages]);
+  const readOnlyUntilFirstAiResponse = !hasInitialAiResponse;
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
@@ -53,7 +57,12 @@ export function EditorPanel() {
   );
 
   const editorTheme = useEditorPanelTheme();
-  const { saveStatus, handleEditorChange } = useEditorPanelSave(activeFilePath, updateFileContent, saveFile);
+  const { saveStatus, handleEditorChange } = useEditorPanelSave(
+    activeFilePath,
+    updateFileContent,
+    saveFile,
+    readOnlyUntilFirstAiResponse
+  );
 
   useEditorPendingReveal(
     editorRef,
@@ -164,7 +173,7 @@ export function EditorPanel() {
 
         {leftTab === 'files' ? (
           <div style={{ flex: 1, overflow: 'auto' }}>
-            <FileTree />
+            <FileTree readOnly={readOnlyUntilFirstAiResponse} />
           </div>
         ) : (
           <EditorSearchPanel
@@ -213,6 +222,11 @@ export function EditorPanel() {
               )}
             </div>
           )}
+          {readOnlyUntilFirstAiResponse && (
+            <div className="px-3 text-[11px] text-muted-foreground shrink-0">
+              {t('editor.readOnlyUntilFirstAiResponse')}
+            </div>
+          )}
         </div>
 
         {activeFilePath && activeContent !== undefined ? (
@@ -225,7 +239,7 @@ export function EditorPanel() {
               onChange={handleEditorChange}
               beforeMount={handleBeforeMount}
               onMount={handleMonacoEditorMount}
-              options={EDITOR_MONACO_OPTIONS}
+              options={{ ...EDITOR_MONACO_OPTIONS, readOnly: readOnlyUntilFirstAiResponse }}
             />
           </div>
         ) : (

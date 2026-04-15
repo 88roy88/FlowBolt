@@ -28,6 +28,7 @@ interface TreeNodeProps {
   onCreate: (basePath: string) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
+  readOnly: boolean;
 }
 
 function normalizePath(path: string): string {
@@ -49,7 +50,7 @@ function joinPath(basePath: string, childName: string): string {
   return base === '/' ? `/${trimmed}` : `${base}/${trimmed}`;
 }
 
-function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps) {
+function TreeNode({ entry, depth, onCreate, onRename, onDelete, readOnly }: TreeNodeProps) {
   const { t } = useTranslation();
   const { openFile, activeFilePath } = useFilesStore();
   const [expanded, setExpanded] = useState(depth < 2);
@@ -75,9 +76,11 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps)
               className="rounded p-0.5 hover:bg-muted"
               onClick={(e) => {
                 e.stopPropagation();
+                if (readOnly) return;
                 onCreate(createInBasePath);
               }}
               title={t('editor.createFile')}
+              disabled={readOnly}
             >
               <Plus size={12} />
             </button>
@@ -86,9 +89,11 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps)
               className="rounded p-0.5 hover:bg-muted"
               onClick={(e) => {
                 e.stopPropagation();
+                if (readOnly) return;
                 onRename(entry);
               }}
               title={t('editor.renameFile')}
+              disabled={readOnly}
             >
               <Pencil size={12} />
             </button>
@@ -97,9 +102,11 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps)
               className="rounded p-0.5 hover:bg-muted text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
+                if (readOnly) return;
                 onDelete(entry);
               }}
               title={t('editor.deleteFile')}
+              disabled={readOnly}
             >
               <Trash2 size={12} />
             </button>
@@ -113,6 +120,7 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps)
             onCreate={onCreate}
             onRename={onRename}
             onDelete={onDelete}
+            readOnly={readOnly}
           />
         ))}
       </div>
@@ -135,9 +143,11 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps)
           className="rounded p-0.5 hover:bg-muted"
           onClick={(e) => {
             e.stopPropagation();
+            if (readOnly) return;
             onRename(entry);
           }}
           title={t('editor.renameFile')}
+          disabled={readOnly}
         >
           <Pencil size={12} />
         </button>
@@ -146,9 +156,11 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps)
           className="rounded p-0.5 hover:bg-muted text-destructive"
           onClick={(e) => {
             e.stopPropagation();
+            if (readOnly) return;
             onDelete(entry);
           }}
           title={t('editor.deleteFile')}
+          disabled={readOnly}
         >
           <Trash2 size={12} />
         </button>
@@ -163,7 +175,11 @@ type FileActionDialogState =
   | { mode: 'delete'; entry: FileEntry }
   | null;
 
-export function FileTree() {
+interface FileTreeProps {
+  readOnly: boolean;
+}
+
+export function FileTree({ readOnly }: FileTreeProps) {
   const { t } = useTranslation();
   const fileTree = useFilesStore((s) => s.fileTree);
   const createFile = useFilesStore((s) => s.createFile);
@@ -182,18 +198,21 @@ export function FileTree() {
   };
 
   const openCreateDialog = (basePath: string) => {
+    if (readOnly) return;
     setDialogState({ mode: 'create', basePath });
     setInputValue('');
     setDialogError(null);
   };
 
   const openRenameDialog = (entry: FileEntry) => {
+    if (readOnly) return;
     setDialogState({ mode: 'rename', entry });
     setInputValue(entry.name);
     setDialogError(null);
   };
 
   const openDeleteDialog = (entry: FileEntry) => {
+    if (readOnly) return;
     setDialogState({ mode: 'delete', entry });
     setInputValue('');
     setDialogError(null);
@@ -259,9 +278,13 @@ export function FileTree() {
           type="button"
           className="mb-1 rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
           onClick={() => openCreateDialog('/')}
+          disabled={readOnly}
         >
           {t('editor.createFile')}
         </button>
+        {readOnly && (
+          <span className="text-[11px] text-muted-foreground">{t('editor.readOnlyUntilFirstAiResponse')}</span>
+        )}
         <Folder size={28} className="text-muted-foreground opacity-30" />
         <span className="text-xs text-muted-foreground">
           No files yet. Start a conversation to scaffold your project.
@@ -278,10 +301,16 @@ export function FileTree() {
             type="button"
             className="w-full rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
             onClick={() => openCreateDialog('/')}
+            disabled={readOnly}
           >
             {t('editor.createFile')}
           </button>
         </div>
+        {readOnly && (
+          <div className="px-2 pb-2 text-[11px] text-muted-foreground">
+            {t('editor.readOnlyUntilFirstAiResponse')}
+          </div>
+        )}
         {fileTree.map((entry) => (
           <TreeNode
             key={entry.path}
@@ -290,6 +319,7 @@ export function FileTree() {
             onCreate={openCreateDialog}
             onRename={openRenameDialog}
             onDelete={openDeleteDialog}
+            readOnly={readOnly}
           />
         ))}
       </div>

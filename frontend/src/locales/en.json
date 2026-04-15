@@ -79,6 +79,7 @@
     "renameFile": "Rename",
     "deleteFile": "Delete",
     "deletedTab": "Deleted file (tab kept open)",
+    "readOnlyUntilFirstAiResponse": "Editing is enabled after the first AI response.",
     "newFilePrompt": "Enter a new file path",
     "renamePrompt": "Enter a new name",
     "confirmDeleteFile": "Delete {{name}}?",

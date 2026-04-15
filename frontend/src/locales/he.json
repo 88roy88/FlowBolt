@@ -79,6 +79,7 @@
     "renameFile": "שנה שם",
     "deleteFile": "מחק",
     "deletedTab": "קובץ נמחק (הלשונית נשארת פתוחה)",
+    "readOnlyUntilFirstAiResponse": "עריכה תופעל אחרי התשובה הראשונה של ה-AI.",
     "newFilePrompt": "הכנס נתיב לקובץ חדש",
     "renamePrompt": "הכנס שם חדש",
     "confirmDeleteFile": "למחוק את {{name}}?",
