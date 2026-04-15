@@ -82,6 +82,7 @@
     "newFilePrompt": "הכנס נתיב לקובץ חדש",
     "renamePrompt": "הכנס שם חדש",
     "confirmDeleteFile": "למחוק את {{name}}?",
+    "fileNameRequired": "חובה להזין שם קובץ.",
     "fileActionFailed": "פעולת קובץ נכשלה. נסה שוב."
   },
   "terminal": {

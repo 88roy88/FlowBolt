@@ -3,6 +3,9 @@ import type { FileEntry } from '../../types';
 import { Folder, FolderOpen, File, FileJson, FileCode, FileText as FileTextIcon, Image, Settings, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '../ui/dialog';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
 
 function getFileIcon(name: string) {
   const ext = name.split('.').pop()?.toLowerCase();
@@ -22,6 +25,9 @@ function getFileIcon(name: string) {
 interface TreeNodeProps {
   entry: FileEntry;
   depth: number;
+  onCreate: (basePath: string) => void;
+  onRename: (entry: FileEntry) => void;
+  onDelete: (entry: FileEntry) => void;
 }
 
 function normalizePath(path: string): string {
@@ -43,45 +49,12 @@ function joinPath(basePath: string, childName: string): string {
   return base === '/' ? `/${trimmed}` : `${base}/${trimmed}`;
 }
 
-function TreeNode({ entry, depth }: TreeNodeProps) {
+function TreeNode({ entry, depth, onCreate, onRename, onDelete }: TreeNodeProps) {
   const { t } = useTranslation();
-  const { openFile, activeFilePath, createFile, renamePath, deletePath } = useFilesStore();
+  const { openFile, activeFilePath } = useFilesStore();
   const [expanded, setExpanded] = useState(depth < 2);
   const isActive = activeFilePath === entry.path;
   const createInBasePath = entry.is_directory ? entry.path : parentDirectory(entry.path);
-
-  const handleCreate = async () => {
-    const name = window.prompt(t('editor.newFilePrompt'), '');
-    if (!name) return;
-    try {
-      await createFile(joinPath(createInBasePath, name));
-    } catch (err) {
-      console.error('Failed to create file', err);
-      window.alert(t('editor.fileActionFailed'));
-    }
-  };
-
-  const handleRename = async () => {
-    const nextName = window.prompt(t('editor.renamePrompt'), entry.name);
-    if (!nextName || nextName === entry.name) return;
-    const nextPath = joinPath(parentDirectory(entry.path), nextName);
-    try {
-      await renamePath(entry.path, nextPath);
-    } catch (err) {
-      console.error('Failed to rename path', err);
-      window.alert(t('editor.fileActionFailed'));
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm(t('editor.confirmDeleteFile', { name: entry.name }))) return;
-    try {
-      await deletePath(entry.path);
-    } catch (err) {
-      console.error('Failed to delete path', err);
-      window.alert(t('editor.fileActionFailed'));
-    }
-  };
 
   if (entry.is_directory) {
     return (
@@ -102,7 +75,7 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
               className="rounded p-0.5 hover:bg-muted"
               onClick={(e) => {
                 e.stopPropagation();
-                void handleCreate();
+                onCreate(createInBasePath);
               }}
               title={t('editor.createFile')}
             >
@@ -113,7 +86,7 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
               className="rounded p-0.5 hover:bg-muted"
               onClick={(e) => {
                 e.stopPropagation();
-                void handleRename();
+                onRename(entry);
               }}
               title={t('editor.renameFile')}
             >
@@ -124,7 +97,7 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
               className="rounded p-0.5 hover:bg-muted text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
-                void handleDelete();
+                onDelete(entry);
               }}
               title={t('editor.deleteFile')}
             >
@@ -133,7 +106,14 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
           </div>
         </div>
         {expanded && entry.children?.map((child) => (
-          <TreeNode key={child.path} entry={child} depth={depth + 1} />
+          <TreeNode
+            key={child.path}
+            entry={child}
+            depth={depth + 1}
+            onCreate={onCreate}
+            onRename={onRename}
+            onDelete={onDelete}
+          />
         ))}
       </div>
     );
@@ -155,7 +135,7 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
           className="rounded p-0.5 hover:bg-muted"
           onClick={(e) => {
             e.stopPropagation();
-            void handleRename();
+            onRename(entry);
           }}
           title={t('editor.renameFile')}
         >
@@ -166,7 +146,7 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
           className="rounded p-0.5 hover:bg-muted text-destructive"
           onClick={(e) => {
             e.stopPropagation();
-            void handleDelete();
+            onDelete(entry);
           }}
           title={t('editor.deleteFile')}
         >
@@ -177,21 +157,100 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
   );
 }
 
+type FileActionDialogState =
+  | { mode: 'create'; basePath: string }
+  | { mode: 'rename'; entry: FileEntry }
+  | { mode: 'delete'; entry: FileEntry }
+  | null;
+
 export function FileTree() {
   const { t } = useTranslation();
   const fileTree = useFilesStore((s) => s.fileTree);
   const createFile = useFilesStore((s) => s.createFile);
+  const renamePath = useFilesStore((s) => s.renamePath);
+  const deletePath = useFilesStore((s) => s.deletePath);
+  const [dialogState, setDialogState] = useState<FileActionDialogState>(null);
+  const [inputValue, setInputValue] = useState('');
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreateAtRoot = async () => {
-    const name = window.prompt(t('editor.newFilePrompt'), '');
-    if (!name) return;
+  const closeDialog = () => {
+    setDialogState(null);
+    setInputValue('');
+    setDialogError(null);
+    setIsSubmitting(false);
+  };
+
+  const openCreateDialog = (basePath: string) => {
+    setDialogState({ mode: 'create', basePath });
+    setInputValue('');
+    setDialogError(null);
+  };
+
+  const openRenameDialog = (entry: FileEntry) => {
+    setDialogState({ mode: 'rename', entry });
+    setInputValue(entry.name);
+    setDialogError(null);
+  };
+
+  const openDeleteDialog = (entry: FileEntry) => {
+    setDialogState({ mode: 'delete', entry });
+    setInputValue('');
+    setDialogError(null);
+  };
+
+  const submitDialogAction = async () => {
+    if (!dialogState) return;
+    setDialogError(null);
+    setIsSubmitting(true);
     try {
-      await createFile(joinPath('/', name));
+      if (dialogState.mode === 'create') {
+        const nextName = inputValue.trim();
+        if (!nextName) {
+          setDialogError(t('editor.fileNameRequired'));
+          return;
+        }
+        await createFile(joinPath(dialogState.basePath, nextName));
+        closeDialog();
+        return;
+      }
+
+      if (dialogState.mode === 'rename') {
+        const nextName = inputValue.trim();
+        if (!nextName) {
+          setDialogError(t('editor.fileNameRequired'));
+          return;
+        }
+        if (nextName === dialogState.entry.name) {
+          closeDialog();
+          return;
+        }
+        const nextPath = joinPath(parentDirectory(dialogState.entry.path), nextName);
+        await renamePath(dialogState.entry.path, nextPath);
+        closeDialog();
+        return;
+      }
+
+      await deletePath(dialogState.entry.path);
+      closeDialog();
     } catch (err) {
-      console.error('Failed to create file', err);
-      window.alert(t('editor.fileActionFailed'));
+      console.error('File action failed', err);
+      setDialogError(t('editor.fileActionFailed'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const isDialogOpen = dialogState !== null;
+  const isDeleteMode = dialogState?.mode === 'delete';
+  const dialogTitle = dialogState?.mode === 'create'
+    ? t('editor.createFile')
+    : dialogState?.mode === 'rename'
+      ? t('editor.renameFile')
+      : t('editor.deleteFile');
+  const dialogDescription = dialogState?.mode === 'delete'
+    ? t('editor.confirmDeleteFile', { name: dialogState.entry.name })
+    : undefined;
 
   if (fileTree.length === 0) {
     return (
@@ -199,7 +258,7 @@ export function FileTree() {
         <button
           type="button"
           className="mb-1 rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
-          onClick={() => void handleCreateAtRoot()}
+          onClick={() => openCreateDialog('/')}
         >
           {t('editor.createFile')}
         </button>
@@ -212,19 +271,64 @@ export function FileTree() {
   }
 
   return (
-    <div className="py-1">
-      <div className="px-2 pb-1">
-        <button
-          type="button"
-          className="w-full rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
-          onClick={() => void handleCreateAtRoot()}
-        >
-          {t('editor.createFile')}
-        </button>
+    <>
+      <div className="py-1">
+        <div className="px-2 pb-1">
+          <button
+            type="button"
+            className="w-full rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+            onClick={() => openCreateDialog('/')}
+          >
+            {t('editor.createFile')}
+          </button>
+        </div>
+        {fileTree.map((entry) => (
+          <TreeNode
+            key={entry.path}
+            entry={entry}
+            depth={0}
+            onCreate={openCreateDialog}
+            onRename={openRenameDialog}
+            onDelete={openDeleteDialog}
+          />
+        ))}
       </div>
-      {fileTree.map((entry) => (
-        <TreeNode key={entry.path} entry={entry} depth={0} />
-      ))}
-    </div>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+        <DialogContent className="w-full max-w-[430px]">
+          <DialogClose onClose={closeDialog} />
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          {dialogDescription ? (
+            <p className="mt-2 text-sm text-muted-foreground">{dialogDescription}</p>
+          ) : (
+            <div className="mt-3">
+              <Input
+                autoFocus
+                value={inputValue}
+                placeholder={dialogState?.mode === 'create' ? t('editor.newFilePrompt') : t('editor.renamePrompt')}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void submitDialogAction();
+                }}
+              />
+            </div>
+          )}
+          {dialogError && (
+            <p className="mt-2 text-xs text-destructive">{dialogError}</p>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={closeDialog} disabled={isSubmitting}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant={isDeleteMode ? 'destructive' : 'default'}
+              onClick={() => void submitDialogAction()}
+              disabled={isSubmitting}
+            >
+              {isDeleteMode ? t('common.delete') : dialogState?.mode === 'rename' ? t('common.save') : t('common.create')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

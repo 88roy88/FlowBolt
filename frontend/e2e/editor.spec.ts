@@ -24,6 +24,29 @@ function fileTreeRowByName(page: import('@playwright/test').Page, name: string) 
   return label.locator('xpath=ancestor::div[contains(@class,"group")][1]');
 }
 
+async function submitCreateDialog(page: import('@playwright/test').Page, value: string) {
+  const input = page.getByPlaceholder('Enter a new file path');
+  await expect(input).toBeVisible({ timeout: 5_000 });
+  await input.fill(value);
+  const dialog = input.locator('xpath=ancestor::div[contains(@class,"relative")][1]');
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+}
+
+async function submitRenameDialog(page: import('@playwright/test').Page, value: string) {
+  const input = page.getByPlaceholder('Enter a new name');
+  await expect(input).toBeVisible({ timeout: 5_000 });
+  await input.fill(value);
+  const dialog = input.locator('xpath=ancestor::div[contains(@class,"relative")][1]');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+}
+
+async function submitDeleteDialog(page: import('@playwright/test').Page, targetName: string) {
+  const message = page.getByText(`Delete ${targetName}?`);
+  await expect(message).toBeVisible({ timeout: 5_000 });
+  const dialog = message.locator('xpath=ancestor::div[contains(@class,"relative")][1]');
+  await dialog.getByRole('button', { name: 'Delete' }).click();
+}
+
 test.describe('Editor', () => {
   test.use({ mockOptions: { seedChatHistory: true } });
 
@@ -91,8 +114,8 @@ test.describe('Editor', () => {
       (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/entry'),
       { timeout: 10_000 }
     );
-    page.once('dialog', (dialog) => dialog.accept('created-from-e2e.ts'));
     await srcRow.getByTitle('Create file').click();
+    await submitCreateDialog(page, 'created-from-e2e.ts');
     const req = await createReq;
     expect(req.postDataJSON()).toMatchObject({
       path: '/src/created-from-e2e.ts',
@@ -114,8 +137,8 @@ test.describe('Editor', () => {
       (req) => req.method() === 'PATCH' && req.url().includes('/api/files/') && req.url().includes('/entry'),
       { timeout: 10_000 }
     );
-    page.once('dialog', (dialog) => dialog.accept('src-renamed'));
     await srcRow.getByTitle('Rename').click();
+    await submitRenameDialog(page, 'src-renamed');
     const req = await renameReq;
     expect(req.postDataJSON()).toMatchObject({
       old_path: '/src',
@@ -136,8 +159,8 @@ test.describe('Editor', () => {
       (req) => req.method() === 'PATCH' && req.url().includes('/api/files/') && req.url().includes('/entry'),
       { timeout: 10_000 }
     );
-    page.once('dialog', (dialog) => dialog.accept('AppRenamed.tsx'));
     await appFileRow.getByTitle('Rename').click();
+    await submitRenameDialog(page, 'AppRenamed.tsx');
     const req = await renameReq;
     expect(req.postDataJSON()).toMatchObject({
       old_path: '/src/App.tsx',
@@ -158,8 +181,8 @@ test.describe('Editor', () => {
       (req) => req.method() === 'DELETE' && req.url().includes('/api/files/') && req.url().includes('/entry'),
       { timeout: 10_000 }
     );
-    page.once('dialog', (dialog) => dialog.accept());
     await appFileRow.getByTitle('Delete').click();
+    await submitDeleteDialog(page, 'App.tsx');
     const req = await deleteReq;
     expect(decodeURIComponent(req.url())).toContain('path=/src/App.tsx');
 
@@ -179,8 +202,8 @@ test.describe('Editor', () => {
       (req) => req.method() === 'DELETE' && req.url().includes('/api/files/') && req.url().includes('/entry'),
       { timeout: 10_000 }
     );
-    page.once('dialog', (dialog) => dialog.accept());
     await srcRow.getByTitle('Delete').click();
+    await submitDeleteDialog(page, 'src');
     const req = await deleteReq;
     expect(decodeURIComponent(req.url())).toContain('path=/src');
 

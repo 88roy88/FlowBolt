@@ -82,6 +82,7 @@
     "newFilePrompt": "Enter a new file path",
     "renamePrompt": "Enter a new name",
     "confirmDeleteFile": "Delete {{name}}?",
+    "fileNameRequired": "File name is required.",
     "fileActionFailed": "File operation failed. Please try again."
   },
   "terminal": {
