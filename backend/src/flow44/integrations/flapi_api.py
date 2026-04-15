@@ -31,9 +31,9 @@ class FlapiClient:
             return {}
         return {"Authorization": token}
 
-    async def _request(self, method: str, path: str, *, authorization: str | None = None, **kwargs: Any) -> Any:
+    async def _request(self, method: str, path: str, *, authorization: str | None = None, body: Any | None = None, **kwargs: Any) -> Any:
         try:
-            resp = await self._http.request(method, path, headers=self._build_auth_header(authorization), **kwargs)
+            resp = await self._http.request(method, path, headers=self._build_auth_header(authorization), json=body, **kwargs)
         except httpx.HTTPError as exc:
             logger.warning("FLAPI %s %s failed: %s", method, path, exc)
             hint = (
@@ -72,8 +72,8 @@ class FlapiClient:
             "POST",
             f"/package/v3/{safe}",
             authorization=authorization,
+            body=body,
             params=params,
-            json=body,
         )
         return result
 

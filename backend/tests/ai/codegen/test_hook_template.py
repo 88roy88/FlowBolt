@@ -17,6 +17,9 @@ class TestGenerateDataSourceHook:
         assert "export function useDataSourceSales()" in result
         # Fetch URL with correct data source ID
         assert "/api/data-source/42/run" in result
+        # POST method
+        assert "method: 'POST'" in result
+        assert "'Content-Type': 'application/json'" in result
         # Auth
         assert "credentialsStore.getValidToken()" in result
         # 401 retry
