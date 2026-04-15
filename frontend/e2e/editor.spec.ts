@@ -61,6 +61,20 @@ function trackFileSaveRequests(page: import('@playwright/test').Page) {
   return () => putCount;
 }
 
+function trackUploadRequests(page: import('@playwright/test').Page) {
+  let uploadCount = 0;
+  page.on('request', (req) => {
+    if (
+      req.method() === 'POST' &&
+      req.url().includes('/api/files/') &&
+      req.url().includes('/entry/upload')
+    ) {
+      uploadCount += 1;
+    }
+  });
+  return () => uploadCount;
+}
+
 test.describe('Editor', () => {
   test.use({ mockOptions: { seedChatHistory: true } });
 
@@ -156,6 +170,53 @@ test.describe('Editor', () => {
     const req = await uploadReq;
     expect(decodeURIComponent(req.url())).toContain('path=/editor.spec.ts');
     await expect(fileTreeContainer(page).getByText('editor.spec.ts', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('can upload an asset into /src/assets folder', async ({ page }) => {
+    await goToEditor(page);
+
+    const srcRow = fileTreeRowByName(page, 'src');
+    await srcRow.hover();
+
+    const createReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/entry'),
+      { timeout: 10_000 }
+    );
+    await srcRow.getByTitle('Create file').click();
+    await submitCreateDialog(page, 'assets/.keep');
+    const createRequest = await createReq;
+    expect(createRequest.postDataJSON()).toMatchObject({
+      path: '/src/assets/.keep',
+      content: '',
+    });
+
+    const assetsRow = fileTreeRowByName(page, 'assets');
+    await assetsRow.hover();
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/entry/upload'),
+      { timeout: 10_000 }
+    );
+    await assetsRow.getByTitle('Upload files').click();
+    await page.getByTestId('file-upload-input').setInputFiles('e2e/editor.spec.ts');
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/src/assets/editor.spec.ts');
+    await expect(fileTreeContainer(page).getByText('editor.spec.ts', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('shows error when uploading an existing file', async ({ page }) => {
+    await goToEditor(page);
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/entry/upload'),
+      { timeout: 10_000 }
+    );
+    await fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first().click();
+    await page.getByTestId('file-upload-input').setInputFiles('package.json');
+
+    await uploadReq;
+    await expect(page.getByText('Upload failed. Please try again.')).toBeVisible({ timeout: 5_000 });
   });
 
   test('can rename a folder from the file tree', async ({ page }) => {
@@ -289,6 +350,22 @@ test.describe('Editor read-only gating', () => {
       await page.keyboard.type('UNLOCKED_PHASE');
       await page.waitForTimeout(1200);
       expect(getPutCount()).toBeGreaterThan(0);
+    });
+
+    test('keeps upload disabled in read-only mode and sends no upload request', async ({ page }) => {
+      await goToEditor(page);
+
+      const getUploadCount = trackUploadRequests(page);
+      const rootUploadButton = fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first();
+      await expect(rootUploadButton).toBeDisabled();
+
+      const srcRow = fileTreeRowByName(page, 'src');
+      await srcRow.hover();
+      const folderUploadButton = srcRow.getByTitle('Upload files');
+      await expect(folderUploadButton).toBeDisabled();
+
+      await page.waitForTimeout(500);
+      expect(getUploadCount()).toBe(0);
     });
   });
 
