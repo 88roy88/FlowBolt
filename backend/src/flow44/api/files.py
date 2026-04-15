@@ -111,10 +111,10 @@ async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = 
         return {"status": "ok", "path": path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
-    except OSError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from None
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
+    except OSError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
 @router.get("/grep")

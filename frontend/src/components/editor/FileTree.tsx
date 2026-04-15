@@ -155,17 +155,6 @@ function TreeNode({ entry, depth }: TreeNodeProps) {
           className="rounded p-0.5 hover:bg-muted"
           onClick={(e) => {
             e.stopPropagation();
-            void handleCreate();
-          }}
-          title={t('editor.createFile')}
-        >
-          <Plus size={12} />
-        </button>
-        <button
-          type="button"
-          className="rounded p-0.5 hover:bg-muted"
-          onClick={(e) => {
-            e.stopPropagation();
             void handleRename();
           }}
           title={t('editor.renameFile')}

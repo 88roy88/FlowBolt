@@ -1,4 +1,5 @@
 import os
+import shutil
 from abc import ABC
 from pathlib import PurePosixPath
 
@@ -58,7 +59,7 @@ class FileSystemMixin(BaseSandbox, ABC):
     async def delete_file(self, path: str) -> None:
         full = self._safe_path(path)
         if os.path.isdir(full):  # noqa: ASYNC240
-            os.rmdir(full)
+            shutil.rmtree(full)
         else:
             os.remove(full)
 
