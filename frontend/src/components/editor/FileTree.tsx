@@ -177,9 +177,10 @@ type FileActionDialogState =
 
 interface FileTreeProps {
   readOnly: boolean;
+  readOnlyMessage: string;
 }
 
-export function FileTree({ readOnly }: FileTreeProps) {
+export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
   const { t } = useTranslation();
   const fileTree = useFilesStore((s) => s.fileTree);
   const createFile = useFilesStore((s) => s.createFile);
@@ -283,7 +284,7 @@ export function FileTree({ readOnly }: FileTreeProps) {
           {t('editor.createFile')}
         </button>
         {readOnly && (
-          <span className="text-[11px] text-muted-foreground">{t('editor.readOnlyUntilFirstAiResponse')}</span>
+          <span className="text-[11px] text-muted-foreground">{readOnlyMessage}</span>
         )}
         <Folder size={28} className="text-muted-foreground opacity-30" />
         <span className="text-xs text-muted-foreground">
@@ -308,7 +309,7 @@ export function FileTree({ readOnly }: FileTreeProps) {
         </div>
         {readOnly && (
           <div className="px-2 pb-2 text-[11px] text-muted-foreground">
-            {t('editor.readOnlyUntilFirstAiResponse')}
+            {readOnlyMessage}
           </div>
         )}
         {fileTree.map((entry) => (

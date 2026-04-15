@@ -115,6 +115,8 @@ export interface MockAPIOptions {
   projects?: typeof MOCK_PROJECT[];
   /** Return a minimal chat event replay so the main layout shows Preview/Code (not empty project). */
   seedChatHistory?: boolean;
+  /** Explicit chat replay events (overrides seedChatHistory when provided). */
+  seedEvents?: Record<string, unknown>[];
 }
 
 export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
@@ -289,7 +291,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   });
 
   await page.route(`**/api/chat/*/events`, async (route) => {
-    const payload = options.seedChatHistory ? CHAT_SEED_EVENTS : [];
+    const payload = options.seedEvents ?? (options.seedChatHistory ? CHAT_SEED_EVENTS : []);
     return route.fulfill({ json: payload });
   });
 

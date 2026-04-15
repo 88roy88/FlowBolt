@@ -47,6 +47,20 @@ async function submitDeleteDialog(page: import('@playwright/test').Page, targetN
   await dialog.getByRole('button', { name: 'Delete' }).click();
 }
 
+function trackFileSaveRequests(page: import('@playwright/test').Page) {
+  let putCount = 0;
+  page.on('request', (req) => {
+    if (
+      req.method() === 'PUT' &&
+      req.url().includes('/api/files/') &&
+      req.url().includes('/content')
+    ) {
+      putCount += 1;
+    }
+  });
+  return () => putCount;
+}
+
 test.describe('Editor', () => {
   test.use({ mockOptions: { seedChatHistory: true } });
 
@@ -210,5 +224,76 @@ test.describe('Editor', () => {
     const tree = fileTreeContainer(page);
     await expect(tree.getByText('src', { exact: true })).toHaveCount(0);
     await expect(tree.getByText('package.json', { exact: true })).toBeVisible();
+  });
+});
+
+test.describe('Editor read-only gating', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('has-projects', 'true');
+        localStorage.setItem('language', 'en');
+      } catch {
+        /* ignore */
+      }
+    });
+  });
+
+  test.describe('before initial completion', () => {
+    test.use({
+      mockOptions: {
+        seedEvents: [{ type: 'user_message', content: 'Seed only user event' }],
+      },
+    });
+
+    test('stays locked until action_complete, then enables editing', async ({ page, sendChatEvents }) => {
+      await goToEditor(page);
+
+      await expect(page.getByText('Editing is enabled after the first AI build completes.').first()).toBeVisible();
+
+      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' }).first();
+      await expect(createRoot).toBeDisabled();
+      const srcRow = fileTreeRowByName(page, 'src');
+      await srcRow.hover();
+      await expect(srcRow.getByTitle('Rename')).toBeDisabled();
+      await expect(srcRow.getByTitle('Delete')).toBeDisabled();
+
+      const getPutCount = trackFileSaveRequests(page);
+      const host = page.getByTestId('monaco-editor-host');
+      await host.click();
+      await page.keyboard.type('LOCKED_PHASE');
+      await page.waitForTimeout(1200);
+      expect(getPutCount()).toBe(0);
+
+      await sendChatEvents([{ type: 'action_complete' }], 20);
+      await expect(page.getByText('Editing is enabled after the first AI build completes.')).toHaveCount(0);
+      await expect(createRoot).toBeEnabled({ timeout: 5_000 });
+
+      await host.click();
+      await page.keyboard.type('UNLOCKED_PHASE');
+      await page.waitForTimeout(1200);
+      expect(getPutCount()).toBeGreaterThan(0);
+    });
+  });
+
+  test.describe('after initial completion', () => {
+    test.use({ mockOptions: { seedChatHistory: true } });
+
+    test('locks while AI is working and unlocks again on completion', async ({ page, sendChatEvents }) => {
+      await goToEditor(page);
+
+      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' }).first();
+      await expect(createRoot).toBeEnabled();
+
+      const chatInput = page.getByPlaceholder(/describe what you want/i);
+      await expect(chatInput).toBeVisible({ timeout: 10_000 });
+      await chatInput.fill('Please continue with a tiny follow-up change');
+      await page.getByRole('button', { name: /send message/i }).click();
+
+      await expect(createRoot).toBeDisabled({ timeout: 5_000 });
+
+      await sendChatEvents([{ type: 'action_complete' }], 20);
+      await expect(createRoot).toBeEnabled({ timeout: 5_000 });
+    });
   });
 });
