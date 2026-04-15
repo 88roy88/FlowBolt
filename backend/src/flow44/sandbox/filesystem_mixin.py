@@ -27,6 +27,24 @@ class FileSystemMixin(BaseSandbox, ABC):
         with open(full, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             f.write(content)
 
+    async def create_file(self, path: str, content: str = "") -> None:
+        full = self._safe_path(path)
+        if os.path.exists(full):  # noqa: ASYNC240
+            raise FileExistsError(path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "x", encoding="utf-8") as f:  # noqa: ASYNC230
+            f.write(content)
+
+    async def rename_path(self, source_path: str, destination_path: str) -> None:
+        source_full = self._safe_path(source_path)
+        destination_full = self._safe_path(destination_path)
+        if not os.path.exists(source_full):  # noqa: ASYNC240
+            raise FileNotFoundError(source_path)
+        if os.path.exists(destination_full):  # noqa: ASYNC240
+            raise FileExistsError(destination_path)
+        os.makedirs(os.path.dirname(destination_full), exist_ok=True)
+        os.replace(source_full, destination_full)
+
     async def edit_file(self, path: str, search: str, replace: str) -> None:
         full = self._safe_path(path)
         with open(full, encoding="utf-8") as fh:  # noqa: ASYNC230

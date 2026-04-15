@@ -74,7 +74,14 @@
     "jumpToMatch": "Jump to match",
     "quickOpenPlaceholder": "Type a file name (Ctrl+P)",
     "noMatchingFiles": "No matching files",
-    "searchShortcutTitle": "Search in files (Ctrl+Shift+F)"
+    "searchShortcutTitle": "Search in files (Ctrl+Shift+F)",
+    "createFile": "Create file",
+    "renameFile": "Rename",
+    "deleteFile": "Delete",
+    "newFilePrompt": "Enter a new file path",
+    "renamePrompt": "Enter a new name",
+    "confirmDeleteFile": "Delete {{name}}?",
+    "fileActionFailed": "File operation failed. Please try again."
   },
   "terminal": {
     "terminal": "Terminal",

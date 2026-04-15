@@ -39,6 +39,26 @@ export async function saveFileContent(projectId: string, path: string, content: 
   });
 }
 
+export async function createFileEntry(projectId: string, path: string, content = ''): Promise<void> {
+  await request(`/files/${projectId}/entry`, {
+    method: 'POST',
+    body: JSON.stringify({ path, content }),
+  });
+}
+
+export async function renameFileEntry(projectId: string, oldPath: string, newPath: string): Promise<void> {
+  await request(`/files/${projectId}/entry`, {
+    method: 'PATCH',
+    body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
+  });
+}
+
+export async function deleteFileEntry(projectId: string, path: string): Promise<void> {
+  await request(`/files/${projectId}/entry?path=${encodeURIComponent(path)}`, {
+    method: 'DELETE',
+  });
+}
+
 export type SearchHit = { line: number; column: number; preview: string };
 export type SearchResult = { path: string; uri?: string; hits: SearchHit[] };
 

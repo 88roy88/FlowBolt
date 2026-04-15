@@ -14,6 +14,16 @@ class WriteFileRequest(BaseModel):
     content: str
 
 
+class CreateFileRequest(BaseModel):
+    path: str
+    content: str = ""
+
+
+class RenamePathRequest(BaseModel):
+    old_path: str
+    new_path: str
+
+
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=500)
     case_sensitive: bool = False
@@ -66,6 +76,43 @@ async def put_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], body: Wr
         return {"status": "ok", "path": body.path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+
+
+@router.post("/entry")
+async def post_create_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: CreateFileRequest) -> dict[str, str]:
+    try:
+        await sandbox.create_file(body.path, body.content)
+        return {"status": "ok", "path": body.path}
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+
+
+@router.patch("/entry")
+async def patch_rename_path(sandbox: Annotated[PnpmSandbox, SandboxDep], body: RenamePathRequest) -> dict[str, str]:
+    try:
+        await sandbox.rename_path(body.old_path, body.new_path)
+        return {"status": "ok", "old_path": body.old_path, "new_path": body.new_path}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+
+
+@router.delete("/entry")
+async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
+    try:
+        await sandbox.delete_file(path)
+        return {"status": "ok", "path": path}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except OSError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
 

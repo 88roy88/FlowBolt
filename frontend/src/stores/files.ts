@@ -17,6 +17,9 @@ interface FilesState {
   setActiveFile: (path: string) => void;
   updateFileContent: (path: string, content: string) => void;
   saveFile: (path: string) => Promise<void>;
+  createFile: (path: string, content?: string) => Promise<void>;
+  renamePath: (oldPath: string, newPath: string) => Promise<void>;
+  deletePath: (path: string) => Promise<void>;
   /** Incremented on every file save — used to trigger preview refresh. */
   saveVersion: number;
   refreshOpenFiles: () => Promise<void>;
@@ -25,6 +28,11 @@ interface FilesState {
 }
 
 function storageKey(projectId: string) { return `editor-tabs:${projectId}`; }
+
+function normalizePath(path: string): string {
+  const normalized = path.replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
 
 function saveEditorTabs(openPaths: string[], activePath: string | null) {
   const projectId = useSessionStore.getState().projectId;
@@ -166,6 +174,72 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       await api.saveFileContent(projectId, path, content);
       set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
+  },
+
+  async createFile(path: string, content = '') {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+    const normalizedPath = normalizePath(path);
+    await api.createFileEntry(projectId, normalizedPath, content);
+    await get().loadFileTree();
+    await get().openFile(normalizedPath);
+  },
+
+  async renamePath(oldPath: string, newPath: string) {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+    const normalizedOldPath = normalizePath(oldPath);
+    const normalizedNewPath = normalizePath(newPath);
+    await api.renameFileEntry(projectId, normalizedOldPath, normalizedNewPath);
+
+    set((state) => {
+      const nextOpenFiles = new Map<string, string>();
+      for (const [path, content] of state.openFiles.entries()) {
+        if (path === normalizedOldPath || path.startsWith(`${normalizedOldPath}/`)) {
+          const suffix = path.slice(normalizedOldPath.length);
+          nextOpenFiles.set(`${normalizedNewPath}${suffix}`, content);
+        } else {
+          nextOpenFiles.set(path, content);
+        }
+      }
+      let nextActivePath = state.activeFilePath;
+      if (nextActivePath) {
+        if (nextActivePath === normalizedOldPath || nextActivePath.startsWith(`${normalizedOldPath}/`)) {
+          const suffix = nextActivePath.slice(normalizedOldPath.length);
+          nextActivePath = `${normalizedNewPath}${suffix}`;
+        }
+      }
+      return { openFiles: nextOpenFiles, activeFilePath: nextActivePath };
+    });
+
+    await get().loadFileTree();
+    saveEditorTabs([...get().openFiles.keys()], get().activeFilePath);
+  },
+
+  async deletePath(path: string) {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+    const normalizedPath = normalizePath(path);
+    await api.deleteFileEntry(projectId, normalizedPath);
+
+    set((state) => {
+      const nextOpenFiles = new Map<string, string>();
+      for (const [openPath, content] of state.openFiles.entries()) {
+        if (openPath === normalizedPath || openPath.startsWith(`${normalizedPath}/`)) continue;
+        nextOpenFiles.set(openPath, content);
+      }
+
+      let nextActivePath = state.activeFilePath;
+      if (nextActivePath && (nextActivePath === normalizedPath || nextActivePath.startsWith(`${normalizedPath}/`))) {
+        const keys = Array.from(nextOpenFiles.keys());
+        nextActivePath = keys.length > 0 ? keys[keys.length - 1] : null;
+      }
+
+      return { openFiles: nextOpenFiles, activeFilePath: nextActivePath };
+    });
+
+    await get().loadFileTree();
+    saveEditorTabs([...get().openFiles.keys()], get().activeFilePath);
   },
 
   clearPendingReveal() {

@@ -74,7 +74,14 @@
     "jumpToMatch": "קפיצה להתאמה",
     "quickOpenPlaceholder": "הקלידי שם קובץ (Ctrl+P)",
     "noMatchingFiles": "אין קבצים תואמים",
-    "searchShortcutTitle": "חיפוש בקבצים (Ctrl+Shift+F)"
+    "searchShortcutTitle": "חיפוש בקבצים (Ctrl+Shift+F)",
+    "createFile": "צור קובץ",
+    "renameFile": "שנה שם",
+    "deleteFile": "מחק",
+    "newFilePrompt": "הכנס נתיב לקובץ חדש",
+    "renamePrompt": "הכנס שם חדש",
+    "confirmDeleteFile": "למחוק את {{name}}?",
+    "fileActionFailed": "פעולת קובץ נכשלה. נסה שוב."
   },
   "terminal": {
     "terminal": "טרמינל",
