@@ -102,9 +102,9 @@ test.describe('Editor', () => {
     await page.keyboard.press('Control+Shift+F');
     const searchInput = page.getByPlaceholder('Search in files...');
     await expect(searchInput).toBeVisible();
-    await searchInput.fill('E2E_TYPES_MARKER');
+    await searchInput.fill('Hello from E2E');
     await searchInput.press('Enter');
-    await expect(page.getByRole('button', { name: /\/src\/types\.ts/ })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /\/src\/App\.tsx/ })).toBeVisible({ timeout: 10_000 });
   });
 
   test('Ctrl+click on import symbol opens types file', async ({ page }) => {
@@ -450,5 +450,33 @@ test.describe('Editor read-only gating', () => {
       await sendChatEvents([{ type: 'action_complete' }], 20);
       await expect(createRoot).toBeEnabled({ timeout: 5_000 });
     });
+  });
+});
+
+test.describe('Editor search failures', () => {
+  test.use({ mockOptions: { seedChatHistory: true, searchUnavailable: true } });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('has-projects', 'true');
+        localStorage.setItem('language', 'en');
+      } catch {
+        /* ignore */
+      }
+    });
+  });
+
+  test('shows an error when backend search is unavailable', async ({ page }) => {
+    await goToEditor(page);
+    await page.keyboard.press('Control+Shift+F');
+
+    const searchInput = page.getByPlaceholder('Search in files...');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('Hello from E2E');
+    await searchInput.press('Enter');
+
+    await expect(page.getByText(/Search failed:/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/ripgrep \(rg\) is required for search/i)).toBeVisible({ timeout: 10_000 });
   });
 });

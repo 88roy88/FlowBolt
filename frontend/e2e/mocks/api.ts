@@ -117,6 +117,12 @@ export interface MockAPIOptions {
   seedChatHistory?: boolean;
   /** Explicit chat replay events (overrides seedChatHistory when provided). */
   seedEvents?: Record<string, unknown>[];
+  /** Simulate backend search tool failure for editor search. */
+  searchUnavailable?: boolean;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
@@ -281,23 +287,47 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     if (route.request().method() !== 'POST') {
       return route.fulfill({ status: 405, body: 'Method Not Allowed' });
     }
-    let body: { query?: string } = {};
+    let body: { query?: string; case_sensitive?: boolean; word_match?: boolean; use_regex?: boolean } = {};
     try {
-      body = route.request().postDataJSON() as { query?: string };
+      body = route.request().postDataJSON() as {
+        query?: string;
+        case_sensitive?: boolean;
+        word_match?: boolean;
+        use_regex?: boolean;
+      };
     } catch {
       /* ignore */
     }
+
+    if (options.searchUnavailable) {
+      return route.fulfill({ status: 503, json: { detail: 'ripgrep (rg) is required for search but was not found in PATH' } });
+    }
+
     const q = (body.query ?? '').trim();
-    const results =
-      q.includes('E2E_TYPES_MARKER')
-        ? [
-            {
-              path: '/src/types.ts',
-              uri: 'file:///src/types.ts',
-              hits: [{ line: 4, column: 1, preview: '// E2E_TYPES_MARKER' }],
-            },
-          ]
-        : [];
+    const patternSource = body.use_regex ? q : escapeRegExp(q);
+    const wrappedPattern = body.word_match ? `\\b${patternSource}\\b` : patternSource;
+    const flags = body.case_sensitive ? 'g' : 'gi';
+    let matcher: RegExp | null = null;
+    try {
+      matcher = q ? new RegExp(wrappedPattern, flags) : null;
+    } catch {
+      return route.fulfill({ status: 400, json: { detail: 'Invalid search pattern' } });
+    }
+
+    const results = Object.entries(fileContents).flatMap(([key, content]) => {
+      if (!matcher) return [];
+      const hits = content
+        .split(/\r?\n/)
+        .flatMap((line, index) => {
+          const lineMatcher = new RegExp(matcher.source, matcher.flags);
+          const match = lineMatcher.exec(line);
+          if (!match) return [];
+          return [{ line: index + 1, column: match.index + 1, preview: line }];
+        });
+      if (hits.length === 0) return [];
+      const path = `/${key}`;
+      return [{ path, uri: `file://${path}`, hits }];
+    });
     return route.fulfill({ json: { query: q, results } });
   });
 

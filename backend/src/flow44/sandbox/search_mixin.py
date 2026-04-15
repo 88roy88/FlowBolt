@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 from abc import ABC
 from pathlib import Path, PurePosixPath
@@ -12,6 +13,10 @@ from flow44.sandbox.base import BaseSandbox
 from flow44.sandbox.constants import GREP_SKIP_GLOBS, SKIP_DIRS
 
 logger = logging.getLogger(__name__)
+
+
+class SearchToolError(RuntimeError):
+    """Raised when the underlying search tool cannot execute correctly."""
 
 
 class GrepMatch(BaseModel):
@@ -56,6 +61,9 @@ class SearchMixin(BaseSandbox, ABC):
         word_match: bool = False,
         fixed_strings: bool = False,
     ) -> list[GrepMatch]:
+        if shutil.which("rg") is None:
+            raise SearchToolError("ripgrep (rg) is required for search but was not found in PATH")
+
         # Validate path (raises PermissionError on traversal); compute workspace-relative search path
         abs_search = self._safe_path(path)
         rel_search = PurePosixPath(os.path.relpath(abs_search, self.workspace_dir)).as_posix()  # noqa: ASYNC240
@@ -86,14 +94,13 @@ class SearchMixin(BaseSandbox, ABC):
                 lines.append(line)
         except Exception as e:
             logger.warning("Failed to execute ripgrep command: %s", e, exc_info=True)
-            return []
+            raise SearchToolError(f"Failed to execute ripgrep command: {e}") from e
 
         output = "".join(lines)
 
         if not output.strip():
             logger.warning("Ripgrep returned no output. Command: %s", cmd)
-            logger.warning("Ripgrep may not be installed or accessible in PATH")
-            return []
+            raise SearchToolError("Ripgrep returned no output")
 
         matches: list[GrepMatch] = []
         has_valid_json = False
@@ -119,5 +126,6 @@ class SearchMixin(BaseSandbox, ABC):
         # If we got output but no valid JSON, ripgrep likely failed
         if output.strip() and not has_valid_json:
             logger.error("Ripgrep failed. Full output: %s", output[:500])
+            raise SearchToolError("Ripgrep returned invalid output")
 
         return matches
