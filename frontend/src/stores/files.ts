@@ -34,6 +34,21 @@ function normalizePath(path: string): string {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
+function collectFilePaths(tree: FileEntry[]): Set<string> {
+  const out = new Set<string>();
+  const stack = [...tree];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (current.is_directory) {
+      if (current.children?.length) stack.push(...current.children);
+      continue;
+    }
+    out.add(normalizePath(current.path));
+  }
+  return out;
+}
+
 function saveEditorTabs(openPaths: string[], activePath: string | null) {
   const projectId = useSessionStore.getState().projectId;
   if (!projectId) return;
@@ -107,49 +122,74 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   },
 
   async openFile(path: string, line?: number, column?: number) {
+    const normalizedPath = normalizePath(path);
     const state = get();
-    if (state.openFiles.has(path)) {
-      set((s) => ({ activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null, revealVersion: s.revealVersion + 1 }));
+    if (state.openFiles.has(normalizedPath)) {
+      set((s) => ({
+        activeFilePath: normalizedPath,
+        pendingRevealLine: line ?? null,
+        pendingRevealColumn: column ?? null,
+        revealVersion: s.revealVersion + 1,
+      }));
       return;
     }
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
     try {
-      const content = await api.fetchFileContent(projectId, path);
+      const content = await api.fetchFileContent(projectId, normalizedPath);
       set((s) => {
         const next = new Map(s.openFiles);
-        next.set(path, content);
-        return { openFiles: next, activeFilePath: path, pendingRevealLine: line ?? null, pendingRevealColumn: column ?? null, revealVersion: s.revealVersion + 1 };
+        next.set(normalizedPath, content);
+        return {
+          openFiles: next,
+          activeFilePath: normalizedPath,
+          pendingRevealLine: line ?? null,
+          pendingRevealColumn: column ?? null,
+          revealVersion: s.revealVersion + 1,
+        };
       });
-      saveEditorTabs([...get().openFiles.keys()], path);
+      const paths = [...get().openFiles.keys()];
+      const existing = collectFilePaths(get().fileTree);
+      const persistable = paths.filter((p) => existing.has(normalizePath(p)));
+      saveEditorTabs(persistable, normalizedPath);
     } catch (err) {
-      console.error('Failed to open file:', path, err);
+      console.error('Failed to open file:', normalizedPath, err);
     }
   },
 
   closeFile(path: string) {
+    const normalizedPath = normalizePath(path);
     set((state) => {
       const next = new Map(state.openFiles);
-      next.delete(path);
+      next.delete(normalizedPath);
       let activePath = state.activeFilePath;
-      if (activePath === path) {
+      if (activePath === normalizedPath) {
         const keys = Array.from(next.keys());
         activePath = keys.length > 0 ? keys[keys.length - 1] : null;
       }
       return { openFiles: next, activeFilePath: activePath };
     });
-    saveEditorTabs([...get().openFiles.keys()], get().activeFilePath);
+    const paths = [...get().openFiles.keys()];
+    const existing = collectFilePaths(get().fileTree);
+    const persistable = paths.filter((p) => existing.has(normalizePath(p)));
+    const active = get().activeFilePath;
+    saveEditorTabs(persistable, active && existing.has(normalizePath(active)) ? normalizePath(active) : null);
   },
 
   setActiveFile(path: string) {
-    set({ activeFilePath: path });
-    saveEditorTabs([...get().openFiles.keys()], path);
+    const normalizedPath = normalizePath(path);
+    set({ activeFilePath: normalizedPath });
+    const paths = [...get().openFiles.keys()];
+    const existing = collectFilePaths(get().fileTree);
+    const persistable = paths.filter((p) => existing.has(normalizePath(p)));
+    saveEditorTabs(persistable, existing.has(normalizedPath) ? normalizedPath : null);
   },
 
   updateFileContent(path: string, content: string) {
+    const normalizedPath = normalizePath(path);
     set((state) => {
       const next = new Map(state.openFiles);
-      next.set(path, content);
+      next.set(normalizedPath, content);
       return { openFiles: next };
     });
   },
@@ -167,11 +207,12 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   },
 
   async saveFile(path: string) {
+    const normalizedPath = normalizePath(path);
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
-    const content = get().openFiles.get(path);
+    const content = get().openFiles.get(normalizedPath);
     if (content !== undefined) {
-      await api.saveFileContent(projectId, path, content);
+      await api.saveFileContent(projectId, normalizedPath, content);
       set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
   },
@@ -195,25 +236,33 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     set((state) => {
       const nextOpenFiles = new Map<string, string>();
       for (const [path, content] of state.openFiles.entries()) {
-        if (path === normalizedOldPath || path.startsWith(`${normalizedOldPath}/`)) {
-          const suffix = path.slice(normalizedOldPath.length);
+        const normalizedExistingPath = normalizePath(path);
+        if (normalizedExistingPath === normalizedOldPath || normalizedExistingPath.startsWith(`${normalizedOldPath}/`)) {
+          const suffix = normalizedExistingPath.slice(normalizedOldPath.length);
           nextOpenFiles.set(`${normalizedNewPath}${suffix}`, content);
         } else {
-          nextOpenFiles.set(path, content);
+          nextOpenFiles.set(normalizedExistingPath, content);
         }
       }
       let nextActivePath = state.activeFilePath;
       if (nextActivePath) {
-        if (nextActivePath === normalizedOldPath || nextActivePath.startsWith(`${normalizedOldPath}/`)) {
-          const suffix = nextActivePath.slice(normalizedOldPath.length);
+        const normalizedActive = normalizePath(nextActivePath);
+        if (normalizedActive === normalizedOldPath || normalizedActive.startsWith(`${normalizedOldPath}/`)) {
+          const suffix = normalizedActive.slice(normalizedOldPath.length);
           nextActivePath = `${normalizedNewPath}${suffix}`;
+        } else {
+          nextActivePath = normalizedActive;
         }
       }
       return { openFiles: nextOpenFiles, activeFilePath: nextActivePath };
     });
 
     await get().loadFileTree();
-    saveEditorTabs([...get().openFiles.keys()], get().activeFilePath);
+    const paths = [...get().openFiles.keys()];
+    const existing = collectFilePaths(get().fileTree);
+    const persistable = paths.filter((p) => existing.has(normalizePath(p)));
+    const active = get().activeFilePath;
+    saveEditorTabs(persistable, active && existing.has(normalizePath(active)) ? normalizePath(active) : null);
   },
 
   async deletePath(path: string) {
@@ -225,21 +274,25 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     set((state) => {
       const nextOpenFiles = new Map<string, string>();
       for (const [openPath, content] of state.openFiles.entries()) {
-        if (openPath === normalizedPath || openPath.startsWith(`${normalizedPath}/`)) continue;
-        nextOpenFiles.set(openPath, content);
+        const normalizedOpenPath = normalizePath(openPath);
+        if (normalizedOpenPath === normalizedPath || normalizedOpenPath.startsWith(`${normalizedPath}/`)) {
+          // Keep deleted entries open in tabs; UI marks them as deleted.
+          nextOpenFiles.set(normalizedOpenPath, content);
+          continue;
+        }
+        nextOpenFiles.set(normalizedOpenPath, content);
       }
 
-      let nextActivePath = state.activeFilePath;
-      if (nextActivePath && (nextActivePath === normalizedPath || nextActivePath.startsWith(`${normalizedPath}/`))) {
-        const keys = Array.from(nextOpenFiles.keys());
-        nextActivePath = keys.length > 0 ? keys[keys.length - 1] : null;
-      }
-
-      return { openFiles: nextOpenFiles, activeFilePath: nextActivePath };
+      const activePath = state.activeFilePath ? normalizePath(state.activeFilePath) : null;
+      return { openFiles: nextOpenFiles, activeFilePath: activePath };
     });
 
     await get().loadFileTree();
-    saveEditorTabs([...get().openFiles.keys()], get().activeFilePath);
+    const paths = [...get().openFiles.keys()];
+    const existing = collectFilePaths(get().fileTree);
+    const persistable = paths.filter((p) => existing.has(normalizePath(p)));
+    const active = get().activeFilePath;
+    saveEditorTabs(persistable, active && existing.has(normalizePath(active)) ? normalizePath(active) : null);
   },
 
   clearPendingReveal() {

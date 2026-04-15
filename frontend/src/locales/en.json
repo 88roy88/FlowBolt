@@ -78,6 +78,7 @@
     "createFile": "Create file",
     "renameFile": "Rename",
     "deleteFile": "Delete",
+    "deletedTab": "Deleted file (tab kept open)",
     "newFilePrompt": "Enter a new file path",
     "renamePrompt": "Enter a new name",
     "confirmDeleteFile": "Delete {{name}}?",

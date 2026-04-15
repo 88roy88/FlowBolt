@@ -127,6 +127,28 @@ test.describe('Editor', () => {
     await expect(tree.getByText('src', { exact: true })).toHaveCount(0);
   });
 
+  test('renaming an open file updates its open tab label', async ({ page }) => {
+    await goToEditor(page);
+    const appFileRow = fileTreeRowByName(page, 'App.tsx');
+    await appFileRow.hover();
+
+    const renameReq = page.waitForRequest(
+      (req) => req.method() === 'PATCH' && req.url().includes('/api/files/') && req.url().includes('/entry'),
+      { timeout: 10_000 }
+    );
+    page.once('dialog', (dialog) => dialog.accept('AppRenamed.tsx'));
+    await appFileRow.getByTitle('Rename').click();
+    const req = await renameReq;
+    expect(req.postDataJSON()).toMatchObject({
+      old_path: '/src/App.tsx',
+      new_path: '/src/AppRenamed.tsx',
+    });
+
+    const tabs = page.locator('div.flex.overflow-auto.border-b');
+    await expect(tabs.getByText('AppRenamed.tsx', { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(tabs.getByText('App.tsx', { exact: true })).toHaveCount(0);
+  });
+
   test('can delete a file from the file tree', async ({ page }) => {
     await goToEditor(page);
     const appFileRow = fileTreeRowByName(page, 'App.tsx');
@@ -143,6 +165,9 @@ test.describe('Editor', () => {
 
     const tree = fileTreeContainer(page);
     await expect(tree.getByText('App.tsx', { exact: true })).toHaveCount(0);
+    const deletedTab = page.locator('[data-file-path="/src/App.tsx"][data-missing="true"]');
+    await expect(deletedTab).toBeVisible({ timeout: 5_000 });
+    await expect(deletedTab.locator('span').first()).toHaveClass(/line-through/);
   });
 
   test('can delete a folder from the file tree', async ({ page }) => {
