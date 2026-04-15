@@ -276,20 +276,44 @@ app.get('/api/flapi/packages/search', (req, res) => {
   res.status(status).json(body);
 });
 
-function getRunResults(dataSourceId) {
+/**
+ * Quick params shape: { paramName: { SomeType: value }, ... }
+ * Returns a flat { paramName: value } map, or null if body has no quick params.
+ */
+function extractQuickParams(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const extracted = {};
+  for (const [paramName, paramObj] of Object.entries(body)) {
+    if (paramObj && typeof paramObj === 'object' && !Array.isArray(paramObj)) {
+      const values = Object.values(paramObj);
+      extracted[paramName] = values.length === 1 ? values[0] : values;
+    }
+  }
+  return Object.keys(extracted).length > 0 ? extracted : null;
+}
+
+function getRunResults(dataSourceId, body) {
   const id = String(dataSourceId).trim();
-  if (id === '3') return { results: { ...stubIntelligenceResults } };
-  if (id === '4') return { results: { ...stubPeopleWithPhotosResults } };
-  if (id === '5') return { results: getRealtimeMetrics() };
-  if (id === '6') return { results: { ...stubPeopleHebrewResults } };
-  if (id === '7') return { results: { ...stubEcommerceResults } };
-  if (id === '8') return { results: { ...stubHRResults } };
-  if (id === '9') return { results: { ...stubLogisticsResults } };
-  if (id === '10') return { results: { ...stubPhoneDevicesResults } };
-  if (id === '11') return { results: { ...stubPhoneCallsResults } };
-  if (id === '12') return { results: { ...stubPhoneRepairsResults } };
-  if (id === '13') return { results: { ...stubPhoneMarketResults } };
-  return { results: { ...stubDataSourceResults } };
+  let results;
+  if (id === '3') results = { ...stubIntelligenceResults };
+  else if (id === '4') results = { ...stubPeopleWithPhotosResults };
+  else if (id === '5') results = getRealtimeMetrics();
+  else if (id === '6') results = { ...stubPeopleHebrewResults };
+  else if (id === '7') results = { ...stubEcommerceResults };
+  else if (id === '8') results = { ...stubHRResults };
+  else if (id === '9') results = { ...stubLogisticsResults };
+  else if (id === '10') results = { ...stubPhoneDevicesResults };
+  else if (id === '11') results = { ...stubPhoneCallsResults };
+  else if (id === '12') results = { ...stubPhoneRepairsResults };
+  else if (id === '13') results = { ...stubPhoneMarketResults };
+  else results = { ...stubDataSourceResults };
+
+  const quickParams = extractQuickParams(body);
+  if (quickParams) {
+    results = { ...results, quickParams };
+  }
+
+  return { results };
 }
 
 app.post('/package/:packageId', (req, res) => {
@@ -298,7 +322,7 @@ app.post('/package/:packageId', (req, res) => {
   if (!dataSourceId?.trim()) {
     return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(dataSourceId));
+  res.status(200).json(getRunResults(dataSourceId, req.body));
 });
 
 app.post('/package/v3/:packageId', (req, res) => {
@@ -307,7 +331,7 @@ app.post('/package/v3/:packageId', (req, res) => {
   if (!dataSourceId?.trim()) {
     return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(dataSourceId));
+  res.status(200).json(getRunResults(dataSourceId, req.body));
 });
 
 app.post('/api/flapi/packages/:packageId/run', (req, res) => {
@@ -318,7 +342,7 @@ app.post('/api/flapi/packages/:packageId/run', (req, res) => {
       .status(400)
       .json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(dataSourceId));
+  res.status(200).json(getRunResults(dataSourceId, req.body));
 });
 
 app.post('/api/flapi/package/v3/:packageId', (req, res) => {
@@ -327,7 +351,7 @@ app.post('/api/flapi/package/v3/:packageId', (req, res) => {
   if (!dataSourceId?.trim()) {
     return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
-  res.status(200).json(getRunResults(dataSourceId));
+  res.status(200).json(getRunResults(dataSourceId, req.body));
 });
 
 // ——— Config & Models (for client) ———
