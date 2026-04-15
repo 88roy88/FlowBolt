@@ -142,6 +142,22 @@ test.describe('Editor', () => {
     });
   });
 
+  test('can upload an asset from the file tree', async ({ page }) => {
+    await goToEditor(page);
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/entry/upload'),
+      { timeout: 10_000 }
+    );
+
+    await fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first().click();
+    await page.getByTestId('file-upload-input').setInputFiles('e2e/editor.spec.ts');
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/editor.spec.ts');
+    await expect(fileTreeContainer(page).getByText('editor.spec.ts', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
   test('can rename a folder from the file tree', async ({ page }) => {
     await goToEditor(page);
     const srcRow = fileTreeRowByName(page, 'src');

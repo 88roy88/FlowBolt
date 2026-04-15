@@ -76,6 +76,7 @@
     "noMatchingFiles": "No matching files",
     "searchShortcutTitle": "Search in files (Ctrl+Shift+F)",
     "createFile": "Create file",
+    "uploadFiles": "Upload files",
     "renameFile": "Rename",
     "deleteFile": "Delete",
     "deletedTab": "Deleted file (tab kept open)",
@@ -85,7 +86,8 @@
     "renamePrompt": "Enter a new name",
     "confirmDeleteFile": "Delete {{name}}?",
     "fileNameRequired": "File name is required.",
-    "fileActionFailed": "File operation failed. Please try again."
+    "fileActionFailed": "File operation failed. Please try again.",
+    "uploadFailed": "Upload failed. Please try again."
   },
   "terminal": {
     "terminal": "Terminal",

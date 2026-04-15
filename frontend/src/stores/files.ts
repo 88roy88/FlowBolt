@@ -18,6 +18,7 @@ interface FilesState {
   updateFileContent: (path: string, content: string) => void;
   saveFile: (path: string) => Promise<void>;
   createFile: (path: string, content?: string) => Promise<void>;
+  uploadFiles: (basePath: string, files: File[]) => Promise<void>;
   renamePath: (oldPath: string, newPath: string) => Promise<void>;
   deletePath: (path: string) => Promise<void>;
   /** Incremented on every file save — used to trigger preview refresh. */
@@ -32,6 +33,13 @@ function storageKey(projectId: string) { return `editor-tabs:${projectId}`; }
 function normalizePath(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/\/$/, '');
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
+function joinPath(basePath: string, childPath: string): string {
+  const base = normalizePath(basePath);
+  const trimmed = childPath.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+  if (!trimmed) return base;
+  return base === '/' ? `/${trimmed}` : `${base}/${trimmed}`;
 }
 
 function collectFilePaths(tree: FileEntry[]): Set<string> {
@@ -224,6 +232,20 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     await api.createFileEntry(projectId, normalizedPath, content);
     await get().loadFileTree();
     await get().openFile(normalizedPath);
+  },
+
+  async uploadFiles(basePath: string, files: File[]) {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId || files.length === 0) return;
+    const normalizedBasePath = normalizePath(basePath);
+    for (const file of files) {
+      const relativePath = file.webkitRelativePath && file.webkitRelativePath.trim().length > 0
+        ? file.webkitRelativePath
+        : file.name;
+      const uploadPath = joinPath(normalizedBasePath, relativePath);
+      await api.uploadFileEntry(projectId, uploadPath, file);
+    }
+    await get().loadFileTree();
   },
 
   async renamePath(oldPath: string, newPath: string) {

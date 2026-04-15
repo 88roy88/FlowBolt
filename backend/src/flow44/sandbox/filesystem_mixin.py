@@ -28,6 +28,14 @@ class FileSystemMixin(BaseSandbox, ABC):
         with open(full, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             f.write(content)
 
+    async def write_binary_file(self, path: str, content: bytes) -> None:
+        full = self._safe_path(path)
+        if os.path.exists(full):  # noqa: ASYNC240
+            raise FileExistsError(path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "xb") as f:  # noqa: ASYNC230
+            f.write(content)
+
     async def create_file(self, path: str, content: str = "") -> None:
         full = self._safe_path(path)
         if os.path.exists(full):  # noqa: ASYNC240

@@ -76,6 +76,7 @@
     "noMatchingFiles": "אין קבצים תואמים",
     "searchShortcutTitle": "חיפוש בקבצים (Ctrl+Shift+F)",
     "createFile": "צור קובץ",
+    "uploadFiles": "העלה קבצים",
     "renameFile": "שנה שם",
     "deleteFile": "מחק",
     "deletedTab": "קובץ נמחק (הלשונית נשארת פתוחה)",
@@ -85,7 +86,8 @@
     "renamePrompt": "הכנס שם חדש",
     "confirmDeleteFile": "למחוק את {{name}}?",
     "fileNameRequired": "חובה להזין שם קובץ.",
-    "fileActionFailed": "פעולת קובץ נכשלה. נסה שוב."
+    "fileActionFailed": "פעולת קובץ נכשלה. נסה שוב.",
+    "uploadFailed": "העלאה נכשלה. נסה שוב."
   },
   "terminal": {
     "terminal": "טרמינל",

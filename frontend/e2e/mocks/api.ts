@@ -185,6 +185,23 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   await page.route(`**/api/files/*/entry**`, async (route) => {
     const req = route.request();
     const method = req.method();
+    const url = new URL(req.url());
+
+    if (method === 'POST' && url.pathname.endsWith('/entry/upload')) {
+      const fullPath = normalizeTreePath(url.searchParams.get('path') ?? '');
+      if (findEntryLocation(fileTree, fullPath)) {
+        return route.fulfill({ status: 409, json: { detail: 'Already exists' } });
+      }
+      const parentPath = getParentPath(fullPath);
+      const siblings = ensureDirectory(fileTree, parentPath);
+      const name = fullPath.split('/').filter(Boolean).pop() ?? fullPath;
+      siblings.push({ name, path: fullPath, is_directory: false });
+      sortTree(fileTree);
+
+      const uploadedBytes = req.postDataBuffer()?.byteLength ?? 0;
+      fileContents[toContentKey(fullPath)] = `// uploaded asset placeholder (${uploadedBytes} bytes)\n`;
+      return route.fulfill({ status: 200, json: { status: 'ok', path: fullPath } });
+    }
 
     if (method === 'POST') {
       let body: { path?: string; content?: string } = {};
@@ -243,7 +260,6 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     }
 
     if (method === 'DELETE') {
-      const url = new URL(req.url());
       const fullPath = normalizeTreePath(url.searchParams.get('path') ?? '');
       const target = findEntryLocation(fileTree, fullPath);
       if (!target) return route.fulfill({ status: 404, json: { detail: 'Not found' } });

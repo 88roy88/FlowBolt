@@ -1,8 +1,8 @@
 import { useFilesStore } from '../../stores/files';
 import type { FileEntry } from '../../types';
-import { Folder, FolderOpen, File, FileJson, FileCode, FileText as FileTextIcon, Image, Settings, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Folder, FolderOpen, File, FileJson, FileCode, FileText as FileTextIcon, Image, Settings, Plus, Pencil, Trash2, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -26,6 +26,7 @@ interface TreeNodeProps {
   entry: FileEntry;
   depth: number;
   onCreate: (basePath: string) => void;
+  onUpload: (basePath: string) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
   readOnly: boolean;
@@ -50,7 +51,7 @@ function joinPath(basePath: string, childName: string): string {
   return base === '/' ? `/${trimmed}` : `${base}/${trimmed}`;
 }
 
-function TreeNode({ entry, depth, onCreate, onRename, onDelete, readOnly }: TreeNodeProps) {
+function TreeNode({ entry, depth, onCreate, onUpload, onRename, onDelete, readOnly }: TreeNodeProps) {
   const { t } = useTranslation();
   const { openFile, activeFilePath } = useFilesStore();
   const [expanded, setExpanded] = useState(depth < 2);
@@ -90,6 +91,19 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete, readOnly }: Tree
               onClick={(e) => {
                 e.stopPropagation();
                 if (readOnly) return;
+                onUpload(createInBasePath);
+              }}
+              title={t('editor.uploadFiles')}
+              disabled={readOnly}
+            >
+              <Upload size={12} />
+            </button>
+            <button
+              type="button"
+              className="rounded p-0.5 hover:bg-muted"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (readOnly) return;
                 onRename(entry);
               }}
               title={t('editor.renameFile')}
@@ -118,6 +132,7 @@ function TreeNode({ entry, depth, onCreate, onRename, onDelete, readOnly }: Tree
             entry={child}
             depth={depth + 1}
             onCreate={onCreate}
+            onUpload={onUpload}
             onRename={onRename}
             onDelete={onDelete}
             readOnly={readOnly}
@@ -184,12 +199,15 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
   const { t } = useTranslation();
   const fileTree = useFilesStore((s) => s.fileTree);
   const createFile = useFilesStore((s) => s.createFile);
+  const uploadFiles = useFilesStore((s) => s.uploadFiles);
   const renamePath = useFilesStore((s) => s.renamePath);
   const deletePath = useFilesStore((s) => s.deletePath);
   const [dialogState, setDialogState] = useState<FileActionDialogState>(null);
   const [inputValue, setInputValue] = useState('');
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadBasePath, setUploadBasePath] = useState('/');
 
   const closeDialog = () => {
     setDialogState(null);
@@ -217,6 +235,28 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
     setDialogState({ mode: 'delete', entry });
     setInputValue('');
     setDialogError(null);
+  };
+
+  const openUploadDialog = (basePath: string) => {
+    if (readOnly) return;
+    setUploadBasePath(basePath);
+    fileInputRef.current?.click();
+  };
+
+  const handleUploadSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = event.target.files ? Array.from(event.target.files) : [];
+    if (selectedFiles.length === 0) return;
+    setDialogError(null);
+    setIsSubmitting(true);
+    try {
+      await uploadFiles(uploadBasePath, selectedFiles);
+    } catch (err) {
+      console.error('Upload failed', err);
+      setDialogError(t('editor.uploadFailed'));
+    } finally {
+      event.target.value = '';
+      setIsSubmitting(false);
+    }
   };
 
   const submitDialogAction = async () => {
@@ -275,17 +315,38 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
   if (fileTree.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-8 px-4 text-center">
-        <button
-          type="button"
-          className="mb-1 rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
-          onClick={() => openCreateDialog('/')}
-          disabled={readOnly}
-        >
-          {t('editor.createFile')}
-        </button>
+        <div className="mb-1 grid w-full max-w-[260px] grid-cols-2 gap-1">
+          <button
+            type="button"
+            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+            onClick={() => openCreateDialog('/')}
+            disabled={readOnly}
+          >
+            {t('editor.createFile')}
+          </button>
+          <button
+            type="button"
+            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+            onClick={() => openUploadDialog('/')}
+            disabled={readOnly}
+          >
+            {t('editor.uploadFiles')}
+          </button>
+        </div>
         {readOnly && (
           <span className="text-[11px] text-muted-foreground">{readOnlyMessage}</span>
         )}
+        {!readOnly && dialogError && (
+          <span className="text-[11px] text-destructive">{dialogError}</span>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          data-testid="file-upload-input"
+          onChange={(e) => void handleUploadSelection(e)}
+        />
         <Folder size={28} className="text-muted-foreground opacity-30" />
         <span className="text-xs text-muted-foreground">
           No files yet. Start a conversation to scaffold your project.
@@ -297,14 +358,22 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
   return (
     <>
       <div className="py-1">
-        <div className="px-2 pb-1">
+        <div className="grid grid-cols-2 gap-1 px-2 pb-1">
           <button
             type="button"
-            className="w-full rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
             onClick={() => openCreateDialog('/')}
             disabled={readOnly}
           >
             {t('editor.createFile')}
+          </button>
+          <button
+            type="button"
+            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+            onClick={() => openUploadDialog('/')}
+            disabled={readOnly}
+          >
+            {t('editor.uploadFiles')}
           </button>
         </div>
         {readOnly && (
@@ -312,12 +381,26 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
             {readOnlyMessage}
           </div>
         )}
+        {!readOnly && dialogError && (
+          <div className="px-2 pb-2 text-[11px] text-destructive">
+            {dialogError}
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          data-testid="file-upload-input"
+          onChange={(e) => void handleUploadSelection(e)}
+        />
         {fileTree.map((entry) => (
           <TreeNode
             key={entry.path}
             entry={entry}
             depth={0}
             onCreate={openCreateDialog}
+            onUpload={openUploadDialog}
             onRename={openRenameDialog}
             onDelete={openDeleteDialog}
             readOnly={readOnly}

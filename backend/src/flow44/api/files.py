@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from flow44.api.deps import SandboxDep
@@ -115,6 +115,21 @@ async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = 
         raise HTTPException(status_code=403, detail=str(exc)) from None
     except OSError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
+
+
+@router.post("/entry/upload")
+async def post_upload_entry(
+    sandbox: Annotated[PnpmSandbox, SandboxDep],
+    path: str = Query(...),
+    body: bytes = Body(...),
+) -> dict[str, str]:
+    try:
+        await sandbox.write_binary_file(path, body)
+        return {"status": "ok", "path": path}
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
 
 
 @router.get("/grep")
