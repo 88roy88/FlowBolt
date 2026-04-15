@@ -44,6 +44,63 @@ class TestDeleteFile:
         with pytest.raises(PermissionError):
             await sandbox.delete_file("../../etc/passwd")
 
+    async def test_removes_non_empty_directory_recursively(
+        self, sandbox: DummySandbox, tmp_path  # type: ignore[type-arg]
+    ) -> None:
+        await sandbox.write_file("src/assets/logo.svg", "<svg></svg>")
+        await sandbox.delete_file("src")
+        assert not (tmp_path / "src").exists()
+
+
+@pytest.mark.asyncio
+class TestCreateRenameAndBinary:
+    async def test_create_file_creates_parent_dirs(self, sandbox: DummySandbox) -> None:
+        await sandbox.create_file("src/new-file.ts", "export const x = 1;\n")
+        assert await sandbox.read_file("src/new-file.ts") == "export const x = 1;\n"
+
+    async def test_create_file_conflict_raises(self, sandbox: DummySandbox) -> None:
+        await sandbox.create_file("dup.txt", "a")
+        with pytest.raises(FileExistsError):
+            await sandbox.create_file("dup.txt", "b")
+
+    async def test_rename_path_for_file(self, sandbox: DummySandbox) -> None:
+        await sandbox.write_file("src/old.ts", "content")
+        await sandbox.rename_path("src/old.ts", "src/new.ts")
+        assert await sandbox.read_file("src/new.ts") == "content"
+        with pytest.raises(FileNotFoundError):
+            await sandbox.read_file("src/old.ts")
+
+    async def test_rename_path_for_directory_with_children(self, sandbox: DummySandbox) -> None:
+        await sandbox.write_file("src/components/Button.tsx", "export const Button = () => null;")
+        await sandbox.rename_path("src/components", "src/ui")
+        assert await sandbox.read_file("src/ui/Button.tsx") == "export const Button = () => null;"
+        with pytest.raises(FileNotFoundError):
+            await sandbox.read_file("src/components/Button.tsx")
+
+    async def test_rename_missing_source_raises(self, sandbox: DummySandbox) -> None:
+        with pytest.raises(FileNotFoundError):
+            await sandbox.rename_path("missing.ts", "new.ts")
+
+    async def test_rename_existing_destination_raises(self, sandbox: DummySandbox) -> None:
+        await sandbox.write_file("src/a.ts", "a")
+        await sandbox.write_file("src/b.ts", "b")
+        with pytest.raises(FileExistsError):
+            await sandbox.rename_path("src/a.ts", "src/b.ts")
+
+    async def test_write_binary_file_roundtrip(self, sandbox: DummySandbox, tmp_path) -> None:  # type: ignore[type-arg]
+        payload = b"\x89PNG\r\n\x1a\n"
+        await sandbox.write_binary_file("src/assets/logo.png", payload)
+        assert (tmp_path / "src" / "assets" / "logo.png").read_bytes() == payload
+
+    async def test_write_binary_file_conflict_raises(self, sandbox: DummySandbox) -> None:
+        await sandbox.write_file("dup.bin", "text")
+        with pytest.raises(FileExistsError):
+            await sandbox.write_binary_file("dup.bin", b"binary")
+
+    async def test_write_binary_file_traversal_blocked(self, sandbox: DummySandbox) -> None:
+        with pytest.raises(PermissionError, match="Path traversal"):
+            await sandbox.write_binary_file("../../tmp/payload.bin", b"x")
+
 
 @pytest.mark.asyncio
 class TestPathTraversal:
