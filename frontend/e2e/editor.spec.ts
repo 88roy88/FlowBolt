@@ -205,6 +205,52 @@ test.describe('Editor', () => {
     await expect(fileTreeContainer(page).getByText('editor.spec.ts', { exact: true })).toBeVisible({ timeout: 5_000 });
   });
 
+  test('can drag and drop a file into a folder', async ({ page }) => {
+    await goToEditor(page);
+    const srcRow = fileTreeRowByName(page, 'src');
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/entry/upload'),
+      { timeout: 10_000 }
+    );
+
+    const dataTransfer = await page.evaluateHandle(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['drag-drop-content'], 'dropped.txt', { type: 'text/plain' }));
+      return dt;
+    });
+
+    await srcRow.dispatchEvent('dragover', { dataTransfer });
+    await srcRow.dispatchEvent('drop', { dataTransfer });
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/src/dropped.txt');
+    await expect(fileTreeContainer(page).getByText('dropped.txt', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('can drag and drop a file into root directory', async ({ page }) => {
+    await goToEditor(page);
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/entry/upload'),
+      { timeout: 10_000 }
+    );
+
+    const dataTransfer = await page.evaluateHandle(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['root-drop-content'], 'root-dropped.txt', { type: 'text/plain' }));
+      return dt;
+    });
+
+    const rootDropzone = page.getByTestId('file-tree-root-dropzone').first();
+    await rootDropzone.dispatchEvent('dragover', { dataTransfer });
+    await rootDropzone.dispatchEvent('drop', { dataTransfer });
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/root-dropped.txt');
+    await expect(fileTreeContainer(page).getByText('root-dropped.txt', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
   test('shows error when uploading an existing file', async ({ page }) => {
     await goToEditor(page);
 
@@ -356,6 +402,8 @@ test.describe('Editor read-only gating', () => {
       await goToEditor(page);
 
       const getUploadCount = trackUploadRequests(page);
+      const initialUrl = page.url();
+      const initialPageCount = page.context().pages().length;
       const rootUploadButton = fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first();
       await expect(rootUploadButton).toBeDisabled();
 
@@ -364,8 +412,22 @@ test.describe('Editor read-only gating', () => {
       const folderUploadButton = srcRow.getByTitle('Upload files');
       await expect(folderUploadButton).toBeDisabled();
 
+      const dataTransfer = await page.evaluateHandle(() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['readonly-drop'], 'readonly.txt', { type: 'text/plain' }));
+        return dt;
+      });
+
+      const rootDropzone = page.getByTestId('file-tree-root-dropzone').first();
+      await rootDropzone.dispatchEvent('dragover', { dataTransfer });
+      await rootDropzone.dispatchEvent('drop', { dataTransfer });
+      await srcRow.dispatchEvent('dragover', { dataTransfer });
+      await srcRow.dispatchEvent('drop', { dataTransfer });
+
       await page.waitForTimeout(500);
       expect(getUploadCount()).toBe(0);
+      expect(page.url()).toBe(initialUrl);
+      expect(page.context().pages().length).toBe(initialPageCount);
     });
   });
 

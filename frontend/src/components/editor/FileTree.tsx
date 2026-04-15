@@ -2,7 +2,7 @@ import { useFilesStore } from '../../stores/files';
 import type { FileEntry } from '../../types';
 import { Folder, FolderOpen, File, FileJson, FileCode, FileText as FileTextIcon, Image, Settings, Plus, Pencil, Trash2, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { type ChangeEvent, useRef, useState } from 'react';
+import { type ChangeEvent, type DragEvent, useRef, useState } from 'react';
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -27,6 +27,9 @@ interface TreeNodeProps {
   depth: number;
   onCreate: (basePath: string) => void;
   onUpload: (basePath: string) => void;
+  onDropUpload: (basePath: string, files: File[]) => void;
+  dropTargetPath: string | null;
+  onDropTargetChange: (path: string | null) => void;
   onRename: (entry: FileEntry) => void;
   onDelete: (entry: FileEntry) => void;
   readOnly: boolean;
@@ -51,19 +54,56 @@ function joinPath(basePath: string, childName: string): string {
   return base === '/' ? `/${trimmed}` : `${base}/${trimmed}`;
 }
 
-function TreeNode({ entry, depth, onCreate, onUpload, onRename, onDelete, readOnly }: TreeNodeProps) {
+function TreeNode({
+  entry,
+  depth,
+  onCreate,
+  onUpload,
+  onDropUpload,
+  dropTargetPath,
+  onDropTargetChange,
+  onRename,
+  onDelete,
+  readOnly,
+}: TreeNodeProps) {
   const { t } = useTranslation();
   const { openFile, activeFilePath } = useFilesStore();
   const [expanded, setExpanded] = useState(depth < 2);
   const isActive = activeFilePath === entry.path;
   const createInBasePath = entry.is_directory ? entry.path : parentDirectory(entry.path);
+  const isDropTarget = entry.is_directory && dropTargetPath === entry.path;
 
   if (entry.is_directory) {
     return (
       <div>
         <div
           onClick={() => setExpanded((v) => !v)}
-          className="group flex items-center gap-1 py-[3px] px-2 cursor-pointer text-[13px] truncate transition-colors duration-75 hover:bg-muted/40"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (readOnly) {
+              e.dataTransfer.dropEffect = 'none';
+              return;
+            }
+            e.dataTransfer.dropEffect = 'copy';
+            onDropTargetChange(entry.path);
+          }}
+          onDragLeave={() => {
+            if (dropTargetPath === entry.path) onDropTargetChange(null);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (readOnly) return;
+            const files = Array.from(e.dataTransfer.files ?? []);
+            onDropTargetChange(null);
+            if (files.length === 0) return;
+            setExpanded(true);
+            onDropUpload(createInBasePath, files);
+          }}
+          className={`group flex items-center gap-1 py-[3px] px-2 cursor-pointer text-[13px] truncate transition-colors duration-75 hover:bg-muted/40 ${
+            isDropTarget ? 'bg-primary/10 ring-1 ring-primary/30' : ''
+          }`}
           style={{ paddingInlineStart: `${8 + depth * 14}px` }}
         >
           {expanded
@@ -133,6 +173,9 @@ function TreeNode({ entry, depth, onCreate, onUpload, onRename, onDelete, readOn
             depth={depth + 1}
             onCreate={onCreate}
             onUpload={onUpload}
+            onDropUpload={onDropUpload}
+            dropTargetPath={dropTargetPath}
+            onDropTargetChange={onDropTargetChange}
             onRename={onRename}
             onDelete={onDelete}
             readOnly={readOnly}
@@ -195,6 +238,8 @@ interface FileTreeProps {
   readOnlyMessage: string;
 }
 
+const ROOT_DROP_PATH = '/';
+
 export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
   const { t } = useTranslation();
   const fileTree = useFilesStore((s) => s.fileTree);
@@ -208,6 +253,8 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadBasePath, setUploadBasePath] = useState('/');
+  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const isRootDropTarget = dropTargetPath === ROOT_DROP_PATH;
 
   const closeDialog = () => {
     setDialogState(null);
@@ -257,6 +304,47 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
       event.target.value = '';
       setIsSubmitting(false);
     }
+  };
+
+  const handleDropUpload = async (basePath: string, files: File[]) => {
+    if (readOnly || files.length === 0) return;
+    setDialogError(null);
+    setIsSubmitting(true);
+    try {
+      await uploadFiles(basePath, files);
+    } catch (err) {
+      console.error('Upload failed', err);
+      setDialogError(t('editor.uploadFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRootDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (readOnly) {
+      event.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    event.dataTransfer.dropEffect = 'copy';
+    setDropTargetPath(ROOT_DROP_PATH);
+  };
+
+  const handleRootDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+    if (dropTargetPath === ROOT_DROP_PATH) setDropTargetPath(null);
+  };
+
+  const handleRootDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (readOnly) return;
+    const files = Array.from(event.dataTransfer.files ?? []);
+    setDropTargetPath(null);
+    if (files.length === 0) return;
+    void handleDropUpload(ROOT_DROP_PATH, files);
   };
 
   const submitDialogAction = async () => {
@@ -314,7 +402,15 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
 
   if (fileTree.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 py-8 px-4 text-center">
+      <div
+        data-testid="file-tree-root-dropzone"
+        onDragOver={handleRootDragOver}
+        onDragLeave={handleRootDragLeave}
+        onDrop={handleRootDrop}
+        className={`flex flex-col items-center justify-center gap-2 py-8 px-4 text-center transition-colors ${
+          isRootDropTarget ? 'bg-primary/10 ring-1 ring-primary/30' : ''
+        }`}
+      >
         <div className="mb-1 grid w-full max-w-[260px] grid-cols-2 gap-1">
           <button
             type="button"
@@ -357,7 +453,13 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
 
   return (
     <>
-      <div className="py-1">
+      <div
+        data-testid="file-tree-root-dropzone"
+        onDragOver={handleRootDragOver}
+        onDragLeave={handleRootDragLeave}
+        onDrop={handleRootDrop}
+        className={`py-1 transition-colors ${isRootDropTarget ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}
+      >
         <div className="grid grid-cols-2 gap-1 px-2 pb-1">
           <button
             type="button"
@@ -401,6 +503,9 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
             depth={0}
             onCreate={openCreateDialog}
             onUpload={openUploadDialog}
+            onDropUpload={handleDropUpload}
+            dropTargetPath={dropTargetPath}
+            onDropTargetChange={setDropTargetPath}
             onRename={openRenameDialog}
             onDelete={openDeleteDialog}
             readOnly={readOnly}
