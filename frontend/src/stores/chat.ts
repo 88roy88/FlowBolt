@@ -22,6 +22,8 @@ export interface ChatState {
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
   selectedDataSources: { id: number; name: string }[];
+  /** True after the project has completed at least one AI action cycle. */
+  buildCompleted: boolean;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'reject' | 'modify', feedback?: string) => void;
@@ -93,6 +95,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
   selectedDataSources: [],
+  buildCompleted: false,
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const projectId = useSessionStore.getState().projectId;
@@ -202,7 +205,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       // Reset state, then replay all events — events are the single source of truth
       // for both user messages and assistant messages/cards
-      set({ messages: [], isStreaming: false, historyLoaded: false, ...RESET_STATE });
+      set({ messages: [], isStreaming: false, historyLoaded: false, buildCompleted: false, ...RESET_STATE });
 
       const socket = getChatSocket(projectId);
       const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
@@ -221,7 +224,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearMessages() {
-    set({ messages: [], historyLoaded: false, ...RESET_STATE });
+    set({ messages: [], historyLoaded: false, buildCompleted: false, ...RESET_STATE });
   },
 
   clearError() {

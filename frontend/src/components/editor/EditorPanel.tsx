@@ -42,9 +42,8 @@ export function EditorPanel() {
     openFile,
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
-  const messages = useChatStore((s) => s.messages);
-  const hasInitialAiResponse = useMemo(() => messages.some((m) => m.role === 'assistant'), [messages]);
-  const readOnlyUntilFirstAiResponse = !hasInitialAiResponse;
+  const buildCompleted = useChatStore((s) => s.buildCompleted);
+  const readOnlyUntilInitialBuildComplete = !buildCompleted;
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
@@ -61,7 +60,7 @@ export function EditorPanel() {
     activeFilePath,
     updateFileContent,
     saveFile,
-    readOnlyUntilFirstAiResponse
+    readOnlyUntilInitialBuildComplete
   );
 
   useEditorPendingReveal(
@@ -173,7 +172,7 @@ export function EditorPanel() {
 
         {leftTab === 'files' ? (
           <div style={{ flex: 1, overflow: 'auto' }}>
-            <FileTree readOnly={readOnlyUntilFirstAiResponse} />
+            <FileTree readOnly={readOnlyUntilInitialBuildComplete} />
           </div>
         ) : (
           <EditorSearchPanel
@@ -222,7 +221,7 @@ export function EditorPanel() {
               )}
             </div>
           )}
-          {readOnlyUntilFirstAiResponse && (
+          {readOnlyUntilInitialBuildComplete && (
             <div className="px-3 text-[11px] text-muted-foreground shrink-0">
               {t('editor.readOnlyUntilFirstAiResponse')}
             </div>
@@ -239,7 +238,7 @@ export function EditorPanel() {
               onChange={handleEditorChange}
               beforeMount={handleBeforeMount}
               onMount={handleMonacoEditorMount}
-              options={{ ...EDITOR_MONACO_OPTIONS, readOnly: readOnlyUntilFirstAiResponse }}
+              options={{ ...EDITOR_MONACO_OPTIONS, readOnly: readOnlyUntilInitialBuildComplete }}
             />
           </div>
         ) : (
