@@ -35,8 +35,9 @@ dev-frontend: kill-ports
 dev-mocks: kill-ports
 	cd mocks/flapi-mock && pnpm install && pnpm dev
 
-# Install dependencies
+# Install dependencies (also installs Husky git hooks)
 install:
+	pnpm install
 	cd frontend && pnpm install
 	cd backend && uv sync
 

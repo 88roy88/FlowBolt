@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+
+echo "Running backend lint (ruff)..."
+cd backend \
+  && uv run --no-sync ruff format --check --config ruff.toml src/ \
+  && uv run --no-sync ruff check --no-fix --config ruff.toml src/ \
+  || { echo "ruff failed — run: cd backend && uv run --no-sync task ruff-all"; exit 1; }
+
+echo "Running backend type check (mypy)..."
+# --platform linux matches CI (avoids false positives from Windows-only os stubs)
+uv run --no-sync mypy --config-file mypy.toml --platform linux src/ \
+  || { echo "mypy failed — fix the errors above before pushing"; exit 1; }
