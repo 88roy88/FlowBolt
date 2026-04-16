@@ -151,7 +151,9 @@
     },
     "dataSource": {
       "removeDataSource": "Remove data source",
-      "searchPlaceholder": "Search data sources (optional)"
+      "searchPlaceholder": "Search data sources (optional)",
+      "searching": "Searching...",
+      "noResults": "No data sources found"
     }
   },
   "publish": {

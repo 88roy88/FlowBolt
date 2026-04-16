@@ -151,7 +151,9 @@
     },
     "dataSource": {
       "removeDataSource": "הסר מקור נתונים",
-      "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)"
+      "searchPlaceholder": "חפש מארזים (אופציונלי)",
+      "searching": "מחפש...",
+      "noResults": "לא נמצאו מארזים"
     }
   },
   "publish": {

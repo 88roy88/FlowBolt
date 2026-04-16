@@ -101,9 +101,9 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
       {showDropdown && (
         <div className="absolute bottom-full start-0 end-0 mb-1 max-h-60 overflow-y-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-md)] z-[1000]">
           {isLoading ? (
-            <div className="p-3 text-center text-[13px] text-muted-foreground">Searching...</div>
+            <div className="p-3 text-center text-[13px] text-muted-foreground">{t('chat.dataSource.searching')}</div>
           ) : results.length === 0 ? (
-            <div className="p-3 text-center text-[13px] text-muted-foreground">No data sources found</div>
+            <div className="p-3 text-center text-[13px] text-muted-foreground">{t('chat.dataSource.noResults')}</div>
           ) : (
             results.map((pkg) => {
               const alreadySelected = selectedIds.has(pkg.Id);
