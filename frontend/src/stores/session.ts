@@ -9,13 +9,16 @@ interface SessionState {
   projects: Project[];
   projectId: string | null;
   isCreating: boolean;
+  pendingRenameProjectId: string | null;
   setCurrentProject: (project: Project) => void;
+  goHome: () => void;
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
   updateProjectSummary: (projectId: string, summary: string) => void;
   setProjectPublishedUrl: (projectId: string, url: string) => void;
+  setPendingRenameProjectId: (id: string | null) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -23,6 +26,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   projects: [],
   projectId: null,
   isCreating: false,
+  pendingRenameProjectId: null,
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, projectId: project.id });
@@ -31,6 +35,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       useChatStore.setState({ selectedModel: project.selected_model });
     }
     useChatStore.getState().clearDataSources();
+  },
+
+  goHome() {
+    set({ currentProject: null, projectId: null });
+    useChatStore.getState().clearMessages();
+    window.location.hash = '';
   },
 
   async loadProjects() {
@@ -92,6 +102,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         : state.currentProject;
       return { projects, currentProject };
     });
+  },
+
+  setPendingRenameProjectId(id: string | null) {
+    set({ pendingRenameProjectId: id });
   },
 
   setProjectPublishedUrl(projectId: string, url: string) {
