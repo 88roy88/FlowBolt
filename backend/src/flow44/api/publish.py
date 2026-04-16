@@ -36,7 +36,10 @@ async def _validate_slug(slug: str, project_id: str) -> None:
     if not _SLUG_RE.match(slug):
         raise HTTPException(
             status_code=400,
-            detail="Invalid slug. Use 3–50 lowercase letters, numbers, and hyphens (must start and end with a letter or digit).",
+            detail=(
+                "Invalid slug. Use 3–50 lowercase letters, numbers, and hyphens"
+                " (must start and end with a letter or digit)."
+            ),
         )
     if await is_slug_taken(slug, exclude_project_id=project_id):
         raise HTTPException(status_code=409, detail=f"The slug '{slug}' is already taken.")

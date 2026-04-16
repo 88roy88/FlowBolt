@@ -36,6 +36,8 @@ export function Preview() {
     console.debug('[Preview] refresh — reason: project changed', { projectId, refreshKey });
   }, [projectId, refreshKey]);
 
+  const clearConsole = useConsoleStore((s) => s.clear);
+
   // Auto-refresh preview when files are saved (by user or AI).
   // Debounce to avoid rapid refreshes during bulk writes.
   const saveVersionRef = useRef(saveVersion);
@@ -48,9 +50,7 @@ export function Preview() {
       setRefreshKey((k) => k + 1);
     }, 2000);
     return () => clearTimeout(timer);
-  }, [saveVersion]);
-
-  const clearConsole = useConsoleStore((s) => s.clear);
+  }, [saveVersion, clearConsole]);
   const handleRefresh = () => {
     console.debug('[Preview] refresh — reason: manual');
     clearConsole();
