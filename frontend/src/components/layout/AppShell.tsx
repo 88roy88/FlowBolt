@@ -164,7 +164,7 @@ export function AppShell() {
       const hasMessages = messages.length > 0;
       setProjectHasMessages(currentProject.id, hasMessages);
     }
-  }, [historyLoaded, messages.length, currentProject?.id]);
+  }, [historyLoaded, messages.length, currentProject?.id, currentProject]);
 
   const handleBottomResize = useCallback((delta: number) => {
     setBottomHeight((h) =>
