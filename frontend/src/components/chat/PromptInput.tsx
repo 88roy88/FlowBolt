@@ -7,11 +7,18 @@ import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 
-export function PromptInput() {
+type Props = {
+  /** Called instead of the normal send when there is no active project yet.
+   *  Responsible for creating a project and dispatching the message. */
+  onFirstSubmit?: (message: string) => Promise<void>;
+};
+
+export function PromptInput({ onFirstSubmit }: Props) {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const [showDsSelector, setShowDsSelector] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const isStreaming = useChatStore((s) => s.isStreaming);
@@ -28,9 +35,23 @@ export function PromptInput() {
     }
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming || !projectId) return;
+    if (!trimmed || isStreaming || isCreatingProject) return;
+
+    if (!projectId) {
+      if (!onFirstSubmit) return;
+      setIsCreatingProject(true);
+      try {
+        await onFirstSubmit(trimmed);
+        setValue('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      } finally {
+        setIsCreatingProject(false);
+      }
+      return;
+    }
+
     sendMessage(trimmed);
     setValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -44,7 +65,7 @@ export function PromptInput() {
   };
 
   const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'complete');
-  const disabled = isBusy || !projectId;
+  const disabled = isBusy || isCreatingProject || (!projectId && !onFirstSubmit);
   const canSend = !!value.trim() && !disabled;
 
   // Global keyboard shortcut: Cmd+K or / to focus
@@ -63,13 +84,15 @@ export function PromptInput() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const placeholder = !projectId
-    ? t('chat.placeholder.selectProject')
-    : agentPhase === 'awaiting_approval'
-      ? t('chat.placeholder.reviewPlan')
-      : isBusy
-        ? t('chat.placeholder.working')
-        : t('chat.placeholder.default');
+  const placeholder = isCreatingProject
+    ? t('onboarding.creatingProject')
+    : !projectId && !onFirstSubmit
+      ? t('chat.placeholder.selectProject')
+      : agentPhase === 'awaiting_approval'
+        ? t('chat.placeholder.reviewPlan')
+        : isBusy
+          ? t('chat.placeholder.working')
+          : t('chat.placeholder.default');
 
   const busyLabel =
     agentPhase === 'classifying' ? t('chat.phase.analyzing') :

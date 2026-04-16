@@ -45,7 +45,7 @@ function getInitials(name: string) {
 
 export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBusyChange }: SidebarProps) {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating } = useSessionStore();
+  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, pendingRenameProjectId, setPendingRenameProjectId } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [newName, setNewName] = useState('');
@@ -74,6 +74,17 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpenId]);
+
+  // Auto-enter rename mode for a newly created project (triggered from onboarding flow)
+  useEffect(() => {
+    if (!pendingRenameProjectId) return;
+    const project = projects.find((p) => p.id === pendingRenameProjectId);
+    if (project) {
+      setRenamingId(project.id);
+      setRenameValue(project.name);
+      setPendingRenameProjectId(null);
+    }
+  }, [pendingRenameProjectId, projects, setPendingRenameProjectId]);
 
   const handleCreate = async () => {
     const name = newName.trim() || 'New Project';
@@ -232,9 +243,11 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                       if (e.key === 'Enter') submitRename();
                       if (e.key === 'Escape') setRenamingId(null);
                     }}
+                    onFocus={(e) => e.target.select()}
                     onBlur={submitRename}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 text-[13px] bg-background border border-border rounded px-1.5 py-0.5"
+                    placeholder={t('sidebar.renameProject')}
+                    className="flex-1 text-[13px] bg-background border border-primary/50 rounded px-1.5 py-0.5 outline-none ring-1 ring-primary/30"
                   />
                 ) : (
                   <span className="flex-1 text-[13px] truncate">{project.name}</span>

@@ -22,6 +22,14 @@
     "retryConnection": "נסה להתחבר שוב",
     "createFirstProject": "צור את הפרויקט הראשון שלך כדי להתחיל"
   },
+  "onboarding": {
+    "tagline": "תאר מה תרצה לבנות והבינה המלאכותית תעצב, תתכנן ותפתח את זה עבורך.",
+    "renameNudge": "תן שם לפרויקט שלך",
+    "creatingProject": "יוצר פרויקט...",
+    "hintDashboard": "דשבורד עם גרפים",
+    "hintTodoApp": "אפליקציית רשימת משימות עם גרירה",
+    "hintLandingPage": "דף נחיתה עם אנימציות"
+  },
   "sidebar": {
     "pinSidebar": "נעץ סרגל צד",
     "unpinSidebar": "בטל נעיצת סרגל צד",
@@ -30,7 +38,9 @@
     "scaffolding": "מכין פרויקט...",
     "rename": "שנה שם",
     "summary": "סיכום",
-    "confirmDelete": "אשר מחיקה?"
+    "confirmDelete": "אשר מחיקה?",
+    "untitledProject": "ללא שם",
+    "renameProject": "שנה שם לפרויקט"
   },
   "settings": {
     "title": "הגדרות",
