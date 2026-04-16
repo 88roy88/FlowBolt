@@ -22,6 +22,7 @@ class Project(SQLModel, table=True):
     data_source_context: str = Field(default="")
     data_sources: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, default=[]))
     published_url: str = Field(default="")
+    published_slug: str | None = Field(default=None, unique=True)
 
 
 async def create_project(name: str) -> Project:
@@ -124,11 +125,26 @@ async def delete_project(project_id: str) -> None:
             await session.commit()
 
 
-async def update_project_published_url(project_id: str, url: str) -> None:
+async def get_project_by_slug(slug: str) -> Project | None:
+    async with database.async_session() as session:
+        result = await session.execute(select(Project).where(Project.published_slug == slug))
+        return result.scalar_one_or_none()
+
+
+async def is_slug_taken(slug: str, exclude_project_id: str) -> bool:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(Project).where(Project.published_slug == slug, Project.id != exclude_project_id)
+        )
+        return result.scalar_one_or_none() is not None
+
+
+async def update_project_published_url(project_id: str, url: str, slug: str | None = None) -> None:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
             project.published_url = url
+            project.published_slug = slug
             project.updated_at = datetime.now(UTC).isoformat()
             session.add(project)
             await session.commit()

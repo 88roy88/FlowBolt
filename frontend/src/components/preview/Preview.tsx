@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useConsoleStore } from '../../stores/console';
-import { RefreshCw, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { publishToS3 } from '../../services/api';
 import { PublishModal } from '../ui/PublishModal';
@@ -17,10 +17,12 @@ export function Preview() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
 
   const isPublished = !!currentProject?.published_url;
+  const liveUrl = currentProject?.published_slug
+    ? `/api/share/${currentProject.published_slug}`
+    : projectId ? `/api/export/${projectId}/published` : null;
 
   useEffect(() => {
     if (!projectId) {
@@ -55,22 +57,22 @@ export function Preview() {
     setRefreshKey((k) => k + 1);
   };
 
-  const handlePublish = useCallback(async () => {
-    if (!projectId || isPublishing) return;
-    setIsPublishing(true);
+  const handlePublish = useCallback(() => {
+    projectId && setPublishModalState({ open: true });
+  }, [projectId]);
+
+  const handleDoPublish = useCallback(async (slug: string | undefined) => {
+    if (!projectId) return;
     try {
-      const result = await publishToS3(projectId);
+      const result = await publishToS3(projectId, slug);
       const current = useSessionStore.getState().currentProject;
-      if (current) {
-        useSessionStore.getState().setProjectPublishedUrl(current.id, result.url);
-      }
-      setPublishModalState({ open: true, url: result.url });
+      current && useSessionStore.getState().setProjectPublishedUrl(current.id, result.url, result.slug || undefined);
+      setPublishModalState((s) => s.open ? { ...s, url: result.url } : s);
     } catch (err) {
-      setPublishModalState({ open: true, error: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setIsPublishing(false);
+      setPublishModalState((s) => s.open ? { ...s, error: err instanceof Error ? err.message : String(err) } : s);
+      throw err;
     }
-  }, [projectId, isPublishing]);
+  }, [projectId]);
 
   if (!projectId) {
     return (
@@ -100,11 +102,11 @@ export function Preview() {
 
         {/* Publish Actions */}
         <div className="flex items-center gap-1.5">
-          {isPublished && projectId ? (
+          {isPublished && liveUrl ? (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`/api/export/${projectId}/published`, '_blank')}
+              onClick={() => window.open(liveUrl, '_blank')}
               title={t('preview.viewPublishedApp')}
             >
               <ExternalLink size={14} />
@@ -114,15 +116,11 @@ export function Preview() {
           <Button
             variant="default"
             size="sm"
-            disabled={!projectId || isPublishing}
+            disabled={!projectId}
             onClick={handlePublish}
             title={isPublished ? t('preview.republish') : t('preview.publish')}
           >
-            {isPublishing ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Globe size={14} />
-            )}
+            <Globe size={14} />
             {isPublished ? t('preview.republish') : t('preview.publish')}
           </Button>
         </div>
@@ -147,9 +145,16 @@ export function Preview() {
       )}
 
       <PublishModal
+        key={String(publishModalState.open)}
         open={publishModalState.open}
-        onOpenChange={(open) => setPublishModalState(s => ({ ...s, open }))}
-        url={publishModalState.url}
+        onOpenChange={(open) => {
+          setPublishModalState(open ? { open: true } : { open: false });
+        }}
+        projectId={projectId ?? ''}
+        existingSlug={currentProject?.published_slug}
+        mode={currentProject?.published_slug ? 'edit' : 'create'}
+        onPublish={handleDoPublish}
+        resultUrl={publishModalState.url}
         errorMessage={publishModalState.error}
       />
     </div>

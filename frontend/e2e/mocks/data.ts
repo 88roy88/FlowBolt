@@ -9,6 +9,18 @@ export const MOCK_PROJECT = {
   name: 'E2E Test Project',
   created_at: new Date().toISOString(),
   model: 'mock/test-model',
+  published_url: '',
+  published_slug: undefined as string | undefined,
+};
+
+/** A second mock project used to simulate a taken slug in publish tests. */
+export const MOCK_PROJECT_WITH_SLUG = {
+  id: 'e2e-test-project-002',
+  name: 'Published Project',
+  created_at: new Date().toISOString(),
+  model: 'mock/test-model',
+  published_url: 'https://s3.local/published/e2e-test-project-002.html',
+  published_slug: 'taken-slug' as string | undefined,
 };
 
 /** Matches backend `FileEntry` shape (`is_directory`, leading `/` on paths). */

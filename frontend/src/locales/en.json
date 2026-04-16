@@ -159,6 +159,26 @@
     "successfullyPublished": "Successfully Published!",
     "projectIsLive": "Your project is now live. Anyone with this link can view it.",
     "copyLink": "Copy link",
-    "openLive": "Open Live"
+    "openLive": "Open Live",
+    "publishing": "Publishing...",
+    "chooseSlugTitle": "Choose a custom URL",
+    "chooseSlugSubtitle": "Pick a short, memorable name for your app's public link",
+    "slugLabel": "Custom URL",
+    "slugPlaceholder": "my-awesome-app",
+    "slugAvailable": "Available",
+    "slugTaken": "Already taken",
+    "slugInvalid": "Use 3–50 lowercase letters, numbers and hyphens",
+    "slugChecking": "Checking...",
+    "publishWithSlug": "Publish",
+    "skipSlug": "Use default link",
+    "republishTitle": "Republish project",
+    "republishSubtitle": "Your app will be updated at the same URL",
+    "currentUrl": "Current URL",
+    "changeUrl": "Change URL",
+    "cancelChange": "Cancel",
+    "republish": "Republish",
+    "republishWithNewSlug": "Republish with new URL",
+    "overwriteWarning": "This will replace the currently published version.",
+    "slugChangeWarning": "Changing the URL will permanently disable the old link."
   }
 }
