@@ -39,6 +39,11 @@ docker-compose.override.yml
 # Claude Code
 .claude/
 
+# Cursor
+.cursor/
+.cursorignore
+AGENTS.md
+
 # Scratch / review notes
 CODE_REVIEW*.md
 BACKLOG*.md
