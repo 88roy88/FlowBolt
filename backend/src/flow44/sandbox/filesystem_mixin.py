@@ -44,7 +44,7 @@ class FileSystemMixin(BaseSandbox, ABC):
         with open(full, "x", encoding="utf-8") as f:  # noqa: ASYNC230
             f.write(content)
 
-    async def rename_path(self, source_path: str, destination_path: str) -> None:
+    async def rename_file(self, source_path: str, destination_path: str) -> None:
         source_full = self._safe_path(source_path)
         destination_full = self._safe_path(destination_path)
         if not os.path.exists(source_full):  # noqa: ASYNC240

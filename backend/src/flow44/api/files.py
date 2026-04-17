@@ -92,9 +92,9 @@ async def post_create_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: Cr
 
 
 @router.patch("/project_file")
-async def patch_rename_path(sandbox: Annotated[PnpmSandbox, SandboxDep], body: RenamePathRequest) -> dict[str, str]:
+async def patch_rename_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: RenamePathRequest) -> dict[str, str]:
     try:
-        await sandbox.rename_path(body.old_path, body.new_path)
+        await sandbox.rename_file(body.old_path, body.new_path)
         return {"status": "ok", "old_path": body.old_path, "new_path": body.new_path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
