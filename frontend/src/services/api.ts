@@ -41,27 +41,27 @@ export async function saveFileContent(projectId: string, path: string, content: 
 }
 
 export async function createFileEntry(projectId: string, path: string, content = ''): Promise<void> {
-  await request(`/files/${projectId}/entry`, {
+  await request(`/files/${projectId}/project_file`, {
     method: 'POST',
     body: JSON.stringify({ path, content }),
   });
 }
 
 export async function renameFileEntry(projectId: string, oldPath: string, newPath: string): Promise<void> {
-  await request(`/files/${projectId}/entry`, {
+  await request(`/files/${projectId}/project_file`, {
     method: 'PATCH',
     body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
   });
 }
 
 export async function deleteFileEntry(projectId: string, path: string): Promise<void> {
-  await request(`/files/${projectId}/entry?path=${encodeURIComponent(path)}`, {
+  await request(`/files/${projectId}/project_file?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',
   });
 }
 
 export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
-  const res = await fetch(`${BASE}/files/${projectId}/entry/upload?path=${encodeURIComponent(path)}`, {
+  const res = await fetch(`${BASE}/files/${projectId}/project_file/upload?path=${encodeURIComponent(path)}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type || 'application/octet-stream' },
     body: file,

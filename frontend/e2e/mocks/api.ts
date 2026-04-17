@@ -182,12 +182,12 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: { path: pathParam || key, content } });
   });
 
-  await page.route(`**/api/files/*/entry**`, async (route) => {
+  await page.route(`**/api/files/*/project_file**`, async (route) => {
     const req = route.request();
     const method = req.method();
     const url = new URL(req.url());
 
-    if (method === 'POST' && url.pathname.endsWith('/entry/upload')) {
+    if (method === 'POST' && url.pathname.endsWith('/project_file/upload')) {
       const fullPath = normalizeTreePath(url.searchParams.get('path') ?? '');
       if (findEntryLocation(fileTree, fullPath)) {
         return route.fulfill({ status: 409, json: { detail: 'Already exists' } });
