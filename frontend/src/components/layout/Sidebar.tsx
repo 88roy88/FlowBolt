@@ -1,15 +1,23 @@
-import { useState, useRef, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useSessionStore } from '../../stores/session';
-import { useChatStore } from '../../stores/chat';
-import { useFilesStore } from '../../stores/files';
-import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil } from 'lucide-react';
-import { FlowBrand } from '../ui/flow-logo';
-import type { ProjectSummary } from '../../types';
-import { SummaryModal } from './SummaryModal';
-import { pollFileTree } from '../../utils/pollFileTree';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
+import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { useSessionStore } from "../../stores/session";
+import { useChatStore } from "../../stores/chat";
+import { useFilesStore } from "../../stores/files";
+import {
+  Plus,
+  Pin,
+  PinOff,
+  MoreHorizontal,
+  Trash2,
+  Info,
+  Settings,
+  Pencil,
+} from "lucide-react";
+import { FlowBrand } from "../ui/flow-logo";
+import type { ProjectSummary } from "../../types";
+import { SummaryModal } from "./SummaryModal";
+import { pollFileTree } from "../../utils/pollFileTree";
+import { Button } from "../ui/button";
 
 type SidebarProps = {
   onCloseSidebar?: () => void;
@@ -33,7 +41,8 @@ const PROJECT_COLORS = [
 
 function getProjectColor(name: string) {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  for (let i = 0; i < name.length; i++)
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
   return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
 }
 
@@ -43,25 +52,42 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBusyChange }: SidebarProps) {
+export function Sidebar({
+  onCloseSidebar,
+  isPinned,
+  onPin,
+  onOpenSettings,
+  onBusyChange,
+}: SidebarProps) {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, pendingRenameProjectId, setPendingRenameProjectId } = useSessionStore();
+  const {
+    projects,
+    currentProject,
+    setCurrentProject,
+    createProject,
+    deleteProject,
+    renameProject,
+    isCreating,
+    pendingRenameProjectId,
+    setPendingRenameProjectId,
+  } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
-  const [newName, setNewName] = useState('');
-  const [showInput, setShowInput] = useState(false);
-  const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
+  const [summaryModal, setSummaryModal] = useState<{
+    projectName: string;
+    summary: ProjectSummary;
+  } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Notify parent when user is busy with an action
   useEffect(() => {
-    const isBusy = showInput || !!menuOpenId || !!renamingId || !!pendingDeleteId;
+    const isBusy = !!menuOpenId || !!renamingId || !!pendingDeleteId;
     onBusyChange?.(isBusy);
-  }, [showInput, menuOpenId, renamingId, pendingDeleteId, onBusyChange]);
+  }, [menuOpenId, renamingId, pendingDeleteId, onBusyChange]);
 
   useEffect(() => {
     if (!menuOpenId) return;
@@ -71,8 +97,8 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
         setPendingDeleteId(null);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [menuOpenId]);
 
   // Auto-enter rename mode for a newly created project (triggered from onboarding flow)
@@ -87,20 +113,21 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
   }, [pendingRenameProjectId, projects, setPendingRenameProjectId]);
 
   const handleCreate = async () => {
-    const name = newName.trim() || 'New Project';
-    setNewName('');
-    setShowInput(false);
-    await createProject(name);
+    // createProject sets the hash to the temp ID immediately (before the API
+    // call) so the project view is shown without any delay.
+    await createProject(t("sidebar.untitledProject"));
     clearMessages();
     const session = useSessionStore.getState();
     if (session.currentProject) {
-      window.location.hash = `#/project/${session.currentProject.id}`;
       loadHistory(session.currentProject.id);
       pollFileTree();
+      // Set AFTER the await so the real project ID is known — the temp entry
+      // is already swapped out by the time we reach here.
+      setPendingRenameProjectId(session.currentProject.id);
     }
   };
 
-  const handleSelect = (project: typeof projects[number]) => {
+  const handleSelect = (project: (typeof projects)[number]) => {
     setCurrentProject(project);
     window.location.hash = `#/project/${project.id}`;
     resetFiles();
@@ -126,14 +153,14 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
         clearMessages();
         loadHistory(next.id);
       } else {
-        window.location.hash = '';
+        window.location.hash = "";
         resetFiles();
         clearMessages();
       }
     }
   };
 
-  const startRename = (project: typeof projects[number]) => {
+  const startRename = (project: (typeof projects)[number]) => {
     setMenuOpenId(null);
     setRenamingId(project.id);
     setRenameValue(project.name);
@@ -148,14 +175,14 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
     setRenamingId(null);
   };
 
-  const handleShowSummary = (project: typeof projects[number]) => {
+  const handleShowSummary = (project: (typeof projects)[number]) => {
     setMenuOpenId(null);
     if (!project.summary) return;
     try {
       const parsedSummary = JSON.parse(project.summary) as ProjectSummary;
       setSummaryModal({ projectName: project.name, summary: parsedSummary });
     } catch (err) {
-      console.error('Failed to parse project summary:', err);
+      console.error("Failed to parse project summary:", err);
     }
   };
 
@@ -166,12 +193,22 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
         <FlowBrand size="sm" />
         <div className="flex items-center gap-0.5">
           {onPin && !isPinned && (
-            <Button variant="ghost" size="icon-sm" onClick={onPin} title={t('sidebar.pinSidebar')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onPin}
+              title={t("sidebar.pinSidebar")}
+            >
               <Pin size={14} />
             </Button>
           )}
           {isPinned && onCloseSidebar && (
-            <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title={t('sidebar.unpinSidebar')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onCloseSidebar}
+              title={t("sidebar.unpinSidebar")}
+            >
               <PinOff size={14} />
             </Button>
           )}
@@ -180,41 +217,17 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
 
       {/* New project button */}
       <div className="px-3 mb-2">
-        {showInput ? (
-          <div className="flex gap-1">
-            <Input
-              autoFocus
-              placeholder={t('common.projectName')}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate();
-                if (e.key === 'Escape') setShowInput(false);
-              }}
-            />
-            <Button size="sm" onClick={handleCreate}>{t('common.add')}</Button>
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowInput(true)}
-            disabled={isCreating}
-            className="w-full justify-start gap-2"
-          >
-            <Plus size={14} />
-            {t('sidebar.newProject')}
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCreate}
+          disabled={isCreating}
+          className="w-full justify-start gap-2"
+        >
+          <Plus size={14} />
+          {t("sidebar.newProject")}
+        </Button>
       </div>
-
-      {/* Creating indicator */}
-      {isCreating && (
-        <div className="flex items-center gap-2 mx-3 px-2 py-2.5 mb-2 rounded-md bg-background border border-border text-[13px] text-muted-foreground">
-          <Loader2 size={14} className="shrink-0 animate-spin" />
-          {t('sidebar.scaffolding')}
-        </div>
-      )}
 
       {/* Project list */}
       <div className="flex-1 overflow-auto px-2">
@@ -228,10 +241,12 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                 onClick={() => handleSelect(project)}
                 data-testid={`project-item-${project.id}`}
                 className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${
-                  isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
+                  isActive ? "bg-muted/60" : "hover:bg-muted/30"
                 }`}
               >
-                <div className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${colorClass}`}>
+                <div
+                  className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${colorClass}`}
+                >
                   {getInitials(project.name)}
                 </div>
                 {renamingId === project.id ? (
@@ -240,17 +255,19 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') submitRename();
-                      if (e.key === 'Escape') setRenamingId(null);
+                      if (e.key === "Enter") submitRename();
+                      if (e.key === "Escape") setRenamingId(null);
                     }}
                     onFocus={(e) => e.target.select()}
                     onBlur={submitRename}
                     onClick={(e) => e.stopPropagation()}
-                    placeholder={t('sidebar.renameProject')}
+                    placeholder={t("sidebar.renameProject")}
                     className="flex-1 text-[13px] bg-background border border-primary/50 rounded px-1.5 py-0.5 outline-none ring-1 ring-primary/30"
                   />
                 ) : (
-                  <span className="flex-1 text-[13px] truncate">{project.name}</span>
+                  <span className="flex-1 text-[13px] truncate">
+                    {project.name}
+                  </span>
                 )}
                 <Button
                   variant="ghost"
@@ -276,7 +293,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
                   >
                     <Pencil size={13} className="text-muted-foreground" />
-                    {t('sidebar.rename')}
+                    {t("sidebar.rename")}
                   </button>
                   {project.summary && (
                     <button
@@ -284,19 +301,28 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                       className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
                     >
                       <Info size={13} className="text-muted-foreground" />
-                      {t('sidebar.summary')}
+                      {t("sidebar.summary")}
                     </button>
                   )}
                   <button
                     onClick={() => handleDelete(project.id)}
                     className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
                       pendingDeleteId === project.id
-                        ? 'text-destructive bg-destructive/10'
-                        : 'text-foreground hover:bg-muted/50'
+                        ? "text-destructive bg-destructive/10"
+                        : "text-foreground hover:bg-muted/50"
                     }`}
                   >
-                    <Trash2 size={13} className={pendingDeleteId === project.id ? 'text-destructive' : 'text-muted-foreground'} />
-                    {pendingDeleteId === project.id ? t('sidebar.confirmDelete') : t('common.delete')}
+                    <Trash2
+                      size={13}
+                      className={
+                        pendingDeleteId === project.id
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                      }
+                    />
+                    {pendingDeleteId === project.id
+                      ? t("sidebar.confirmDelete")
+                      : t("common.delete")}
                   </button>
                 </div>
               )}
@@ -307,9 +333,14 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
 
       {/* Bottom: Settings */}
       <div className="border-t border-border px-3 py-2">
-        <Button variant="ghost" size="sm" onClick={onOpenSettings} className="w-full justify-start gap-2 text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onOpenSettings}
+          className="w-full justify-start gap-2 text-muted-foreground"
+        >
           <Settings size={14} />
-          <span className="text-[13px]">{t('common.settings')}</span>
+          <span className="text-[13px]">{t("common.settings")}</span>
         </Button>
       </div>
 

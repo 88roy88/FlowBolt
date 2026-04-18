@@ -143,6 +143,7 @@
     "send": "send",
     "newLine": "new line",
     "scrollToBottom": "Scroll to bottom",
+    "settingUpProject": "Setting up your project…",
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept, modify, or reject",

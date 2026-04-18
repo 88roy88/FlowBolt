@@ -50,17 +50,6 @@ function saveSidebarPinned(pinned: boolean) {
   } catch {}
 }
 
-function getProjectHasMessages(projectId: string): boolean | null {
-  try {
-    const v = localStorage.getItem(`project-has-messages:${projectId}`);
-    if (v === "true") return true;
-    if (v === "false") return false;
-    return null; // No cache
-  } catch {
-    return null;
-  }
-}
-
 function setProjectHasMessages(projectId: string, hasMessages: boolean) {
   try {
     localStorage.setItem(
@@ -117,18 +106,55 @@ export function AppShell() {
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
   const createProject = useSessionStore((s) => s.createProject);
+  const pendingRenameProjectId = useSessionStore(
+    (s) => s.pendingRenameProjectId,
+  );
   const setPendingRenameProjectId = useSessionStore(
     (s) => s.setPendingRenameProjectId,
   );
 
+  // ---------- Router-driven render gate ----------
+  // Track the project ID from the URL hash reactively. This is the single
+  // source of truth for whether to show the project view or the landing screen.
+  // Using state (not a plain variable) ensures a re-render fires on every
+  // hashchange, including programmatic changes made during project creation.
+  const parseHashProjectId = () =>
+    window.location.hash.match(/^#\/project\/(.+)$/)?.[1] ?? null;
+
+  const [urlProjectId, setUrlProjectId] = useState<string | null>(
+    parseHashProjectId,
+  );
+
+  useEffect(() => {
+    const sync = () => setUrlProjectId(parseHashProjectId());
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  // Show the landing screen only when there is no project ID in the URL.
+  // currentProject?.id is used as a fallback for the rare moment between a
+  // programmatic navigation and the hashchange event firing.
+  const isInProject = !!(urlProjectId || currentProject?.id);
+  const isNewProject = !isInProject;
+  const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
+
+  // Auto-open the sidebar when rename is triggered so the user sees it
+  useEffect(() => {
+    if (pendingRenameProjectId && !sidebarPinned) {
+      setSidebarHover(true);
+    }
+  }, [pendingRenameProjectId, sidebarPinned]);
+
   // Create an "Untitled" project, navigate to it, then send the first message.
   // Called when the user submits a prompt from the home screen (no active project).
+  // createProject sets the hash to the temp ID immediately (before the API call),
+  // so urlProjectId updates and the project view renders without waiting.
   const handleCreateAndSend = useCallback(
     async (message: string) => {
       await createProject(t("sidebar.untitledProject"));
       const session = useSessionStore.getState();
       if (session.currentProject) {
-        window.location.hash = `#/project/${session.currentProject.id}`;
+        // Hash is already set/updated inside createProject (temp → real ID swap)
         useFilesStore.getState().reset();
         useChatStore.getState().loadHistory(session.currentProject.id);
         pollFileTree();
@@ -144,19 +170,6 @@ export function AppShell() {
     },
     [createProject, setPendingRenameProjectId, t],
   );
-
-  // Use cache to determine layout before history loads to prevent flicker
-  // Read project ID from URL hash immediately (don't wait for currentProject to be set)
-  const urlProjectId = window.location.hash.match(/^#\/project\/(.+)$/)?.[1];
-  const projectIdForCache = currentProject?.id || urlProjectId;
-  const cachedHasMessages = projectIdForCache
-    ? getProjectHasMessages(projectIdForCache)
-    : null;
-
-  const isNewProject = historyLoaded
-    ? messages.length === 0 && !isStreaming
-    : cachedHasMessages !== true; // Show empty state unless cache explicitly says has messages
-  const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
 
   // Update cache after history loads
   useEffect(() => {
