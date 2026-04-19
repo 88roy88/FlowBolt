@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorBody } from './errorBody.js';
-import { stubDataSourceResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics, stubHRResults, stubEcommerceResults, stubLogisticsResults, stubPhoneDevicesResults, stubPhoneCallsResults, stubPhoneRepairsResults, stubPhoneMarketResults } from './stubData.js';
+import { stubDataSourceResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics, stubHRResults, stubEcommerceResults, stubLogisticsResults, stubPhoneDevicesResults, stubPhoneCallsResults, stubPhoneRepairsResults, stubPhoneMarketResults, stubQuickParametersInfo } from './stubData.js';
 
 const app = express();
 app.use(cors());
@@ -262,6 +262,11 @@ function handlePackageSearchByPartialOrId(partialOrId) {
   // Otherwise behave like autocomplete by name.
   return handlePackageSearch(q);
 }
+
+app.get('/package/v1/quick/:packageId', (req, res) => {
+  if (!assertFlapiApiAuthorized(req, res)) return;
+  res.status(200).json(stubQuickParametersInfo);
+});
 
 app.get('/package/v1/search/:partial', (req, res) => {
   if (!assertFlapiApiAuthorized(req, res)) return;
