@@ -116,42 +116,48 @@ async def test_export_html_error():
 async def test_proxy_published_app_basic():
     project_id = "published-proj"
     mock_project = AsyncMock()
-    mock_project.published_url = "http://s3.local/published.html"
+    mock_project.id = project_id
+    mock_project.published_url = project_id
+    mock_project.published_at = "2026-04-18T21:00:00Z"
 
-    with patch("flow44.api.publish.get_project", return_value=mock_project):
-        with patch("httpx.AsyncClient.get") as mock_get:
-            mock_resp = AsyncMock()
-            mock_resp.status_code = 200
-            mock_resp.text = "<html>S3 Content</html>"
-            mock_resp.headers = {"etag": "tag123"}
-            mock_resp.raise_for_status = lambda: None
-            mock_get.return_value = mock_resp
+    with patch("flow44.api.shared.get_project_by_handle", return_value=mock_project):
+        with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/published.html"):
+            with patch("httpx.AsyncClient.get") as mock_get:
+                mock_resp = AsyncMock()
+                mock_resp.status_code = 200
+                mock_resp.text = "<html>S3 Content</html>"
+                mock_resp.headers = {"etag": "tag123"}
+                mock_resp.raise_for_status = lambda: None
+                mock_get.return_value = mock_resp
 
-            response = client.get(f"/api/export/{project_id}/published")
+                response = client.get(f"/shared/{project_id}")
 
-            assert response.status_code == 200
-            assert response.text == "<html>S3 Content</html>"
-            assert response.headers["ETag"] == "tag123"
-            assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
+                assert response.status_code == 200
+                assert response.text == "<html>S3 Content</html>"
+                assert response.headers["ETag"] == "tag123"
+                assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
 
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_fetch_error():
     project_id = "fetch-err"
     mock_project = AsyncMock()
-    mock_project.published_url = "http://s3.local/published.html"
+    mock_project.id = project_id
+    mock_project.published_url = project_id
+    mock_project.published_at = "2026-04-18T21:00:00Z"
 
-    with patch("flow44.api.publish.get_project", return_value=mock_project):
-        with patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")):
-            response = client.get(f"/api/export/{project_id}/published")
-            assert response.status_code == 502
-            assert response.json()["detail"] == "Error fetching published app from S3."
+    with patch("flow44.api.shared.get_project_by_handle", return_value=mock_project):
+        with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/published.html"):
+            with patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")):
+                response = client.get(f"/shared/{project_id}")
+                assert response.status_code == 502
+                assert response.json()["detail"] == "Error fetching published app from S3."
 
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_not_found():
     project_id = "non-existent"
-    with patch("flow44.api.publish.get_project", return_value=None):
-        response = client.get(f"/api/export/{project_id}/published")
+    with patch("flow44.api.shared.get_project_by_handle", return_value=None):
+        response = client.get(f"/shared/{project_id}")
         assert response.status_code == 404
-        assert response.json()["detail"] == "Published app not found or not published yet."
+        assert response.json()["detail"] == f"No published app found for handle '{project_id}'."

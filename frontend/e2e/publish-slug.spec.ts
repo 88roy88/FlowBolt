@@ -70,8 +70,8 @@ test.describe('Publish modal — edit mode', () => {
 
   const publishedProject = {
     ...MOCK_PROJECT,
-    published_url: 'https://s3.local/published/e2e-test-project-001.html',
-    published_slug: 'my-existing-app',
+    published_url: 'my-existing-app',
+    published_at: new Date().toISOString(),
   };
   test.use({
     mockOptions: {
@@ -124,7 +124,7 @@ test.describe('Publish modal — edit mode', () => {
 
     // Success phase with the slug URL
     await expect(page.getByText('Successfully Published!')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/\/api\/share\/my-existing-app/)).toBeVisible();
+    await expect(page.getByText(/\/shared\/my-existing-app/)).toBeVisible();
   });
 
   test('Change URL unlocks editing and shows slug input', async ({ page }) => {
@@ -195,6 +195,6 @@ test.describe('Publish modal — edit mode', () => {
 
     // Success
     await expect(page.getByText('Successfully Published!')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/\/api\/share\/brand-new-slug/)).toBeVisible();
+    await expect(page.getByText(/\/shared\/brand-new-slug/)).toBeVisible();
   });
 });

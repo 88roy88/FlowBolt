@@ -21,8 +21,8 @@ class Project(SQLModel, table=True):
     data_source_id: str = Field(default="")
     data_source_context: str = Field(default="")
     data_sources: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, default=[]))
-    published_url: str = Field(default="")
-    published_slug: str | None = Field(default=None, unique=True)
+    published_url: str | None = Field(default=None, sa_column_kwargs={"unique": True})
+    published_at: str | None = Field(default=None)
 
 
 async def create_project(name: str) -> Project:
@@ -125,26 +125,29 @@ async def delete_project(project_id: str) -> None:
             await session.commit()
 
 
-async def get_project_by_slug(slug: str) -> Project | None:
+async def get_project_by_handle(handle: str) -> Project | None:
     async with database.async_session() as session:
-        result = await session.execute(select(Project).where(Project.published_slug == slug))
+        result = await session.execute(select(Project).where(Project.published_url == handle))
         return result.scalar_one_or_none()
 
 
-async def is_slug_taken(slug: str, exclude_project_id: str) -> bool:
+async def is_handle_taken(handle: str, exclude_project_id: str) -> bool:
     async with database.async_session() as session:
         result = await session.execute(
-            select(Project).where(Project.published_slug == slug, Project.id != exclude_project_id)
+            select(Project).where(Project.published_url == handle, Project.id != exclude_project_id)
         )
         return result.scalar_one_or_none() is not None
 
 
-async def update_project_published_url(project_id: str, url: str, slug: str | None = None) -> None:
+async def update_project_published_url(project_id: str, handle: str) -> str:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
-            project.published_url = url
-            project.published_slug = slug
-            project.updated_at = datetime.now(UTC).isoformat()
+            now = datetime.now(UTC).isoformat()
+            project.published_url = handle
+            project.published_at = now
+            project.updated_at = now
             session.add(project)
             await session.commit()
+            return now
+        return ""

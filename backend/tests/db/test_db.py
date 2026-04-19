@@ -113,12 +113,13 @@ class TestProjectCRUD:
 
     async def test_update_project_published_url(self, test_db):
         project = await create_project("App")
-        url = "https://s3.amazonaws.com/my-bucket/project-id/index.html"
-        await update_project_published_url(project.id, url)
+        handle = "my-custom-slug"
+        await update_project_published_url(project.id, handle)
 
         fetched = await get_project(project.id)
         assert fetched is not None
-        assert fetched.published_url == url
+        assert fetched.published_url == handle
+        assert fetched.published_at is not None
         assert fetched.updated_at > project.updated_at
 
     async def test_delete_project_cascades_messages(self, test_db):

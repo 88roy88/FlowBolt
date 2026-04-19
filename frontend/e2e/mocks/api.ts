@@ -141,7 +141,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     const slug = url.searchParams.get('slug') ?? '';
     const projectId = url.pathname.split('/api/export/')[1]?.split('/slug/check')[0] ?? '';
     const taken = projects.some(
-      (p) => 'published_slug' in p && p.published_slug === slug && p.id !== projectId
+      (p) => p.published_url === slug && p.id !== projectId
     );
     return route.fulfill({ json: { available: !taken } });
   });
@@ -156,14 +156,15 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     try { body = route.request().postDataJSON(); } catch { /* ignore */ }
     const slug = body.slug ?? undefined;
 
+    const handle = slug || projectId;
     const proj = projects.find((p) => p.id === projectId);
-    if (proj && 'published_slug' in proj) {
-      (proj as typeof MOCK_PROJECT).published_url = `https://s3.local/published/${projectId}.html`;
-      (proj as typeof MOCK_PROJECT).published_slug = slug;
+    if (proj) {
+      proj.published_url = handle;
+      proj.published_at = new Date().toISOString();
     }
 
-    const publicPath = slug ? `/api/share/${slug}` : `/api/export/${projectId}/published`;
-    return route.fulfill({ json: { url: publicPath, slug: slug ?? '' } });
+    const publicPath = `/shared/${handle}`;
+    return route.fulfill({ json: { url: publicPath, handle, published_at: proj?.published_at ?? new Date().toISOString() } });
   });
 
   // --- Data source search ---

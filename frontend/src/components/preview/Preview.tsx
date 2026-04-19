@@ -6,23 +6,24 @@ import { useConsoleStore } from '../../stores/console';
 import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { publishToS3 } from '../../services/api';
-import { PublishModal } from '../ui/PublishModal';
+import { PublishModal } from '../ui/Publish/PublishModal';
 
 export function Preview() {
   const { t } = useTranslation();
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const saveVersion = useFilesStore((s) => s.saveVersion);
+  const setProjectPublishedUrl = useSessionStore((s) => s.setProjectPublishedUrl);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
 
-  const isPublished = !!currentProject?.published_url;
-  const liveUrl = currentProject?.published_slug
-    ? `/api/share/${currentProject.published_slug}`
-    : projectId ? `/api/export/${projectId}/published` : null;
+  const isPublished = !!currentProject?.published_at;
+  const liveUrl = currentProject?.published_url
+    ? `/shared/${currentProject.published_url}`
+    : null;
 
   useEffect(() => {
     if (!projectId) {
@@ -65,8 +66,7 @@ export function Preview() {
     if (!projectId) return;
     try {
       const result = await publishToS3(projectId, slug);
-      const current = useSessionStore.getState().currentProject;
-      current && useSessionStore.getState().setProjectPublishedUrl(current.id, result.url, result.slug || undefined);
+      setProjectPublishedUrl(projectId, result.handle, result.published_at);
       setPublishModalState((s) => s.open ? { ...s, url: result.url } : s);
     } catch (err) {
       setPublishModalState((s) => s.open ? { ...s, error: err instanceof Error ? err.message : String(err) } : s);
@@ -151,8 +151,8 @@ export function Preview() {
           setPublishModalState(open ? { open: true } : { open: false });
         }}
         projectId={projectId ?? ''}
-        existingSlug={currentProject?.published_slug}
-        mode={currentProject?.published_slug ? 'edit' : 'create'}
+        existingHandle={currentProject?.published_url}
+        mode={currentProject?.published_at ? 'edit' : 'create'}
         onPublish={handleDoPublish}
         resultUrl={publishModalState.url}
         errorMessage={publishModalState.error}

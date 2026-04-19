@@ -133,8 +133,8 @@ export function downloadSingleHtml(projectId: string): void {
   window.open(`${BASE}/export/${projectId}/html`, '_blank');
 }
 
-export async function publishToS3(projectId: string, slug?: string): Promise<{ url: string; slug: string }> {
-  return request<{ url: string; slug: string }>(`/export/${projectId}/publish`, {
+export async function publishToS3(projectId: string, slug?: string): Promise<{ url: string; handle: string; published_at: string }> {
+  return request<{ url: string; handle: string; published_at: string }>(`/export/${projectId}/publish`, {
     method: 'POST',
     body: JSON.stringify({ slug: slug ?? null }),
   });
