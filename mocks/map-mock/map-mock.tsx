@@ -1,12 +1,11 @@
 import { useRef } from "react";
-
 import {
   MAP_VISUALIZATION,
   type MapDataInstanceInfoDictionary,
   type MapVisualization,
   type MapVisualizationOptions,
   type TableDictionary,
-} from "./types/visit-map.types"
+} from "./types/visit-map.types";
 
 interface Props {
   tableDictionary: TableDictionary;
@@ -43,16 +42,16 @@ export const MapRenderer = ({
   ) => {
     if (tableData.noData) {
       return (
-        <div key={tableId} style={{ marginBottom: "20px" }}>
-          <h3>No Data</h3>
+        <div key={tableId} className="mb-5">
+          <h3 className="text-lg font-semibold">No Data</h3>
         </div>
       );
     }
 
     if (tableData.failedParsing) {
       return (
-        <div key={tableId} style={{ marginBottom: "20px" }}>
-          <h3>Failed to parse data</h3>
+        <div key={tableId} className="mb-5">
+          <h3 className="text-lg font-semibold">Failed to parse data</h3>
         </div>
       );
     }
@@ -65,110 +64,76 @@ export const MapRenderer = ({
         : null;
 
     return (
-      <div key={tableId} style={{ marginBottom: "30px" }}>
-        <div style={{ marginBottom: "10px" }}>
-          <h3
-            style={{
-              margin: "0 0 5px 0",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
+      <div key={tableId} className="mb-8">
+        <div className="mb-2.5">
+          <h3 className="mb-1 flex items-center gap-2 text-lg font-semibold text-gray-900">
             {tableInfo?.icon && <span>{tableInfo.icon}</span>}
             {tableInfo?.displayName || tableInfo?.name || tableId}
           </h3>
 
           {tableInfo && (
-            <p style={{ margin: "0", color: "#888", fontSize: "11px" }}>
+            <p className="m-0 text-[11px] text-gray-500">
               State: {tableInfo.state} | {data.length} records
             </p>
           )}
         </div>
 
-        <table
-          style={{
-            width: "100%",
-            fontSize: "12px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-          }}
-        >
-          <thead>
-            <tr style={{ backgroundColor: "#f5f5f5" }}>
-              {schema.map((field) => (
-                <th
-                  key={field.key}
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: "8px 12px",
-                    textAlign: "left",
-                    fontWeight: "600",
-                    color: "#333",
-                  }}
-                >
-                  <div>{field.displayName || field.key}</div>
-                  {field.type !== "string" && (
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color: "#888",
-                        fontWeight: "400",
-                      }}
-                    >
-                      {field.type}
-                    </div>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {data.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                style={{
-                  backgroundColor: rowIndex % 2 === 0 ? "#fff" : "#f9f9f9",
-                }}
-              >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm shadow">
+            <thead>
+              <tr className="bg-gray-100">
                 {schema.map((field) => (
-                  <td
+                  <th
                     key={field.key}
-                    style={{
-                      border: "1px solid #ddd",
-                      padding: "8px 12px",
-                      color: "#333",
-                    }}
+                    className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-800"
                   >
-                    {String(row[field.key] || "")}
-                  </td>
+                    <div>{field.displayName || field.key}</div>
+
+                    {field.type !== "string" && (
+                      <div className="text-[10px] font-normal text-gray-500">
+                        {field.type}
+                      </div>
+                    )}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {data.map((row, rowIndex) => (
+                <tr
+                  key={rowIndex}
+                  className={rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                >
+                  {schema.map((field) => (
+                    <td
+                      key={field.key}
+                      className="border border-gray-300 px-3 py-2 text-gray-800"
+                    >
+                      {String(row[field.key] || "")}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
 
   return (
-    <div ref={containerRef} style={{ height: "100%", width: "100%" }}>
+    <div ref={containerRef} className="h-full w-full">
       {visualization && visualization.isPending ? (
-        <div>Loading...</div>
+        <div className="text-sm text-gray-600">Loading...</div>
       ) : (
         <div>
-          <h2
-            style={{
-              marginBottom: "20px",
-              borderBottom: "2px solid #3B82F6",
-              paddingBottom: "10px",
-            }}
-          >
+          <h2 className="mb-5 border-b-2 border-blue-500 pb-2.5 text-2xl font-bold text-gray-900">
             Geographic Data Tables
           </h2>
 
           {Object.entries(tableDictionary).length === 0 ? (
-            <div>No tables available</div>
+            <div className="text-sm text-gray-600">No tables available</div>
           ) : (
             Object.entries(tableDictionary).map(([tableId, tableData]) =>
               renderTable(tableId, tableData)
