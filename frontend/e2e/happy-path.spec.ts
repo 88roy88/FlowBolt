@@ -28,7 +28,7 @@ async function gotoHomeReady(page: import('@playwright/test').Page) {
 /** Wait for projects to load, expand sidebar if collapsed. */
 async function ensureSidebar(page: import('@playwright/test').Page) {
   // Icon rail uses a button with initials; full sidebar uses a non-button row.
-  const rail = page.getByRole('button', { name: 'ET' });
+  const rail = page.getByRole('button', { name: 'ET', exact: true });
   const row = page.getByTestId(`project-item-${MOCK_PROJECT.id}`);
   await expect(rail.or(row)).toBeVisible({ timeout: 30_000 });
   // Expand if collapsed
@@ -53,9 +53,11 @@ test.describe('Happy path', () => {
     await ensureSidebar(page);
 
     await page.getByRole('button', { name: /new project/i }).click();
-    const nameInput = page.getByPlaceholder('Project name');
-    await nameInput.fill('My New Project');
-    await nameInput.press('Enter');
+
+    // New UI: project is created immediately and sidebar enters inline rename mode.
+    const renameInput = page.getByPlaceholder('Rename project');
+    await expect(renameInput).toBeVisible({ timeout: 10_000 });
+    await renameInput.press('Escape');
 
     // Mock always returns MOCK_PROJECT, so its name should still be there
     await expect(page.getByText(MOCK_PROJECT.name)).toBeAttached();

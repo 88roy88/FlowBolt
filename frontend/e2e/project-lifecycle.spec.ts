@@ -38,7 +38,7 @@ test.describe('Delete project', () => {
     await page.goto('/');
 
     // Wait for project to load — sidebar may be pinned (row visible) or collapsed (icon-rail button visible)
-    const rail = page.getByRole('button', { name: 'ET' });
+    const rail = page.getByRole('button', { name: 'ET', exact: true });
     const row = page.getByTestId(`project-item-${MOCK_PROJECT.id}`);
     await expect(rail.or(row)).toBeVisible({ timeout: 10_000 });
 
