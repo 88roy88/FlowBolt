@@ -31,6 +31,7 @@ export const MapRenderer = ({
     return tableInfoDictionary[dataInstanceId];
   };
 
+  // displaying the data received in a table in order to show it received as expected
   const renderTable = (
     tableId: string,
     tableData: {
