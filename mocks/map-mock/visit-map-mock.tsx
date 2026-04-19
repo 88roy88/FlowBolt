@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type MutableRefObject } from "react";
 import {
   MAP_VISUALIZATION,
   type MapDataInstanceInfoDictionary,
@@ -15,7 +15,7 @@ interface Props {
     isPending: boolean;
     template: string;
   };
-  mapServiceRef?: React.MutableRefObject<any>;
+  mapServiceRef?: MutableRefObject<any>;
 }
 
 export const MapRenderer = ({
