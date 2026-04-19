@@ -18,8 +18,8 @@ class Flow44BaseSettings(BaseSettings):
 class SandboxSettings(Flow44BaseSettings):
     WORKSPACE_BASE_DIR: str = _DEFAULT_WORKSPACE
     TEMPLATE_DIR: str = _DEFAULT_TEMPLATE
-    SANDBOX_PORT_RANGE_START: int = 3101
-    SANDBOX_PORT_RANGE_END: int = 4101
+    SANDBOX_PORT_RANGE_START: int = 3501
+    SANDBOX_PORT_RANGE_END: int = 4501
     NSJAIL_BIN: str = "/usr/bin/nsjail"
     MAX_COMMAND_TIMEOUT: int = 60
     SANDBOX_MEMORY_LIMIT_MB: int = 512
