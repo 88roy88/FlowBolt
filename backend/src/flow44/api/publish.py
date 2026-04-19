@@ -85,4 +85,3 @@ async def publish_to_s3(project_id: str, body: PublishRequest = PublishRequest()
     logger.info("Published project %s (handle: %s, public: %s)", project_id, handle, public_path)
 
     return {"url": public_path, "handle": handle, "published_at": published_at}
-
