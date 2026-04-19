@@ -55,7 +55,7 @@ export function ModelSelector() {
         <div className="absolute bottom-full start-0 mb-1 min-w-[260px] max-h-80 overflow-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] z-40">
           {Object.entries(grouped).map(([provider, providerModels]) => (
             <div key={provider}>
-              <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-[var(--dropdown-divider)] bg-[var(--dropdown-header-bg)]">
+              <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-dropdown-divider bg-dropdown-header-bg">
                 {provider}
               </div>
               {providerModels.map((m) => {
@@ -65,8 +65,8 @@ export function ModelSelector() {
                     key={m.id}
                     type="button"
                     onClick={() => { setSelectedModel(m.id); setOpen(false); }}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left cursor-pointer border-b border-[var(--dropdown-divider)] ${
-                      isActive ? 'bg-[var(--accent-bg-strong)]' : 'hover:bg-muted/50'
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left cursor-pointer border-b border-dropdown-divider ${
+                      isActive ? 'bg-accent-bg-strong' : 'hover:bg-muted/50'
                     }`}
                   >
                     <Check size={14} className={`shrink-0 text-primary ${isActive ? 'opacity-100' : 'opacity-0'}`} />

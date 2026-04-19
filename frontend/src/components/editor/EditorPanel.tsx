@@ -208,7 +208,7 @@ export function EditorPanel() {
                 </>
               ) : (
                 <>
-                  <Check size={10} className="text-green-400" /> {t('editor.saved')}
+                  <Check size={10} className="text-success" /> {t('editor.saved')}
                 </>
               )}
             </div>
