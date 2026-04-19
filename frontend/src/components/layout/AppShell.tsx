@@ -4,7 +4,7 @@ import { ChevronUp } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Resizer } from "./Resizer";
 import { GlobalProgress } from "./GlobalProgress";
-import { SettingsModal } from "./SettingsModal";
+import { ThemeToggle } from "./ThemeToggle";
 import { ClassicLayout } from "./ClassicLayout";
 import { FlexibleLayout } from "./FlexibleLayout";
 import { MobileLayout } from "./MobileLayout";
@@ -88,9 +88,8 @@ export function AppShell() {
   const [bottomTab, setBottomTab] = useState<BottomTab>("server");
   const [bottomHeight, setBottomHeight] = useState(250);
 
-  // Layout + settings
+  // Layout
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(loadLayoutMode);
-  const [showSettings, setShowSettings] = useState(false);
 
   const switchLayout = (mode: LayoutMode) => {
     setLayoutMode(mode);
@@ -349,7 +348,8 @@ export function AppShell() {
               setSidebarPinned(true);
               saveSidebarPinned(true);
             }}
-            onOpenSettings={() => setShowSettings(true)}
+            layoutMode={layoutMode}
+            onLayoutChange={switchLayout}
             onBusyChange={setSidebarBusy}
           />
         </div>
@@ -383,7 +383,8 @@ export function AppShell() {
                   saveSidebarPinned(true);
                   setSidebarHover(false);
                 }}
-                onOpenSettings={() => setShowSettings(true)}
+                layoutMode={layoutMode}
+                onLayoutChange={switchLayout}
                 onBusyChange={setSidebarBusy}
               />
             </div>
@@ -392,7 +393,8 @@ export function AppShell() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden relative">
+        <ThemeToggle />
         <GlobalProgress />
 
         {isNewProject ? (
@@ -451,13 +453,6 @@ export function AppShell() {
         )}
       </div>
 
-      {showSettings && (
-        <SettingsModal
-          layoutMode={layoutMode}
-          onLayoutChange={switchLayout}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
     </div>
   );
 }

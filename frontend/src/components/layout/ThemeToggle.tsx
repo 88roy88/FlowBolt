@@ -28,22 +28,9 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setTheme(isLight ? 'dark' : 'light')}
       title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 28,
-        height: 28,
-        borderRadius: 999,
-        border: '1px solid var(--border)',
-        background: 'var(--surface)',
-        color: 'var(--text-dim)',
-        cursor: 'pointer',
-        marginRight: 8,
-      }}
+      className="absolute top-3 end-3 z-20 flex items-center justify-center w-8 h-8 rounded-full border border-border bg-surface/80 text-muted-foreground hover:text-foreground hover:bg-muted/60 backdrop-blur-sm transition-all cursor-pointer shadow-sm"
     >
       {isLight ? <MoonStar size={16} /> : <SunMedium size={16} />}
     </button>
   );
 }
-

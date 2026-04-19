@@ -16,6 +16,7 @@ import {
 import { FlowBrand } from "../ui/flow-logo";
 import type { ProjectSummary } from "../../types";
 import { SummaryModal } from "./SummaryModal";
+import { SettingsPopover, type LayoutMode } from "./SettingsModal";
 import { pollFileTree } from "../../utils/pollFileTree";
 import { Button } from "../ui/button";
 
@@ -23,7 +24,8 @@ type SidebarProps = {
   onCloseSidebar?: () => void;
   isPinned?: boolean;
   onPin?: () => void;
-  onOpenSettings?: () => void;
+  layoutMode: LayoutMode;
+  onLayoutChange: (mode: LayoutMode) => void;
   onBusyChange?: (busy: boolean) => void;
 };
 
@@ -56,7 +58,8 @@ export function Sidebar({
   onCloseSidebar,
   isPinned,
   onPin,
-  onOpenSettings,
+  layoutMode,
+  onLayoutChange,
   onBusyChange,
 }: SidebarProps) {
   const { t } = useTranslation();
@@ -81,13 +84,16 @@ export function Sidebar({
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
   // Notify parent when user is busy with an action
   useEffect(() => {
-    const isBusy = !!menuOpenId || !!renamingId || !!pendingDeleteId;
+    const isBusy = !!menuOpenId || !!renamingId || !!pendingDeleteId || settingsOpen;
     onBusyChange?.(isBusy);
-  }, [menuOpenId, renamingId, pendingDeleteId, onBusyChange]);
+  }, [menuOpenId, renamingId, pendingDeleteId, settingsOpen, onBusyChange]);
 
   useEffect(() => {
     if (!menuOpenId) return;
@@ -100,6 +106,22 @@ export function Sidebar({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpenId]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        settingsRef.current &&
+        !settingsRef.current.contains(e.target as Node) &&
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(e.target as Node)
+      ) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [settingsOpen]);
 
   // Auto-enter rename mode for a newly created project (triggered from onboarding flow)
   useEffect(() => {
@@ -332,16 +354,29 @@ export function Sidebar({
       </div>
 
       {/* Bottom: Settings */}
-      <div className="border-t border-border px-3 py-2">
+      <div className="border-t border-border px-3 py-2 relative">
         <Button
+          ref={settingsButtonRef}
           variant="ghost"
           size="sm"
-          onClick={onOpenSettings}
-          className="w-full justify-start gap-2 text-muted-foreground"
+          onClick={() => setSettingsOpen((v) => !v)}
+          className={`w-full justify-start gap-2 transition-colors ${
+            settingsOpen
+              ? "text-foreground bg-muted/50"
+              : "text-muted-foreground"
+          }`}
         >
           <Settings size={14} />
           <span className="text-[13px]">{t("common.settings")}</span>
         </Button>
+        {settingsOpen && (
+          <SettingsPopover
+            ref={settingsRef}
+            layoutMode={layoutMode}
+            onLayoutChange={onLayoutChange}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
       </div>
 
       {summaryModal && (
