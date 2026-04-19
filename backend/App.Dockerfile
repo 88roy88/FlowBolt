@@ -1,5 +1,5 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
+ARG BACKEND_BASE_IMAGE
+FROM ${BACKEND_BASE_IMAGE}
 
 # UV configuration build args
 ARG UV_NATIVE_TLS=true
@@ -20,7 +20,7 @@ COPY --chown=appuser:appuser . .
 
 # Generate uv.toml from build args (overwriting any existing one from the context)
 RUN echo "native-tls = ${UV_NATIVE_TLS}" > uv.toml && \
-    echo "insecure-host = [\"${UV_INSECURE_HOST1}\", \"${UV_INSECURE_HOST2}\"]" >> uv.toml && \
+    echo "allow-insecure-host = [\"${UV_INSECURE_HOST1}\", \"${UV_INSECURE_HOST2}\"]" >> uv.toml && \
     echo "[[index]]" >> uv.toml && \
     echo "name = \"${UV_INDEX_NAME}\"" >> uv.toml && \
     echo "url = \"${UV_INDEX_URL}\"" >> uv.toml && \

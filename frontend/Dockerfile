@@ -1,7 +1,10 @@
-ARG BASE_IMAGE=node:20-slim
-FROM ${BASE_IMAGE} AS build
+ARG FRONTEND_BASE_IMAGE=node:20-slim
+ARG NGINX_IMAGE=nginx:alpine
 
-COPY .npmrc* ./
+FROM ${FRONTEND_BASE_IMAGE} AS build
+
+RUN npm set registry ${NPM_REGISTRY}
+RUN npm config set strict-ssl ${NPM_STRICT_SSL}
 
 RUN npm install -g pnpm
 
@@ -15,7 +18,6 @@ USER root
 COPY . .
 RUN pnpm build
 
-ARG NGINX_IMAGE=nginx:alpine
 FROM ${NGINX_IMAGE}
 
 RUN rm -f /etc/nginx/conf.d/default.conf
