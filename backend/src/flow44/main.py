@@ -75,7 +75,29 @@ app = FastAPI(
     title="AI Web App Builder",
     version="0.1.0",
     lifespan=lifespan,
+    swagger_ui_parameters={"persistAuthorization": True},
 )
+
+#### hack
+from fastapi.openapi.utils import get_openapi  # noqa: E402
+def custom_openapi() -> dict:
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        routes=app.routes,
+    )
+    schema.setdefault("components", {}).setdefault("securitySchemes", {})["Authorization"] = {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+    }
+    schema["security"] = [{"Authorization": []}]
+    app.openapi_schema = schema
+    return schema
+app.openapi = custom_openapi  # type: ignore[method-assign]
+#### please remove
 
 
 @app.get("/health")
@@ -90,6 +112,7 @@ async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError)
 
 
 # CORS — allow all origins in development
+# TODO: limit CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

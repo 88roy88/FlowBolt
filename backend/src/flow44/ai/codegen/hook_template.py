@@ -22,22 +22,33 @@ def generate_data_source_hook(
     hook_name = f"useDataSource{sanitized_name}"
     response_type = f"{sanitized_name}Response"
 
+    # TODO: move to jinja
     return f"""\
 import {{ useState, useEffect, useCallback }} from 'react';
 import {{ API_BASE }} from '../config';
 import {{ credentialsStore, authSession }} from '../auth';
 import type {{ {response_type} }} from '{types_import_path}';
 
-async function fetchWithAuth(url: string): Promise<Response> {{
+async function fetchWithAuth(url: string, body?: unknown): Promise<Response> {{
   const token = credentialsStore.getValidToken();
-  const res = await fetch(url, {{
-    headers: token ? {{ Authorization: token }} : undefined,
-  }});
+  const options: RequestInit = {{
+    method: 'POST',
+    headers: {{
+      'Content-Type': 'application/json',
+      ...(token ? {{ Authorization: token }} : {{}}),
+    }},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }};
+  const res = await fetch(url, options);
   if (res.status === 401) {{
     await authSession.refreshAfter401();
     const retryToken = credentialsStore.getValidToken();
     const retry = await fetch(url, {{
-      headers: retryToken ? {{ Authorization: retryToken }} : undefined,
+      ...options,
+      headers: {{
+        'Content-Type': 'application/json',
+        ...(retryToken ? {{ Authorization: retryToken }} : {{}}),
+      }},
     }});
     if (!retry.ok) throw new Error(`Request failed: ${{retry.status}}`);
     return retry;

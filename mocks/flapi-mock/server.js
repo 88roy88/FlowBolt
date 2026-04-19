@@ -3,7 +3,24 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorBody } from './errorBody.js';
-import { stubDataSourceResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics, stubHRResults, stubEcommerceResults, stubLogisticsResults, stubPhoneDevicesResults, stubPhoneCallsResults, stubPhoneRepairsResults, stubPhoneMarketResults } from './stubData.js';
+import {
+  stubDataSourceResults,
+  stubIntelligenceResults,
+  stubPeopleWithPhotosResults,
+  stubPeopleHebrewResults,
+  stubLibs,
+  putRun,
+  getRun,
+  getRealtimeMetrics,
+  stubHRResults,
+  stubEcommerceResults,
+  stubLogisticsResults,
+  stubPhoneDevicesResults,
+  stubPhoneCallsResults,
+  stubPhoneRepairsResults,
+  stubPhoneMarketResults,
+  getPersonById
+} from './stubData.js';
 
 const app = express();
 app.use(cors());
@@ -239,6 +256,7 @@ function buildPackageSearchRecordById(id) {
     11: { Id: 11, Name: 'Phone Call Records', ...base, Tags: JSON.stringify([{ value: 'טלפונים', label: 'טלפונים' }, { value: 'שיחות', label: 'שיחות' }]) },
     12: { Id: 12, Name: 'Phone Repairs & Warranty', ...base, Tags: JSON.stringify([{ value: 'טלפונים', label: 'טלפונים' }, { value: 'תיקונים', label: 'תיקונים' }]) },
     13: { Id: 13, Name: 'Phone Market Analytics', ...base, Tags: JSON.stringify([{ value: 'טלפונים', label: 'טלפונים' }, { value: 'שוק', label: 'שוק' }]) },
+    20: { Id: 20, Name: 'Get Person by ID', ...base, Tags: JSON.stringify([{ value: 'דוגמה', label: 'דוגמה' }]) },
     572903: { Id: 572903, Name: 'כרטסת - base', ...base },
   };
 
@@ -276,58 +294,85 @@ app.get('/api/flapi/packages/search', (req, res) => {
   res.status(status).json(body);
 });
 
-function getRunResults(dataSourceId) {
+function extractQuickParams(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const extracted = {};
+  for (const [paramName, paramObj] of Object.entries(body)) {
+    if (paramObj && typeof paramObj === 'object' && !Array.isArray(paramObj)) {
+      const values = Object.values(paramObj);
+      extracted[paramName] = values.length === 1 ? values[0] : values;
+    }
+  }
+  return Object.keys(extracted).length > 0 ? extracted : null;
+}
+
+function getRunResults(dataSourceId, body) {
   const id = String(dataSourceId).trim();
-  if (id === '3') return { results: { ...stubIntelligenceResults } };
-  if (id === '4') return { results: { ...stubPeopleWithPhotosResults } };
-  if (id === '5') return { results: getRealtimeMetrics() };
-  if (id === '6') return { results: { ...stubPeopleHebrewResults } };
-  if (id === '7') return { results: { ...stubEcommerceResults } };
-  if (id === '8') return { results: { ...stubHRResults } };
-  if (id === '9') return { results: { ...stubLogisticsResults } };
-  if (id === '10') return { results: { ...stubPhoneDevicesResults } };
-  if (id === '11') return { results: { ...stubPhoneCallsResults } };
-  if (id === '12') return { results: { ...stubPhoneRepairsResults } };
-  if (id === '13') return { results: { ...stubPhoneMarketResults } };
-  return { results: { ...stubDataSourceResults } };
+  switch (id) {
+    case '3':
+        return { results: { ...stubIntelligenceResults } };
+    case '4':
+        return { results: { ...stubPeopleWithPhotosResults } };
+    case '5':
+        return { results: getRealtimeMetrics() };
+    case '6':
+        return { results: { ...stubPeopleHebrewResults } };
+    case '7':
+        return { results: { ...stubEcommerceResults } };
+    case '8':
+        return { results: { ...stubHRResults } };
+    case '9':
+        return { results: { ...stubLogisticsResults } };
+    case '10':
+        return { results: { ...stubPhoneDevicesResults } };
+    case '11':
+        return { results: { ...stubPhoneCallsResults } };
+    case '12':
+        return { results: { ...stubPhoneRepairsResults } };
+    case '13':
+        return { results: { ...stubPhoneMarketResults } };
+    case '20':
+        // Example of using quick params from request body to modify results.
+        const quickParams = extractQuickParams(body);
+        const personId = quickParams?.personId;
+        const person = getPersonById(personId);
+        return { results: person ? { Person: person } : null };
+      default:
+        return null;
+
+  }
+}
+
+function runPackageById(req, res) {
+    if (!assertFlapiApiAuthorized(req, res)){
+      return res.status(401).json(errorBody('unauthorized', 'Authorization header is required'));
+    }
+    const dataSourceId = req.params.packageId;
+    if (!dataSourceId?.trim()) {
+      return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
+    }
+    let results = getRunResults(dataSourceId, req.body);
+    if (results) {
+      return res.status(200).json(results);
+    } else {
+      return res.status(404).json(errorBody('not_found', `No package found for id: ${dataSourceId}`));
+    }
 }
 
 app.post('/package/:packageId', (req, res) => {
-  if (!assertFlapiApiAuthorized(req, res)) return;
-  const dataSourceId = req.params.packageId;
-  if (!dataSourceId?.trim()) {
-    return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
-  }
-  res.status(200).json(getRunResults(dataSourceId));
+  return runPackageById(req, res);
 });
 
 app.post('/package/v3/:packageId', (req, res) => {
-  if (!assertFlapiApiAuthorized(req, res)) return;
-  const dataSourceId = req.params.packageId;
-  if (!dataSourceId?.trim()) {
-    return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
-  }
-  res.status(200).json(getRunResults(dataSourceId));
+  return runPackageById(req, res);
 });
 
 app.post('/api/flapi/packages/:packageId/run', (req, res) => {
-  if (!assertFlapiApiAuthorized(req, res)) return;
-  const dataSourceId = req.params.packageId;
-  if (!dataSourceId?.trim()) {
-    return res
-      .status(400)
-      .json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
-  }
-  res.status(200).json(getRunResults(dataSourceId));
+  return runPackageById(req, res);
 });
 
 app.post('/api/flapi/package/v3/:packageId', (req, res) => {
-  if (!assertFlapiApiAuthorized(req, res)) return;
-  const dataSourceId = req.params.packageId;
-  if (!dataSourceId?.trim()) {
-    return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
-  }
-  res.status(200).json(getRunResults(dataSourceId));
+  return runPackageById(req, res);
 });
 
 // ——— Config & Models (for client) ———

@@ -294,6 +294,23 @@ export function getRealtimeMetrics() {
   };
 }
 
+
+/**
+ * Person by ID: package 20.
+ * returns person details based on ID
+ */
+export function getPersonById(personId) {
+    const peopleData = {
+      1: { id: 'p12345', name: 'Roy M' },
+      2: { id: 'p22345', name: 'Noa T' },
+      3: { id: 'p32345', name: 'Rivky K' },
+      4: { id: 'p42345', name: 'Shalom R' },
+      5: { id: 'p52345', name: 'Ori C'},
+    }
+    return peopleData[personId] || {id: "not found", name: "not found person for id " + personId};
+}
+
+
 /** ── PHONE DOMAIN (packages 10–13) ──
  *  Cross-package shared fields:
  *    device_id, model_name, brand       → Devices (10), Repairs (12), Market (13)
