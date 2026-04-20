@@ -1,4 +1,4 @@
-import { useRef, type MutableRefObject } from "react";
+import { MutableRefObject, useRef } from "react";
 import {
   MAP_VISUALIZATION,
   type MapDataInstanceInfoDictionary,
