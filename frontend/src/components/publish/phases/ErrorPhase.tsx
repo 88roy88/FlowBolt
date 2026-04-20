@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { AlertCircle } from 'lucide-react';
-import { DialogTitle } from '../../dialog';
+import { DialogTitle } from '../../ui/dialog';
 import { BTN_SECONDARY } from '../styles';
 
 interface ErrorPhaseProps {

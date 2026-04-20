@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { checkSlugAvailability } from '../../../services/api';
+import { checkSlugAvailability } from '../../services/api';
 
 export type SlugStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 

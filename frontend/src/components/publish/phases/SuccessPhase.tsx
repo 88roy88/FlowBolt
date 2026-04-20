@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Copy, ExternalLink } from 'lucide-react';
-import { DialogTitle } from '../../dialog';
+import { DialogTitle } from '../../ui/dialog';
 import { BTN_PRIMARY, BTN_SECONDARY } from '../styles';
 
 interface SuccessPhaseProps {

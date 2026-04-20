@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogClose } from '../dialog';
+import { Dialog, DialogContent, DialogClose } from '../ui/dialog';
 import { usePublishLogic } from './usePublishLogic';
 import { InputPhase } from './phases/InputPhase';
 import { SuccessPhase } from './phases/SuccessPhase';

@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe, Pencil } from 'lucide-react';
-import { DialogTitle } from '../../dialog';
+import { DialogTitle } from '../../ui/dialog';
 import { SlugInput } from '../components/SlugInput';
 import { SlugPreview } from '../components/SlugPreview';
 import { PublishButton } from '../components/PublishButton';

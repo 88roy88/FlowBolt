@@ -6,7 +6,7 @@ import { useConsoleStore } from '../../stores/console';
 import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { publishToS3 } from '../../services/api';
-import { PublishModal } from '../ui/Publish/PublishModal';
+import { PublishModal } from '../publish/PublishModal';
 
 export function Preview() {
   const { t } = useTranslation();
