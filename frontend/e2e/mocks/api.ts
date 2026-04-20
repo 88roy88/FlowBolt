@@ -182,26 +182,34 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: { path: pathParam || key, content } });
   });
 
-  await page.route(`**/api/files/*/file**`, async (route) => {
+  await page.route(`**/api/files/*/file/upload**`, async (route) => {
     const req = route.request();
     const method = req.method();
     const url = new URL(req.url());
 
-    if (method === 'POST' && url.pathname.endsWith('/file/upload')) {
-      const fullPath = normalizeTreePath(url.searchParams.get('path') ?? '');
-      if (findEntryLocation(fileTree, fullPath)) {
-        return route.fulfill({ status: 409, json: { detail: 'Already exists' } });
-      }
-      const parentPath = getParentPath(fullPath);
-      const siblings = ensureDirectory(fileTree, parentPath);
-      const name = fullPath.split('/').filter(Boolean).pop() ?? fullPath;
-      siblings.push({ name, path: fullPath, is_directory: false });
-      sortTree(fileTree);
-
-      const uploadedBytes = req.postDataBuffer()?.byteLength ?? 0;
-      fileContents[toContentKey(fullPath)] = `// uploaded asset placeholder (${uploadedBytes} bytes)\n`;
-      return route.fulfill({ status: 200, json: { status: 'ok', path: fullPath } });
+    if (method !== 'POST') {
+      return route.fulfill({ status: 405, body: 'Method Not Allowed' });
     }
+
+    const fullPath = normalizeTreePath(url.searchParams.get('path') ?? '');
+    if (findEntryLocation(fileTree, fullPath)) {
+      return route.fulfill({ status: 409, json: { detail: 'Already exists' } });
+    }
+    const parentPath = getParentPath(fullPath);
+    const siblings = ensureDirectory(fileTree, parentPath);
+    const name = fullPath.split('/').filter(Boolean).pop() ?? fullPath;
+    siblings.push({ name, path: fullPath, is_directory: false });
+    sortTree(fileTree);
+
+    const uploadedBytes = req.postDataBuffer()?.byteLength ?? 0;
+    fileContents[toContentKey(fullPath)] = `// uploaded asset placeholder (${uploadedBytes} bytes)\n`;
+    return route.fulfill({ status: 200, json: { status: 'ok', path: fullPath } });
+  });
+
+  await page.route(`**/api/files/*/file`, async (route) => {
+    const req = route.request();
+    const method = req.method();
+    const url = new URL(req.url());
 
     if (method === 'POST') {
       let body: { path?: string; content?: string } = {};
