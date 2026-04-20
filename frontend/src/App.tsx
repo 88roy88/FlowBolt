@@ -13,6 +13,7 @@ import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
 import { getAppName } from './utils/easterEgg';
+import { MockApp } from '../../mocks/map-mock/mock-app';
 
 function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
@@ -263,7 +264,8 @@ export default function App() {
 
   return (
     <>
-      <AppShell />
+      {/* <AppShell /> */}
+      <MockApp></MockApp>
       <ErrorToast />
     </>
   );
