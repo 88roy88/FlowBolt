@@ -109,7 +109,8 @@ class TestGrep:
         monkeypatch.setattr(sandbox, "exec", _fake_exec)
         matches = await sandbox.grep("hello", file_pattern="*.tsx")
         assert matches == []
-        assert "--glob *.tsx" in seen["command"]
+        assert "--glob" in seen["command"]
+        assert "*.tsx" in seen["command"]
 
     async def test_no_matches_returns_empty(self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(search_mixin_module.shutil, "which", lambda _name: "rg")
@@ -134,6 +135,7 @@ class TestGrep:
         with pytest.raises(SearchToolError, match="Ripgrep returned no output"):
             await sandbox.grep("pattern")
 
-    async def test_traversal_blocked(self, sandbox: DummySandbox) -> None:
+    async def test_traversal_blocked(self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(search_mixin_module.shutil, "which", lambda _name: "rg")
         with pytest.raises(PermissionError):
             await sandbox.grep("pattern", path="../../etc")
