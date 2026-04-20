@@ -22,6 +22,13 @@ export class DebouncedAction {
   }
 
   /**
+   * Returns true if a task is currently scheduled or in-flight
+   */
+  isPending() {
+    return this.timer !== null || this.controller !== null;
+  }
+
+  /**
    * Schedules a task to run after the specified delay.
    * If a task is already scheduled, it is cancelled.
    * 
