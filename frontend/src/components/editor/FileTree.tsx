@@ -241,7 +241,8 @@ interface FileTreeProps {
 const ROOT_DROP_PATH = '/';
 
 export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRtl = i18n.dir(i18n.resolvedLanguage) === 'rtl';
   const fileTree = useFilesStore((s) => s.fileTree);
   const createFile = useFilesStore((s) => s.createFile);
   const uploadFiles = useFilesStore((s) => s.uploadFiles);
@@ -515,14 +516,15 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
         <DialogContent className="w-full max-w-[430px]">
           <DialogClose onClose={closeDialog} />
-          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogTitle className={isRtl ? 'text-right' : undefined}>{dialogTitle}</DialogTitle>
           {dialogDescription ? (
-            <p className="mt-2 text-sm text-muted-foreground">{dialogDescription}</p>
+            <p className={`mt-2 text-sm text-muted-foreground ${isRtl ? 'text-right' : ''}`}>{dialogDescription}</p>
           ) : (
             <div className="mt-3">
               <Input
                 autoFocus
                 value={inputValue}
+                className={isRtl ? 'text-right placeholder:text-right' : undefined}
                 placeholder={dialogState?.mode === 'create' ? t('editor.newFilePrompt') : t('editor.renamePrompt')}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
@@ -532,7 +534,7 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
             </div>
           )}
           {dialogError && (
-            <p className="mt-2 text-xs text-destructive">{dialogError}</p>
+            <p className={`mt-2 text-xs text-destructive ${isRtl ? 'text-right' : ''}`}>{dialogError}</p>
           )}
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="outline" onClick={closeDialog} disabled={isSubmitting}>

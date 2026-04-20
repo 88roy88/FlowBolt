@@ -63,29 +63,29 @@ class TestCreateRenameAndBinary:
         with pytest.raises(FileExistsError):
             await sandbox.create_file("dup.txt", "b")
 
-    async def test_rename_path_for_file(self, sandbox: DummySandbox) -> None:
+    async def test_rename_file_for_file(self, sandbox: DummySandbox) -> None:
         await sandbox.write_file("src/old.ts", "content")
-        await sandbox.rename_path("src/old.ts", "src/new.ts")
+        await sandbox.rename_file("src/old.ts", "src/new.ts")
         assert await sandbox.read_file("src/new.ts") == "content"
         with pytest.raises(FileNotFoundError):
             await sandbox.read_file("src/old.ts")
 
-    async def test_rename_path_for_directory_with_children(self, sandbox: DummySandbox) -> None:
+    async def test_rename_file_for_directory_with_children(self, sandbox: DummySandbox) -> None:
         await sandbox.write_file("src/components/Button.tsx", "export const Button = () => null;")
-        await sandbox.rename_path("src/components", "src/ui")
+        await sandbox.rename_file("src/components", "src/ui")
         assert await sandbox.read_file("src/ui/Button.tsx") == "export const Button = () => null;"
         with pytest.raises(FileNotFoundError):
             await sandbox.read_file("src/components/Button.tsx")
 
     async def test_rename_missing_source_raises(self, sandbox: DummySandbox) -> None:
         with pytest.raises(FileNotFoundError):
-            await sandbox.rename_path("missing.ts", "new.ts")
+            await sandbox.rename_file("missing.ts", "new.ts")
 
     async def test_rename_existing_destination_raises(self, sandbox: DummySandbox) -> None:
         await sandbox.write_file("src/a.ts", "a")
         await sandbox.write_file("src/b.ts", "b")
         with pytest.raises(FileExistsError):
-            await sandbox.rename_path("src/a.ts", "src/b.ts")
+            await sandbox.rename_file("src/a.ts", "src/b.ts")
 
     async def test_write_binary_file_roundtrip(self, sandbox: DummySandbox, tmp_path) -> None:  # type: ignore[type-arg]
         payload = b"\x89PNG\r\n\x1a\n"
