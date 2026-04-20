@@ -140,8 +140,15 @@ export async function publishToS3(projectId: string, slug?: string): Promise<{ u
   });
 }
 
-export async function checkSlugAvailability(projectId: string, slug: string): Promise<{ available: boolean }> {
-  return request<{ available: boolean }>(`/export/${projectId}/slug/check?slug=${encodeURIComponent(slug)}`);
+export async function checkSlugAvailability(
+  projectId: string,
+  slug: string,
+  options?: RequestInit
+): Promise<{ available: boolean }> {
+  return request<{ available: boolean }>(
+    `/export/${projectId}/slug/check?slug=${encodeURIComponent(slug)}`,
+    options
+  );
 }
 
 export async function checkBackendHealth(): Promise<boolean> {

@@ -1,70 +1,35 @@
 import { Dialog, DialogContent, DialogClose } from '../ui/dialog';
-import { usePublishLogic } from './usePublishLogic';
+import { usePublishStore } from '../../stores/publish';
 import { InputPhase } from './phases/InputPhase';
 import { SuccessPhase } from './phases/SuccessPhase';
 import { ErrorPhase } from './phases/ErrorPhase';
 
-interface PublishModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  projectId: string;
-  existingHandle?: string;
-  mode?: 'create' | 'edit';
-  onPublish: (slug: string | undefined) => Promise<void>;
-  resultUrl?: string;
-  errorMessage?: string;
-}
+export function PublishModal() {
+  const isOpen = usePublishStore(s => s.isOpen);
+  const closeModal = usePublishStore(s => s.close);
+  const resultUrl = usePublishStore(s => s.resultUrl);
+  const errorMessage = usePublishStore(s => s.errorMessage);
+  const mode = usePublishStore(s => s.mode);
+  const resetSlug = usePublishStore(s => s.resetSlug);
+  const performPublish = usePublishStore(s => s.performPublish);
 
-export function PublishModal({
-  open,
-  onOpenChange,
-  projectId,
-  existingHandle,
-  mode = 'create',
-  onPublish,
-  resultUrl,
-  errorMessage,
-}: PublishModalProps) {
-  // If handle matches projectId, it's the default handle (no custom slug)
-  const isDefaultHandle = existingHandle === projectId;
-  const initialSlug = isDefaultHandle ? '' : (existingHandle ?? '');
+  if (!isOpen) return null;
 
-  const {
-    slug,
-    slugStatus,
-    isPublishing,
-    handleSlugChange,
-    handlePublish,
-    resetSlug,
-    canPublish,
-    isChanged
-  } = usePublishLogic({ projectId, initialSlug, onPublish });
-
-  // Phase derivation
-  // SuccessPhase handles its own display.
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && closeModal()}>
       <DialogContent className="w-[448px] p-0 pb-10 border-border/60 bg-surface/95 backdrop-blur-xl min-h-[260px] flex flex-col transition-all duration-300 ease-in-out">
-        <DialogClose onClose={() => onOpenChange(false)} />
+        <DialogClose onClose={closeModal} />
 
         <div className="flex-1 flex flex-col pt-10 pb-0 px-6">
           {errorMessage ? (
-            <ErrorPhase errorMessage={errorMessage} onClose={() => onOpenChange(false)} />
+            <ErrorPhase errorMessage={errorMessage} onClose={closeModal} />
           ) : resultUrl ? (
-            <SuccessPhase resultUrl={resultUrl} onClose={() => onOpenChange(false)} />
+            <SuccessPhase resultUrl={resultUrl} onClose={closeModal} />
           ) : (
             <InputPhase
               mode={mode}
-              slug={slug}
-              slugStatus={slugStatus}
-              isPublishing={isPublishing}
-              canPublish={canPublish}
-              isChanged={isChanged}
-              existingHandle={existingHandle}
-              initialSlug={initialSlug}
-              onSlugChange={handleSlugChange}
-              onPublish={handlePublish}
+              onPublish={performPublish}
               onCancelEditing={resetSlug}
             />
           )}

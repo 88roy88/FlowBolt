@@ -1,40 +1,31 @@
 import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe, Pencil } from 'lucide-react';
-import { DialogTitle } from '../../ui/dialog';
+import { DialogTitle } from '../../../components/ui/dialog';
 import { SlugInput } from '../components/SlugInput';
 import { SlugPreview } from '../components/SlugPreview';
 import { PublishButton } from '../components/PublishButton';
 import { BTN_SECONDARY } from '../styles';
-import { SlugStatus } from '../usePublishLogic';
+import { usePublishStore, SlugStatus } from '../../../stores/publish';
 
 interface InputPhaseProps {
   mode: 'create' | 'edit';
-  slug: string;
-  slugStatus: SlugStatus;
-  isPublishing: boolean;
-  canPublish: boolean;
-  isChanged: boolean;
-  existingHandle?: string;
-  initialSlug: string;
-  onSlugChange: (val: string) => void;
   onPublish: (useSlug: boolean) => void;
   onCancelEditing: () => void;
 }
 
 export function InputPhase({
   mode,
-  slug,
-  slugStatus,
-  isPublishing,
-  canPublish,
-  isChanged,
-  existingHandle,
-  initialSlug,
-  onSlugChange,
   onPublish,
   onCancelEditing,
 }: InputPhaseProps) {
+  const slug = usePublishStore(s => s.slug);
+  const slugStatus = usePublishStore(s => s.status);
+  const isPublishing = usePublishStore(s => s.isPublishing);
+  const initialSlug = usePublishStore(s => s.initialSlug);
+  const onSlugChange = usePublishStore(s => s.setSlug);
+  const canPublish = usePublishStore(s => s.canPublish());
+  const isChanged = usePublishStore(s => s.isChanged());
   const { t } = useTranslation();
   const [isEditingSlug, setIsEditingSlug] = useState(mode === 'create');
   
@@ -85,7 +76,7 @@ export function InputPhase({
         <>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">{t('publish.currentUrl')}</label>
-            <SlugPreview slugValue={existingHandle!} />
+            <SlugPreview slugValue={initialSlug || usePublishStore.getState().projectId!} />
           </div>
 
           <p className="text-xs text-amber-500/90">{t('publish.overwriteWarning')}</p>

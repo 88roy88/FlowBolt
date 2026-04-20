@@ -3,22 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useConsoleStore } from '../../stores/console';
+import { usePublishStore } from '../../stores/publish';
 import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
-import { publishToS3 } from '../../services/api';
-import { PublishModal } from '../publish/PublishModal';
 
 export function Preview() {
   const { t } = useTranslation();
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const saveVersion = useFilesStore((s) => s.saveVersion);
-  const setProjectPublishedUrl = useSessionStore((s) => s.setProjectPublishedUrl);
+  
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
 
   const isPublished = !!currentProject?.published_at;
   const liveUrl = currentProject?.published_url
@@ -52,6 +50,7 @@ export function Preview() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [saveVersion, clearConsole]);
+
   const handleRefresh = () => {
     console.debug('[Preview] refresh — reason: manual');
     clearConsole();
@@ -59,20 +58,10 @@ export function Preview() {
   };
 
   const handlePublish = useCallback(() => {
-    projectId && setPublishModalState({ open: true });
-  }, [projectId]);
-
-  const handleDoPublish = useCallback(async (slug: string | undefined) => {
-    if (!projectId) return;
-    try {
-      const result = await publishToS3(projectId, slug);
-      setProjectPublishedUrl(projectId, result.handle, result.published_at);
-      setPublishModalState((s) => s.open ? { ...s, url: result.url } : s);
-    } catch (err) {
-      setPublishModalState((s) => s.open ? { ...s, error: err instanceof Error ? err.message : String(err) } : s);
-      throw err;
+    if (projectId) {
+      usePublishStore.getState().open(projectId, currentProject?.published_url);
     }
-  }, [projectId]);
+  }, [projectId, currentProject]);
 
   if (!projectId) {
     return (
@@ -143,20 +132,6 @@ export function Preview() {
           {loading ? t('preview.loading') : t('preview.noPreviewAvailable')}
         </div>
       )}
-
-      <PublishModal
-        key={String(publishModalState.open)}
-        open={publishModalState.open}
-        onOpenChange={(open) => {
-          setPublishModalState(open ? { open: true } : { open: false });
-        }}
-        projectId={projectId ?? ''}
-        existingHandle={currentProject?.published_url}
-        mode={currentProject?.published_at ? 'edit' : 'create'}
-        onPublish={handleDoPublish}
-        resultUrl={publishModalState.url}
-        errorMessage={publishModalState.error}
-      />
     </div>
   );
 }
