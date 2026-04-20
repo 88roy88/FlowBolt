@@ -206,7 +206,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ status: 200, json: { status: 'ok', path: fullPath } });
   });
 
-  await page.route(`**/api/files/*/file`, async (route) => {
+  await page.route(/\/api\/files\/[^/]+\/file(?:\?.*)?$/, async (route) => {
     const req = route.request();
     const method = req.method();
     const url = new URL(req.url());
