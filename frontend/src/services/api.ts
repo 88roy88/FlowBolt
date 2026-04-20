@@ -28,40 +28,40 @@ export async function fetchFileTree(projectId: string): Promise<FileEntry[]> {
 
 export async function fetchFileContent(projectId: string, path: string): Promise<string> {
   const data = await request<{ path: string; content: string }>(
-    `/files/${projectId}/content?path=${encodeURIComponent(path)}`
+    `/files/${projectId}/file/content?path=${encodeURIComponent(path)}`
   );
   return data.content;
 }
 
 export async function saveFileContent(projectId: string, path: string, content: string): Promise<void> {
-  await request(`/files/${projectId}/content`, {
+  await request(`/files/${projectId}/file/content`, {
     method: 'PUT',
     body: JSON.stringify({ path, content }),
   });
 }
 
 export async function createFileEntry(projectId: string, path: string, content = ''): Promise<void> {
-  await request(`/files/${projectId}/project_file`, {
+  await request(`/files/${projectId}/file`, {
     method: 'POST',
     body: JSON.stringify({ path, content }),
   });
 }
 
 export async function renameFileEntry(projectId: string, oldPath: string, newPath: string): Promise<void> {
-  await request(`/files/${projectId}/project_file`, {
+  await request(`/files/${projectId}/file`, {
     method: 'PATCH',
     body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
   });
 }
 
 export async function deleteFileEntry(projectId: string, path: string): Promise<void> {
-  await request(`/files/${projectId}/project_file?path=${encodeURIComponent(path)}`, {
+  await request(`/files/${projectId}/file?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',
   });
 }
 
 export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
-  const res = await fetch(`${BASE}/files/${projectId}/project_file/upload?path=${encodeURIComponent(path)}`, {
+  const res = await fetch(`${BASE}/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type || 'application/octet-stream' },
     body: file,

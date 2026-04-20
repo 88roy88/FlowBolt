@@ -58,7 +58,7 @@ async def get_file_tree(sandbox: Annotated[PnpmSandbox, SandboxDep]) -> list[dic
         raise HTTPException(status_code=404, detail=str(exc)) from None
 
 
-@router.get("/content")
+@router.get("/file/content")
 async def get_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
     try:
         content = await sandbox.read_file(path)
@@ -69,7 +69,7 @@ async def get_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], path: st
         raise HTTPException(status_code=403, detail=str(exc)) from None
 
 
-@router.put("/content")
+@router.put("/file/content")
 async def put_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], body: WriteFileRequest) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
@@ -80,7 +80,7 @@ async def put_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], body: Wr
         raise HTTPException(status_code=403, detail=str(exc)) from None
 
 
-@router.post("/project_file")
+@router.post("/file")
 async def post_create_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: CreateFileRequest) -> dict[str, str]:
     try:
         await sandbox.create_file(body.path, body.content)
@@ -91,7 +91,7 @@ async def post_create_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: Cr
         raise HTTPException(status_code=403, detail=str(exc)) from None
 
 
-@router.patch("/project_file")
+@router.patch("/file")
 async def patch_rename_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: RenamePathRequest) -> dict[str, str]:
     try:
         await sandbox.rename_file(body.old_path, body.new_path)
@@ -104,7 +104,7 @@ async def patch_rename_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: R
         raise HTTPException(status_code=403, detail=str(exc)) from None
 
 
-@router.delete("/project_file")
+@router.delete("/file")
 async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
     try:
         await sandbox.delete_file(path)
@@ -117,7 +117,7 @@ async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = 
         raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
-@router.post("/project_file/upload")
+@router.post("/file/upload")
 async def post_upload_entry(
     sandbox: Annotated[PnpmSandbox, SandboxDep],
     path: str = Query(...),

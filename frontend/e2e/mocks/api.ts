@@ -164,7 +164,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: fileTree });
   });
 
-  await page.route(`**/api/files/*/content**`, async (route) => {
+  await page.route(`**/api/files/*/file/content**`, async (route) => {
     if (route.request().method() === 'PUT') {
       try {
         const body = route.request().postDataJSON() as { path?: string; content?: string };
@@ -182,12 +182,12 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: { path: pathParam || key, content } });
   });
 
-  await page.route(`**/api/files/*/project_file**`, async (route) => {
+  await page.route(`**/api/files/*/file**`, async (route) => {
     const req = route.request();
     const method = req.method();
     const url = new URL(req.url());
 
-    if (method === 'POST' && url.pathname.endsWith('/project_file/upload')) {
+    if (method === 'POST' && url.pathname.endsWith('/file/upload')) {
       const fullPath = normalizeTreePath(url.searchParams.get('path') ?? '');
       if (findEntryLocation(fileTree, fullPath)) {
         return route.fulfill({ status: 409, json: { detail: 'Already exists' } });
