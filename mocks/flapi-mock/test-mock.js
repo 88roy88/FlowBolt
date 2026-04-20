@@ -5,6 +5,7 @@
  * Default baseUrl: http://localhost:6001
  */
 const baseUrl = process.argv[2] || 'http://localhost:6001';
+const AUTH_HEADER = { Authorization: 'Bearer mock-test-token' };
 
 const parseBody = async (response) => {
   const text = await response.text();
@@ -16,9 +17,18 @@ const parseBody = async (response) => {
   }
 };
 
-const get = (path) => fetch(`${baseUrl}${path}`).then(async (r) => ({ status: r.status, body: parseBody(r) }));
+const get = (path) =>
+  fetch(`${baseUrl}${path}`, { headers: AUTH_HEADER }).then(async (r) => ({
+    status: r.status,
+    body: parseBody(r),
+  }));
+
 const post = (path, body) =>
-  fetch(`${baseUrl}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({
+  fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH_HEADER },
+    body: JSON.stringify(body),
+  }).then(async (r) => ({
     status: r.status,
     body: parseBody(r),
   }));
@@ -28,61 +38,61 @@ const assert = (cond, msg) => {
 };
 
 const run = async () => {
+  // Health (no auth needed)
   const health = await get('/health');
   assert(health.status === 200, `GET /health expected 200, got ${health.status}`);
   const healthBody = await health.body;
   assert(healthBody?.ok === true, 'GET /health body.ok should be true');
   console.log('GET /health OK');
 
-  const searchEmpty = await get('/api/flapi/packages/search');
-  assert(searchEmpty.status === 422, `GET search without q expected 422, got ${searchEmpty.status}`);
-  console.log('GET /api/flapi/packages/search 422 when q missing OK');
-
-  const search = await get('/api/flapi/packages/search?q=Sales');
+  // Search — by name
+  const search = await get('/package/v1/search/Sales');
   assert(search.status === 200, `GET search expected 200, got ${search.status}`);
   const searchBody = await search.body;
   assert(Array.isArray(searchBody), 'search must return array');
   assert(searchBody.every((p) => p.Type === 'Package'), 'search must return only Type===Package');
-  console.log('GET /api/flapi/packages/search OK');
+  console.log('GET /package/v1/search/:partial OK');
 
-  const flapi = await post('/api/flapi/packages/my-pkg/run', { param: 'value' });
-  assert(flapi.status === 200, `POST flapi run expected 200, got ${flapi.status}`);
+  // Search — by ID (returns metadata with schema)
+  const searchById = await get('/package/v1/search/7');
+  assert(searchById.status === 200, `GET search by ID expected 200, got ${searchById.status}`);
+  const searchByIdBody = await searchById.body;
+  assert(Array.isArray(searchByIdBody) && searchByIdBody.length === 1, 'search by ID must return single-element array');
+  assert(searchByIdBody[0].schema && typeof searchByIdBody[0].schema === 'object', 'search by ID must include schema');
+  console.log('GET /package/v1/search/:id OK (includes schema)');
+
+  // Run package
+  const flapi = await post('/package/v3/7', {});
+  assert(flapi.status === 200, `POST run expected 200, got ${flapi.status}`);
   const flapiBody = await flapi.body;
-  assert(flapiBody?.results && typeof flapiBody.results === 'object', 'flapi body must have results');
-  console.log('POST /api/flapi/packages/:id/run OK');
+  assert(flapiBody?.results && typeof flapiBody.results === 'object', 'run body must have results');
+  console.log('POST /package/v3/:id OK');
 
-  const libs = await get('/api/libs');
-  assert(libs.status === 200, `GET /api/libs expected 200, got ${libs.status}`);
-  const libsBody = await libs.body;
-  assert(Array.isArray(libsBody), 'GET /api/libs must return array');
-  console.log('GET /api/libs OK');
+  // Run package — not found
+  const notFoundPkg = await post('/package/v3/99999', {});
+  assert(notFoundPkg.status === 404, `POST run unknown ID expected 404, got ${notFoundPkg.status}`);
+  console.log('POST /package/v3/:id 404 for unknown ID OK');
 
-  const gen = await post('/api/generate', {
-    fieldExplanations: [{ fieldName: 'amount', explanation: 'USD' }],
-    userPrompt: 'Bar chart',
-    mainCubeName: 'sales_cube',
-    mainCubeData: [{ region: 'North', amount: 100 }],
-  });
-  assert(gen.status === 200, `POST /api/generate expected 200, got ${gen.status}`);
-  const genBody = await gen.body;
-  assert(genBody?.runId && genBody?.htmlSnippet && Array.isArray(genBody?.librariesUsed), 'generate must return runId, htmlSnippet, librariesUsed');
-  console.log('POST /api/generate OK');
+  // Quick params info
+  const quick = await get('/package/v1/quick/7');
+  assert(quick.status === 200, `GET quick params expected 200, got ${quick.status}`);
+  const quickBody = await quick.body;
+  assert(quickBody && typeof quickBody === 'object', 'quick params must return object');
+  console.log('GET /package/v1/quick/:id OK');
 
-  const feedback = await post('/api/feedback', { runId: genBody.runId, feedback: 'Make it blue' });
-  assert(feedback.status === 200, `POST /api/feedback expected 200, got ${feedback.status}`);
-  console.log('POST /api/feedback OK (valid runId)');
+  // Run with quick params (package 20 — person by ID)
+  const personRun = await post('/package/v3/20', { personId: { text: 2 } });
+  assert(personRun.status === 200, `POST run with quick params expected 200, got ${personRun.status}`);
+  const personBody = await personRun.body;
+  assert(personBody?.results?.Person?.name === 'Noa T', `Expected person name 'Noa T', got ${personBody?.results?.Person?.name}`);
+  console.log('POST /package/v3/20 with quick params OK');
 
-  const snippet = await get(`/api/snippets/${genBody.runId}.html`);
-  assert(snippet.status === 200, `GET /api/snippets/:runId.html expected 200, got ${snippet.status}`);
-  const snippetBody = await snippet.body;
-  assert(typeof snippetBody === 'string' && snippetBody.includes('<html'), 'snippet must return html text');
-  console.log('GET /api/snippets/:runId.html OK');
+  // Auth required
+  const noAuth = await fetch(`${baseUrl}/package/v1/search/test`, { headers: {} });
+  assert(noAuth.status === 401, `GET search without auth expected 401, got ${noAuth.status}`);
+  console.log('GET /package/v1/search/:partial 401 without auth OK');
 
-  const notFound = await post('/api/feedback', { runId: 'run_nonexistent', feedback: 'x' });
-  assert(notFound.status === 404, `POST /api/feedback unknown runId expected 404, got ${notFound.status}`);
-  console.log('POST /api/feedback 404 for unknown runId OK');
-
-  console.log('All mock tests passed.');
+  console.log('\nAll mock tests passed.');
 };
 
 run().catch((e) => {
