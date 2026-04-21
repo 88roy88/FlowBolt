@@ -2,11 +2,14 @@ import time
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Header, HTTPException, WebSocket
+from fastapi import Depends, HTTPException, WebSocket
+from fastapi.security import APIKeyHeader
 
 from flow44.config import settings
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+
+authorization_scheme = APIKeyHeader(name="Authorization", auto_error=False)
 
 
 def get_sandbox(project_id: str) -> PnpmSandbox:
@@ -27,7 +30,7 @@ async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox |
 SandboxDep = Depends(get_sandbox)
 
 
-def get_authorization(authorization: str | None = Header(None, alias="Authorization")) -> str:
+def get_authorization(authorization: str | None = Depends(authorization_scheme)) -> str:
     if not authorization or not authorization.strip():
         raise HTTPException(status_code=401, detail="Authorization required")
 
