@@ -92,6 +92,38 @@ const run = async () => {
   assert(noAuth.status === 401, `GET search without auth expected 401, got ${noAuth.status}`);
   console.log('GET /package/v1/search/:partial 401 without auth OK');
 
+  // Validation: missing required param (package 14 requires 'status')
+  const missingRequired = await post('/package/v3/14', {});
+  assert(missingRequired.status === 422, `POST with missing required param expected 422, got ${missingRequired.status}`);
+  const missingRequiredBody = await missingRequired.body;
+  assert(
+    missingRequiredBody?.error?.message?.includes('status'),
+    `Expected error about 'status', got: ${missingRequiredBody?.error?.message}`,
+  );
+  console.log('POST /package/v3/14 rejects missing required param OK');
+
+  // Validation: missing requireAny param (package 16 requires at least one region)
+  const missingRequireAny = await post('/package/v3/16', {});
+  assert(missingRequireAny.status === 422, `POST with missing requireAny param expected 422, got ${missingRequireAny.status}`);
+  const missingRequireAnyBody = await missingRequireAny.body;
+  assert(
+    missingRequireAnyBody?.error?.message?.includes('region'),
+    `Expected error about 'region', got: ${missingRequireAnyBody?.error?.message}`,
+  );
+  console.log('POST /package/v3/16 rejects missing requireAny param OK');
+
+  // Validation: missing multiple required params (package 17 requires type and year)
+  const missingMultiple = await post('/package/v3/17', {});
+  assert(missingMultiple.status === 422, `POST with missing multiple params expected 422, got ${missingMultiple.status}`);
+  console.log('POST /package/v3/17 rejects missing required params OK');
+
+  // Validation: valid required param (package 14 with status)
+  const validRequired = await post('/package/v3/14', { status: { String: 'Active' } });
+  assert(validRequired.status === 200, `POST with valid required param expected 200, got ${validRequired.status}`);
+  const validRequiredBody = await validRequired.body;
+  assert(validRequiredBody?.results?.required_cube?.length > 0, 'Expected filtered results');
+  console.log('POST /package/v3/14 accepts valid required param OK');
+
   console.log('\nAll mock tests passed.');
 };
 

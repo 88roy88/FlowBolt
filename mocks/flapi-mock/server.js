@@ -67,10 +67,13 @@ function runPackageById(req, res) {
     return res.status(400).json(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
   const result = getRunResults(dataSourceId, req.body);
-  if (result) {
-    return res.status(200).json(result);
+  if (!result) {
+    return res.status(404).json(errorBody('not_found', `No package found for id: ${dataSourceId}`));
   }
-  return res.status(404).json(errorBody('not_found', `No package found for id: ${dataSourceId}`));
+  if (result.error) {
+    return res.status(422).json(errorBody('missing_required_params', result.error));
+  }
+  return res.status(200).json(result);
 }
 
 app.post('/package/:packageId', runPackageById);
