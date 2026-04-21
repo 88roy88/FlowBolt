@@ -83,7 +83,13 @@ export const usePublishStore = create<PublishState>((set, get) => ({
   },
 
   setSlug(val) {
-    const formatted = val.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    // Replace spaces and underscores with hyphens, then strip non-slug chars
+    const formatted = val
+      .toLowerCase()
+      .replace(/[\s_]+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-');
+    
     const { initialSlug, projectId } = get();
 
     set({ slug: formatted });
