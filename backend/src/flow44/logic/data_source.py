@@ -16,8 +16,11 @@ from flow44.logic.models import (
     DataSourceQuerySchema,
     DataSourceResult,
     DataSourceUsage,
+    FieldType,
     ParamDefinition,
     ParamOption,
+    ParamType,
+    ParamValue,
     parse_param_value,
 )
 
@@ -42,6 +45,38 @@ __all__ = [
 
 # -- FLAPI -> domain conversions -----------------------------------------
 
+# FLAPI speaks its own vocabulary (PascalCase quick-param types, a wider
+# lowercase-plus-legacy field-type set). The rest of the app doesn't care —
+# these two mappers are the single seam that translates into the narrow
+# domain Literals. Keep them exhaustive; unmapped values fall back to
+# "string" so the UI still renders, but should be reported and added.
+_FLAPI_PARAM_TYPE: dict[flapi_models.ParamType, ParamType] = {
+    "String": "string",
+    "Int": "int",
+    "Double": "double",
+    "Boolean": "bool",
+    "DateTime": "datetime",
+}
+
+_FLAPI_FIELD_TYPE: dict[str, FieldType] = {
+    "string": "string",
+    "int": "int",
+    "double": "double",
+    "bool": "bool",
+    "datetime": "datetime",
+    "wkt": "wkt",
+    # "Haphoch" isn't a meaningful type for us — render as plain string.
+    "Haphoch": "string",
+}
+
+
+def _to_domain_field_type(t: str) -> FieldType:
+    mapped = _FLAPI_FIELD_TYPE.get(t)
+    if mapped is None:
+        logger.warning("Unmapped FLAPI field type %r — falling back to 'string'", t)
+        return "string"
+    return mapped
+
 
 def _to_data_source(result: flapi_models.PackageSearchResult) -> DataSource:
     return DataSource(
@@ -63,7 +98,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
                     name=p.name,
                     display_name=p.display_name,
                     description=p.description,
-                    type=p.type_,
+                    type=_FLAPI_PARAM_TYPE[p.type_],
                     is_required=p.is_required,
                     is_single_value=p.is_single_value,
                     is_require_any=p.is_require_any,
@@ -142,23 +177,36 @@ async def fetch_data_source(
     return name, result
 
 
+def _default_for(param: ParamDefinition) -> ParamValue | None:
+    # Returns the smallest concrete value we can send: a scalar for single-value
+    # params, a one-element list for multi-value params. None means the options
+    # list is empty or the first option can't be parsed.
+    if not param.options:
+        return None
+    try:
+        parsed = parse_param_value(param.options[0].value, param.type)
+    except ValueError:
+        return None
+    return parsed if param.is_single_value else [parsed]
+
+
 def _minimal_params_for(params_info: DataSourceParamsInfo) -> DataSourceParams | None:
     # Pure derivation from params_info — no I/O. Returns None if user input is
     # required, or a (possibly empty) DataSourceParams if we can run without it.
     if not params_info.parameters:
         return DataSourceParams(root={})
 
-    defaults: dict[str, str | int | bool] = {}
+    defaults: dict[str, ParamValue] = {}
 
     if params_info.require_any:
         satisfied = False
         for param in params_info.parameters:
-            if not param.is_require_any or not param.options:
+            if not param.is_require_any:
                 continue
-            try:
-                defaults[param.name] = parse_param_value(param.options[0].value, param.type)
-            except ValueError:
+            value = _default_for(param)
+            if value is None:
                 continue
+            defaults[param.name] = value
             satisfied = True
             break
         if not satisfied:
@@ -167,12 +215,10 @@ def _minimal_params_for(params_info: DataSourceParamsInfo) -> DataSourceParams |
     for param in params_info.parameters:
         if not param.is_required or param.name in defaults:
             continue
-        if not param.options:
+        value = _default_for(param)
+        if value is None:
             return None
-        try:
-            defaults[param.name] = parse_param_value(param.options[0].value, param.type)
-        except ValueError:
-            return None
+        defaults[param.name] = value
 
     return DataSourceParams(root=defaults)
 
@@ -214,7 +260,7 @@ async def get_usage(
                 DataSourceFieldSchema(
                     name=field.name,
                     display_name=field.display_name,
-                    type=field.type_,
+                    type=_to_domain_field_type(field.type_),
                     description=field.description,
                 )
                 for field in query.fields

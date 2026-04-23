@@ -16,10 +16,11 @@ from flow44.ai.codegen.ts_types import generate_ts_interfaces
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition, ParamType
 
 _PARAM_TYPE_TO_TS: dict[ParamType, str] = {
-    "String": "string",
-    "Integer": "number",
-    "Boolean": "boolean",
-    "Date": "string",
+    "string": "string",
+    "int": "number",
+    "double": "number",
+    "bool": "boolean",
+    "datetime": "string",
 }
 
 # Param names that would clip a JS/TS reserved word when used as a parameter

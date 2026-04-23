@@ -30,7 +30,7 @@ def _usage(
                 name="rows",
                 display_name="Rows",
                 description="Rows cube",
-                fields=[DataSourceFieldSchema(name="id", display_name="ID", type="Integer")],
+                fields=[DataSourceFieldSchema(name="id", display_name="ID", type="int")],
             )
         ],
         params=DataSourceParamsInfo(parameters=params, require_any=require_any),
@@ -85,7 +85,7 @@ class TestFetchAndAnalyze:
                     ParamDefinition(
                         name="person_id",
                         display_name="Person",
-                        type="Integer",
+                        type="int",
                         is_required=True,
                         is_single_value=True,
                         options=[],
@@ -129,7 +129,7 @@ class TestGenerateDataSourceFiles:
                     "name": "rows",
                     "display_name": "Rows",
                     "description": "",
-                    "fields": [{"name": "id", "display_name": "ID", "type": "Integer", "description": None}],
+                    "fields": [{"name": "id", "display_name": "ID", "type": "int", "description": None}],
                 }
             ],
             "sample_data": {"results": {"rows": [{"id": 1}]}},
@@ -150,7 +150,7 @@ class TestGenerateDataSourceFiles:
                         "name": "person_id",
                         "display_name": "Person",
                         "description": None,
-                        "type": "Integer",
+                        "type": "int",
                         "is_required": True,
                         "is_single_value": True,
                         "is_require_any": False,
@@ -164,7 +164,7 @@ class TestGenerateDataSourceFiles:
                     "name": "person",
                     "display_name": "Person",
                     "description": "",
-                    "fields": [{"name": "id", "display_name": "ID", "type": "Integer", "description": None}],
+                    "fields": [{"name": "id", "display_name": "ID", "type": "int", "description": None}],
                 }
             ],
             "sample_data": None,

@@ -89,7 +89,8 @@ export class MockPackage {
 export interface QuickParamOptions {
   name: string;
   displayName?: string;
-  type?: 'String' | 'Integer' | 'Date' | 'Boolean';
+  // Quick-param types are PascalCase on the wire (FLAPI contract).
+  type?: 'String' | 'Int' | 'Double' | 'Boolean' | 'DateTime';
   defaultValues?: (string | number | boolean)[];
   required?: boolean;
   requireAny?: boolean;
@@ -101,7 +102,9 @@ export function quickParam(opts: QuickParamOptions): QuickParamDefinition {
   const name = opts.name;
   const displayName = opts.displayName || name.charAt(0).toUpperCase() + name.slice(1);
   const type = opts.type || 'String';
-  const ontology = type === 'Integer' ? 'NUMBER' : type === 'Date' ? 'DATE' : 'TEXT';
+  // OntologyType narrowed on the FLAPI side — only TEXT is meaningful for
+  // the scalar types we emit. Everything else is specialty (geo/PSTN/etc).
+  const ontology = 'TEXT';
 
   return {
     Name: name,
@@ -125,20 +128,23 @@ export function quickParamsQuery(
   };
 }
 
-type FieldType = 'String' | 'Integer' | 'Decimal' | 'Boolean' | 'Date';
-type OntologyType = 'TEXT' | 'NUMBER' | 'BOOLEAN' | 'DATE';
+// FieldType is the schema-output vocabulary (lowercase + a couple of legacy
+// tags). OntologyType was narrowed on the FLAPI side; only TEXT lines up
+// with the scalar shapes we emit, so that's what we always send.
+type FieldType = 'string' | 'int' | 'double' | 'bool' | 'datetime' | 'Haphoch' | 'wkt';
+type OntologyType = 'TEXT' | 'GEOMETRY' | 'TOOLID' | 'PSTN' | 'IMEI' | 'IMSI' | 'TIME';
 
 function inferFieldType(value: unknown): { fieldType: FieldType; ontologyType: OntologyType } {
   if (typeof value === 'number') {
-    return { fieldType: Number.isInteger(value) ? 'Integer' : 'Decimal', ontologyType: 'NUMBER' };
+    return { fieldType: Number.isInteger(value) ? 'int' : 'double', ontologyType: 'TEXT' };
   }
   if (typeof value === 'boolean') {
-    return { fieldType: 'Boolean', ontologyType: 'BOOLEAN' };
+    return { fieldType: 'bool', ontologyType: 'TEXT' };
   }
   if (value instanceof Date || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))) {
-    return { fieldType: 'Date', ontologyType: 'DATE' };
+    return { fieldType: 'datetime', ontologyType: 'TEXT' };
   }
-  return { fieldType: 'String', ontologyType: 'TEXT' };
+  return { fieldType: 'string', ontologyType: 'TEXT' };
 }
 
 export function buildQueriesFromData(
@@ -180,7 +186,7 @@ export function buildQueriesFromData(
         ResultsLimit: 1000,
         DataSourceName: packageName,
         Description: `Query for ${cubeName}`,
-        Id: `query-${packageId}-${cubeName}`,
+        id: `query-${packageId}-${cubeName}`,
         Fields: fields,
       });
     }

@@ -131,7 +131,7 @@ class FlapiClient:
     ) -> PackageMetadata:
         safe = quote(str(data_source_id), safe="")
         raw: dict[str, Any] = await self._request(
-            "GET", f"/package/v3/{safe}", authorization=authorization
+            "GET", f"/package/v2/{safe}", authorization=authorization
         )
         return PackageMetadata.model_validate(raw)
 

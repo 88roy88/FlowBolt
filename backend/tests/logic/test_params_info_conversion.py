@@ -55,7 +55,7 @@ class TestToParamsInfo:
         p = result.parameters[0]
         assert p.name == "status"
         assert p.display_name == "Status"
-        assert p.type == "String"
+        assert p.type == "string"
         assert p.is_required is True
         assert p.is_single_value is True
         assert p.is_require_any is False

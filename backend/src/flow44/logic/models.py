@@ -1,9 +1,14 @@
-from typing import Any, Literal, assert_never
+from typing import Any, Literal, TypeAlias, assert_never
 
 from pydantic import BaseModel, Field, RootModel, computed_field
 
-ParamType = Literal["String", "Integer", "Boolean", "Date"]
-FieldType = Literal["String", "Integer", "Decimal", "Boolean", "Date"]
+# Domain-side vocabulary. The FLAPI adapter translates into these;
+# the rest of the app is agnostic to FLAPI's wire spellings.
+ParamType = Literal["string", "int", "double", "bool", "datetime"]
+FieldType = Literal["string", "int", "double", "bool", "datetime", "wkt"]
+
+ParamScalar: TypeAlias = str | int | float | bool
+ParamValue: TypeAlias = ParamScalar | list[ParamScalar]
 
 
 class DataSource(BaseModel):
@@ -28,7 +33,7 @@ class ParamDefinition(BaseModel):
     options: list[ParamOption] = Field(default_factory=list)
 
     @computed_field
-    def default_values(self) -> str | int | bool | list[str | int | bool] | None:
+    def default_values(self) -> ParamScalar | list[ParamScalar] | None:
         if not self.options:
             return None
         if self.is_single_value:
@@ -36,17 +41,22 @@ class ParamDefinition(BaseModel):
         return [parse_param_value(opt.value, self.type) for opt in self.options]
 
 
-def parse_param_value(value: str, param_type: ParamType) -> str | int | bool:
-    # FLAPI delivers option values as strings on the wire; caller needs them typed.
+def parse_param_value(value: str, param_type: ParamType) -> ParamScalar:
+    # Option values arrive as strings; the caller needs them typed.
     match param_type:
-        case "String" | "Date":
+        case "string" | "datetime":
             return value
-        case "Integer":
+        case "int":
             try:
                 return int(value)
             except ValueError as exc:
-                raise ValueError(f"Cannot parse {value!r} as Integer") from exc
-        case "Boolean":
+                raise ValueError(f"Cannot parse {value!r} as int") from exc
+        case "double":
+            try:
+                return float(value)
+            except ValueError as exc:
+                raise ValueError(f"Cannot parse {value!r} as double") from exc
+        case "bool":
             return value.strip().lower() in ("true", "1", "yes")
         case _:
             assert_never(param_type)
@@ -58,7 +68,7 @@ class DataSourceParamsInfo(BaseModel):
     require_any: bool = False
 
 
-class DataSourceParams(RootModel[dict[str, str | int | bool]]):
+class DataSourceParams(RootModel[dict[str, ParamValue]]):
     pass
 
 
@@ -83,7 +93,7 @@ class DataSourceQuerySchema(BaseModel):
 class CanRunResponse(BaseModel):
     can_run: bool
     # Minimal params needed to run: {} if no input required, None if user input is required.
-    minimal_params: dict[str, str | int | bool] | None = None
+    minimal_params: dict[str, ParamValue] | None = None
 
 
 class DataSourceUsage(BaseModel):
@@ -92,7 +102,7 @@ class DataSourceUsage(BaseModel):
     queries: list[DataSourceQuerySchema]
     params: DataSourceParamsInfo
     # Smallest param set that will run the data source; None if user input is required.
-    minimal_params: dict[str, str | int | bool] | None = None
+    minimal_params: dict[str, ParamValue] | None = None
     # Populated only when minimal_params actually produced a response.
     sample: dict[str, Any] | None = None
 

@@ -209,10 +209,10 @@ class TestGenerateTsInterfacesSchemaOnly:
                 display_name="Sales",
                 description="Sales rows",
                 fields=[
-                    DataSourceFieldSchema(name="id", display_name="ID", type="Integer"),
-                    DataSourceFieldSchema(name="amount", display_name="Amount", type="Decimal"),
-                    DataSourceFieldSchema(name="active", display_name="Active", type="Boolean"),
-                    DataSourceFieldSchema(name="created", display_name="Created", type="Date"),
+                    DataSourceFieldSchema(name="id", display_name="ID", type="int"),
+                    DataSourceFieldSchema(name="amount", display_name="Amount", type="double"),
+                    DataSourceFieldSchema(name="active", display_name="Active", type="bool"),
+                    DataSourceFieldSchema(name="created", display_name="Created", type="datetime"),
                 ],
             )
         ]
@@ -233,13 +233,13 @@ class TestGenerateTsInterfacesSchemaOnly:
                 name="orders",
                 display_name="Orders",
                 description="",
-                fields=[DataSourceFieldSchema(name="id", display_name="ID", type="Integer")],
+                fields=[DataSourceFieldSchema(name="id", display_name="ID", type="int")],
             ),
             DataSourceQuerySchema(
                 name="customers",
                 display_name="Customers",
                 description="",
-                fields=[DataSourceFieldSchema(name="name", display_name="Name", type="String")],
+                fields=[DataSourceFieldSchema(name="name", display_name="Name", type="string")],
             ),
         ]
         result = generate_ts_interfaces(None, "Multi", queries=queries)

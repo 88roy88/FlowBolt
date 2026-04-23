@@ -30,8 +30,8 @@ class TestPromptRendering:
                         "display_name": "Records",
                         "description": "Sales records",
                         "fields": [
-                            {"name": "date", "display_name": "Date", "type": "Date", "description": None},
-                            {"name": "amount", "display_name": "Amount", "type": "Decimal", "description": None},
+                            {"name": "date", "display_name": "Date", "type": "datetime", "description": None},
+                            {"name": "amount", "display_name": "Amount", "type": "double", "description": None},
                         ],
                     }
                 ],
@@ -125,8 +125,8 @@ class TestPromptRendering:
                             "display_name": "Metrics",
                             "description": "Per-metric rows",
                             "fields": [
-                                {"name": "metric", "display_name": "Metric", "type": "String", "description": None},
-                                {"name": "value", "display_name": "Value", "type": "Integer", "description": None},
+                                {"name": "metric", "display_name": "Metric", "type": "string", "description": None},
+                                {"name": "value", "display_name": "Value", "type": "int", "description": None},
                             ],
                         }
                     ],

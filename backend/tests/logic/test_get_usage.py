@@ -27,7 +27,7 @@ def _query(name: str = "q") -> flapi_models.Query:
         "ResultsLimit": 1000,
         "DataSourceName": "test",
         "Description": "",
-        "Id": f"id-{name}",
+        "id": f"id-{name}",
         "Fields": [],
     })
 

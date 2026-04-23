@@ -23,7 +23,7 @@ export default new MockPackage({
     {
       name: 'minPrice',
       displayName: 'Min Price',
-      type: 'Integer',
+      type: 'Int',
       defaultValues: [0],
       required: false,
       singleValue: true,

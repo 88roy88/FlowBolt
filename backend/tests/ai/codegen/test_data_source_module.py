@@ -23,8 +23,8 @@ def _queries(cube_name: str = "items") -> list[DataSourceQuerySchema]:
             display_name=cube_name,
             description="Items cube",
             fields=[
-                DataSourceFieldSchema(name="id", display_name="ID", type="Integer"),
-                DataSourceFieldSchema(name="label", display_name="Label", type="String"),
+                DataSourceFieldSchema(name="id", display_name="ID", type="int"),
+                DataSourceFieldSchema(name="label", display_name="Label", type="string"),
             ],
         )
     ]
@@ -67,7 +67,7 @@ class TestRequiredParam:
                 ParamDefinition(
                     name="person_id",
                     display_name="Person",
-                    type="Integer",
+                    type="int",
                     is_required=True,
                     is_single_value=True,
                     options=[],
@@ -108,7 +108,7 @@ class TestMixedParams:
                 ParamDefinition(
                     name="type",
                     display_name="Type",
-                    type="String",
+                    type="string",
                     is_required=True,
                     is_single_value=True,
                     options=[],
@@ -116,7 +116,7 @@ class TestMixedParams:
                 ParamDefinition(
                     name="priority",
                     display_name="Priority",
-                    type="String",
+                    type="string",
                     is_required=False,
                     is_single_value=False,
                     options=[ParamOption(name="low", value="low")],
@@ -124,7 +124,7 @@ class TestMixedParams:
                 ParamDefinition(
                     name="created_after",
                     display_name="Created after",
-                    type="Date",
+                    type="datetime",
                     is_required=False,
                     is_single_value=True,
                     options=[],
@@ -152,7 +152,7 @@ class TestArrayParam:
                 ParamDefinition(
                     name="tags",
                     display_name="Tags",
-                    type="String",
+                    type="string",
                     is_required=True,
                     is_single_value=False,
                     options=[],
@@ -177,7 +177,7 @@ class TestTypeCoercion:
                 ParamDefinition(
                     name="active",
                     display_name="Active",
-                    type="Boolean",
+                    type="bool",
                     is_required=True,
                     is_single_value=True,
                     options=[],
@@ -200,7 +200,7 @@ class TestTypeCoercion:
                 ParamDefinition(
                     name="start_date",
                     display_name="Start",
-                    type="Date",
+                    type="datetime",
                     is_required=True,
                     is_single_value=True,
                     options=[],
@@ -228,7 +228,7 @@ class TestReservedWordParamName:
                 ParamDefinition(
                     name="from",
                     display_name="From",
-                    type="Date",
+                    type="datetime",
                     is_required=True,
                     is_single_value=True,
                     options=[],
@@ -236,7 +236,7 @@ class TestReservedWordParamName:
                 ParamDefinition(
                     name="delete",
                     display_name="Delete",
-                    type="Boolean",
+                    type="bool",
                     is_required=False,
                     is_single_value=True,
                     options=[],
@@ -265,7 +265,7 @@ class TestRequireAnyGroup:
                 ParamDefinition(
                     name="email",
                     display_name="Email",
-                    type="String",
+                    type="string",
                     is_required=False,
                     is_require_any=True,
                     is_single_value=True,
@@ -273,7 +273,7 @@ class TestRequireAnyGroup:
                 ParamDefinition(
                     name="phone",
                     display_name="Phone",
-                    type="String",
+                    type="string",
                     is_required=False,
                     is_require_any=True,
                     is_single_value=True,

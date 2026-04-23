@@ -154,7 +154,7 @@ server.get(
 // ——— FLAPI Package Metadata ———
 
 server.get(
-  '/package/v3/:packageId',
+  '/package/v2/:packageId',
   {
     schema: {
       tags: ['Metadata'],

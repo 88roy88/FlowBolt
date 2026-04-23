@@ -19,6 +19,7 @@ import pkg18 from './mocks/18-required-no-default.js';
 import pkg20 from './mocks/20-person-by-id.js';
 import pkg22 from './mocks/22-name-search.js';
 import pkg23 from './mocks/23-person-by-name.js';
+import pkg24 from './mocks/24-people-by-ids.js';
 
 const allPackages: MockPackage[] = [
   pkg01,
@@ -41,6 +42,7 @@ const allPackages: MockPackage[] = [
   pkg20,
   pkg22,
   pkg23,
+  pkg24,
 ];
 
 export const packageById = new Map(allPackages.map((pkg) => [String(pkg.id), pkg]));

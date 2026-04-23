@@ -13,7 +13,7 @@ from flow44.integrations.flapi.models import (
 
 MOCK_BASE_URL = "http://localhost:6001"
 AUTH = {"Authorization": "a"}
-PACKAGE_IDS = [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+PACKAGE_IDS = [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 23, 24]
 
 
 def _mock_is_up() -> bool:

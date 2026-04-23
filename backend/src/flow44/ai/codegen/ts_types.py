@@ -10,11 +10,12 @@ from flow44.logic.models import DataSourceQuerySchema, FieldType
 _MAX_DEPTH = 5
 
 _FIELD_TYPE_TO_TS: dict[FieldType, str] = {
-    "String": "string",
-    "Integer": "number",
-    "Decimal": "number",
-    "Boolean": "boolean",
-    "Date": "string",
+    "string": "string",
+    "int": "number",
+    "double": "number",
+    "bool": "boolean",
+    "datetime": "string",
+    "wkt": "string",
 }
 
 # Keys that look like identifiers don't need quoting

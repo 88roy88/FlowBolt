@@ -33,7 +33,7 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="category",
                         display_name="Category",
-                        type="String",
+                        type="string",
                         is_required=False,
                         is_single_value=False,
                         options=[ParamOption(name="Electronics", value="Electronics")],
@@ -58,9 +58,9 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="status",
                         display_name="Status",
-                        type="String",
+                        type="string",
                         is_required=True,
-                        is_single_value=False,
+                        is_single_value=True,
                         options=[
                             ParamOption(name="Active", value="Active"),
                             ParamOption(name="Inactive", value="Inactive"),
@@ -86,7 +86,7 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="user_id",
                         display_name="User ID",
-                        type="Integer",
+                        type="int",
                         is_required=True,
                         is_single_value=True,
                         options=[],  # No options = no default
@@ -110,15 +110,15 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="status",
                         display_name="Status",
-                        type="String",
+                        type="string",
                         is_required=True,
-                        is_single_value=False,
+                        is_single_value=True,
                         options=[ParamOption(name="Active", value="Active")],
                     ),
                     ParamDefinition(
                         name="category",
                         display_name="Category",
-                        type="String",
+                        type="string",
                         is_required=False,
                         is_single_value=False,
                         options=[ParamOption(name="All", value="All")],
@@ -143,7 +143,7 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="limit",
                         display_name="Limit",
-                        type="Integer",
+                        type="int",
                         is_required=True,
                         is_single_value=True,
                         options=[ParamOption(name="100", value="100")],
@@ -169,7 +169,7 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="active",
                         display_name="Active",
-                        type="Boolean",
+                        type="bool",
                         is_required=True,
                         is_single_value=True,
                         options=[ParamOption(name="Yes", value="true")],
@@ -195,7 +195,7 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="count",
                         display_name="Count",
-                        type="Integer",
+                        type="int",
                         is_required=True,
                         is_single_value=True,
                         options=[ParamOption(name="Invalid", value="not-a-number")],
@@ -219,16 +219,16 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="filter1",
                         display_name="Filter 1",
-                        type="String",
+                        type="string",
                         is_required=False,
-                        is_single_value=False,
+                        is_single_value=True,
                         is_require_any=True,
                         options=[ParamOption(name="A", value="A")],
                     ),
                     ParamDefinition(
                         name="filter2",
                         display_name="Filter 2",
-                        type="String",
+                        type="string",
                         is_required=False,
                         is_single_value=False,
                         is_require_any=True,
@@ -245,6 +245,60 @@ class TestCanRunWithoutParams:
         assert params is not None
         assert params.root == {"filter1": "A"}  # Uses the one with default
 
+    async def test_multi_value_required_param_emits_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """is_single_value=False on a required param yields a one-element list default."""
+
+        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+            return DataSourceParamsInfo(
+                parameters=[
+                    ParamDefinition(
+                        name="personIds",
+                        display_name="Person IDs",
+                        type="int",
+                        is_required=True,
+                        is_single_value=False,
+                        options=[
+                            ParamOption(name="1", value="1"),
+                            ParamOption(name="2", value="2"),
+                        ],
+                    ),
+                ],
+                require_any=False,
+            )
+
+        monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
+
+        can_run, params = await ds_logic.can_run_without_params("123")
+        assert can_run is True
+        assert params is not None
+        assert params.root == {"personIds": [1]}
+
+    async def test_multi_value_require_any_emits_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Multi-value require_any group default is also wrapped in a list."""
+
+        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+            return DataSourceParamsInfo(
+                parameters=[
+                    ParamDefinition(
+                        name="region",
+                        display_name="Region",
+                        type="string",
+                        is_required=False,
+                        is_single_value=False,
+                        is_require_any=True,
+                        options=[ParamOption(name="North", value="North")],
+                    ),
+                ],
+                require_any=True,
+            )
+
+        monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
+
+        can_run, params = await ds_logic.can_run_without_params("123")
+        assert can_run is True
+        assert params is not None
+        assert params.root == {"region": ["North"]}
+
     async def test_require_any_without_defaults_cannot_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with RequireAny where none have defaults cannot run."""
 
@@ -254,7 +308,7 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="filter1",
                         display_name="Filter 1",
-                        type="String",
+                        type="string",
                         is_required=False,
                         is_single_value=False,
                         is_require_any=True,
@@ -263,7 +317,7 @@ class TestCanRunWithoutParams:
                     ParamDefinition(
                         name="filter2",
                         display_name="Filter 2",
-                        type="String",
+                        type="string",
                         is_required=False,
                         is_single_value=False,
                         is_require_any=True,

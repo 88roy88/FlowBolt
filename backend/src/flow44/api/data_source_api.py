@@ -9,6 +9,7 @@ from flow44.logic.models import (
     DataSourceParamsInfo,
     DataSourceResult,
     DataSourceUsage,
+    ParamValue,
 )
 
 router = APIRouter(prefix="/api/data-source", tags=["data-source"])
@@ -76,7 +77,9 @@ async def can_run_without_params(
 async def run_data_source(
     authorization: AuthDep,
     data_source_id: str,
-    params: dict[str, str | int | bool] | None = Body(None, examples=[{"person_id": 2, "active": True}]),
+    params: dict[str, ParamValue] | None = Body(
+        None, examples=[{"person_id": 2, "active": True, "tag_ids": [10, 11]}]
+    ),
 ) -> DataSourceResult:
     try:
         ds_params = DataSourceParams.model_validate(params) if params else None

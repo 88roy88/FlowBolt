@@ -16,7 +16,7 @@ export default new MockPackage({
     {
       name: 'personId',
       displayName: 'Person ID',
-      type: 'Integer',
+      type: 'Int',
       defaultValues: [1],
       required: true,
       singleValue: true,
