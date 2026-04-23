@@ -9,6 +9,7 @@ type SetState = (
 ) => void;
 
 let _skipMessages = false;
+let _refreshTreeTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function setReplayMode(replay: boolean) {
   _skipMessages = replay;
@@ -30,7 +31,11 @@ function generateId(): string {
 
 function refreshFileTreeAfterAgentWrite() {
   if (_skipMessages) return;
-  void useFilesStore.getState().loadFileTree();
+  if (_refreshTreeTimer) return;
+  _refreshTreeTimer = setTimeout(() => {
+    _refreshTreeTimer = null;
+    void useFilesStore.getState().loadFileTree();
+  }, 300);
 }
 
 function handleFileUpdate(msg: { path: string; content: string }, set: SetState) {
@@ -160,8 +165,10 @@ export function createFixErrorHandler(
           notifyBuildComplete(useSessionStore.getState().currentProject?.name);
         }
         cleanup();
-        useFilesStore.getState().loadFileTree();
-        useFilesStore.getState().refreshOpenFiles();
+        if (!_skipMessages) {
+          useFilesStore.getState().loadFileTree();
+          useFilesStore.getState().refreshOpenFiles();
+        }
         break;
       }
     }
@@ -488,6 +495,8 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     notifyBuildComplete(useSessionStore.getState().currentProject?.name);
   }
   cleanup();
-  useFilesStore.getState().loadFileTree();
-  useFilesStore.getState().refreshOpenFiles();
+  if (!_skipMessages) {
+    useFilesStore.getState().loadFileTree();
+    useFilesStore.getState().refreshOpenFiles();
+  }
 }

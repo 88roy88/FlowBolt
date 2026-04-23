@@ -208,13 +208,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ messages: [], isStreaming: false, historyLoaded: false, buildCompleted: false, ...RESET_STATE });
 
       const socket = getChatSocket(projectId);
-      const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
-      attachHandler(projectId, socket, handler);
+      const replayHandler = createSendMessageHandler(set, get, () => {}, { replay: true });
 
       const events = await fetchAgentEvents(projectId);
       for (const evt of events) {
-        handler(evt as import('../types').WSMessage);
+        replayHandler(evt as import('../types').WSMessage);
       }
+
+      const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
+      attachHandler(projectId, socket, handler);
 
       set({ historyLoaded: true });
     } catch (err) {
