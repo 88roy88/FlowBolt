@@ -1,0 +1,247 @@
+import logging
+
+from pydantic import ValidationError
+
+from flow44.integrations.flapi import (
+    FlapiUpstreamError,
+    QuickParams,
+    data_source_client,
+)
+from flow44.integrations.flapi import models as flapi_models
+from flow44.logic.models import (
+    DataSource,
+    DataSourceFieldSchema,
+    DataSourceParams,
+    DataSourceParamsInfo,
+    DataSourceQuerySchema,
+    DataSourceResult,
+    DataSourceUsage,
+    ParamDefinition,
+    ParamOption,
+    parse_param_value,
+)
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "DataSource",
+    "DataSourceParams",
+    "DataSourceParamsInfo",
+    "DataSourceResult",
+    "DataSourceUsage",
+    "FlapiUpstreamError",
+    "can_run_without_params",
+    "fetch_data_source",
+    "get_display_name",
+    "get_params_info",
+    "get_usage",
+    "run_data_source",
+    "search_data_sources",
+]
+
+
+# -- FLAPI -> domain conversions -----------------------------------------
+
+
+def _to_data_source(result: flapi_models.PackageSearchResult) -> DataSource:
+    return DataSource(
+        id=result.id_,
+        name=result.name,
+        description=result.description or None,
+    )
+
+
+def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
+    parameters: list[ParamDefinition] = []
+    require_any = False
+
+    for param_list in info.root.values():
+        for p in param_list:
+            options = [ParamOption(name=opt.name, value=opt.value) for opt in p.value]
+            parameters.append(
+                ParamDefinition(
+                    name=p.name,
+                    display_name=p.display_name,
+                    description=p.description,
+                    type=p.type_,
+                    is_required=p.is_required,
+                    is_single_value=p.is_single_value,
+                    is_require_any=p.is_require_any,
+                    options=options,
+                )
+            )
+            if p.is_require_any:
+                require_any = True
+
+    return DataSourceParamsInfo(parameters=parameters, require_any=require_any)
+
+
+def _to_result(raw: flapi_models.DataSourceRunResult) -> DataSourceResult:
+    return DataSourceResult(data=raw.results)
+
+
+# -- Public API ----------------------------------------------------------
+
+
+async def search_data_sources(
+    query_or_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> list[DataSource]:
+    results = await data_source_client.search(query_or_id, authorization=authorization)
+    return [_to_data_source(r) for r in results]
+
+
+async def get_params_info(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> DataSourceParamsInfo:
+    info = await data_source_client.get_quick_params_info(
+        data_source_id, authorization=authorization
+    )
+    return _to_params_info(info)
+
+
+async def run_data_source(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+    params: DataSourceParams | None = None,
+) -> DataSourceResult:
+    quick_params = QuickParams.from_values(params.root) if params else None
+    raw = await data_source_client.run_data_source(
+        data_source_id,
+        authorization=authorization,
+        quick_params=quick_params,
+    )
+    return _to_result(raw)
+
+
+async def get_display_name(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> str:
+    results = await search_data_sources(data_source_id, authorization=authorization)
+    if not results:
+        raise LookupError(f"Data source {data_source_id} not found")
+    name = results[0].name.strip()
+    if not name:
+        raise LookupError(f"Data source {data_source_id} has no display name")
+    return name
+
+
+async def fetch_data_source(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> tuple[str, DataSourceResult]:
+    name = await get_display_name(data_source_id, authorization=authorization)
+    result = await run_data_source(data_source_id, authorization=authorization)
+    return name, result
+
+
+def _minimal_params_for(params_info: DataSourceParamsInfo) -> DataSourceParams | None:
+    # Pure derivation from params_info — no I/O. Returns None if user input is
+    # required, or a (possibly empty) DataSourceParams if we can run without it.
+    if not params_info.parameters:
+        return DataSourceParams(root={})
+
+    defaults: dict[str, str | int | bool] = {}
+
+    if params_info.require_any:
+        satisfied = False
+        for param in params_info.parameters:
+            if not param.is_require_any or not param.options:
+                continue
+            try:
+                defaults[param.name] = parse_param_value(param.options[0].value, param.type)
+            except ValueError:
+                continue
+            satisfied = True
+            break
+        if not satisfied:
+            return None
+
+    for param in params_info.parameters:
+        if not param.is_required or param.name in defaults:
+            continue
+        if not param.options:
+            return None
+        try:
+            defaults[param.name] = parse_param_value(param.options[0].value, param.type)
+        except ValueError:
+            return None
+
+    return DataSourceParams(root=defaults)
+
+
+async def can_run_without_params(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> tuple[bool, DataSourceParams | None]:
+    params_info = await get_params_info(data_source_id, authorization=authorization)
+    minimal = _minimal_params_for(params_info)
+    return minimal is not None, minimal
+
+
+async def get_usage(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> DataSourceUsage:
+    metadata = await data_source_client.get_metadata(
+        data_source_id, authorization=authorization
+    )
+    if not metadata.queries:
+        # Planner relies on at least one query for its schema-only TS fallback.
+        raise FlapiUpstreamError(
+            f"Data source {data_source_id} has no queries in metadata",
+        )
+
+    queries = [
+        DataSourceQuerySchema(
+            # `original_name` is what the run endpoint returns as the cube key
+            # in `results`; `name` is its display form. Don't mix them up — the
+            # codegen uses `name` as a TS property key and a mismatch yields
+            # a Response type whose fields never resolve at runtime.
+            name=query.original_name,
+            display_name=query.name,
+            description=query.description,
+            fields=[
+                DataSourceFieldSchema(
+                    name=field.name,
+                    display_name=field.display_name,
+                    type=field.type_,
+                    description=field.description,
+                )
+                for field in query.fields
+            ],
+        )
+        for query in metadata.queries
+    ]
+
+    params_info = await get_params_info(data_source_id, authorization=authorization)
+    minimal_params_obj = _minimal_params_for(params_info)
+    minimal_params = minimal_params_obj.root if minimal_params_obj else None
+
+    sample: dict[str, object] | None = None
+    if minimal_params_obj is not None:
+        try:
+            result = await run_data_source(
+                data_source_id,
+                authorization=authorization,
+                params=minimal_params_obj,
+            )
+            sample = result.data
+        except (FlapiUpstreamError, ValidationError) as exc:
+            logger.debug("Skipping sample for data source %s: %s", data_source_id, exc)
+
+    return DataSourceUsage(
+        queries=queries,
+        params=params_info,
+        minimal_params=minimal_params,
+        sample=sample,
+    )
