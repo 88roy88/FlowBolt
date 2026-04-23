@@ -6,6 +6,7 @@ from flow44.sandbox.base import SandboxInfo
 from flow44.sandbox.filesystem_mixin import FileSystemMixin
 from flow44.sandbox.search_mixin import SearchMixin
 from flow44.sandbox.unix_local import UnixSandbox
+
 from .conftest import DummySandbox
 
 rg_available = pytest.mark.skipif(shutil.which("rg") is None, reason="ripgrep (rg) not installed")

@@ -56,16 +56,10 @@ export interface AIModel {
   provider: string;
 }
 
-export interface DataSourceSearchRecord {
-  Id: number;
-  Name: string;
-  Purpose?: string;
-  Description?: string;
-  UserName?: string;
-  TimedPackageCount?: number;
-  Tags?: string;
-  Subjects?: string;
-  [key: string]: unknown;
+export interface DataSourceSearchResult {
+  id: number;
+  name: string;
+  description: string | null;
 }
 
 // Agent types

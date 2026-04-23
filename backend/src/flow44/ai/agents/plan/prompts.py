@@ -22,7 +22,11 @@ def render_architecture(*, data_source_contexts: list[dict[str, Any]] | None = N
         prepared = [
             {
                 **ctx,
-                "sample_data_json": json.dumps(ctx.get("sample_data", {}), indent=2)[:1000],
+                "sample_data_json": (
+                    json.dumps(ctx["sample_data"], indent=2)[:1000]
+                    if ctx.get("sample_data") is not None
+                    else None
+                ),
             }
             for ctx in data_source_contexts
         ]
@@ -37,13 +41,23 @@ def render_user_plan(*, has_feedback: bool = False) -> str:
     return render("user_plan.jinja2", has_feedback=has_feedback)
 
 
-def render_data_source_analysis(*, user_content: str, data_source_name: str, sample_data: Any) -> str:
-    sample_json = json.dumps(sample_data, indent=2)[:2000] if sample_data else "{}"
+def render_data_source_analysis(
+    *,
+    user_content: str,
+    data_source_name: str,
+    sample_data: Any,
+    queries: list[dict[str, Any]] | None = None,
+    params_info: dict[str, Any] | None = None,
+) -> str:
+    sample_json = json.dumps(sample_data, indent=2)[:2000] if sample_data else None
     return render(
         "data_source_analysis.jinja2",
         user_content=user_content,
         data_source_name=data_source_name,
         sample_data_json=sample_json,
+        queries=queries or [],
+        params=(params_info or {}).get("parameters", []),
+        require_any=(params_info or {}).get("require_any", False),
     )
 
 

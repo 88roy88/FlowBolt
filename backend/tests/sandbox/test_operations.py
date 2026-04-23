@@ -5,8 +5,6 @@ All functions tested here are pure (read files + transform strings) — no sandb
 
 import base64
 
-import pytest
-
 from flow44.sandbox.operations import (
     _inline_css_assets,
     _inline_favicon,

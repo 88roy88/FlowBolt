@@ -1,4 +1,4 @@
-import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
+import type { FileEntry, Project, AIModel, DataSourceSearchResult } from '../types';
 import { readDataSourceAuthorization } from './dataSourceAuth';
 
 const BASE = '/api';
@@ -112,7 +112,7 @@ export async function fetchDefaultModel(): Promise<string> {
   return data.model;
 }
 
-export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
+export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchResult[]> {
   const headers: Record<string, string> = {};
   const auth = readDataSourceAuthorization();
   if (auth) headers.Authorization = auth;
@@ -121,8 +121,8 @@ export async function searchDataSources(queryOrId: string): Promise<DataSourceSe
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${text}`);
   }
-  if (!text) return [] as DataSourceSearchRecord[];
-  return JSON.parse(text) as DataSourceSearchRecord[];
+  if (!text) return [] as DataSourceSearchResult[];
+  return JSON.parse(text) as DataSourceSearchResult[];
 }
 
 export function downloadZip(projectId: string): void {

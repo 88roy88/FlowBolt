@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign
 from flow44.ai.agents.execute.models import Task, WorkPlan
+from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign
 
 
 def _make_plan(tasks: list[Task]) -> WorkPlan:
