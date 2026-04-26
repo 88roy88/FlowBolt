@@ -36,9 +36,9 @@ export function FlowBrand({ size = 'md', className }: FlowBrandProps) {
 
   return (
     <div className={`flex items-center ${config.gap} ${className ?? ''}`}>
-      <FlowLogo size={config.icon} className="text-[#2bbcc4]" />
+      <FlowLogo size={config.icon} className="text-brand" />
       <span className={`font-bold tracking-tight ${config.text}`}>
-        <span className="text-[#2bbcc4]">FLOW</span>
+        <span className="text-brand">FLOW</span>
         <span className="text-foreground">{suffix}</span>
       </span>
     </div>

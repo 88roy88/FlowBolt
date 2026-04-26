@@ -75,6 +75,19 @@
   --preview-bg: #181825;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
+  /* Brand (fixed — does not change with theme) */
+  --brand: #2bbcc4;
+
+  /* Project avatar palette */
+  --project-purple: #cba6f7;
+  --project-teal: #94e2d5;
+  --project-peach: #fab387;
+  --project-sky: #74c7ec;
+
+  /* Utility aliases */
+  --dim: var(--muted-foreground);
+  --strong: var(--surface);
+
   /* Legacy aliases (used by non-migrated components) */
   --bg: var(--background);
   --text: var(--foreground);
@@ -137,6 +150,16 @@
   --table-stripe: rgba(0, 0, 0, 0.02);
   --preview-bg: #ffffff;
 
+  /* Project avatar palette */
+  --project-purple: #7c3aed;
+  --project-teal: #0d9488;
+  --project-peach: #ea580c;
+  --project-sky: #0284c7;
+
+  /* Utility aliases */
+  --dim: var(--muted-foreground);
+  --strong: var(--muted);
+
   --bg: var(--background);
   --text: var(--foreground);
   --text-dim: var(--muted-foreground);
@@ -176,7 +199,21 @@
   --color-danger-bg: var(--danger-bg);
   --color-diff-add: var(--diff-add);
   --color-diff-remove: var(--diff-remove);
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-remove-bg: var(--diff-remove-bg);
   --color-overlay: var(--overlay);
+  --color-success-bg: var(--success-bg);
+  --color-accent-bg-strong: var(--accent-bg-strong);
+  --color-accent-border: var(--accent-border);
+  --color-dropdown-header-bg: var(--dropdown-header-bg);
+  --color-dropdown-divider: var(--dropdown-divider);
+  --color-project-purple: var(--project-purple);
+  --color-project-teal: var(--project-teal);
+  --color-project-peach: var(--project-peach);
+  --color-project-sky: var(--project-sky);
+  --color-brand: var(--brand);
+  --color-dim: var(--dim);
+  --color-strong: var(--strong);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -252,12 +289,12 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border);
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: var(--muted-foreground);
   }
 }
 

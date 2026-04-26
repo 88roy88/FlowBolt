@@ -8,16 +8,16 @@ import { Trash2 } from 'lucide-react';
 
 const LEVEL_COLORS: Record<ConsoleLevel, string> = {
   log: 'text-foreground',
-  info: 'text-blue-400',
-  warn: 'text-yellow-400',
-  error: 'text-red-400',
+  info: 'text-primary',
+  warn: 'text-warning',
+  error: 'text-destructive',
 };
 
 const LEVEL_BG: Record<ConsoleLevel, string> = {
   log: '',
   info: '',
-  warn: 'bg-yellow-500/5',
-  error: 'bg-red-500/5',
+  warn: 'bg-warning/10',
+  error: 'bg-destructive/10',
 };
 
 function resolveSourceLine(file: string, args: string[]): Promise<number | undefined> {
