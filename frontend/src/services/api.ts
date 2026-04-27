@@ -5,8 +5,9 @@ const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
-  // Only set Content-Type for requests with a body
-  if (options?.body) {
+  const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
+  // Only set JSON Content-Type when body is not FormData.
+  if (options?.body && !isFormDataBody) {
     headers['Content-Type'] = 'application/json';
   }
   const res = await fetch(`${BASE}${path}`, {
@@ -27,16 +28,48 @@ export async function fetchFileTree(projectId: string): Promise<FileEntry[]> {
 
 export async function fetchFileContent(projectId: string, path: string): Promise<string> {
   const data = await request<{ path: string; content: string }>(
-    `/files/${projectId}/content?path=${encodeURIComponent(path)}`
+    `/files/${projectId}/file/content?path=${encodeURIComponent(path)}`
   );
   return data.content;
 }
 
 export async function saveFileContent(projectId: string, path: string, content: string): Promise<void> {
-  await request(`/files/${projectId}/content`, {
+  await request(`/files/${projectId}/file/content`, {
     method: 'PUT',
     body: JSON.stringify({ path, content }),
   });
+}
+
+export async function createFileEntry(projectId: string, path: string, content = ''): Promise<void> {
+  await request(`/files/${projectId}/file`, {
+    method: 'POST',
+    body: JSON.stringify({ path, content }),
+  });
+}
+
+export async function renameFileEntry(projectId: string, oldPath: string, newPath: string): Promise<void> {
+  await request(`/files/${projectId}/file`, {
+    method: 'PATCH',
+    body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
+  });
+}
+
+export async function deleteFileEntry(projectId: string, path: string): Promise<void> {
+  await request(`/files/${projectId}/file?path=${encodeURIComponent(path)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
+  const res = await fetch(`${BASE}/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
 }
 
 export type SearchHit = { line: number; column: number; preview: string };

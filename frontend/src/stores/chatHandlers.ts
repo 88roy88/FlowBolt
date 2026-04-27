@@ -145,6 +145,7 @@ export function createFixErrorHandler(
             fixSteps: [],
             isStreaming: false,
             agentPhase: 'idle',
+            buildCompleted: true,
           }));
         } else {
           set({
@@ -152,6 +153,7 @@ export function createFixErrorHandler(
             actions: [],
             isStreaming: false,
             agentPhase: 'idle',
+            buildCompleted: true,
           });
         }
         if (!_skipMessages) {
@@ -480,6 +482,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     followUpSteps: [],
     followUpDiffs: [],
     projectSummary: null,
+    buildCompleted: true,
   }));
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name);

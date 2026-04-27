@@ -57,6 +57,7 @@ const INITIAL_STATE: ChatState = {
   planOverview: null,
   executionTasks: [],
   error: null,
+  buildCompleted: false,
   fixSteps: [],
   followUpSteps: [],
   followUpDiffs: [],
