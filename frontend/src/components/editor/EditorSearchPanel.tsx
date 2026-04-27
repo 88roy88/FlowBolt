@@ -115,7 +115,7 @@ export function EditorSearchPanel({
             left: 10,
             top: '50%',
             transform: 'translateY(-50%)',
-            color: 'var(--muted-foreground)',
+            color: searchQuery ? 'var(--primary)' : 'var(--muted-foreground)',
             pointerEvents: 'none',
           }}
         />
@@ -153,7 +153,7 @@ export function EditorSearchPanel({
               right: 10,
               top: '50%',
               transform: 'translateY(-50%)',
-              color: 'var(--muted-foreground)',
+              color: 'var(--primary)',
               animation: 'spin 1s linear infinite',
             }}
           />

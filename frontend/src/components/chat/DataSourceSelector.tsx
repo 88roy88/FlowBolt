@@ -85,7 +85,7 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
 
       {/* Search input */}
       <div className={`flex items-center gap-2 px-3 py-2 bg-background border rounded-lg transition-colors ${showDropdown ? 'border-primary' : 'border-border'}`}>
-        <Search size={14} className="text-muted-foreground shrink-0" />
+        <Search size={14} className={`shrink-0 transition-colors ${showDropdown ? 'text-primary' : 'text-muted-foreground'}`} />
         <input
           ref={inputRef}
           type="text"
