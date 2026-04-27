@@ -79,9 +79,7 @@ class QuickParams(RootModel[dict[str, dict[str, list[dict[str, Any]]]]]):
             for group_key, defs in info.root.items():
                 for d in defs:
                     param_to_group[d.name] = group_key
-        print("param_to_group:", param_to_group)
         wrapped: dict[str, dict[str, list[dict[str, Any]]]] = {}
-        print("values:", values.items())
         for name, value in values.items():
             group_key = param_to_group.get(name, "default")
             if group_key not in wrapped:
@@ -124,19 +122,14 @@ class QueryField(PascalCaseBaseModel):
     def normalize_field_type(cls, v: str) -> str:
         """Normalize field type to handle case variations and type name aliases."""
         type_mapping = {
-            "int": "Integer",
-            "number": "Integer",
-            "num": "Integer",
-            "str": "String",
-            "text": "String",
-            "double": "double",
-            "decimal": "Decimal",
-            "bool": "Boolean",
-            "boolean": "Boolean",
-            "datetime": "datetime",
+            "number": "int",
+            "num": "int",
+            "str": "string",
+            "text": "string",
+            "decimal": "double",
+            "boolean": "bool",
             "time": "datetime",
             "geometry": "wkt",
-            "geojson": "geojson",
             "geoellipse": "GeoEllipse",
             "object": "Object",
         }

@@ -10,13 +10,23 @@ from flow44.logic.models import DataSourceQuerySchema, FieldType
 _MAX_DEPTH = 5
 
 _FIELD_TYPE_TO_TS: dict[FieldType, str] = {
-    "str": "string",
     "string": "string",
+    "String": "string",
     "int": "number",
+    "Int": "number",
+    "Integer": "number",
     "double": "number",
+    "float": "number",
+    "Decimal": "number",
     "bool": "boolean",
+    "Boolean": "boolean",
     "datetime": "string",
     "wkt": "string",
+    "geojson": "string",
+    "GeoEllipse": "string",
+    "Haphoch": "string",
+    "dynamic": "unknown",
+    "Object": "Record<string, unknown>",
 }
 
 # Keys that look like identifiers don't need quoting
@@ -83,7 +93,7 @@ def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) 
     for query in queries:
         type_name = f"{base_name}{sanitize_to_pascal_case(query.name)}"
         field_lines = [
-            f"  {_quote_key(field.name)}: {_FIELD_TYPE_TO_TS[field.type]};" for field in query.fields
+            f"  {_quote_key(field.name)}: {_FIELD_TYPE_TO_TS.get(field.type, 'unknown')};" for field in query.fields
         ]
         body = "\n".join(field_lines) if field_lines else "  [key: string]: unknown;"
         interfaces.append(f"export interface {type_name} {{\n{body}\n}}\n")

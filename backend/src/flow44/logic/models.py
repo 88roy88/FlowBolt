@@ -69,7 +69,7 @@ class DataSourceParamsInfo(BaseModel):
     require_any: bool = False
 
 
-class DataSourceParams(RootModel[dict[str, str | int | bool | list]]):
+class DataSourceParams(RootModel[dict[str, str | int | float | bool | list]]):
     pass
 
 

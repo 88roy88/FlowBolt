@@ -36,6 +36,7 @@ const OntologyType = Type.Union([
   Type.Literal('IMEI'),
   Type.Literal('IMSI'),
   Type.Literal('TIME'),
+  Type.Literal('CELL'),
   Type.Literal('OCR'),
 ]);
 
