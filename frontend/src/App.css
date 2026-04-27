@@ -24,10 +24,10 @@
   --muted-foreground: #a6adc8;
 
   /* Brand */
-  --primary: #89b4fa;
-  --primary-foreground: #1e1e2e;
-  --accent: #89b4fa;
-  --accent-foreground: #1e1e2e;
+  --primary: #3AD4EA;
+  --primary-foreground: #0a1a1c;
+  --accent: #3AD4EA;
+  --accent-foreground: #0a1a1c;
 
   /* Semantic */
   --destructive: #f38ba8;
@@ -40,7 +40,7 @@
   /* Chrome */
   --border: #45475a;
   --input: #45475a;
-  --ring: #89b4fa;
+  --ring: #3AD4EA;
   --radius: 0.5rem;
 
   /* Card / Popover */
@@ -50,17 +50,17 @@
   --popover-foreground: #cdd6f4;
 
   /* Chat-specific */
-  --user-bubble: rgba(137, 180, 250, 0.13);
+  --user-bubble: rgba(58, 212, 234, 0.13);
   --assistant-bubble: #1e1e2e;
 
   /* Semantic tints */
   --text-on-accent: #ffffff;
-  --accent-bg: rgba(137, 180, 250, 0.14);
-  --accent-border: rgba(137, 180, 250, 0.25);
-  --accent-bg-strong: rgba(137, 180, 250, 0.15);
+  --accent-bg: rgba(58, 212, 234, 0.14);
+  --accent-border: rgba(58, 212, 234, 0.25);
+  --accent-bg-strong: rgba(58, 212, 234, 0.15);
   --danger-bg: rgba(243, 139, 168, 0.15);
   --success-bg: rgba(166, 227, 161, 0.1);
-  --running-bg: rgba(137, 180, 250, 0.08);
+  --running-bg: rgba(58, 212, 234, 0.08);
   --diff-add: #a6e3a1;
   --diff-add-bg: rgba(166, 227, 161, 0.1);
   --diff-remove: #f38ba8;
@@ -76,7 +76,7 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
   /* Brand (fixed — does not change with theme) */
-  --brand: #2bbcc4;
+  --brand: #13BBD1;
 
   /* Project avatar palette */
   --project-purple: #cba6f7;
@@ -93,7 +93,7 @@
   --text: var(--foreground);
   --text-dim: var(--muted-foreground);
   --danger: var(--destructive);
-  --accent-hover: #74a8f7;
+  --accent-hover: #13BBD1;
 }
 
 /* Light theme */
@@ -106,9 +106,9 @@
   --muted: #f3f4f6;
   --muted-foreground: #6b7280;
 
-  --primary: #2563eb;
+  --primary: #0090A3;
   --primary-foreground: #ffffff;
-  --accent: #2563eb;
+  --accent: #0090A3;
   --accent-foreground: #ffffff;
 
   --destructive: #dc2626;
@@ -120,23 +120,23 @@
 
   --border: #d1d5db;
   --input: #d1d5db;
-  --ring: #2563eb;
+  --ring: #0090A3;
 
   --card: #ffffff;
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
 
-  --user-bubble: #e5f0ff;
+  --user-bubble: #E2FDFF;
   --assistant-bubble: #f3f4f6;
 
   --text-on-accent: #ffffff;
-  --accent-bg: rgba(37, 99, 235, 0.1);
-  --accent-border: rgba(37, 99, 235, 0.25);
-  --accent-bg-strong: rgba(37, 99, 235, 0.15);
+  --accent-bg: rgba(0, 144, 163, 0.1);
+  --accent-border: rgba(0, 144, 163, 0.25);
+  --accent-bg-strong: rgba(0, 144, 163, 0.15);
   --danger-bg: rgba(220, 38, 38, 0.1);
   --success-bg: rgba(22, 163, 74, 0.1);
-  --running-bg: rgba(37, 99, 235, 0.06);
+  --running-bg: rgba(0, 144, 163, 0.06);
   --diff-add: #16a34a;
   --diff-add-bg: rgba(22, 163, 74, 0.1);
   --diff-remove: #dc2626;
@@ -164,7 +164,7 @@
   --text: var(--foreground);
   --text-dim: var(--muted-foreground);
   --danger: var(--destructive);
-  --accent-hover: #1d4ed8;
+  --accent-hover: #007a8c;
 }
 
 /* Register our tokens with Tailwind v4 */
