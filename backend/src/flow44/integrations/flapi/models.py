@@ -8,8 +8,9 @@ from pydantic.alias_generators import to_pascal
 # Wire vocabulary — authoritative per FLAPI. Quick-params types are
 # PascalCase; schema field types are lowercase with a few legacy tags.
 ParamType = Literal["String", "Int", "Double", "Boolean", "DateTime"]   # "Haphoch"
-FieldType = Literal["string", "int", "double", "bool", "datetime", "Haphoch", "wkt"]
-OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
+FieldType = Literal["string", "int", "double", "bool", "datetime", "Haphoch", "wkt",
+    "float", "geojson", "GeoEllipse", "Object", "Int", "String", "Integer", "Decimal", "Boolean"]
+OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME", "CELL", "OCR"]
 
 
 class PascalCaseBaseModel(BaseModel):
@@ -44,7 +45,7 @@ class QuickParamDefinition(PascalCaseBaseModel):
     display_name: str
     description: str | None = None
     type_: ParamType = Field(alias="Type")
-    ontology_type: OntologyType
+    ontology_type: OntologyType | str | None = None
     is_single_value: bool
     is_required: bool
     is_require_any: bool = False
@@ -66,35 +67,28 @@ class QuickParamsInfo(RootModel[dict[str, list[QuickParamDefinition]]]):
 # -- Run: POST /package/v3/{id} ------------------------------------------
 
 
-QuickParamScalar: TypeAlias = str | int | float | bool
-QuickParamValue: TypeAlias = QuickParamScalar | list[QuickParamScalar]
+QuickParamsScalar: TypeAlias = str | int | float | bool
+QuickParamsValue: TypeAlias = QuickParamsScalar | list[QuickParamsScalar]
 
 
-class QuickParams(RootModel[dict[str, dict[ParamType, QuickParamValue]]]):
+class QuickParams(RootModel[dict[str, dict[str, list[dict[str, Any]]]]]):
     @classmethod
-    def from_values(cls, values: dict[str, QuickParamValue]) -> "QuickParams":
-        wrapped: dict[str, dict[ParamType, QuickParamValue]] = {}
+    def from_values(cls, values: dict[str, QuickParamsValue], *, info: QuickParamsInfo | None = None) -> "QuickParams":
+        param_to_group: dict[str, str] = {}
+        if info:
+            for group_key, defs in info.root.items():
+                for d in defs:
+                    param_to_group[d.name] = group_key
+        print("param_to_group:", param_to_group)
+        wrapped: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        print("values:", values.items())
         for name, value in values.items():
-            wrapped[name] = {cls._type_key(name, value): value}
+            group_key = param_to_group.get(name, "default")
+            if group_key not in wrapped:
+                wrapped[group_key] = {}
+            scalar_values = value if isinstance(value, list) else [value]
+            wrapped[group_key][name] = [{"Value": v, "Name": v} for v in scalar_values]
         return cls(root=wrapped)
-
-    @staticmethod
-    def _type_key(name: str, value: QuickParamValue) -> ParamType:
-        # For multi-value params the type key still reflects the element type;
-        # FLAPI keys the envelope by element type, not container shape.
-        probe = value[0] if isinstance(value, list) and value else value
-        # bool must be checked before int since bool is a subclass of int.
-        if isinstance(probe, bool):
-            return "Boolean"
-        if isinstance(probe, int):
-            return "Int"
-        if isinstance(probe, float):
-            return "Double"
-        if isinstance(probe, str):
-            return "String"
-        raise TypeError(
-            f"Unsupported FLAPI quick-param value type for {name!r}: {type(probe).__name__}"
-        )
 
 
 class DataSourceRunResult(BaseModel):
@@ -109,8 +103,12 @@ class FieldAttributes(PascalCaseBaseModel):
     original_ontology_type: OntologyType | None = None
 
     @field_validator("ontology_type", "original_ontology_type", mode="before")
-    def _normalize_ontology_type(cls, v: object) -> object:
-        return v.upper() if isinstance(v, str) else v
+    @classmethod
+    def normalize_case(cls, v: str | None) -> str | None:
+        """Normalize ontology type to uppercase to handle case variations."""
+        if isinstance(v, str):
+            return v.upper()
+        return v
 
 
 class QueryField(PascalCaseBaseModel):
@@ -120,6 +118,32 @@ class QueryField(PascalCaseBaseModel):
     is_dynamic: bool | None = None
     attributes: FieldAttributes = Field(default_factory=FieldAttributes)
     description: str | None = None
+
+    @field_validator("type_", mode="before")
+    @classmethod
+    def normalize_field_type(cls, v: str) -> str:
+        """Normalize field type to handle case variations and type name aliases."""
+        type_mapping = {
+            "int": "Integer",
+            "number": "Integer",
+            "num": "Integer",
+            "str": "String",
+            "text": "String",
+            "double": "double",
+            "decimal": "Decimal",
+            "bool": "Boolean",
+            "boolean": "Boolean",
+            "datetime": "datetime",
+            "time": "datetime",
+            "geometry": "wkt",
+            "geojson": "geojson",
+            "geoellipse": "GeoEllipse",
+            "object": "Object",
+        }
+        if isinstance(v, str):
+            normalized = v.lower()
+            return type_mapping.get(normalized, v)
+        return v
 
 
 class Query(PascalCaseBaseModel):

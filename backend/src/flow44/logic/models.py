@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field, RootModel, computed_field
 # Domain-side vocabulary. The FLAPI adapter translates into these;
 # the rest of the app is agnostic to FLAPI's wire spellings.
 ParamType = Literal["string", "int", "double", "bool", "datetime"]
-FieldType = Literal["string", "int", "double", "bool", "datetime", "wkt"]
+FieldType = Literal["string", "int", "double", "bool", "datetime", "wkt",
+    "float", "geojson", "GeoEllipse", "Object", "Int"]
 
 ParamScalar: TypeAlias = str | int | float | bool
 ParamValue: TypeAlias = ParamScalar | list[ParamScalar]
@@ -68,7 +69,7 @@ class DataSourceParamsInfo(BaseModel):
     require_any: bool = False
 
 
-class DataSourceParams(RootModel[dict[str, ParamValue]]):
+class DataSourceParams(RootModel[dict[str, str | int | bool | list]]):
     pass
 
 

@@ -131,8 +131,8 @@ export function quickParamsQuery(
 // FieldType is the schema-output vocabulary (lowercase + a couple of legacy
 // tags). OntologyType was narrowed on the FLAPI side; only TEXT lines up
 // with the scalar shapes we emit, so that's what we always send.
-type FieldType = 'string' | 'int' | 'double' | 'bool' | 'datetime' | 'Haphoch' | 'wkt';
-type OntologyType = 'TEXT' | 'GEOMETRY' | 'TOOLID' | 'PSTN' | 'IMEI' | 'IMSI' | 'TIME';
+type FieldType = 'string' | 'int' | 'double' | 'bool' | 'datetime' | 'Haphoch' | 'wkt' | 'float';
+type OntologyType = 'TEXT' | 'GEOMETRY' | 'TOOLID' | 'PSTN' | 'IMEI' | 'IMSI' | 'TIME' | 'OCR';
 
 function inferFieldType(value: unknown): { fieldType: FieldType; ontologyType: OntologyType } {
   if (typeof value === 'number') {

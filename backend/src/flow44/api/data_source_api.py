@@ -77,9 +77,7 @@ async def can_run_without_params(
 async def run_data_source(
     authorization: AuthDep,
     data_source_id: str,
-    params: dict[str, ParamValue] | None = Body(
-        None, examples=[{"person_id": 2, "active": True, "tag_ids": [10, 11]}]
-    ),
+    params: dict[str, str | int | bool |list] | None = Body(None, examples=[{"person_id": 2, "active": True}]),
 ) -> DataSourceResult:
     try:
         ds_params = DataSourceParams.model_validate(params) if params else None

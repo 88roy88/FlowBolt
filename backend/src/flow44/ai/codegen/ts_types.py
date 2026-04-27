@@ -10,6 +10,7 @@ from flow44.logic.models import DataSourceQuerySchema, FieldType
 _MAX_DEPTH = 5
 
 _FIELD_TYPE_TO_TS: dict[FieldType, str] = {
+    "str": "string",
     "string": "string",
     "int": "number",
     "double": "number",

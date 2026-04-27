@@ -12,6 +12,12 @@ const FieldType = Type.Union([
   Type.Literal('datetime'),
   Type.Literal('Haphoch'),
   Type.Literal('wkt'),
+  Type.Literal('dynamic'),
+  Type.Literal('float'),
+  Type.Literal('geojson'),
+  Type.Literal('GeoEllipse'),
+  Type.Literal('Object'),
+  Type.Literal('Int'),
 ]);
 
 const ParamType = Type.Union([
@@ -30,6 +36,7 @@ const OntologyType = Type.Union([
   Type.Literal('IMEI'),
   Type.Literal('IMSI'),
   Type.Literal('TIME'),
+  Type.Literal('OCR'),
 ]);
 
 const SearchResultType = Type.Literal('Package');

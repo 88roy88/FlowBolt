@@ -144,7 +144,8 @@ async def run_data_source(
     authorization: str | None = None,
     params: DataSourceParams | None = None,
 ) -> DataSourceResult:
-    quick_params = QuickParams.from_values(params.root) if params else None
+    info = await data_source_client.get_quick_params_info(data_source_id, authorization=authorization)
+    quick_params = QuickParams.from_values(params.root, info=info) if params else None
     raw = await data_source_client.run_data_source(
         data_source_id,
         authorization=authorization,

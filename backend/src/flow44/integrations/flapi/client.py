@@ -101,11 +101,11 @@ class FlapiClient:
         execute_continued_process: bool | None = None,
         quick_params: QuickParams | None = None,
     ) -> DataSourceRunResult:
-        query: dict[str, str] = {}
-        if all_queries is not None:
-            query["allQueries"] = "true" if all_queries else "false"
+        queryParams: dict[str, str] = {}
+        queryParams["allQueries"] = "true"
+        # if all_queries is not None:
         if execute_continued_process is not None:
-            query["executeContinuedProcess"] = "true" if execute_continued_process else "false"
+            queryParams["executeContinuedProcess"] = "true" if execute_continued_process else "false"
         safe = quote(str(data_source_id), safe="")
         body = quick_params.model_dump() if quick_params else {}
         raw: dict[str, Any] = await self._request(
@@ -113,7 +113,7 @@ class FlapiClient:
             f"/package/v3/{safe}",
             authorization=authorization,
             body=body,
-            params=query,
+            params=queryParams,
         )
         return DataSourceRunResult.model_validate(raw)
 
