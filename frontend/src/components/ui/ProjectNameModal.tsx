@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Dialog, DialogContent, DialogTitle } from "./dialog";
+import { Dialog, DialogContent, DialogClose, DialogTitle } from "./dialog";
 import { Button } from "./button";
 import { Input } from "./input";
 
 interface ProjectNameModalProps {
   open: boolean;
   onSubmit: (name: string) => Promise<void>;
+  onCancel: () => void;
 }
 
-export function ProjectNameModal({ open, onSubmit }: ProjectNameModalProps) {
+export function ProjectNameModal({
+  open,
+  onSubmit,
+  onCancel,
+}: ProjectNameModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +52,21 @@ export function ProjectNameModal({ open, onSubmit }: ProjectNameModalProps) {
     }
   };
 
+  const handleCancel = () => {
+    if (submitting) return;
+    onCancel();
+  };
+
   return (
-    // Pass a no-op so clicking the overlay doesn't close — user must name the project
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="w-[340px] animate-card-in">
+    <Dialog open={open} onOpenChange={(o) => !o && handleCancel()}>
+      <DialogContent
+        className="w-[340px] animate-card-in"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") handleCancel();
+        }}
+      >
         <DialogTitle>{t("sidebar.nameYourProject")}</DialogTitle>
+        <DialogClose onClose={handleCancel} />
         <div className="mt-4 space-y-3">
           <Input
             ref={inputRef}
@@ -66,7 +81,14 @@ export function ProjectNameModal({ open, onSubmit }: ProjectNameModalProps) {
           {error && (
             <p className="text-[12px] text-destructive">{error}</p>
           )}
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              variant="ghost"
+              onClick={handleCancel}
+              disabled={submitting}
+            >
+              {t("common.cancel")}
+            </Button>
             <Button
               onClick={handleSubmit}
               disabled={!name.trim() || submitting}

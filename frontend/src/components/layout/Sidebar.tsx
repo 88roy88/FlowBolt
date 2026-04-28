@@ -169,18 +169,9 @@ export function Sidebar({
     const wasSelected = currentProject?.id === id;
     await deleteProject(id);
     if (wasSelected) {
-      const next = useSessionStore.getState().currentProject;
-      if (next) {
-        window.location.hash = `#/project/${next.id}`;
-        resetFiles();
-        loadFileTree();
-        clearMessages();
-        loadHistory(next.id);
-      } else {
-        window.location.hash = "";
-        resetFiles();
-        clearMessages();
-      }
+      // Always go home after deleting the current project — don't auto-select another
+      useSessionStore.getState().goHome();
+      resetFiles();
     }
   };
 
@@ -392,6 +383,7 @@ export function Sidebar({
       <ProjectNameModal
         open={showNameModal}
         onSubmit={handleNameSubmit}
+        onCancel={() => setShowNameModal(false)}
       />
     </div>
   );
