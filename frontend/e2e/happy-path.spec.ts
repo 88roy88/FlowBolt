@@ -54,10 +54,10 @@ test.describe('Happy path', () => {
 
     await page.getByRole('button', { name: /new project/i }).click();
 
-    // New UI: project is created immediately and sidebar enters inline rename mode.
-    const renameInput = page.getByPlaceholder('Rename project');
-    await expect(renameInput).toBeVisible({ timeout: 10_000 });
-    await renameInput.press('Escape');
+    // New UI: a modal appears prompting for a project name.
+    const nameInput = page.getByPlaceholder('Untitled Project');
+    await expect(nameInput).toBeVisible({ timeout: 10_000 });
+    await nameInput.press('Enter');
 
     // Mock always returns MOCK_PROJECT, so its name should still be there
     await expect(page.getByText(MOCK_PROJECT.name)).toBeAttached();
