@@ -82,7 +82,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       if (window.location.hash === `#/project/${tempId}`) {
         window.location.hash = `#/project/${project.id}`;
       }
-    } catch {
+    } catch (err) {
       // Roll back the optimistic update on failure
       set((state) => ({
         projects: state.projects.filter((p) => p.id !== tempId),
@@ -93,6 +93,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       if (window.location.hash === `#/project/${tempId}`) {
         window.location.hash = "";
       }
+      throw err;
     } finally {
       set({ isCreating: false });
     }

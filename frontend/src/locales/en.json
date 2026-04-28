@@ -40,7 +40,10 @@
     "summary": "Summary",
     "confirmDelete": "Confirm delete?",
     "untitledProject": "Untitled",
-    "renameProject": "Rename project"
+    "untitledProjectDefault": "Untitled Project",
+    "renameProject": "Rename project",
+    "nameYourProject": "Name your project",
+    "createProjectError": "Failed to create project. Please try again."
   },
   "settings": {
     "title": "Settings",

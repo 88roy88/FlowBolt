@@ -17,6 +17,7 @@ import { FlowBrand } from "../ui/flow-logo";
 import type { ProjectSummary } from "../../types";
 import { SummaryModal } from "./SummaryModal";
 import { SettingsPopover, type LayoutMode } from "./SettingsModal";
+import { ProjectNameModal } from "../ui/ProjectNameModal";
 import { pollFileTree } from "../../utils/pollFileTree";
 import { Button } from "../ui/button";
 
@@ -24,8 +25,8 @@ type SidebarProps = {
   onCloseSidebar?: () => void;
   isPinned?: boolean;
   onPin?: () => void;
-  layoutMode: LayoutMode;
-  onLayoutChange: (mode: LayoutMode) => void;
+  layoutMode?: LayoutMode;
+  onLayoutChange?: (mode: LayoutMode) => void;
   onBusyChange?: (busy: boolean) => void;
 };
 
@@ -58,8 +59,8 @@ export function Sidebar({
   onCloseSidebar,
   isPinned,
   onPin,
-  layoutMode,
-  onLayoutChange,
+  layoutMode = "classic",
+  onLayoutChange = () => {},
   onBusyChange,
 }: SidebarProps) {
   const { t } = useTranslation();
@@ -76,6 +77,7 @@ export function Sidebar({
   } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
+  const [showNameModal, setShowNameModal] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{
     projectName: string;
     summary: ProjectSummary;
@@ -134,18 +136,18 @@ export function Sidebar({
     }
   }, [pendingRenameProjectId, projects, setPendingRenameProjectId]);
 
-  const handleCreate = async () => {
-    // createProject sets the hash to the temp ID immediately (before the API
-    // call) so the project view is shown without any delay.
-    await createProject(t("sidebar.untitledProject"));
+  const handleCreate = () => {
+    setShowNameModal(true);
+  };
+
+  const handleNameSubmit = async (name: string) => {
+    await createProject(name);
+    setShowNameModal(false);
     clearMessages();
     const session = useSessionStore.getState();
     if (session.currentProject) {
       loadHistory(session.currentProject.id);
       pollFileTree();
-      // Set AFTER the await so the real project ID is known — the temp entry
-      // is already swapped out by the time we reach here.
-      setPendingRenameProjectId(session.currentProject.id);
     }
   };
 
@@ -386,6 +388,11 @@ export function Sidebar({
           onClose={() => setSummaryModal(null)}
         />
       )}
+
+      <ProjectNameModal
+        open={showNameModal}
+        onSubmit={handleNameSubmit}
+      />
     </div>
   );
 }

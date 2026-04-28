@@ -40,7 +40,10 @@
     "summary": "סיכום",
     "confirmDelete": "אשר מחיקה?",
     "untitledProject": "ללא שם",
-    "renameProject": "שנה שם לפרויקט"
+    "untitledProjectDefault": "פרויקט ללא שם",
+    "renameProject": "שנה שם לפרויקט",
+    "nameYourProject": "תן שם לפרויקט",
+    "createProjectError": "יצירת הפרויקט נכשלה. אנא נסה שוב."
   },
   "settings": {
     "title": "הגדרות",
