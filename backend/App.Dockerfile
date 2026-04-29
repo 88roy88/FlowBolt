@@ -12,9 +12,6 @@ ARG UV_INSECURE_HOST2
 USER root
 WORKDIR /app
 
-# Copy .npmrc if it exists in the build context
-COPY .npmrc* ./
-
 # Copy all project files
 COPY --chown=appuser:appuser . .
 
