@@ -21,16 +21,26 @@ class PnpmMixin(BaseSandbox, ABC):
     # TODO: change to configure_npmrc
     def configure_npmrc(self) -> None:
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
-        with open(npmrc, "w", encoding="utf-8") as f:
-            if settings.SANDBOX_MODE == "namespaced":
-                f.write("store-dir=/.pnpm-store\n")
+        existing_content = ""
+        if os.path.exists(npmrc):
+            with open(npmrc, encoding="utf-8") as f:
+                existing_content = f.read()
+
+        # Ensure store-dir is set so pnpm uses the correct volume path
+        if "store-dir" not in existing_content:
+            store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
+            with open(npmrc, "a", encoding="utf-8") as f:
+                if existing_content and not existing_content.endswith("\n"):
+                    f.write("\n")
+                f.write(f"store-dir={store_path}\n")
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)
         shutil.copytree(template_dir, self.workspace_dir, dirs_exist_ok=True)
 
         self._stamp_vite_config(template_dir)
-
+        self.configure_npmrc()
+ 
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
 
