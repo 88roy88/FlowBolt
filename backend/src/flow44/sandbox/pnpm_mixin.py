@@ -40,7 +40,7 @@ class PnpmMixin(BaseSandbox, ABC):
 
         self._stamp_vite_config(template_dir)
         self.configure_npmrc()
- 
+
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
 
