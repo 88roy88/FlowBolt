@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { credentialsStore } from '../../auth';
 import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
@@ -28,7 +29,8 @@ export function Preview() {
       return;
     }
     setLoading(true);
-    const url = `/api/preview/${projectId}/proxy/`;
+    const token = useSessionStore.getState().projectId ? credentialsStore.getValidToken() : null;
+    const url = `/api/preview/${projectId}/proxy/${token ? `?token=${encodeURIComponent(token)}` : ''}`;
     setPreviewUrl(url);
     setLoading(false);
     console.debug('[Preview] refresh — reason: project changed', { projectId, refreshKey });

@@ -1,3 +1,4 @@
+import { credentialsStore } from '../auth';
 import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
 import { readDataSourceAuthorization } from './dataSourceAuth';
 
@@ -5,6 +6,12 @@ const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
+
+  const token = credentialsStore.getValidToken();
+  if (token) {
+    headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+  }
+
   const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   // Only set JSON Content-Type when body is not FormData.
   if (options?.body && !isFormDataBody) {
@@ -61,9 +68,13 @@ export async function deleteFileEntry(projectId: string, path: string): Promise<
 }
 
 export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': file.type || 'application/octet-stream' };
+  const token = credentialsStore.getValidToken();
+  if (token) headers['Authorization'] = token;
+
   const res = await fetch(`${BASE}/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
     method: 'POST',
-    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    headers,
     body: file,
   });
   const text = await res.text();
@@ -159,11 +170,15 @@ export async function searchDataSources(queryOrId: string): Promise<DataSourceSe
 }
 
 export function downloadZip(projectId: string): void {
-  window.open(`${BASE}/export/${projectId}/zip`, '_blank');
+  const token = credentialsStore.getValidToken();
+  const url = `${BASE}/export/${projectId}/zip${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
 }
 
 export function downloadSingleHtml(projectId: string): void {
-  window.open(`${BASE}/export/${projectId}/html`, '_blank');
+  const token = credentialsStore.getValidToken();
+  const url = `${BASE}/export/${projectId}/html${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
 }
 
 export async function publishToS3(projectId: string): Promise<{ url: string }> {

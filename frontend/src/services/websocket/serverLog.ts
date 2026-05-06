@@ -1,5 +1,6 @@
 import type { ReadOnlySocket } from './types';
 import { getWsBase } from './reconnecting';
+import { credentialsStore } from '../../auth';
 
 export function createServerLogSocket(projectId: string): ReadOnlySocket {
   const handlers: Array<(data: string) => void> = [];
@@ -9,7 +10,8 @@ export function createServerLogSocket(projectId: string): ReadOnlySocket {
 
   function connect() {
     if (closed) return;
-    socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
+    const token = credentialsStore.getValidToken();
+    socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}${token ? `?token=${encodeURIComponent(token)}` : ''}`);
     socket.binaryType = 'arraybuffer';
 
     socket.addEventListener('message', (event) => {

@@ -8,14 +8,13 @@ passthrough — no response rewriting required.
 from __future__ import annotations
 
 import logging
-from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 
-from flow44.api.deps import SandboxDep, get_ws_sandbox
-from flow44.sandbox.main import PnpmSandbox
+from flow44.api.auth import ProjectDep
+from flow44.api.sandbox import SandboxDep, get_ws_sandbox
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +22,9 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 
 @router.get("/{project_id}/port")
-async def get_preview_port(project_id: str, sandbox: Annotated[PnpmSandbox, SandboxDep]) -> dict[str, str | int]:
+async def get_preview_port(_project: ProjectDep, sandbox: SandboxDep) -> dict[str, str | int]:
     """Return the allocated port for the sandbox's dev server."""
-    return {"project_id": project_id, "port": sandbox.port}
+    return {"project_id": _project.id, "port": sandbox.port}
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +37,7 @@ async def get_preview_port(project_id: str, sandbox: Annotated[PnpmSandbox, Sand
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
 async def proxy_to_sandbox(  # noqa: E501
-    project_id: str, path: str, request: Request, sandbox: Annotated[PnpmSandbox, SandboxDep]
+    _project: ProjectDep, path: str, request: Request, sandbox: SandboxDep
 ) -> Response:
     """Reverse proxy requests to the sandbox's dev server.
 
@@ -46,7 +45,7 @@ async def proxy_to_sandbox(  # noqa: E501
     full prefixed path to the upstream server.
     """
 
-    proxy_prefix = f"/api/preview/{project_id}/proxy"
+    proxy_prefix = f"/api/preview/{_project.id}/proxy"
     target_url = f"http://127.0.0.1:{sandbox.port}{proxy_prefix}/{path}"
     if request.url.query:
         target_url += f"?{request.url.query}"
@@ -75,7 +74,7 @@ async def proxy_to_sandbox(  # noqa: E501
             media_type="text/html",
         )
     except Exception:
-        logger.exception("Preview proxy error for session %s", project_id)
+        logger.exception("Preview proxy error for session %s", _project.id)
         raise HTTPException(status_code=502, detail="Preview proxy error") from None
 
     # Forward response headers

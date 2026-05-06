@@ -4,7 +4,7 @@ export function getWsBase(): string {
 }
 
 export function createReconnectingSocket(
-  url: string,
+  url: string | (() => string),
   onOpen?: () => void,
   onMessage?: (data: string) => void,
   onClose?: () => void,
@@ -25,7 +25,7 @@ export function createReconnectingSocket(
 
   function connect() {
     if (closed) return;
-    socket = new WebSocket(url);
+    socket = new WebSocket(typeof url === 'function' ? url() : url);
 
     socket.addEventListener('open', () => {
       hasConnectedOnce = true;

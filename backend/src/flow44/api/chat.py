@@ -12,15 +12,20 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
+from flow44.api.auth import ProjectDep, extract_user_id
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
-from flow44.db.project import get_project
+from flow44.db.project import get_project as db_get_project
 from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
 logger = logging.getLogger(__name__)
 
+# HTTP routes — included in main's protected api_router
+http_router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+# WebSocket route — registered directly on app (browser WS can't send headers)
 router = APIRouter()
 
 
@@ -38,18 +43,15 @@ async def _run_agent_safe(project_id: str, coro: Any) -> None:
         await emit_event(project_id, {"type": "error", "message": "AI processing failed"})
 
 
-@router.get("/api/chat/{project_id}/history")
-async def chat_history(project_id: str) -> list[dict[str, Any]]:
-    project = await get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Unknown project")
-    messages = await get_messages(project_id)
+@http_router.get("/{project_id}/history")
+async def chat_history(project: ProjectDep) -> list[dict[str, Any]]:
+    messages = await get_messages(project.id)
     return [m.model_dump() for m in messages]
 
 
-@router.get("/api/chat/{project_id}/events")
-async def chat_events(project_id: str) -> list[dict[str, Any]]:
-    events = await get_events(project_id)
+@http_router.get("/{project_id}/events")
+async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
+    events = await get_events(project.id)
     return [{**evt.payload, "_ts": evt.created_at} for evt in events]
 
 
@@ -58,12 +60,38 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", project_id)
 
-    project = await get_project(project_id)
-    if project is None:
-        await websocket.send_json({"type": "error", "message": "Unknown project"})
+    # --- Step 1: authenticate before any project or sandbox access ---
+    try:
+        raw_first = await websocket.receive_text()
+        first = json.loads(raw_first)
+    except Exception:
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+
+    if first.get("type") != "auth":
+        await websocket.send_json({"type": "error", "message": "Unauthorized"})
         await websocket.close()
         return
 
+    raw_ds_auth = first.get("dataSourceAuthorization")
+    data_source_authorization: str | None = raw_ds_auth.strip() or None if isinstance(raw_ds_auth, str) else None
+    user_token = first.get("userAuthorization")
+
+    try:
+        caller_id = extract_user_id(user_token if isinstance(user_token, str) else None)
+    except HTTPException as exc:
+        await websocket.send_json({"type": "error", "message": exc.detail})
+        await websocket.close()
+        return
+
+    # --- Step 2: load and authorize project (unified 404 prevents project enumeration) ---
+    project = await db_get_project(project_id)
+    if project is None or project.user_id != caller_id:
+        await websocket.send_json({"type": "error", "message": "Project not found"})
+        await websocket.close()
+        return
+
+    # --- Step 3: prepare sandbox (only reached after successful auth) ---
     try:
         sandbox = sandbox_manager.get_sandbox(project_id)
         await sandbox_manager.ensure_ready(sandbox)
@@ -78,7 +106,8 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         await websocket.close()
         return
 
-    # Subscribe to live events (replay is handled by GET /api/chat/{project_id}/events)
+    # --- Step 4: subscribe to live events and start processing ---
+    # (replay is handled by GET /api/chat/{project_id}/events)
     queue = subscribe(project_id)
 
     async def _forward_events() -> None:
@@ -90,16 +119,12 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
             logger.debug("Event forwarding stopped for session %s", project_id)
 
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
-        data_source_authorization: str | None = None
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
             msg_type = data.get("type")
 
-            if msg_type == "auth":
-                raw_auth = data.get("dataSourceAuthorization")
-                data_source_authorization = raw_auth.strip() or None if isinstance(raw_auth, str) else None
-            elif msg_type == "message":
+            if msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
                 ds_ids: list[int] = data.get("dataSourceIds") or []

@@ -1,5 +1,6 @@
 import type { WSMessage } from '../../types';
 import type { ChatSocket } from './types';
+import { credentialsStore } from '../../auth';
 import { readDataSourceAuthorization } from '../dataSourceAuth';
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
@@ -15,9 +16,11 @@ export function getChatSocket(projectId: string): ChatSocket {
   const sendAuthMessage = (send: (message: WSMessage) => void) => {
     const rawToken = readDataSourceAuthorization();
     const dataSourceAuthorization = rawToken?.trim() || undefined;
+    const userAuthorization = credentialsStore.getValidToken();
     send({
       type: 'auth',
       ...(dataSourceAuthorization && { dataSourceAuthorization }),
+      ...(userAuthorization && { userAuthorization }),
     });
   };
 
@@ -55,12 +58,6 @@ export function getChatSocket(projectId: string): ChatSocket {
 
   const socket: ChatSocket = {
     send(message: WSMessage) {
-      // Re-send auth before outbound messages so backend has latest token value.
-      if (message.type !== 'auth') {
-        sendAuthMessage((authMessage) => {
-          sendOrQueue(JSON.stringify(authMessage));
-        });
-      }
       sendOrQueue(JSON.stringify(message));
     },
     onMessage(handler: (msg: WSMessage) => void) {

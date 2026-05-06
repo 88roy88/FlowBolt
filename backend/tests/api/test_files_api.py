@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from flow44.api.deps import get_sandbox
+from flow44.api.sandbox import get_sandbox
 from flow44.main import app
 from flow44.sandbox.base import BaseSandbox, SandboxInfo
 from flow44.sandbox.filesystem_mixin import FileSystemMixin

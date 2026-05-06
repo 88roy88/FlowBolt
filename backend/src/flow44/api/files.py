@@ -1,10 +1,9 @@
-from typing import Annotated, Any
+from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from flow44.api.deps import SandboxDep
-from flow44.sandbox.main import PnpmSandbox
+from flow44.api.sandbox import SandboxDep
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 
@@ -50,7 +49,7 @@ class SearchResponse(BaseModel):
 
 
 @router.get("/tree")
-async def get_file_tree(sandbox: Annotated[PnpmSandbox, SandboxDep]) -> list[dict[str, Any]]:
+async def get_file_tree(sandbox: SandboxDep) -> list[dict[str, Any]]:
     try:
         tree = await sandbox.list_files()
         return [entry.model_dump() for entry in tree]
@@ -59,7 +58,7 @@ async def get_file_tree(sandbox: Annotated[PnpmSandbox, SandboxDep]) -> list[dic
 
 
 @router.get("/file/content")
-async def get_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
+async def get_file_content(sandbox: SandboxDep, path: str = Query(...)) -> dict[str, str]:
     try:
         content = await sandbox.read_file(path)
         return {"path": path, "content": content}
@@ -70,7 +69,7 @@ async def get_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], path: st
 
 
 @router.put("/file/content")
-async def put_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], body: WriteFileRequest) -> dict[str, str]:
+async def put_file_content(sandbox: SandboxDep, body: WriteFileRequest) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
         return {"status": "ok", "path": body.path}
@@ -81,7 +80,7 @@ async def put_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], body: Wr
 
 
 @router.post("/file")
-async def post_create_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: CreateFileRequest) -> dict[str, str]:
+async def post_create_file(sandbox: SandboxDep, body: CreateFileRequest) -> dict[str, str]:
     try:
         await sandbox.create_file(body.path, body.content)
         return {"status": "ok", "path": body.path}
@@ -92,7 +91,7 @@ async def post_create_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: Cr
 
 
 @router.patch("/file")
-async def patch_rename_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: RenamePathRequest) -> dict[str, str]:
+async def patch_rename_file(sandbox: SandboxDep, body: RenamePathRequest) -> dict[str, str]:
     try:
         await sandbox.rename_file(body.old_path, body.new_path)
         return {"status": "ok", "old_path": body.old_path, "new_path": body.new_path}
@@ -105,7 +104,7 @@ async def patch_rename_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: R
 
 
 @router.delete("/file")
-async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
+async def delete_entry(sandbox: SandboxDep, path: str = Query(...)) -> dict[str, str]:
     try:
         await sandbox.delete_file(path)
         return {"status": "ok", "path": path}
@@ -119,7 +118,7 @@ async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = 
 
 @router.post("/file/upload")
 async def post_upload_entry(
-    sandbox: Annotated[PnpmSandbox, SandboxDep],
+    sandbox: SandboxDep,
     path: str = Query(...),
     body: bytes = Body(...),
 ) -> dict[str, str]:
@@ -134,7 +133,7 @@ async def post_upload_entry(
 
 @router.get("/grep")
 async def get_grep(
-    sandbox: Annotated[PnpmSandbox, SandboxDep],
+    sandbox: SandboxDep,
     pattern: str = Query(...),
     path: str = Query(default="/"),
     file_pattern: str | None = Query(default=None),
@@ -147,7 +146,7 @@ async def get_grep(
 
 
 @router.post("/search")
-async def post_search(sandbox: Annotated[PnpmSandbox, SandboxDep], body: SearchRequest) -> SearchResponse:
+async def post_search(sandbox: SandboxDep, body: SearchRequest) -> SearchResponse:
     """Search using ripgrep with column positions for frontend integration."""
     try:
         # Use grep with column tracking

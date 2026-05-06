@@ -9,11 +9,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from flow44.api.auth import ProjectDep, UserDep
 from flow44.config import settings
 from flow44.db.project import (
     create_project,
     delete_project,
-    get_project,
     list_projects,
     rename_project,
     update_project_model,
@@ -39,14 +39,14 @@ class UpdateProjectModelRequest(BaseModel):
 
 
 @router.get("")
-async def list_all_projects() -> list[dict[str, Any]]:
-    projects = await list_projects()
+async def list_all_projects(user_id: UserDep) -> list[dict[str, Any]]:
+    projects = await list_projects(user_id)
     return [p.model_dump() for p in projects]
 
 
 @router.post("", status_code=201)
-async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
-    project = await create_project(body.name)
+async def create_new_project(body: CreateProjectRequest, user_id: UserDep) -> dict[str, Any]:
+    project = await create_project(body.name, user_id)
 
     sandbox = await sandbox_manager.create_sandbox(project.id)
     project_registry.register(project.id, sandbox.info)
@@ -69,33 +69,22 @@ async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
 
 
 @router.patch("/{project_id}/name", status_code=200)
-async def rename_existing_project(project_id: str, body: RenameProjectRequest) -> dict[str, bool]:
-    project = await get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+async def rename_existing_project(project: ProjectDep, body: RenameProjectRequest) -> dict[str, bool]:
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name cannot be empty")
 
-    await rename_project(project_id, body.name.strip())
+    await rename_project(project.id, body.name.strip())
     return {"success": True}
 
 
 @router.patch("/{project_id}/model", status_code=200)
-async def update_project_selected_model(project_id: str, body: UpdateProjectModelRequest) -> dict[str, bool]:
-    project = await get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    await update_project_model(project_id, body.model)
+async def update_project_selected_model(project: ProjectDep, body: UpdateProjectModelRequest) -> dict[str, bool]:
+    await update_project_model(project.id, body.model)
     return {"success": True}
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_existing_project(project_id: str) -> None:
-    project = await get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-
+async def delete_existing_project(project: ProjectDep) -> None:
     await sandbox_manager.destroy_sandbox(project.id, delete_workspace=True)
     project_registry.remove(project.id)
-    await delete_project(project_id)
+    await delete_project(project.id)
