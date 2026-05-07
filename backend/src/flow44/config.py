@@ -65,7 +65,7 @@ class AuthSettings(Flow44BaseSettings):
     # JWT public key or secret for token validation (optional - if not set, only checks structure/expiry)
     AUTH_JWT_SECRET: str | None = None
     # JWT algorithm (default: HS256 for HMAC, use RS256 for RSA)
-    AUTH_JWT_ALGORITHM: str = "HS256"
+    AUTH_JWT_ALGORITHM: str = "RS256"
     # Require JWT format (vs allowing opaque tokens)
     AUTH_REQUIRE_JWT: bool = False
 

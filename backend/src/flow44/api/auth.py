@@ -13,6 +13,18 @@ from flow44.db.project import get_project as db_get_project
 
 logger = logging.getLogger(__name__)
 
+_DECODE_OPTIONS: dict[str, bool] = {
+    "verify_signature": False,
+    "verify_exp": False,
+    "verify_nbf": False,
+    "verify_iat": False,
+    "verify_aud": False,
+}
+
+
+def _find_unique_id(payload: dict[str, object]) -> str | None:
+    return next((str(v) for k, v in payload.items() if k.endswith("/UniqueID")), None)
+
 
 def get_authorization_header(
     authorization: str | None = Header(None, alias="Authorization"),
@@ -29,17 +41,7 @@ TokenDep = Annotated[str | None, Depends(get_authorization_header)]
 
 
 def extract_user_id(token: str | None) -> str:
-    """Resolve a raw token string to a user_id.
-
-    Behavior matrix:
-    - No token + AUTH_REQUIRE_JWT=true  -> 401
-    - No token + AUTH_REQUIRE_JWT=false -> "anonymous"
-    - JWT-shaped + AUTH_JWT_SECRET set  -> verify signature, extract sub/UniqueID/id
-    - JWT-shaped + no secret + AUTH_REQUIRE_JWT=true  -> 401 (config error; forged tokens rejected)
-    - JWT-shaped + no secret + AUTH_REQUIRE_JWT=false -> treat as opaque (dev mode, no decode)
-    - Opaque   + AUTH_REQUIRE_JWT=true  -> 401
-    - Opaque   + AUTH_REQUIRE_JWT=false -> token value used as user_id
-    """
+    """Resolve token to user_id. JWT payload parsed unsigned; uid from ``/UniqueID`` claim."""
     if not token:
         if settings.AUTH_REQUIRE_JWT:
             raise HTTPException(status_code=401, detail="Authorization required")
@@ -48,32 +50,23 @@ def extract_user_id(token: str | None) -> str:
     is_jwt = token.count(".") == 2
 
     if is_jwt:
-        if not settings.AUTH_JWT_SECRET:
-            if settings.AUTH_REQUIRE_JWT:
-                # Cannot verify signature — reject to prevent forged-token impersonation.
-                logger.warning(
-                    "JWT token received but AUTH_JWT_SECRET is not configured; "
-                    "rejecting request to prevent forged-token impersonation. "
-                    "Set AUTH_JWT_SECRET or disable AUTH_REQUIRE_JWT for local dev."
-                )
-                raise HTTPException(status_code=401, detail="Server authentication is misconfigured")
-            # AUTH_REQUIRE_JWT=false + no secret: treat whole token as opaque user_id (local dev only).
-            return token
-
         try:
-            payload = jwt.decode(
+            decoded = jwt.decode(
                 token,
-                settings.AUTH_JWT_SECRET,
+                "",
                 algorithms=[settings.AUTH_JWT_ALGORITHM],
+                options=_DECODE_OPTIONS,
             )
-            uid = payload.get("UniqueID") or payload.get("sub") or payload.get("id")
-            if not uid:
-                raise HTTPException(status_code=401, detail="Token missing user identification")
-            return str(uid)
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Token expired") from None
-        except jwt.InvalidTokenError as e:
-            raise HTTPException(status_code=401, detail=f"Invalid token: {e}") from None
+            uid = _find_unique_id(decoded) if isinstance(decoded, dict) else None
+        except jwt.PyJWTError as e:
+            logger.debug("JWT parse failed: %s", e)
+            uid = None
+
+        if uid: return uid
+
+        if settings.AUTH_REQUIRE_JWT:
+            raise HTTPException(status_code=401, detail="Token missing user identification")
+        return token
 
     elif settings.AUTH_REQUIRE_JWT:
         raise HTTPException(status_code=401, detail="JWT token required")
@@ -99,7 +92,7 @@ ProjectDep = Annotated[Project, Depends(get_project)]
 
 
 async def get_ws_project(websocket: WebSocket, project_id: str) -> Project | None:
-    """WS auth via query param token; delegates ownership check to get_project."""
+    """WS auth via query param or cookie."""
     token = websocket.query_params.get("token") or websocket.cookies.get("fb_token")
     try:
         user_id = extract_user_id(token)
@@ -113,17 +106,11 @@ async def preview_token_cookie(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    """Promote ?token= to an httponly cookie scoped to the preview proxy path.
-
-    Set once on the first authenticated preview hit so subsequent sub-resource
-    requests (assets, Vite HMR socket) can authenticate via cookie without
-    needing the token in every query string.
-    """
+    """Set httponly cookie from ?token= so sub-resources authenticate without it in the query string."""
     response = await call_next(request)
     token = request.query_params.get("token")
     if token:
         parts = request.url.path.split("/")
-        # /api/preview/{project_id}/proxy/...  →  parts[3] is project_id
         if len(parts) >= 5 and parts[1] == "api" and parts[2] == "preview" and parts[4] == "proxy":
             response.set_cookie(
                 key="fb_token",
