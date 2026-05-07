@@ -62,7 +62,8 @@ def extract_user_id(token: str | None) -> str:
             logger.debug("JWT parse failed: %s", e)
             uid = None
 
-        if uid: return uid
+        if uid:
+            return uid
 
         if settings.AUTH_REQUIRE_JWT:
             raise HTTPException(status_code=401, detail="Token missing user identification")
