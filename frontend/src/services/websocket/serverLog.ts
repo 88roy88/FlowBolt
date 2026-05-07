@@ -1,6 +1,5 @@
 import type { ReadOnlySocket } from './types';
-import { getWsBase } from './reconnecting';
-import { credentialsStore } from '../../auth';
+import { getWsBase, sendWsAuth } from './reconnecting';
 
 export function createServerLogSocket(projectId: string): ReadOnlySocket {
   const handlers: Array<(data: string) => void> = [];
@@ -10,24 +9,28 @@ export function createServerLogSocket(projectId: string): ReadOnlySocket {
 
   function connect() {
     if (closed) return;
-    const token = credentialsStore.getValidToken();
-    socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}${token ? `?token=${encodeURIComponent(token)}` : ''}`);
-    socket.binaryType = 'arraybuffer';
+    const ws = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
+    ws.binaryType = 'arraybuffer';
+    socket = ws;
 
-    socket.addEventListener('message', (event) => {
+    ws.addEventListener('open', () => {
+      sendWsAuth((data) => ws.send(data));
+    });
+
+    ws.addEventListener('message', (event) => {
       const text = event.data instanceof ArrayBuffer
         ? new TextDecoder().decode(event.data)
         : event.data as string;
       handlers.forEach((h) => h(text));
     });
 
-    socket.addEventListener('close', () => {
+    ws.addEventListener('close', () => {
       socket = null;
       if (!closed) setTimeout(connect, 2000);
     });
 
-    socket.addEventListener('error', () => {
-      socket?.close();
+    ws.addEventListener('error', () => {
+      ws.close();
     });
   }
 

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Annotated
+from typing import Annotated, cast
 
 import jwt
+from jwt.types import Options
 from fastapi import Cookie, Depends, Header, HTTPException, Query, Request, Response, WebSocket
 
 from flow44.config import settings
@@ -13,7 +14,7 @@ from flow44.db.project import get_project as db_get_project
 
 logger = logging.getLogger(__name__)
 
-_DECODE_OPTIONS: dict[str, bool] = {
+_DECODE_OPTIONS = {
     "verify_signature": False,
     "verify_exp": False,
     "verify_nbf": False,
@@ -55,7 +56,7 @@ def extract_user_id(token: str | None) -> str:
                 token,
                 "",
                 algorithms=[settings.AUTH_JWT_ALGORITHM],
-                options=_DECODE_OPTIONS,
+                options=cast(Options, _DECODE_OPTIONS),
             )
             uid = _find_unique_id(decoded) if isinstance(decoded, dict) else None
         except jwt.PyJWTError as e:

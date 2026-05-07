@@ -1,6 +1,13 @@
+import { credentialsStore } from '../../auth';
+
 export function getWsBase(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}`;
+}
+
+export function sendWsAuth(send: (data: string) => void): void {
+  const token = credentialsStore.getValidToken();
+  send(JSON.stringify({ type: 'auth', userAuthorization: token ?? '' }));
 }
 
 export function createReconnectingSocket(

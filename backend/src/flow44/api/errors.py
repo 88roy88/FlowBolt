@@ -9,7 +9,7 @@ import os
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.api.sandbox import get_ws_sandbox
+from flow44.api.sandbox import accept_ws_sandbox
 from flow44.errors.parser import BuildError, is_error_line, parse_error_block, should_ignore, strip_ansi
 
 logger = logging.getLogger(__name__)
@@ -20,13 +20,11 @@ router = APIRouter()
 @router.websocket("/ws/errors/{project_id}")
 async def errors_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901, PLR0915
     """Watch ``.dev-server.log`` for error patterns and send structured events."""
-    sandbox = await get_ws_sandbox(websocket, project_id)
+    sandbox = await accept_ws_sandbox(websocket, project_id)
     if sandbox is None:
         return
 
     log_path = os.path.join(sandbox.workspace_dir, ".dev-server.log")
-
-    await websocket.accept()
 
     stop = asyncio.Event()
     sent_errors: set[BuildError] = set()

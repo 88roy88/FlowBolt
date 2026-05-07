@@ -1,16 +1,14 @@
-import { createReconnectingSocket, getWsBase } from './reconnecting';
-import { credentialsStore } from '../../auth';
+import { createReconnectingSocket, getWsBase, sendWsAuth } from './reconnecting';
 
 export function createErrorSocket(
   projectId: string,
   onError: (data: unknown) => void,
 ): { close(): void } {
-  const { close } = createReconnectingSocket(
+  const { sendOrQueue, close } = createReconnectingSocket(
+    `${getWsBase()}/ws/errors/${projectId}`,
     () => {
-      const token = credentialsStore.getValidToken();
-      return `${getWsBase()}/ws/errors/${projectId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      sendWsAuth(sendOrQueue);
     },
-    undefined,
     (data) => {
       try {
         onError(JSON.parse(data));

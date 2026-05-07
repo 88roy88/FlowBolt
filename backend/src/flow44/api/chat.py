@@ -12,11 +12,10 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.auth import ProjectDep, extract_user_id
+from flow44.api.auth import ProjectDep, extract_user_id, get_project
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
-from flow44.db.project import get_project as db_get_project
 from flow44.integrations.flapi_api import data_source_client
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
@@ -85,8 +84,9 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         return
 
     # --- Step 2: load and authorize project (unified 404 prevents project enumeration) ---
-    project = await db_get_project(project_id)
-    if project is None or project.user_id != caller_id:
+    try:
+        project = await get_project(project_id, caller_id)
+    except HTTPException:
         await websocket.send_json({"type": "error", "message": "Project not found"})
         await websocket.close()
         return
