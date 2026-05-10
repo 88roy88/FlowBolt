@@ -35,7 +35,7 @@ async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox |
         return None
 
 
-async def _read_auth_frame(websocket: WebSocket) -> dict[str, object] | None:
+async def read_auth_frame(websocket: WebSocket) -> dict[str, object] | None:
     try:
         raw = await asyncio.wait_for(websocket.receive_text(), timeout=10)
         data = json.loads(raw)
@@ -72,7 +72,7 @@ async def accept_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbo
     """Accept WS, authenticate via first auth frame, return sandbox or None."""
     await websocket.accept()
 
-    auth_frame = await _read_auth_frame(websocket)
+    auth_frame = await read_auth_frame(websocket)
     if auth_frame is None:
         return None
 

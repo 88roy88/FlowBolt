@@ -22,9 +22,9 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 
 @router.get("/{project_id}/port")
-async def get_preview_port(_project: ProjectDep, sandbox: SandboxDep) -> dict[str, str | int]:
+async def get_preview_port(project: ProjectDep, sandbox: SandboxDep) -> dict[str, str | int]:
     """Return the allocated port for the sandbox's dev server."""
-    return {"project_id": _project.id, "port": sandbox.port}
+    return {"project_id": project.id, "port": sandbox.port}
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ async def get_preview_port(_project: ProjectDep, sandbox: SandboxDep) -> dict[st
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
 async def proxy_to_sandbox(  # noqa: E501
-    _project: ProjectDep, path: str, request: Request, sandbox: SandboxDep
+    project: ProjectDep, path: str, request: Request, sandbox: SandboxDep
 ) -> Response:
     """Reverse proxy requests to the sandbox's dev server.
 
@@ -45,7 +45,7 @@ async def proxy_to_sandbox(  # noqa: E501
     full prefixed path to the upstream server.
     """
 
-    proxy_prefix = f"/api/preview/{_project.id}/proxy"
+    proxy_prefix = f"/api/preview/{project.id}/proxy"
     target_url = f"http://127.0.0.1:{sandbox.port}{proxy_prefix}/{path}"
     if request.url.query:
         target_url += f"?{request.url.query}"
@@ -74,7 +74,7 @@ async def proxy_to_sandbox(  # noqa: E501
             media_type="text/html",
         )
     except Exception:
-        logger.exception("Preview proxy error for session %s", _project.id)
+        logger.exception("Preview proxy error for session %s", project.id)
         raise HTTPException(status_code=502, detail="Preview proxy error") from None
 
     # Forward response headers
@@ -99,11 +99,10 @@ async def proxy_to_sandbox(  # noqa: E501
 @router.websocket("/{project_id}/proxy")
 async def proxy_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
     """Proxy WebSocket connections for Vite HMR."""
+    await websocket.accept()
     sandbox = await get_ws_sandbox(websocket, project_id)
     if sandbox is None:
         return
-
-    await websocket.accept()
 
     import asyncio  # noqa: PLC0415
 

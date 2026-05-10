@@ -13,6 +13,7 @@ from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
 from flow44.api.auth import ProjectDep, extract_user_id, get_project
+from flow44.api.sandbox import read_auth_frame
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -59,17 +60,8 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", project_id)
 
-    # --- Step 1: authenticate before any project or sandbox access ---
-    try:
-        raw_first = await websocket.receive_text()
-        first = json.loads(raw_first)
-    except Exception:
-        await websocket.close(code=1008, reason="Unauthorized")
-        return
-
-    if first.get("type") != "auth":
-        await websocket.send_json({"type": "error", "message": "Unauthorized"})
-        await websocket.close()
+    first = await read_auth_frame(websocket)
+    if first is None:
         return
 
     raw_ds_auth = first.get("dataSourceAuthorization")
@@ -83,7 +75,6 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         await websocket.close()
         return
 
-    # --- Step 2: load and authorize project (unified 404 prevents project enumeration) ---
     try:
         project = await get_project(project_id, caller_id)
     except HTTPException:
@@ -91,7 +82,6 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         await websocket.close()
         return
 
-    # --- Step 3: prepare sandbox (only reached after successful auth) ---
     try:
         sandbox = sandbox_manager.get_sandbox(project_id)
         await sandbox_manager.ensure_ready(sandbox)
@@ -106,8 +96,6 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
         await websocket.close()
         return
 
-    # --- Step 4: subscribe to live events and start processing ---
-    # (replay is handled by GET /api/chat/{project_id}/events)
     queue = subscribe(project_id)
 
     async def _forward_events() -> None:

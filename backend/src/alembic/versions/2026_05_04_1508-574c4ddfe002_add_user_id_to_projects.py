@@ -30,7 +30,7 @@ def upgrade() -> None:
     op.add_column('projects', sa.Column('user_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True))
     
     # 2. Update existing rows with a default user_id
-    op.execute("UPDATE projects SET user_id = 'legacy' WHERE user_id IS NULL")
+    op.execute("UPDATE projects SET user_id = 'anonymous' WHERE user_id IS NULL")
     
     # 3. Make it non-nullable and add index
     op.alter_column('projects', 'user_id', nullable=False)
