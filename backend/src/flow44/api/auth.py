@@ -5,8 +5,8 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated, cast
 
 import jwt
-from jwt.types import Options
 from fastapi import Cookie, Depends, Header, HTTPException, Query, Request, Response, WebSocket
+from jwt.types import Options
 
 from flow44.config import settings
 from flow44.db.project import Project

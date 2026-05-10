@@ -59,7 +59,7 @@ def _recv(ws: WebSocketTestSession) -> dict | None:
 
 def test_non_auth_first_message_rejected():
     """Sending any non-auth message first must be immediately rejected."""
-    with patch("flow44.api.chat.db_get_project") as mock_get, \
+    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock) as mock_get, \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         try:
@@ -79,7 +79,7 @@ def test_non_auth_first_message_rejected():
 
 def test_malformed_json_first_message_rejected():
     """Non-parseable first message should close the socket."""
-    with patch("flow44.api.chat.db_get_project") as mock_get, \
+    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock) as mock_get, \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         try:
@@ -100,7 +100,7 @@ def test_malformed_json_first_message_rejected():
 
 def test_auth_missing_token_rejected_when_required():
     """Empty userAuthorization with AUTH_REQUIRE_JWT=true must be rejected."""
-    with patch("flow44.api.chat.db_get_project") as mock_get, \
+    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock) as mock_get, \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr, \
          patch("flow44.api.auth.settings") as mock_settings:
 
@@ -129,7 +129,7 @@ def test_auth_wrong_owner_gets_not_found():
     """A valid token that does not own the project should get 'Project not found'."""
     project = _mock_project(user_id="owner-user")
 
-    with patch("flow44.api.chat.db_get_project", return_value=project), \
+    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=project), \
          patch("flow44.api.chat.extract_user_id", return_value="other-user"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
@@ -149,7 +149,7 @@ def test_auth_wrong_owner_gets_not_found():
 
 def test_auth_unknown_project_gets_not_found():
     """A valid token for a project that doesn't exist should get 'Project not found'."""
-    with patch("flow44.api.chat.db_get_project", return_value=None), \
+    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=None), \
          patch("flow44.api.chat.extract_user_id", return_value="some-user"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
@@ -175,7 +175,7 @@ def test_sandbox_not_touched_before_auth():
     """Sandbox manager must never be invoked when auth fails."""
     mock_mgr = MagicMock()
 
-    with patch("flow44.api.chat.db_get_project") as mock_get, \
+    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock) as mock_get, \
          patch("flow44.api.chat.sandbox_manager", mock_mgr):
 
         try:
@@ -199,7 +199,7 @@ def test_sandbox_not_found_after_auth_sends_error():
     """After successful auth, a missing sandbox returns a meaningful error."""
     project = _mock_project(user_id="user-a")
 
-    with patch("flow44.api.chat.db_get_project", return_value=project), \
+    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=project), \
          patch("flow44.api.chat.extract_user_id", return_value="user-a"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
