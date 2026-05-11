@@ -5,7 +5,8 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated, cast
 
 import jwt
-from fastapi import Cookie, Depends, Header, HTTPException, Query, Request, Response, WebSocket
+from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, WebSocket
+from starlette.datastructures import MutableHeaders
 from jwt.types import Options
 
 from flow44.config import settings
@@ -29,10 +30,9 @@ def _find_unique_id(payload: dict[str, object]) -> str | None:
 
 def get_authorization_header(
     authorization: str | None = Header(None, alias="Authorization"),
-    token: str | None = Query(None),
     fb_token: str | None = Cookie(None),
 ) -> str | None:
-    raw = (authorization or token or fb_token or "").strip()
+    raw = (authorization or fb_token or "").strip()
     if not raw:
         return None
     return raw[7:].strip() if raw.lower().startswith("bearer ") else raw
@@ -104,21 +104,27 @@ async def get_ws_project(websocket: WebSocket, project_id: str) -> Project | Non
         return None
 
 
+def _preview_project_id(path: str) -> str | None:
+    # nginx guarantees /api/preview/{id}/proxy/... structure before routing here
+    if not path.startswith("/api/preview/"):
+        return None
+    project_id, _, _ = path.removeprefix("/api/preview/").partition("/")
+    return project_id or None
+
+
 async def preview_token_cookie(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    """Set httponly cookie from ?token= so sub-resources authenticate without it in the query string."""
-    response = await call_next(request)
+    """Scope ?token= to preview proxy: inject as fb_token cookie so sub-resources authenticate."""
     token = request.query_params.get("token")
-    if token:
-        parts = request.url.path.split("/")
-        if len(parts) >= 5 and parts[1] == "api" and parts[2] == "preview" and parts[4] == "proxy":
-            response.set_cookie(
-                key="fb_token",
-                value=token,
-                path=f"/api/preview/{parts[3]}/proxy",
-                httponly=True,
-                samesite="lax",
-            )
+    project_id = _preview_project_id(request.url.path) if token else None
+
+    if not project_id:
+        return await call_next(request)
+
+    MutableHeaders(scope=request.scope)["authorization"] = f"Bearer {token}"
+
+    response = await call_next(request)
+    response.set_cookie("fb_token", token, path=f"/api/preview/{project_id}/proxy", httponly=True, samesite="lax")
     return response
