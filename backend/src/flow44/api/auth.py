@@ -6,8 +6,8 @@ from typing import Annotated, cast
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, WebSocket
-from starlette.datastructures import MutableHeaders
 from jwt.types import Options
+from starlette.datastructures import MutableHeaders
 
 from flow44.config import settings
 from flow44.db.project import Project
@@ -120,7 +120,7 @@ async def preview_token_cookie(
     token = request.query_params.get("token")
     project_id = _preview_project_id(request.url.path) if token else None
 
-    if not project_id:
+    if not project_id or not token:
         return await call_next(request)
 
     MutableHeaders(scope=request.scope)["authorization"] = f"Bearer {token}"
