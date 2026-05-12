@@ -33,6 +33,7 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_AUTH_PROVIDER_URL: str = "http://localhost:6001/sso"
     SANDBOX_AUTH_STORAGE_KEY: str = "Auth"
     SANDBOX_AUTH_USE_IFRAME: bool = True
+    SANDBOX_AUTH_POST_MESSAGE_TARGET: str = "*"
 
 
 class DatabaseSettings(Flow44BaseSettings):
