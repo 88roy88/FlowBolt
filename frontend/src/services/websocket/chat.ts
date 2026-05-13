@@ -1,6 +1,6 @@
 import type { WSMessage } from '../../types';
 import type { ChatSocket } from './types';
-import { credentialsStore } from '../../auth';
+import { authSession } from '../../auth';
 import { readDataSourceAuthorization } from '../dataSourceAuth';
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
@@ -13,10 +13,10 @@ export function getChatSocket(projectId: string): ChatSocket {
   const handlers = new Set<(msg: WSMessage) => void>();
   let stopReconnect: (() => void) | null = null;
 
-  const sendAuthMessage = (send: (message: WSMessage) => void) => {
-    const rawToken = readDataSourceAuthorization();
+  const sendAuthMessage = async (send: (message: WSMessage) => void) => {
+    const rawToken = await readDataSourceAuthorization();
     const dataSourceAuthorization = rawToken?.trim() || undefined;
-    const userAuthorization = credentialsStore.getValidToken();
+    const userAuthorization = await authSession.ensureFreshToken();
     send({
       type: 'auth',
       ...(dataSourceAuthorization && { dataSourceAuthorization }),
@@ -26,8 +26,8 @@ export function getChatSocket(projectId: string): ChatSocket {
 
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${projectId}`,
-    () => {
-      sendAuthMessage((message) => {
+    async () => {
+      await sendAuthMessage((message) => {
         sendOrQueue(JSON.stringify(message));
       });
     },

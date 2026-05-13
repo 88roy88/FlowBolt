@@ -1,5 +1,5 @@
-import { credentialsStore } from '../auth';
+import { authSession } from '../auth';
 
-export function readDataSourceAuthorization(): string | undefined {
-  return credentialsStore.getValidToken();
+export async function readDataSourceAuthorization(): Promise<string | undefined> {
+  return authSession.ensureFreshToken();
 }

@@ -1,18 +1,18 @@
-import { credentialsStore } from '../../auth';
+import { authSession } from '../../auth';
 
 export function getWsBase(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}`;
 }
 
-export function sendWsAuth(send: (data: string) => void): void {
-  const token = credentialsStore.getValidToken();
+export async function sendWsAuth(send: (data: string) => void): Promise<void> {
+  const token = await authSession.ensureFreshToken();
   send(JSON.stringify({ type: 'auth', userAuthorization: token ?? '' }));
 }
 
 export function createReconnectingSocket(
   url: string | (() => string),
-  onOpen?: () => void,
+  onOpen?: () => void | Promise<void>,
   onMessage?: (data: string) => void,
   onClose?: () => void,
   onError?: (error: Event) => void,
@@ -34,10 +34,10 @@ export function createReconnectingSocket(
     if (closed) return;
     socket = new WebSocket(typeof url === 'function' ? url() : url);
 
-    socket.addEventListener('open', () => {
+    socket.addEventListener('open', async () => {
       hasConnectedOnce = true;
       retryDelay = 1000;
-      onOpen?.();
+      await onOpen?.();
       flushQueue();
     });
 
