@@ -9,7 +9,7 @@ from flow44.db.project import (
     delete_project,
     get_project,
     get_project_data_sources,
-    list_projects,
+    list_all_projects,
     rename_project,
     update_project_data_source,
     update_project_data_sources,
@@ -43,7 +43,7 @@ class TestProjectCRUD:
         assert result is None
 
     async def test_list_projects_empty(self, test_db):
-        projects = await list_projects()
+        projects = await list_all_projects()
         assert projects == []
 
     async def test_list_projects_ordered_newest_first(self, test_db):
@@ -51,7 +51,7 @@ class TestProjectCRUD:
         p2 = await create_project("Second", user_id="test-user")
         p3 = await create_project("Third", user_id="test-user")
 
-        projects = await list_projects()
+        projects = await list_all_projects()
         assert len(projects) == 3
         assert projects[0].id == p3.id
         assert projects[2].id == p1.id

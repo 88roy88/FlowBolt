@@ -27,16 +27,16 @@ async def test_list_projects_isolation(test_db):
     await create_project(name="A2", user_id="user_a")
     await create_project(name="B1", user_id="user_b")
 
-    from flow44.db.project import list_projects
+    from flow44.db.project import list_all_projects, list_user_projects
 
-    projects_a = await list_projects(user_id="user_a")
+    projects_a = await list_user_projects(user_id="user_a")
     assert len(projects_a) == 2
     assert all(p.user_id == "user_a" for p in projects_a)
 
-    projects_b = await list_projects(user_id="user_b")
+    projects_b = await list_user_projects(user_id="user_b")
     assert len(projects_b) == 1
     assert projects_b[0].user_id == "user_b"
 
-    # System level (None) should see all
-    all_projects = await list_projects(user_id=None)
+    # System level should see all
+    all_projects = await list_all_projects()
     assert len(all_projects) == 3

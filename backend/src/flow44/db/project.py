@@ -39,12 +39,21 @@ async def get_project(project_id: str) -> Project | None:
         return await session.get(Project, project_id)
 
 
-async def list_projects(user_id: str | None = None) -> list[Project]:
+async def list_user_projects(user_id: str) -> list[Project]:
     async with database.async_session() as session:
-        query = select(Project)
-        if user_id:
-            query = query.where(Project.user_id == user_id)
-        query = query.order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+        query = (
+            select(Project)
+            .where(Project.user_id == user_id)
+            .order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+        )
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+
+async def list_all_projects() -> list[Project]:
+    """System-level: returns every project across all users. Never call from a request handler."""
+    async with database.async_session() as session:
+        query = select(Project).order_by(Project.created_at.desc())  # type: ignore[attr-defined]
         result = await session.execute(query)
         return list(result.scalars().all())
 

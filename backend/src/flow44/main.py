@@ -27,7 +27,7 @@ from flow44.api import (
 from flow44.api.auth import get_user_id, preview_token_cookie
 from flow44.config import settings
 from flow44.db.database import init_db
-from flow44.db.project import list_projects
+from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import setup_bucket
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Restoring existing sandbox workspaces...")
 
-    live_projects = await list_projects(user_id=None)
+    live_projects = await list_all_projects()
 
     live_project_ids = {p.id for p in live_projects}
     await sandbox_manager.reconcile_workspaces(live_project_ids)
