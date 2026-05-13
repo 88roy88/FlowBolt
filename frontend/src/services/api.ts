@@ -1,4 +1,4 @@
-import { credentialsStore } from '../auth';
+import { authSession, credentialsStore } from '../auth';
 import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
 import { readDataSourceAuthorization } from './dataSourceAuth';
 
@@ -7,7 +7,7 @@ const BASE = '/api';
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
 
-  const token = credentialsStore.getValidToken();
+  const token = await authSession.ensureFreshToken();
   if (token) {
     headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
   }
@@ -69,7 +69,7 @@ export async function deleteFileEntry(projectId: string, path: string): Promise<
 
 export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
   const headers: Record<string, string> = { 'Content-Type': file.type || 'application/octet-stream' };
-  const token = credentialsStore.getValidToken();
+  const token = await authSession.ensureFreshToken();
   if (token) headers['Authorization'] = token;
 
   const res = await fetch(`${BASE}/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
@@ -158,7 +158,7 @@ export async function fetchDefaultModel(): Promise<string> {
 
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
   const headers: Record<string, string> = {};
-  const auth = readDataSourceAuthorization();
+  const auth = await readDataSourceAuthorization();
   if (auth) headers.Authorization = auth;
   const res = await fetch(`${BASE}/data-source/search/${encodeURIComponent(queryOrId)}`, { headers });
   const text = await res.text();

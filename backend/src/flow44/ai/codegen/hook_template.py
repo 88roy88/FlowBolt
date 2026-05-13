@@ -29,7 +29,7 @@ import {{ credentialsStore, authSession }} from '../auth';
 import type {{ {response_type} }} from '{types_import_path}';
 
 async function fetchWithAuth(url: string): Promise<Response> {{
-  const token = credentialsStore.getValidToken();
+  const token = await authSession.ensureFreshToken();
   const res = await fetch(url, {{
     headers: token ? {{ Authorization: token }} : undefined,
   }});

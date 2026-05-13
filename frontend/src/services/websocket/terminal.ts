@@ -22,9 +22,9 @@ export function createTerminalSocket(projectId: string): TerminalSocket {
     ws.binaryType = 'arraybuffer';
     socket = ws;
 
-    ws.addEventListener('open', () => {
+    ws.addEventListener('open', async () => {
       retryDelay = 1000;
-      sendWsAuth((data) => ws.send(data));
+      await sendWsAuth((data) => ws.send(data));
       flushQueue();
     });
 

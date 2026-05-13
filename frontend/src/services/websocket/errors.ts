@@ -6,8 +6,8 @@ export function createErrorSocket(
 ): { close(): void } {
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/errors/${projectId}`,
-    () => {
-      sendWsAuth(sendOrQueue);
+    async () => {
+      await sendWsAuth(sendOrQueue);
     },
     (data) => {
       try {

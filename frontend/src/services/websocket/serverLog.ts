@@ -13,8 +13,8 @@ export function createServerLogSocket(projectId: string): ReadOnlySocket {
     ws.binaryType = 'arraybuffer';
     socket = ws;
 
-    ws.addEventListener('open', () => {
-      sendWsAuth((data) => ws.send(data));
+    ws.addEventListener('open', async () => {
+      await sendWsAuth((data) => ws.send(data));
     });
 
     ws.addEventListener('message', (event) => {
