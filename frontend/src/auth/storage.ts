@@ -13,14 +13,8 @@ function parseStoredCredentials(raw: string): AuthCredentials | null {
 }
 
 function parseExpiryTimestamp(creds: AuthCredentials): number | null {
-  for (const key of ['expiresAt', 'expiration', 'tokenExpiry']) {
-    const val = (creds as Record<string, unknown>)[key];
-    if (typeof val === 'string' && val.trim()) {
-      const ms = Date.parse(val.trim());
-      return Number.isFinite(ms) ? ms : null;
-    }
-  }
-  return null;
+  const val = (creds as Record<string, unknown>).exp;
+  return typeof val === 'number' && Number.isFinite(val) ? val * 1000 : null;
 }
 
 export const credentialsStore = {

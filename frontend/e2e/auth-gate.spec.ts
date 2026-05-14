@@ -41,7 +41,7 @@ async function seedExpiredToken(page: import('@playwright/test').Page) {
       try {
         localStorage.setItem(
           key,
-          JSON.stringify({ auth_token: 'expired-token', expiresAt: '2020-01-01T00:00:00.000Z' }),
+          JSON.stringify({ auth_token: 'expired-token', exp: 1577836800 }),
         );
       } catch { /* ignore */ }
     },
