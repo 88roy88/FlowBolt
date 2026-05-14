@@ -157,7 +157,19 @@ const applyInjectionFlows = (rawHtml) => {
   return { htmlSnippet: withData, librariesUsed };
 };
 
-/** FLAPI expects a non-empty Authorization header; empty or missing => 401 (mock parity). */
+/** Decode a JWT payload without verifying the signature. Returns null if not a JWT shape. */
+const decodeJwtPayload = (token) => {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const json = Buffer.from(parts[1], 'base64url').toString('utf8');
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+};
+
+/** FLAPI expects a non-empty Authorization header; empty/missing/expired => 401 (mock parity). */
 const assertFlapiApiAuthorized = (req, res) => {
   const raw = req.headers.authorization;
   if (typeof raw !== 'string' || !raw.trim()) {
@@ -165,6 +177,17 @@ const assertFlapiApiAuthorized = (req, res) => {
       .status(401)
       .json(errorBody('unauthorized', 'Authorization header is required'));
     return false;
+  }
+  const token = raw.replace(/^Bearer\s+/i, '').trim();
+  const payload = decodeJwtPayload(token);
+  if (payload && typeof payload.exp === 'number') {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (payload.exp <= nowSeconds) {
+      res
+        .status(401)
+        .json(errorBody('token_expired', 'Token has expired'));
+      return false;
+    }
   }
   return true;
 };
