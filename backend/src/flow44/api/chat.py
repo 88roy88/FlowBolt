@@ -184,7 +184,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
 
                 elif action == "reject":
                     await delete_pending_plan(project_id)
-                    await emit_event(project_id, {"type": "plan_rejected"})
+                    await emit_event(project_id, {"type": "plan_rejected", "overview": state.user_overview.model_dump()})
                     await emit_event(project_id, {"type": "phase", "phase": "idle"})
 
             elif msg_type == "fix_error":
