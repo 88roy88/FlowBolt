@@ -98,18 +98,22 @@ def _build_body(
     if not required and not optional:
         lines.append(f"  const res = await fetchWithAuth('{path}');\n")
     else:
-        lines.append("  const body: Record<string, unknown> = {};\n")
+        all_params = required + optional
+        cube_ids = sorted({p.cube_id for p in all_params})
+        lines.append("  const body: Record<string, Record<string, unknown>> = {};\n")
+        for cube_id in cube_ids:
+            lines.append(f"  body[{_js_string(cube_id)}] = {{}};\n")
         for p in required:
-            lines.append(f"  body[{_js_string(p.name)}] = {_ts_ident(p.name)};\n")
+            lines.append(
+                f"  body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {_ts_ident(p.name)};\n"
+            )
         for p in optional:
             ident = _ts_ident(p.name)
             lines.append(
-                f"  if (options?.{ident} !== undefined) body[{_js_string(p.name)}] = options.{ident};\n"
+                f"  if (options?.{ident} !== undefined) body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = options.{ident};\n"
             )
         lines.append(f"  const res = await fetchWithAuth('{path}', body);\n")
 
-    # /api/data-source/{id}/run wraps results in { data: ... } — unwrap here so
-    # the returned object matches the response schema the type describes.
     lines.append(f"  const envelope = (await res.json()) as {{ data: {response_type} }};\n")
     lines.append("  return envelope.data;\n")
     return "".join(lines)

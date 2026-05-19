@@ -33,7 +33,7 @@ def _param(
         "DisplayName": name.title(),
         "Description": description,
         "Type": type_,
-        "OntologyType": "TEXT",
+        # "OntologyType": "TEXT",
         "IsSingleValue": is_single_value,
         "IsRequired": is_required,
         "IsRequireAny": is_require_any,

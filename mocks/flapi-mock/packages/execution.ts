@@ -9,10 +9,9 @@ function extractQuickParams(body: unknown): QuickParams {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return {};
 
   const extracted: QuickParams = {};
-  for (const [paramName, paramObj] of Object.entries(body)) {
-    if (paramObj && typeof paramObj === 'object' && !Array.isArray(paramObj)) {
-      const values = Object.values(paramObj);
-      extracted[paramName] = values.length === 1 ? values[0] : values;
+  for (const cubeParams of Object.values(body)) {
+    if (cubeParams && typeof cubeParams === 'object' && !Array.isArray(cubeParams)) {
+      Object.assign(extracted, cubeParams);
     }
   }
   return extracted;

@@ -2,14 +2,13 @@ from fastapi import APIRouter, Body, HTTPException
 
 from flow44.api.deps import AuthDep
 from flow44.logic import data_source as ds_logic
+from flow44.integrations.flapi.models import CubeId, QuickParamValue, QuickParams
 from flow44.logic.models import (
     CanRunResponse,
     DataSource,
-    DataSourceParams,
     DataSourceParamsInfo,
     DataSourceResult,
     DataSourceUsage,
-    ParamValue,
 )
 
 router = APIRouter(prefix="/api/data-source", tags=["data-source"])
@@ -60,14 +59,11 @@ async def can_run_without_params(
     data_source_id: str,
 ) -> CanRunResponse:
     try:
-        can_run, minimal_params = await ds_logic.can_run_without_params(
+        can_run, _minimal = await ds_logic.can_run_without_params(
             data_source_id,
             authorization=authorization,
         )
-        return CanRunResponse(
-            can_run=can_run,
-            minimal_params=minimal_params.root if minimal_params else None,
-        )
+        return CanRunResponse(can_run=can_run)
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err
@@ -77,16 +73,17 @@ async def can_run_without_params(
 async def run_data_source(
     authorization: AuthDep,
     data_source_id: str,
-    params: dict[str, ParamValue] | None = Body(
-        None, examples=[{"person_id": 2, "active": True, "tag_ids": [10, 11]}]
+    params: dict[CubeId, dict[str, QuickParamValue]] | None = Body(
+        None,
+        examples=[{"cube-1": {"person_id": 2, "active": True, "tag_ids": [10, 11]}}],
     ),
 ) -> DataSourceResult:
     try:
-        ds_params = DataSourceParams.model_validate(params) if params else None
+        quick_params = QuickParams(root=params) if params else None
         return await ds_logic.run_data_source(
             data_source_id,
             authorization=authorization,
-            params=ds_params,
+            params=quick_params,
         )
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502

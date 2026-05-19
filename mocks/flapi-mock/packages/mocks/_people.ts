@@ -204,7 +204,7 @@ export const people: PersonDetail[] = [
     bio: 'Builds churn models.',
   }),
   makePerson({
-    name: 'Noa Tal',
+    name: 'Noa T',
     title: 'Data Scientist',
     department: 'Analytics',
     phone: '+972-3-555-0022',

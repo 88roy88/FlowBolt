@@ -222,7 +222,6 @@ class PlanAgent(BaseAgent):
             "params_info": usage.params.model_dump(),
             "sample_data": usage.sample,
             "can_run_without_input": usage.can_run,
-            "minimal_params": usage.minimal_params,
             **analysis,
         }
 

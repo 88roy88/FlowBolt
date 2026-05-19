@@ -11,7 +11,6 @@ from flow44.integrations.flapi import models as flapi_models
 from flow44.logic.models import (
     DataSource,
     DataSourceFieldSchema,
-    DataSourceParams,
     DataSourceParamsInfo,
     DataSourceQuerySchema,
     DataSourceResult,
@@ -28,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "DataSource",
-    "DataSourceParams",
     "DataSourceParamsInfo",
     "DataSourceResult",
     "DataSourceUsage",
@@ -90,7 +88,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
     parameters: list[ParamDefinition] = []
     require_any = False
 
-    for param_list in info.root.values():
+    for cube_id, param_list in info.root.items():
         for p in param_list:
             options = [ParamOption(name=opt.name, value=opt.value) for opt in p.value]
             parameters.append(
@@ -103,6 +101,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
                     is_single_value=p.is_single_value,
                     is_require_any=p.is_require_any,
                     options=options,
+                    cube_id=cube_id,
                 )
             )
             if p.is_require_any:
@@ -142,13 +141,12 @@ async def run_data_source(
     data_source_id: str | int,
     *,
     authorization: str | None = None,
-    params: DataSourceParams | None = None,
+    params: QuickParams | None = None,
 ) -> DataSourceResult:
-    quick_params = QuickParams.from_values(params.root) if params else None
     raw = await data_source_client.run_data_source(
         data_source_id,
         authorization=authorization,
-        quick_params=quick_params,
+        quick_params=params,
     )
     return _to_result(raw)
 
@@ -190,13 +188,11 @@ def _default_for(param: ParamDefinition) -> ParamValue | None:
     return parsed if param.is_single_value else [parsed]
 
 
-def _minimal_params_for(params_info: DataSourceParamsInfo) -> DataSourceParams | None:
-    # Pure derivation from params_info — no I/O. Returns None if user input is
-    # required, or a (possibly empty) DataSourceParams if we can run without it.
+def _minimal_params_for(params_info: DataSourceParamsInfo) -> QuickParams | None:
     if not params_info.parameters:
-        return DataSourceParams(root={})
+        return QuickParams(root={})
 
-    defaults: dict[str, ParamValue] = {}
+    defaults: dict[str, tuple[str, ParamValue]] = {}
 
     if params_info.require_any:
         satisfied = False
@@ -206,7 +202,7 @@ def _minimal_params_for(params_info: DataSourceParamsInfo) -> DataSourceParams |
             value = _default_for(param)
             if value is None:
                 continue
-            defaults[param.name] = value
+            defaults[param.name] = (param.cube_id, value)
             satisfied = True
             break
         if not satisfied:
@@ -218,16 +214,19 @@ def _minimal_params_for(params_info: DataSourceParamsInfo) -> DataSourceParams |
         value = _default_for(param)
         if value is None:
             return None
-        defaults[param.name] = value
+        defaults[param.name] = (param.cube_id, value)
 
-    return DataSourceParams(root=defaults)
+    grouped: dict[str, dict[str, ParamValue]] = {}
+    for name, (cube_id, value) in defaults.items():
+        grouped.setdefault(cube_id, {})[name] = value
+    return QuickParams(root=grouped)
 
 
 async def can_run_without_params(
     data_source_id: str | int,
     *,
     authorization: str | None = None,
-) -> tuple[bool, DataSourceParams | None]:
+) -> tuple[bool, QuickParams | None]:
     params_info = await get_params_info(data_source_id, authorization=authorization)
     minimal = _minimal_params_for(params_info)
     return minimal is not None, minimal
@@ -270,16 +269,16 @@ async def get_usage(
     ]
 
     params_info = await get_params_info(data_source_id, authorization=authorization)
-    minimal_params_obj = _minimal_params_for(params_info)
-    minimal_params = minimal_params_obj.root if minimal_params_obj else None
+    minimal = _minimal_params_for(params_info)
+    can_run = minimal is not None
 
     sample: dict[str, object] | None = None
-    if minimal_params_obj is not None:
+    if minimal is not None:
         try:
             result = await run_data_source(
                 data_source_id,
                 authorization=authorization,
-                params=minimal_params_obj,
+                params=minimal,
             )
             sample = result.data
         except (FlapiUpstreamError, ValidationError) as exc:
@@ -288,6 +287,6 @@ async def get_usage(
     return DataSourceUsage(
         queries=queries,
         params=params_info,
-        minimal_params=minimal_params,
+        can_run=can_run,
         sample=sample,
     )

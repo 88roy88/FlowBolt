@@ -31,6 +31,8 @@ class ParamDefinition(BaseModel):
     is_single_value: bool
     is_require_any: bool = False
     options: list[ParamOption] = Field(default_factory=list)
+    cube_id: str = ""
+    query_id: str = ""
 
     @computed_field
     def default_values(self) -> ParamScalar | list[ParamScalar] | None:
@@ -92,20 +94,10 @@ class DataSourceQuerySchema(BaseModel):
 
 class CanRunResponse(BaseModel):
     can_run: bool
-    # Minimal params needed to run: {} if no input required, None if user input is required.
-    minimal_params: dict[str, ParamValue] | None = None
 
 
 class DataSourceUsage(BaseModel):
-    # Always non-empty when the data source has any metadata at all; get_usage
-    # raises FlapiUpstreamError rather than returning an empty list.
     queries: list[DataSourceQuerySchema]
     params: DataSourceParamsInfo
-    # Smallest param set that will run the data source; None if user input is required.
-    minimal_params: dict[str, ParamValue] | None = None
-    # Populated only when minimal_params actually produced a response.
+    can_run: bool = False
     sample: dict[str, Any] | None = None
-
-    @computed_field
-    def can_run(self) -> bool:
-        return self.minimal_params is not None
