@@ -128,12 +128,12 @@ class TestGrep:
         with pytest.raises(SearchToolError, match="ripgrep \\(rg\\) is required"):
             await sandbox.grep("pattern")
 
-    async def test_raises_when_rg_returns_no_output(self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_no_output_returns_empty(self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(search_mixin_module.shutil, "which", lambda _name: "rg")
         monkeypatch.setattr(sandbox, "exec", lambda command: _yield_lines([]))
 
-        with pytest.raises(SearchToolError, match="Ripgrep returned no output"):
-            await sandbox.grep("pattern")
+        result = await sandbox.grep("pattern")
+        assert result == []
 
     async def test_traversal_blocked(self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(search_mixin_module.shutil, "which", lambda _name: "rg")

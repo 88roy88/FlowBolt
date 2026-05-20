@@ -71,5 +71,5 @@ lint-all = "task lint"
 tests = "pytest"
 tests-all = "task tests"
 
-benchmark = "python -m benchmarks.src -c \"$@\""
+benchmark = "python -m benchmarks.src -c"
 benchmark-main = "task benchmark config.yaml"

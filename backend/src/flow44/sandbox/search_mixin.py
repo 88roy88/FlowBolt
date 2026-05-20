@@ -114,11 +114,7 @@ class SearchMixin(BaseSandbox, ABC):
         except Exception as e:
             logger.warning("Failed to execute ripgrep command: %s", e, exc_info=True)
             raise SearchToolError(f"Failed to execute ripgrep command: {e}") from e
-        output = "".join(lines)
-        if not output.strip():
-            logger.warning("Ripgrep returned no output. Command: %s", cmd)
-            raise SearchToolError("Ripgrep returned no output")
-        return output
+        return "".join(lines)
 
     # TODO: take a look at the grep.py in code-validation-service for reference
     async def grep(  # noqa: PLR0913
