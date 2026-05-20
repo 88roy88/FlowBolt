@@ -182,7 +182,6 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                     )
                     asyncio.create_task(_run_agent_safe(project_id, plan_agent.rebuild_with_feedback(state, feedback)))
 
-
             elif msg_type == "fix_error":
                 error_message = data.get("error_message", "")
                 error_file = data.get("error_file")
