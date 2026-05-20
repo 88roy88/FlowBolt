@@ -2,11 +2,11 @@ import { useState, useEffect, type RefObject } from 'react';
 import type { TFunction } from 'i18next';
 import { ChevronRight, Search, X, Loader2, FileText, FileCode, ChevronDown } from 'lucide-react';
 import type { SearchResult } from '../../services/api';
+import { CODE_EXTS, INITIAL_VISIBLE_RESULTS, SEARCH_OPTION_LABEL_STYLE } from './editorConstants';
 
 function getFileIcon(path: string) {
   const ext = path.split('.').pop()?.toLowerCase();
-  const codeExts = ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'cpp', 'c', 'go', 'rs'];
-  return codeExts.includes(ext || '') ? FileCode : FileText;
+  return CODE_EXTS.has(ext ?? '') ? FileCode : FileText;
 }
 
 function highlightMatch(text: string, query: string, caseSensitive: boolean): React.ReactNode {
@@ -15,27 +15,13 @@ function highlightMatch(text: string, query: string, caseSensitive: boolean): Re
   const parts: React.ReactNode[] = [];
   const searchText = caseSensitive ? text : text.toLowerCase();
   const searchQuery = caseSensitive ? query : query.toLowerCase();
-
   let lastIndex = 0;
   let index = searchText.indexOf(searchQuery);
 
   while (index !== -1) {
-    // Add text before match
-    if (index > lastIndex) {
-      parts.push(text.substring(lastIndex, index));
-    }
-    // Add highlighted match
+    if (index > lastIndex) parts.push(text.substring(lastIndex, index));
     parts.push(
-      <mark
-        key={`match-${index}`}
-        style={{
-          background: 'var(--accent)',
-          color: 'var(--accent-foreground)',
-          padding: '0 2px',
-          borderRadius: 2,
-          fontWeight: 600,
-        }}
-      >
+      <mark key={`match-${index}`} style={{ background: 'var(--accent)', color: 'var(--accent-foreground)', padding: '0 2px', borderRadius: 2, fontWeight: 600 }}>
         {text.substring(index, index + query.length)}
       </mark>
     );
@@ -43,12 +29,27 @@ function highlightMatch(text: string, query: string, caseSensitive: boolean): Re
     index = searchText.indexOf(searchQuery, lastIndex);
   }
 
-  // Add remaining text
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
-  }
-
+  if (lastIndex < text.length) parts.push(text.substring(lastIndex));
   return parts;
+}
+
+function SearchOptionLabel({ title, shorthand, checked, onChange }: {
+  title: string;
+  shorthand: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      style={SEARCH_OPTION_LABEL_STYLE}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--muted)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      title={title}
+    >
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ cursor: 'pointer', width: 12, height: 12 }} />
+      <span style={{ fontWeight: 600 }}>{shorthand}</span>
+    </label>
+  );
 }
 
 type Props = {
@@ -72,8 +73,6 @@ type Props = {
   toggleSearchFileCollapsed: (path: string) => void;
   jumpToSearchHit: (path: string, line: number, column: number) => void;
 };
-
-const INITIAL_VISIBLE_RESULTS = 50;
 
 export function EditorSearchPanel({
   t,
@@ -99,14 +98,12 @@ export function EditorSearchPanel({
   const displayedResults = searchResults.slice(0, visibleResults);
   const hasMore = searchResults.length > visibleResults;
 
-  // Reset visible results when search results change
   useEffect(() => {
     setVisibleResults(INITIAL_VISIBLE_RESULTS);
-  }, [searchResults.length, searchQuery]);
+  }, [searchQuery]);
 
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 12, flex: 1, overflow: 'hidden' }}>
-      {/* Search Input with Icons */}
       <div style={{ position: 'relative' }}>
         <Search
           size={14}
@@ -190,95 +187,11 @@ export function EditorSearchPanel({
         ) : null}
       </div>
 
-      {/* Compact Search Options & Stats */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'space-between', minHeight: 24 }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <label
-            style={{
-              display: 'flex',
-              gap: 4,
-              alignItems: 'center',
-              fontSize: 11,
-              color: 'var(--muted-foreground)',
-              cursor: 'pointer',
-              padding: '2px 6px',
-              borderRadius: 3,
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--muted)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-            title={t('editor.caseSensitive')}
-          >
-            <input
-              type="checkbox"
-              checked={searchCaseSensitive}
-              onChange={(e) => onSearchCaseSensitiveChange(e.target.checked)}
-              style={{ cursor: 'pointer', width: 12, height: 12 }}
-            />
-            <span style={{ fontWeight: 600 }}>Aa</span>
-          </label>
-
-          <label
-            style={{
-              display: 'flex',
-              gap: 4,
-              alignItems: 'center',
-              fontSize: 11,
-              color: 'var(--muted-foreground)',
-              cursor: 'pointer',
-              padding: '2px 6px',
-              borderRadius: 3,
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--muted)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-            title="Match whole words"
-          >
-            <input
-              type="checkbox"
-              checked={searchWordMatch}
-              onChange={(e) => onSearchWordMatchChange(e.target.checked)}
-              style={{ cursor: 'pointer', width: 12, height: 12 }}
-            />
-            <span style={{ fontWeight: 600 }}>W</span>
-          </label>
-
-          <label
-            style={{
-              display: 'flex',
-              gap: 4,
-              alignItems: 'center',
-              fontSize: 11,
-              color: 'var(--muted-foreground)',
-              cursor: 'pointer',
-              padding: '2px 6px',
-              borderRadius: 3,
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--muted)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-            title="Use regular expression"
-          >
-            <input
-              type="checkbox"
-              checked={searchUseRegex}
-              onChange={(e) => onSearchUseRegexChange(e.target.checked)}
-              style={{ cursor: 'pointer', width: 12, height: 12 }}
-            />
-            <span style={{ fontWeight: 600 }}>.*</span>
-          </label>
+          <SearchOptionLabel title={t('editor.caseSensitive')} shorthand="Aa" checked={searchCaseSensitive} onChange={onSearchCaseSensitiveChange} />
+          <SearchOptionLabel title="Match whole words" shorthand="W" checked={searchWordMatch} onChange={onSearchWordMatchChange} />
+          <SearchOptionLabel title="Use regular expression" shorthand=".*" checked={searchUseRegex} onChange={onSearchUseRegexChange} />
         </div>
 
         {totalMatches > 0 && (
@@ -298,70 +211,35 @@ export function EditorSearchPanel({
         )}
       </div>
 
-      {/* Results Area */}
       <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-        {searchBusy ? (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              color: 'var(--muted-foreground)',
-              fontSize: 13,
-              padding: 8,
-            }}
-          >
-            <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-            <span>{t('editor.searching')}</span>
-          </div>
-        ) : searchError ? (
-          <div
-            style={{
-              color: 'var(--destructive)',
-              fontSize: 13,
-              padding: 12,
-              background: 'var(--destructive-foreground)',
-              borderRadius: 6,
-              border: '1px solid var(--destructive)',
-            }}
-          >
-            {t('editor.searchFailedPrefix')}: {searchError}
-          </div>
-        ) : !searchQuery ? (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-              padding: 32,
-              color: 'var(--muted-foreground)',
-              textAlign: 'center',
-            }}
-          >
-            <Search size={32} strokeWidth={1.5} />
-            <div style={{ fontSize: 13 }}>
-              <div style={{ fontWeight: 500, marginBottom: 4 }}>Search across all files</div>
-              <div style={{ fontSize: 11, opacity: 0.8 }}>Start typing to find matches in your project</div>
+        {(() => {
+          if (searchBusy) return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted-foreground)', fontSize: 13, padding: 8 }}>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              <span>{t('editor.searching')}</span>
             </div>
-          </div>
-        ) : searchResults.length === 0 ? (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 8,
-              padding: 32,
-              color: 'var(--muted-foreground)',
-              textAlign: 'center',
-            }}
-          >
-            <FileText size={24} strokeWidth={1.5} />
-            <div style={{ fontSize: 12 }}>{t('editor.noSearchResults')}</div>
-          </div>
-        ) : (
+          );
+          if (searchError) return (
+            <div style={{ color: 'var(--destructive)', fontSize: 13, padding: 12, background: 'var(--destructive-foreground)', borderRadius: 6, border: '1px solid var(--destructive)' }}>
+              {t('editor.searchFailedPrefix')}: {searchError}
+            </div>
+          );
+          if (!searchQuery) return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, color: 'var(--muted-foreground)', textAlign: 'center' }}>
+              <Search size={32} strokeWidth={1.5} />
+              <div style={{ fontSize: 13 }}>
+                <div style={{ fontWeight: 500, marginBottom: 4 }}>Search across all files</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Start typing to find matches in your project</div>
+              </div>
+            </div>
+          );
+          if (searchResults.length === 0) return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 32, color: 'var(--muted-foreground)', textAlign: 'center' }}>
+              <FileText size={24} strokeWidth={1.5} />
+              <div style={{ fontSize: 12 }}>{t('editor.noSearchResults')}</div>
+            </div>
+          );
+          return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {displayedResults.map((r: SearchResult) => {
               const FileIcon = getFileIcon(r.path);
@@ -490,7 +368,6 @@ export function EditorSearchPanel({
               );
             })}
 
-            {/* Show More Button */}
             {hasMore && (
               <button
                 onClick={() => setVisibleResults((prev) => prev + INITIAL_VISIBLE_RESULTS)}
@@ -529,15 +406,10 @@ export function EditorSearchPanel({
               </button>
             )}
           </div>
-        )}
+        );
+        })()}
       </div>
 
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

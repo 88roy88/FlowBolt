@@ -309,6 +309,9 @@
   to { transform: rotate(360deg); }
 }
 
+.editor-search-hit-highlight-inline { background: rgba(255, 211, 77, 0.35); border-radius: 2px; }
+.editor-search-hit-highlight-line { background: rgba(255, 211, 77, 0.08); }
+
 /* Markdown content styling */
 .markdown-content { overflow-wrap: break-word; word-break: break-word; }
 .markdown-content pre { overflow-x: auto; max-width: 100%; }

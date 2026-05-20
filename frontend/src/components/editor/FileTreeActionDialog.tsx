@@ -34,11 +34,8 @@ export function FileTreeActionDialog({
   const { t } = useTranslation();
   const isDialogOpen = dialogState !== null;
   const isDeleteMode = dialogState?.mode === 'delete';
-  const dialogTitle = dialogState?.mode === 'create'
-    ? t('editor.createFile')
-    : dialogState?.mode === 'rename'
-      ? t('editor.renameFile')
-      : t('editor.deleteFile');
+  const titleKey = { create: 'editor.createFile', rename: 'editor.renameFile', delete: 'editor.deleteFile' } as const;
+  const dialogTitle = dialogState ? t(titleKey[dialogState.mode]) : '';
   const dialogDescription = dialogState?.mode === 'delete'
     ? t('editor.confirmDeleteFile', { name: dialogState.entry.name })
     : undefined;
