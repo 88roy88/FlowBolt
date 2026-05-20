@@ -232,7 +232,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     const content = get().openFiles.get(normalizedPath);
     if (content !== undefined) {
       await api.saveFileContent(projectId, normalizedPath, content);
-      queryClient.invalidateQueries({ queryKey: ['file', projectId, normalizedPath] });
       set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
   },
