@@ -21,6 +21,7 @@ async def _collect(gen) -> list[str]:  # type: ignore[type-arg]
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(os.name == "nt", reason="UnixSandbox.exec tests require /bin/bash")
 class TestUnixSandboxExec:
     async def test_echo(self, sandbox: UnixSandbox) -> None:
         lines = await _collect(sandbox.exec("echo hello"))

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from flow44.api.deps import SandboxDep
 from flow44.sandbox.main import PnpmSandbox
+from flow44.sandbox.search_mixin import SearchToolError
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 
@@ -143,6 +144,8 @@ async def get_grep(
         matches = await sandbox.grep(pattern, path, file_pattern)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
+    except SearchToolError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
     return {"matches": [{"file": m.file, "line": m.line, "content": m.content} for m in matches]}
 
 
@@ -187,3 +190,5 @@ async def post_search(sandbox: Annotated[PnpmSandbox, SandboxDep], body: SearchR
         )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
+    except SearchToolError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
