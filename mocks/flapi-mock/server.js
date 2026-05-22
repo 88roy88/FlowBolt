@@ -1,7 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yaml';
 import { errorBody } from './errorBody.js';
 import { stubDataSourceResults, stubIntelligenceResults, stubPeopleWithPhotosResults, stubPeopleHebrewResults, stubLibs, putRun, getRun, getRealtimeMetrics, stubHRResults, stubEcommerceResults, stubLogisticsResults, stubPhoneDevicesResults, stubPhoneCallsResults, stubPhoneRepairsResults, stubPhoneMarketResults } from './stubData.js';
 
@@ -23,6 +26,21 @@ app.use('/libs', express.static(libsRoot));
 // Serve static files from public directory (mock SSO page, etc.)
 const publicRoot = path.join(__dirname, 'public');
 app.use(express.static(publicRoot));
+
+const openapiPath = path.join(__dirname, 'openapi.yaml');
+const openapiSpec = YAML.parse(fs.readFileSync(openapiPath, 'utf8'));
+
+app.get('/openapi.json', (_req, res) => {
+  res.json(openapiSpec);
+});
+
+app.use(
+  '/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openapiSpec, {
+    swaggerOptions: { url: '/openapi.json' },
+  }),
+);
 
 /** Minimal stub for flapi package search autocomplete. Server-spec §2.1: filter to Type === "Package". */
 const stubSearchResultsRaw = [
@@ -505,4 +523,5 @@ app.get('/sso', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Mock server listening on http://localhost:${PORT}`);
+  console.log(`Swagger UI available at http://localhost:${PORT}/docs`);
 });

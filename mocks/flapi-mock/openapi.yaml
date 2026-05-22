@@ -1,0 +1,635 @@
+openapi: 3.0.3
+info:
+  title: FlowBolt FLAPI Mock
+  description: |
+    Development mock for FLAPI package search/run APIs, legacy Visualis client endpoints,
+    and mock SSO. Used by the FlowBolt backend (`FlapiClient`) and frontend auth in local dev.
+
+    **Stub package IDs** (POST run endpoints return different cube datasets):
+    - `1` — default sales cubes
+    - `3` — intelligence briefing
+    - `4` — people & photos
+    - `5` — real-time server dashboard (metrics refresh on each call)
+    - `6` — people Hebrew names
+    - `7` — e-commerce analytics
+    - `8` — HR & workforce
+    - `9` — logistics & shipping
+    - `10`–`13` — phone device/call/repair/market datasets
+    - any other ID — default sales cubes
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:6001
+    description: Local dev (default MOCK_PORT)
+
+tags:
+  - name: FLAPI
+    description: FLAPI-compatible package search and run endpoints (require Authorization header)
+  - name: Client
+    description: Client configuration and library listing
+  - name: Agent
+    description: Legacy Visualis agent/generate mock endpoints
+  - name: Utility
+    description: Health checks and mock SSO
+
+components:
+  securitySchemes:
+    FlapiAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Non-empty Authorization header required for FLAPI routes (any token value accepted in mock)
+
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: validation_failed
+            message:
+              type: string
+              example: Query parameter "q" is required
+            details:
+              description: Optional extra error context
+
+    PackageSearchResult:
+      type: object
+      properties:
+        Id:
+          type: integer
+          example: 1
+        Logo:
+          type: string
+          example: ''
+        Name:
+          type: string
+          example: Sample Sales Package
+        Type:
+          type: string
+          enum: [Package, Template]
+          example: Package
+
+    PackageMetadata:
+      type: object
+      properties:
+        Id:
+          type: integer
+        Name:
+          type: string
+        Purpose:
+          type: string
+        Description:
+          type: string
+        UserName:
+          type: string
+        TimedPackageCount:
+          type: integer
+        Tags:
+          type: string
+          description: JSON-encoded tag array
+        Subjects:
+          type: string
+          description: JSON-encoded subjects array
+
+    PackageRunResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: object
+          additionalProperties: true
+          description: Cube name → array of row objects (shape varies by package ID)
+
+    ConfigResponse:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+          example: http://localhost:6001
+        iframeDataEvent:
+          type: string
+          example: IFRAME_DATA
+
+    ModelInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+
+    LibraryInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [js, css, js-css]
+        files:
+          type: object
+          additionalProperties:
+            type: string
+
+    FieldExplanation:
+      type: object
+      properties:
+        fieldName:
+          type: string
+        explanation:
+          type: string
+
+    GenerateRequest:
+      type: object
+      required: [fieldExplanations, userPrompt, mainCubeName, mainCubeData]
+      properties:
+        fieldExplanations:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/FieldExplanation'
+        userPrompt:
+          type: string
+        mainCubeName:
+          type: string
+        mainCubeData:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    GenerateResponse:
+      type: object
+      required: [runId, htmlSnippet, librariesUsed]
+      properties:
+        runId:
+          type: string
+          example: run_1710000000000_abc123
+        htmlSnippet:
+          type: string
+          description: HTML with library injection and data listener applied
+        librariesUsed:
+          type: array
+          items:
+            type: string
+
+    FeedbackRequest:
+      type: object
+      required: [runId, feedback]
+      properties:
+        runId:
+          type: string
+        feedback:
+          type: string
+
+    ModelPromptRequest:
+      type: object
+      required: [userPrompt]
+      properties:
+        userPrompt:
+          type: string
+        systemPrompt:
+          type: string
+        structuredOutputPrompt:
+          type: string
+        restrictionsPrompt:
+          type: string
+
+    ModelPromptResponse:
+      type: object
+      properties:
+        response:
+          type: string
+        modelResponse:
+          type: object
+          properties:
+            id:
+              type: string
+            object:
+              type: string
+            choices:
+              type: array
+              items:
+                type: object
+
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        mock:
+          type: boolean
+          example: true
+
+paths:
+  /package/v1/search/{partial}:
+    get:
+      tags: [FLAPI]
+      summary: Search packages by partial name or numeric ID
+      security:
+        - FlapiAuth: []
+      parameters:
+        - name: partial
+          in: path
+          required: true
+          schema:
+            type: string
+          description: |
+            Autocomplete query (filters packages by name) or numeric package ID
+            (returns metadata array, empty if unknown).
+      responses:
+        '200':
+          description: Matching packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/PackageSearchResult'
+                    - $ref: '#/components/schemas/PackageMetadata'
+        '401':
+          description: Missing Authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '422':
+          description: Empty partial/query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/flapi/packages/search:
+    get:
+      tags: [FLAPI]
+      summary: Search packages (legacy alias)
+      security:
+        - FlapiAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Autocomplete query or numeric package ID
+      responses:
+        '200':
+          description: Matching packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/PackageSearchResult'
+                    - $ref: '#/components/schemas/PackageMetadata'
+        '401':
+          description: Missing Authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '422':
+          description: Missing q parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /package/{packageId}:
+    post:
+      tags: [FLAPI]
+      summary: Run package / data source (v1 path)
+      security:
+        - FlapiAuth: []
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Stub cube results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageRunResponse'
+        '400':
+          description: Invalid package ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '401':
+          description: Missing Authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /package/v3/{packageId}:
+    post:
+      tags: [FLAPI]
+      summary: Run package / data source (v3 path, used by backend)
+      security:
+        - FlapiAuth: []
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Stub cube results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageRunResponse'
+        '400':
+          description: Invalid package ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '401':
+          description: Missing Authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/flapi/packages/{packageId}/run:
+    post:
+      tags: [FLAPI]
+      summary: Run package (legacy alias)
+      security:
+        - FlapiAuth: []
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Stub cube results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageRunResponse'
+        '400':
+          description: Invalid package ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '401':
+          description: Missing Authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/flapi/package/v3/{packageId}:
+    post:
+      tags: [FLAPI]
+      summary: Run package v3 (legacy alias)
+      security:
+        - FlapiAuth: []
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Stub cube results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageRunResponse'
+        '400':
+          description: Invalid package ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '401':
+          description: Missing Authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/config:
+    get:
+      tags: [Client]
+      summary: Client configuration
+      responses:
+        '200':
+          description: Mock client config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+
+  /api/models:
+    get:
+      tags: [Client]
+      summary: Available mock models
+      responses:
+        '200':
+          description: Model list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModelInfo'
+
+  /api/libs:
+    get:
+      tags: [Client]
+      summary: Available injectable libraries
+      responses:
+        '200':
+          description: Library catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LibraryInfo'
+
+  /api/generate:
+    post:
+      tags: [Agent]
+      summary: Generate HTML snippet from cube data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateRequest'
+      responses:
+        '200':
+          description: Generated snippet stored by runId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/feedback:
+    post:
+      tags: [Agent]
+      summary: Regenerate snippet with user feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '200':
+          description: Updated snippet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateResponse'
+        '404':
+          description: Unknown runId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/model/prompt:
+    post:
+      tags: [Agent]
+      summary: Mock model prompt assembly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPromptRequest'
+      responses:
+        '200':
+          description: Assembled prompt JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelPromptResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/snippets/{runId}.html:
+    get:
+      tags: [Agent]
+      summary: Fetch stored HTML snippet by runId
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTML snippet
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Unknown runId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '422':
+          description: Missing runId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /health:
+    get:
+      tags: [Utility]
+      summary: Health check
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /sso:
+    get:
+      tags: [Utility]
+      summary: Mock SSO login page
+      description: Serves static HTML used as VITE_AUTH_PROVIDER_URL in local dev.
+      responses:
+        '200':
+          description: Mock SSO login HTML page
+          content:
+            text/html:
+              schema:
+                type: string

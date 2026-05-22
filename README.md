@@ -65,7 +65,7 @@ This launches three processes in parallel:
 | ------------------------ | ----------------------------------------- | --------------------- |
 | Backend (FastAPI)        | `uv run uvicorn flow44.main:app --reload` | http://localhost:8000 |
 | Frontend (Vite)          | `pnpm dev`                                | http://localhost:5173 |
-| Mock server (flapi-mock) | `pnpm dev`                                | http://localhost:4000 |
+| Mock server (flapi-mock) | `pnpm dev`                                | http://localhost:6001 |
 
 Or start each service individually:
 
@@ -75,7 +75,7 @@ make dev-frontend   # Vite only
 make dev-mocks      # flapi-mock only
 ```
 
-> `make dev` (and each individual target) automatically kills any processes occupying ports **4000**, **8000**, and **5173** before starting.
+> `make dev` (and each individual target) automatically kills any processes occupying ports **6001**, **8000**, and **5173** before starting.
 
 **No make:** open three separate terminals and run one command in each:
 
@@ -96,6 +96,19 @@ pnpm dev
 cd mocks/flapi-mock
 pnpm install
 pnpm dev
+```
+
+Mock API docs (Swagger UI): http://localhost:6001/docs  
+OpenAPI spec: http://localhost:6001/openapi.json
+
+See [`mocks/flapi-mock/README.md`](mocks/flapi-mock/README.md) for endpoints, stub data, env vars, and troubleshooting.
+
+The separate **model mock** (OpenAI-compatible completions for tests) is a FastAPI app under `mocks/flapi-mock/model_mock/`. Run it locally with uvicorn and browse `/docs`:
+
+```bash
+cd mocks/flapi-mock
+uv run uvicorn model_mock.app:app --reload --port 6002
+# Swagger UI: http://localhost:6002/docs
 ```
 
 ---

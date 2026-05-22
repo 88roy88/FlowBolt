@@ -5,6 +5,7 @@
  * Default baseUrl: http://localhost:6001
  */
 const baseUrl = process.argv[2] || 'http://localhost:6001';
+const flapiAuth = { Authorization: 'Bearer mock-token' };
 
 const parseBody = async (response) => {
   const text = await response.text();
@@ -16,9 +17,14 @@ const parseBody = async (response) => {
   }
 };
 
-const get = (path) => fetch(`${baseUrl}${path}`).then(async (r) => ({ status: r.status, body: parseBody(r) }));
-const post = (path, body) =>
-  fetch(`${baseUrl}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({
+const get = (path, headers = {}) =>
+  fetch(`${baseUrl}${path}`, { headers }).then(async (r) => ({ status: r.status, body: parseBody(r) }));
+const post = (path, body, headers = {}) =>
+  fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  }).then(async (r) => ({
     status: r.status,
     body: parseBody(r),
   }));
@@ -34,18 +40,31 @@ const run = async () => {
   assert(healthBody?.ok === true, 'GET /health body.ok should be true');
   console.log('GET /health OK');
 
-  const searchEmpty = await get('/api/flapi/packages/search');
+  const openapi = await get('/openapi.json');
+  assert(openapi.status === 200, `GET /openapi.json expected 200, got ${openapi.status}`);
+  const openapiBody = await openapi.body;
+  assert(typeof openapiBody?.openapi === 'string', 'GET /openapi.json must include openapi version');
+  assert(openapiBody?.paths && typeof openapiBody.paths === 'object', 'GET /openapi.json must include paths');
+  console.log('GET /openapi.json OK');
+
+  const docs = await get('/docs');
+  assert(docs.status === 200, `GET /docs expected 200, got ${docs.status}`);
+  const docsBody = await docs.body;
+  assert(typeof docsBody === 'string' && docsBody.includes('swagger'), 'GET /docs must return Swagger UI HTML');
+  console.log('GET /docs OK');
+
+  const searchEmpty = await get('/api/flapi/packages/search', flapiAuth);
   assert(searchEmpty.status === 422, `GET search without q expected 422, got ${searchEmpty.status}`);
   console.log('GET /api/flapi/packages/search 422 when q missing OK');
 
-  const search = await get('/api/flapi/packages/search?q=Sales');
+  const search = await get('/api/flapi/packages/search?q=Sales', flapiAuth);
   assert(search.status === 200, `GET search expected 200, got ${search.status}`);
   const searchBody = await search.body;
   assert(Array.isArray(searchBody), 'search must return array');
   assert(searchBody.every((p) => p.Type === 'Package'), 'search must return only Type===Package');
   console.log('GET /api/flapi/packages/search OK');
 
-  const flapi = await post('/api/flapi/packages/my-pkg/run', { param: 'value' });
+  const flapi = await post('/api/flapi/packages/my-pkg/run', { param: 'value' }, flapiAuth);
   assert(flapi.status === 200, `POST flapi run expected 200, got ${flapi.status}`);
   const flapiBody = await flapi.body;
   assert(flapiBody?.results && typeof flapiBody.results === 'object', 'flapi body must have results');
