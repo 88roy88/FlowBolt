@@ -39,15 +39,17 @@ export function EditorSidebarHeader({
     }
   };
 
+  // Close export menu when clicking outside
   useEffect(() => {
-    if (!exportMenuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (!exportMenuRef.current?.contains(e.target as Node)) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
         setExportMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    if (exportMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
   }, [exportMenuOpen]);
 
   return (

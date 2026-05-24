@@ -3,33 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useFilesStore } from '../../stores/files';
 import type { FileEntry } from '../../types';
-import { File, FileCode, FileJson, FileText as FileTextIcon, Image, Settings } from 'lucide-react';
-
-const FILE_ICON_MAP: Record<string, React.ReactElement> = {
-  json: <FileJson size={14} className="shrink-0 text-[#c9a04a]" />,
-  ts:   <FileCode size={14} className="shrink-0 text-[#5a9bcf]" />,
-  tsx:  <FileCode size={14} className="shrink-0 text-[#5a9bcf]" />,
-  js:   <FileCode size={14} className="shrink-0 text-[#c4b456]" />,
-  jsx:  <FileCode size={14} className="shrink-0 text-[#c4b456]" />,
-  css:  <FileCode size={14} className="shrink-0 text-[#6b8fd4]" />,
-  scss: <FileCode size={14} className="shrink-0 text-[#6b8fd4]" />,
-  html: <FileCode size={14} className="shrink-0 text-[#c47a5a]" />,
-  md:   <FileTextIcon size={14} className="shrink-0 text-muted-foreground" />,
-  png:  <Image size={14} className="shrink-0 text-[#7ab88a]" />,
-  jpg:  <Image size={14} className="shrink-0 text-[#7ab88a]" />,
-  svg:  <Image size={14} className="shrink-0 text-[#7ab88a]" />,
-  gif:  <Image size={14} className="shrink-0 text-[#7ab88a]" />,
-  toml: <Settings size={14} className="shrink-0 text-muted-foreground" />,
-  yaml: <Settings size={14} className="shrink-0 text-muted-foreground" />,
-  yml:  <Settings size={14} className="shrink-0 text-muted-foreground" />,
-};
-
-const DEFAULT_FILE_ICON = <File size={14} className="shrink-0 text-muted-foreground" />;
-
-function getFileIcon(name: string) {
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  return FILE_ICON_MAP[ext] ?? DEFAULT_FILE_ICON;
-}
+import { getFileIcon } from './fileTreeIcons';
 import { parentDirectory } from './fileTreePaths';
 
 interface FileTreeNodeProps {

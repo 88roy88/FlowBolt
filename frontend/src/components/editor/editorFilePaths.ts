@@ -1,21 +1,5 @@
 import type { FileEntry } from '../../types';
 
-const LANG_MAP: Record<string, string> = {
-  ts: 'typescript', tsx: 'typescript',
-  js: 'javascript', jsx: 'javascript',
-  json: 'json', html: 'html',
-  css: 'css', scss: 'scss', less: 'less',
-  md: 'markdown', py: 'python',
-  yaml: 'yaml', yml: 'yaml',
-  toml: 'toml', sh: 'shell', bash: 'shell',
-  svg: 'xml',
-};
-
-export function getEditorLanguageForPath(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase();
-  return LANG_MAP[ext ?? ''] ?? 'plaintext';
-}
-
 export function toMonacoUri(path: string) {
   const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
   return `file:///${normalized}`;

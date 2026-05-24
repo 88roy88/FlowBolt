@@ -3,9 +3,10 @@ import { useFilesStore } from '../../stores/files';
 
 export function useEditorPanelSave(
   activeFilePath: string | null,
+  updateFileContent: (path: string, content: string) => void,
+  saveFile: (path: string) => Promise<void>,
   readOnly: boolean
 ) {
-  const { updateFileContent, saveFile } = useFilesStore();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
@@ -63,5 +64,5 @@ export function useEditorPanelSave(
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [doSave, readOnly]);
 
-  return { saveStatus, handleEditorChange };
+  return { saveStatus, handleEditorChange, doSave, saveTimerRef };
 }

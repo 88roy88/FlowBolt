@@ -1,29 +1,22 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFilesStore } from '../../stores/files';
 import { X } from 'lucide-react';
-import { flattenFileTreeEntries } from './editorFilePaths';
-import { normalizePath } from './fileTreePaths';
+import { flattenFileTreeEntries, normalizeProjectPath } from './editorFilePaths';
 
 export function FileTabs() {
   const { t } = useTranslation();
   const { openFiles, fileTree, activeFilePath, setActiveFile, closeFile } = useFilesStore();
-  const paths = useMemo(() => Array.from(openFiles.keys()), [openFiles]);
-  const existingPaths = useMemo(
-    () => new Set(flattenFileTreeEntries(fileTree).map(normalizePath)),
-    [fileTree]
-  );
+  const paths = Array.from(openFiles.keys());
+  const existingPaths = new Set(flattenFileTreeEntries(fileTree).map((path) => `/${normalizeProjectPath(path)}`));
 
   if (paths.length === 0) return null;
-
-  const normalizedActive = activeFilePath ? normalizePath(activeFilePath) : null;
 
   return (
     <div className="flex overflow-auto bg-surface border-b border-border shrink-0">
       {paths.map((path) => {
-        const normalizedPath = normalizePath(path);
+        const normalizedPath = `/${normalizeProjectPath(path)}`;
         const fileName = normalizedPath.split('/').pop() ?? normalizedPath;
-        const isActive = normalizedPath === normalizedActive;
+        const isActive = normalizedPath === (activeFilePath ? `/${normalizeProjectPath(activeFilePath)}` : activeFilePath);
         const isMissing = !existingPaths.has(normalizedPath);
         return (
           <div

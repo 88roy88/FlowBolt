@@ -46,13 +46,6 @@ export function useEditorPanelQuickOpen(
     [openFile]
   );
 
-  const openQuickOpen = useCallback(() => {
-    setQuickOpenVisible(true);
-    setQuickOpenQuery('');
-    setQuickOpenSelectedIndex(0);
-    setTimeout(() => quickOpenInputRef.current?.focus(), 0);
-  }, []);
-
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
       const key = e.key?.toLowerCase?.() ?? '';
@@ -62,7 +55,10 @@ export function useEditorPanelQuickOpen(
       if (ctrlOrMeta && (key === 'p' || code === 'KeyP')) {
         e.preventDefault();
         e.stopPropagation();
-        openQuickOpen();
+        setQuickOpenVisible(true);
+        setQuickOpenQuery('');
+        setQuickOpenSelectedIndex(0);
+        setTimeout(() => quickOpenInputRef.current?.focus(), 0);
         return;
       }
 
@@ -83,7 +79,12 @@ export function useEditorPanelQuickOpen(
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [quickOpenVisible, openQuickOpen, searchInputRef, setLeftTab]);
+  }, [quickOpenVisible, searchInputRef, setLeftTab]);
+
+  useEffect(() => {
+    if (!quickOpenVisible) return;
+    setTimeout(() => quickOpenInputRef.current?.focus(), 0);
+  }, [quickOpenVisible]);
 
   useEffect(() => {
     setQuickOpenSelectedIndex((index: number) => {
@@ -131,7 +132,6 @@ export function useEditorPanelQuickOpen(
     setQuickOpenSelectedIndex,
     quickOpenInputRef,
     quickOpenResults,
-    openQuickOpen,
     openQuickOpenFile,
     handleQuickOpenKeyDown,
   };

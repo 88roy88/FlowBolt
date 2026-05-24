@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import type { Monaco, OnMount } from '@monaco-editor/react';
-import { searchFiles } from '../../services/api';
+import { searchFiles, type SearchResult } from '../../services/api';
 import { useFilesStore } from '../../stores/files';
 import { normalizeProjectPath } from './editorFilePaths';
-import { useDebounce } from '../../utils/useDebounce';
+import { ensureEditorSearchHitHighlightStyles } from './searchHighlightStyles';
 
 type StandaloneEditor = Parameters<OnMount>[0];
 
@@ -15,36 +14,83 @@ export function useEditorPanelSearch(
   monacoRef: MutableRefObject<Monaco | null>
 ) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [collapsedSearchFiles, setCollapsedSearchFiles] = useState<Set<string>>(new Set());
   const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
   const [searchWordMatch, setSearchWordMatch] = useState(false);
   const [searchUseRegex, setSearchUseRegex] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchRequestIdRef = useRef(0);
   const searchHighlightDecorationIdsRef = useRef<string[]>([]);
   const searchHighlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const revealRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const debouncedQuery = useDebounce(searchQuery, 500);
-
-  const { data: searchResults = [], isFetching: searchBusy, error, refetch } = useQuery({
-    queryKey: ['search', projectId, debouncedQuery, searchCaseSensitive, searchWordMatch, searchUseRegex],
-    queryFn: () => searchFiles(projectId!, debouncedQuery, {
-      caseSensitive: searchCaseSensitive,
-      wordMatch: searchWordMatch,
-      useRegex: searchUseRegex,
-      maxResults: 2000,
-      maxHitsPerFile: 200,
-    }),
-    enabled: !!projectId && !!debouncedQuery.trim(),
-    staleTime: 30_000,
-    gcTime: 60_000,
-    retry: false,
-  });
-
-  const searchError = error instanceof Error ? error.message : null;
+  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    ensureEditorSearchHitHighlightStyles();
+  }, []);
+
+  const performSearch = useCallback(async () => {
+    if (!projectId) return;
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+
+    const requestId = ++searchRequestIdRef.current;
+    setSearchBusy(true);
+    setSearchResults([]);
+    setSearchError(null);
     setCollapsedSearchFiles(new Set());
-  }, [debouncedQuery]);
+
+    try {
+      const results = await searchFiles(projectId, query, {
+        caseSensitive: searchCaseSensitive,
+        wordMatch: searchWordMatch,
+        useRegex: searchUseRegex,
+        maxResults: 2000,
+        maxHitsPerFile: 200,
+      });
+      if (searchRequestIdRef.current !== requestId) return;
+      setSearchResults(results);
+    } catch (err) {
+      if (searchRequestIdRef.current !== requestId) return;
+      const message = err instanceof Error ? err.message : 'Search failed';
+      setSearchError(message);
+    } finally {
+      if (searchRequestIdRef.current === requestId) setSearchBusy(false);
+    }
+  }, [searchCaseSensitive, searchWordMatch, searchUseRegex, searchQuery, projectId]);
+
+  // Auto-search with debounce when query changes
+  useEffect(() => {
+    // Clear previous timer
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
+    }
+
+    // Don't auto-search if query is empty
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+
+    // Debounce: wait 500ms after user stops typing
+    searchDebounceTimerRef.current = setTimeout(() => {
+      void performSearch();
+    }, 500);
+
+    return () => {
+      if (searchDebounceTimerRef.current) {
+        clearTimeout(searchDebounceTimerRef.current);
+      }
+    };
+  }, [searchQuery, searchCaseSensitive, searchWordMatch, searchUseRegex, projectId, performSearch]);
 
   const toggleSearchFileCollapsed = useCallback((path: string) => {
     setCollapsedSearchFiles((prev) => {
@@ -57,10 +103,8 @@ export function useEditorPanelSearch(
 
   const jumpToSearchHit = useCallback(
     (path: string, line: number, column: number) => {
-      const highlightLength = Math.max(1, debouncedQuery.trim().length);
+      const highlightLength = Math.max(1, searchQuery.trim().length);
       const normalizedTargetPath = normalizeProjectPath(path);
-
-      if (revealRetryTimerRef.current) clearTimeout(revealRetryTimerRef.current);
 
       const tryReveal = (attempt: number) => {
         const editor = editorRef.current;
@@ -71,7 +115,7 @@ export function useEditorPanelSearch(
 
         if (!editor || !m || !model || normalizedActivePath !== normalizedTargetPath) {
           if (attempt < 12) {
-            revealRetryTimerRef.current = setTimeout(() => tryReveal(attempt + 1), 40);
+            setTimeout(() => tryReveal(attempt + 1), 40);
           }
           return;
         }
@@ -93,16 +137,24 @@ export function useEditorPanelSearch(
           [
             {
               range: new m.Range(safeLine, safeColumn, safeLine, endColumn),
-              options: { inlineClassName: 'editor-search-hit-highlight-inline', isWholeLine: false },
+              options: {
+                inlineClassName: 'editor-search-hit-highlight-inline',
+                isWholeLine: false,
+              },
             },
             {
               range: new m.Range(safeLine, 1, safeLine, lineMaxColumn),
-              options: { className: 'editor-search-hit-highlight-line', isWholeLine: true },
+              options: {
+                className: 'editor-search-hit-highlight-line',
+                isWholeLine: true,
+              },
             },
           ]
         );
 
-        if (searchHighlightClearTimerRef.current) clearTimeout(searchHighlightClearTimerRef.current);
+        if (searchHighlightClearTimerRef.current) {
+          clearTimeout(searchHighlightClearTimerRef.current);
+        }
         searchHighlightClearTimerRef.current = setTimeout(() => {
           const activeEditor = editorRef.current;
           if (!activeEditor) return;
@@ -116,10 +168,11 @@ export function useEditorPanelSearch(
       void openFile(path, line, column);
       tryReveal(0);
     },
-    [openFile, debouncedQuery, editorRef, monacoRef]
+    [openFile, searchQuery, editorRef, monacoRef]
   );
 
   return {
+    searchInputRef,
     searchQuery,
     setSearchQuery,
     searchBusy,
@@ -132,7 +185,7 @@ export function useEditorPanelSearch(
     setSearchWordMatch,
     searchUseRegex,
     setSearchUseRegex,
-    performSearch: refetch,
+    performSearch,
     toggleSearchFileCollapsed,
     jumpToSearchHit,
   };

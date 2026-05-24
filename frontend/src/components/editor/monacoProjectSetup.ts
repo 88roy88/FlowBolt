@@ -13,20 +13,22 @@ import {
 } from './monacoAmbientTypes';
 
 let monacoTypeLibDisposables: Array<{ dispose(): void }> = [];
-let definitionProviderDisposable: { dispose(): void } | null = null;
+let monacoImportDefinitionProviderInitialized = false;
 
-export function installMonacoProjectTypes(
-  monaco: Monaco,
-  getIndexedFilePaths: () => Set<string>,
-  openFile: (path: string, line?: number, col?: number) => Promise<void>,
-): void {
+/**
+ * Configures TS/JS defaults, injects ambient libs, and registers the import definition provider once.
+ * Call from Monaco `beforeMount` with a getter so indexed paths stay current.
+ */
+export function installMonacoProjectTypes(monaco: Monaco, getIndexedFilePaths: () => Set<string>): void {
   try {
     const tsDefaults = monaco.languages.typescript.typescriptDefaults;
     const jsDefaults = monaco.languages.typescript.javascriptDefaults;
 
     const sharedCompilerOptions: Parameters<typeof tsDefaults.setCompilerOptions>[0] = {
+      // Mirror frontend/tsconfig.app.json so Monaco diagnostics match the real build.
       target: monaco.languages.typescript.ScriptTarget.ES2020,
       module: monaco.languages.typescript.ModuleKind.ESNext,
+      // Monaco's TS worker is more stable with NodeJs resolution for virtual models.
       moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
       jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
       allowJs: true,
@@ -44,13 +46,23 @@ export function installMonacoProjectTypes(
     tsDefaults.setCompilerOptions(sharedCompilerOptions);
     jsDefaults.setCompilerOptions(sharedCompilerOptions);
 
-    tsDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false });
-    jsDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false });
+    tsDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+    });
+
+    jsDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+    });
+
     tsDefaults.setEagerModelSync(true);
     jsDefaults.setEagerModelSync(true);
 
     const reactTypes = getMonacoReactViteAmbientSource();
 
+    // Refresh Monaco extra libs on each mount to avoid stale worker cache
+    // holding old ambient declarations between project/editor reloads.
     for (const disposable of monacoTypeLibDisposables) {
       disposable.dispose();
     }
@@ -59,38 +71,37 @@ export function installMonacoProjectTypes(
       jsDefaults.addExtraLib(reactTypes, MONACO_REACT_VITE_JS_DTS_URI),
     ];
 
-    const makeProvider = () => ({
-      async provideDefinition(model: editor.ITextModel, position: IPosition) {
-        const word = model.getWordAtPosition(position);
-        if (!word?.word) return null;
+    if (!monacoImportDefinitionProviderInitialized) {
+      const definitionProvider = {
+        provideDefinition(model: editor.ITextModel, position: IPosition) {
+          const word = model.getWordAtPosition(position);
+          if (!word?.word) return null;
 
-        const importPath = findImportedModuleForSymbol(model.getValue(), word.word);
-        if (!importPath) return null;
+          const importPath = findImportedModuleForSymbol(model.getValue(), word.word);
+          if (!importPath) return null;
 
-        const currentPath = normalizeProjectPath(decodeURIComponent(model.uri.path));
-        const targetPath = resolveRelativeImportPath(currentPath, importPath, getIndexedFilePaths());
-        if (!targetPath) return null;
+          const currentPath = normalizeProjectPath(decodeURIComponent(model.uri.path));
+          const targetPath = resolveRelativeImportPath(currentPath, importPath, getIndexedFilePaths());
+          if (!targetPath) return null;
 
-        await openFile(targetPath);
-        return {
-          uri: monaco.Uri.parse(toMonacoUri(targetPath)),
-          range: new monaco.Range(1, 1, 1, 1),
-        };
-      },
-    });
+          const uri = monaco.Uri.parse(toMonacoUri(targetPath));
+          return {
+            uri,
+            range: new monaco.Range(1, 1, 1, 1),
+          };
+        },
+      };
 
-    definitionProviderDisposable?.dispose();
-    definitionProviderDisposable = monaco.languages.registerDefinitionProvider(
-      ['typescript', 'javascript'],
-      makeProvider(),
-    );
+      monaco.languages.registerDefinitionProvider('typescript', definitionProvider);
+      monaco.languages.registerDefinitionProvider('javascript', definitionProvider);
+      monacoImportDefinitionProviderInitialized = true;
+    }
   } catch (err) {
     console.error('Monaco types init failed, will retry on next mount:', err);
     for (const disposable of monacoTypeLibDisposables) {
       disposable.dispose();
     }
     monacoTypeLibDisposables = [];
-    definitionProviderDisposable?.dispose();
-    definitionProviderDisposable = null;
+    monacoImportDefinitionProviderInitialized = false;
   }
 }
