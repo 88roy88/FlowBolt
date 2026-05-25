@@ -16,7 +16,6 @@ from flow44.db.project import get_project as db_get_project
 logger = logging.getLogger(__name__)
 
 _DECODE_OPTIONS = {
-    "verify_signature": False,
     "verify_exp": False,
     "verify_nbf": False,
     "verify_iat": False,
@@ -54,7 +53,7 @@ def extract_user_id(token: str | None) -> str:
         try:
             decoded = jwt.decode(
                 token,
-                "",
+                settings.AUTH_JWT_PUBLIC_KEY,
                 algorithms=[settings.AUTH_JWT_ALGORITHM],
                 options=cast(Options, _DECODE_OPTIONS),
             )

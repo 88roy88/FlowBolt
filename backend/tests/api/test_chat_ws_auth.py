@@ -105,7 +105,7 @@ def test_auth_missing_token_rejected_when_required():
          patch("flow44.api.auth.settings") as mock_settings:
 
         mock_settings.AUTH_REQUIRE_JWT = True
-        mock_settings.AUTH_JWT_SECRET = "some-secret"  # noqa: S105
+        mock_settings.AUTH_JWT_PUBLIC_KEY = "some-secret"  # noqa: S105
 
         try:
             with client.websocket_connect("/ws/chat/proj-123") as ws:

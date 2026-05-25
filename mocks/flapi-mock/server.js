@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -13,6 +14,50 @@ app.use(express.json({ limit: '10mb', strict: false }));
 const PORT = Number(process.env.MOCK_PORT) || 6001;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const IFRAME_DATA_EVENT = process.env.IFRAME_DATA_EVENT || 'IFRAME_DATA';
+
+// Dev RSA private key for signing JWT tokens (RS256).
+// The corresponding public key goes in AIB_AUTH_JWT_PUBLIC_KEY in the backend .env.
+// Override with MOCK_JWT_PRIVATE_KEY env var for non-dev environments.
+const DEV_JWT_PRIVATE_KEY = process.env.MOCK_JWT_PRIVATE_KEY ||
+`-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDmuU+ys5zolViz
+qOoOLOPEM6qKw1O2zvLDrp17LN70fPcILlqLG8+ucCJG85TvlxHo9BjNe08wKxl+
+V+YguAkF88CVFzvIXbXUkFjq70irorck3tw3KEfv0Zbp0MxnKog1cx5rzh5CYHBt
+AoeCrAVAX6EG0gZ9UoBqlGIFtAARxgUVUWNDasfhzICI8vAei0oc/4Br3/0TUt7e
+brSk0UBnWIn/ui8ubWjQQ1NApsUTLNdu6l63Z/ORSfyNq49UM6lbEXGwQjjt1WVv
+kllQue6zNffSbcRAPmUONs0MxRWajbd6uJCMOFqaGvtFuHbo3wOLpaRm/oafOxuk
++Z2munZPAgMBAAECggEAAXjnQEp5hgzSuK34QftMjMddOQhCc+Uukv8XQPgqIadD
+SeMTb6KcZaf2uaGUrrhPd4wVm6IQzeVIgvZ7bac4letWeRBH4/rTgTXwMbeX+bho
+SmAkFmbRM3+Qr5DfudZn17RFwNLBsKy+EVDPao8Mc+4bfSUNjSX5bQF7ZD8gADA4
+yxYCWEtbFW0m6Tu+VRLMfiIsnwfAiPlKm6J4J06eCTa+MX17AR6KOWYe7eWfGDme
+b3BPvLajw1+AGtY7Mtqbvl+PQhdOPoCdqdKC81cyuJ68YrofbY7dohYl+Wpg7ytQ
+QyKHif8NO0RPOBhxpe13ZbF2jeyPCUTSWQXTObRWYQKBgQD39hLhpqaR52U0J7jY
+09NwLYSHrs3vAzdXDM6G8tJFMFG3F/yQoYQRt7C8VZx+l5QUZHfFBlN/VoQFlCDc
+TBTic2ZWY25Q6IG/EPCSu4+Wft2I4W4GYukHs9jMtUgWHPEVzZG9gGWRJi1DYNkF
+FZrx+wpCcP+6qZlx47D0pApafwKBgQDuNC2Xlhf3Th+XzifeuBb/7he1haBW1NXh
+HXwRrGHRFIOykEfoIXPXrzHKseVOiN8+iXCIqKV8bK+DMeYCjwh/DNLggMKPny8Q
+fhyWzaMFrQaloPx2rv9sr5bk0TZDtz8y2RviBy0+ykcKCorhYDwIxlEJ8Sa7qNUy
+HT62xAbcMQKBgQDXxVz22TLXghlSAkLbA7FZS3KpM1bmZtEQQgex7LlHFd31yryw
+CqzHUiZMLN9qVXK5MBf87h1YkKt/wz+5E8eUqsDh6dJEO58z6YS+2tH/LtSOWUSJ
+8CZB2qGMuS9KdtLfmyv4UDOR1DvNBwiyYPOdIEv0NyqBfzYUogMJT3nm9wKBgQDG
+iuUpgShOsGYy4NlokSZSgcBvQ4bGeTYgIbRFAtqxK5kt34af3CozL0qgOTD5CaqR
+9HrA3Vi54dlUz+V4YoHha+3kxE3m6faPl536sEHePD7bFNj5j5lEnQJ3jE3fmUBr
+AH12Iyc6O92EaA8kFVNUuP/Y+pCfP/UbhTa9nZxeMQKBgQDIepUV+2LblsC7CIae
+2N1drFIDvYYJz0h+fJEMO6rNen2JbDm10SbHChyaKT1/RX5KqdiUrKgT/MmquxyT
+3HZCzITfN1nbtE4791So44Ccj6lbRYJzY7N3AOgRcBYaBLSqsgPe+1uYymhUXRQl
+8+TyOXMa9uhwS4VHilRUZ7Tjmg==
+-----END PRIVATE KEY-----`;
+
+const _jwtBase64url = (obj) =>
+  Buffer.from(JSON.stringify(obj)).toString('base64url');
+
+const signJwt = (claims) => {
+  const header = _jwtBase64url({ alg: 'RS256', typ: 'JWT' });
+  const payload = _jwtBase64url(claims);
+  const data = `${header}.${payload}`;
+  const sig = crypto.createSign('SHA256').update(data).sign(DEV_JWT_PRIVATE_KEY, 'base64url');
+  return `${data}.${sig}`;
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -524,6 +569,28 @@ app.get('/health', (_req, res) => {
 // Mock SSO endpoint
 app.get('/sso', (_req, res) => {
   res.sendFile(path.join(publicRoot, 'sso-login.html'));
+});
+
+// Issues a signed JWT for the mock SSO login form
+app.post('/sso/token', (req, res) => {
+  const { uniqueId, givenName, surname, expiresInSeconds, issuer } = req.body ?? {};
+  if (!uniqueId?.trim()) {
+    return res.status(422).json({ error: 'uniqueId is required' });
+  }
+  const claimPrefix = 'https://issuer.example/v1/claims/';
+  const expSeconds = Number.isFinite(Number(expiresInSeconds)) ? Number(expiresInSeconds) : 3600;
+  const claims = {
+    exp: Math.floor(Date.now() / 1000) + expSeconds,
+    iss: issuer?.trim() || 'flapi-mock',
+    [claimPrefix + 'UniqueID']: uniqueId.trim(),
+  };
+  if (givenName?.trim()) claims[claimPrefix + 'givenname'] = givenName.trim();
+  if (surname?.trim()) claims[claimPrefix + 'surname'] = surname.trim();
+  try {
+    res.json({ token: signJwt(claims), claims });
+  } catch {
+    res.status(500).json({ error: 'Failed to sign token' });
+  }
 });
 
 app.listen(PORT, () => {
