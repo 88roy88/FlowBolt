@@ -62,7 +62,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
 `;
 
 /** Minimal replay so ClassicLayout leaves "new project" mode and shows Preview/Code. */
-export const CHAT_SEED_EVENTS = [{ type: 'user_message', content: 'E2E bootstrap' }];
+export const CHAT_SEED_EVENTS = [
+  { type: 'user_message', content: 'E2E bootstrap' },
+  { type: 'text', content: 'Initial assistant response' },
+  { type: 'action_complete' },
+];
 
 /** Path keys without leading slash — matches API ?path= after normalization. */
 export const MOCK_FILE_CONTENTS: Record<string, string> = {

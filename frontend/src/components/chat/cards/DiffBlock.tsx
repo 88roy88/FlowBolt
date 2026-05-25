@@ -33,10 +33,10 @@ export function DiffBlock({ fileDiff }: { fileDiff: FileDiff }) {
             let bgClass = '';
             let textClass = 'text-muted-foreground';
             if (line.startsWith('+') && !line.startsWith('+++')) {
-              bgClass = 'bg-[var(--diff-add-bg)]';
+              bgClass = 'bg-diff-add-bg';
               textClass = 'text-diff-add';
             } else if (line.startsWith('-') && !line.startsWith('---')) {
-              bgClass = 'bg-[var(--diff-remove-bg)]';
+              bgClass = 'bg-diff-remove-bg';
               textClass = 'text-diff-remove';
             } else if (line.startsWith('@@')) {
               textClass = 'text-primary';

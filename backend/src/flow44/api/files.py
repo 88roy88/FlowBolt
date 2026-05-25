@@ -1,10 +1,11 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from flow44.api.deps import SandboxDep
 from flow44.sandbox.main import PnpmSandbox
+from flow44.sandbox.search_mixin import SearchToolError
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 
@@ -12,6 +13,16 @@ router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 class WriteFileRequest(BaseModel):
     path: str
     content: str
+
+
+class CreateFileRequest(BaseModel):
+    path: str
+    content: str = ""
+
+
+class RenamePathRequest(BaseModel):
+    old_path: str
+    new_path: str
 
 
 class SearchRequest(BaseModel):
@@ -48,7 +59,7 @@ async def get_file_tree(sandbox: Annotated[PnpmSandbox, SandboxDep]) -> list[dic
         raise HTTPException(status_code=404, detail=str(exc)) from None
 
 
-@router.get("/content")
+@router.get("/file/content")
 async def get_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
     try:
         content = await sandbox.read_file(path)
@@ -59,13 +70,65 @@ async def get_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], path: st
         raise HTTPException(status_code=403, detail=str(exc)) from None
 
 
-@router.put("/content")
+@router.put("/file/content")
 async def put_file_content(sandbox: Annotated[PnpmSandbox, SandboxDep], body: WriteFileRequest) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
         return {"status": "ok", "path": body.path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+
+
+@router.post("/file")
+async def post_create_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: CreateFileRequest) -> dict[str, str]:
+    try:
+        await sandbox.create_file(body.path, body.content)
+        return {"status": "ok", "path": body.path}
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+
+
+@router.patch("/file")
+async def patch_rename_file(sandbox: Annotated[PnpmSandbox, SandboxDep], body: RenamePathRequest) -> dict[str, str]:
+    try:
+        await sandbox.rename_file(body.old_path, body.new_path)
+        return {"status": "ok", "old_path": body.old_path, "new_path": body.new_path}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+
+
+@router.delete("/file")
+async def delete_entry(sandbox: Annotated[PnpmSandbox, SandboxDep], path: str = Query(...)) -> dict[str, str]:
+    try:
+        await sandbox.delete_file(path)
+        return {"status": "ok", "path": path}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+    except OSError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+
+
+@router.post("/file/upload")
+async def post_upload_entry(
+    sandbox: Annotated[PnpmSandbox, SandboxDep],
+    path: str = Query(...),
+    body: bytes = Body(...),
+) -> dict[str, str]:
+    try:
+        await sandbox.write_binary_file(path, body)
+        return {"status": "ok", "path": path}
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
 
@@ -81,6 +144,8 @@ async def get_grep(
         matches = await sandbox.grep(pattern, path, file_pattern)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
+    except SearchToolError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
     return {"matches": [{"file": m.file, "line": m.line, "content": m.content} for m in matches]}
 
 
@@ -125,3 +190,5 @@ async def post_search(sandbox: Annotated[PnpmSandbox, SandboxDep], body: SearchR
         )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
+    except SearchToolError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None

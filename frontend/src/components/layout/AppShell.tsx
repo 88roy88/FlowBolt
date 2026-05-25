@@ -117,10 +117,14 @@ export function AppShell() {
 
   // Project colors + initials for icon rail
   const PROJECT_COLORS = [
-    'bg-[#89b4fa]/20 text-[#89b4fa]', 'bg-[#a6e3a1]/20 text-[#a6e3a1]',
-    'bg-[#f9e2af]/20 text-[#f9e2af]', 'bg-[#cba6f7]/20 text-[#cba6f7]',
-    'bg-[#f38ba8]/20 text-[#f38ba8]', 'bg-[#94e2d5]/20 text-[#94e2d5]',
-    'bg-[#fab387]/20 text-[#fab387]', 'bg-[#74c7ec]/20 text-[#74c7ec]',
+    'bg-primary/20 text-primary',
+    'bg-success/20 text-success',
+    'bg-warning/20 text-warning',
+    'bg-project-purple/20 text-project-purple',
+    'bg-destructive/20 text-destructive',
+    'bg-project-teal/20 text-project-teal',
+    'bg-project-peach/20 text-project-peach',
+    'bg-project-sky/20 text-project-sky',
   ];
 
   function getColor(name: string) {
@@ -145,7 +149,7 @@ export function AppShell() {
   const IconRail = () => (
     <div className="flex flex-col items-center h-full py-2 gap-1">
       <button onClick={() => setSidebarPinned(true)} title={t('sidebar.expandSidebar')} className="mb-1 shrink-0">
-        <FlowLogo size={18} className="text-[#2bbcc4]" />
+        <FlowLogo size={18} className="text-brand" />
       </button>
       <div className="w-8 h-px bg-border shrink-0" />
       <div className="flex-1 flex flex-col items-center gap-1.5 py-1 overflow-hidden">

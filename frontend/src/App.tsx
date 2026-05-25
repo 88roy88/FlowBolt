@@ -178,7 +178,7 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
         <FlowBrand size="lg" />
-        <Loader2 size={20} className="animate-spin text-[#2bbcc4]" />
+        <Loader2 size={20} className="animate-spin text-brand" />
       </div>
     );
   }

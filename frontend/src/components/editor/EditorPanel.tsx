@@ -6,6 +6,7 @@ import * as monaco from 'monaco-editor';
 loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
+import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
@@ -41,6 +42,15 @@ export function EditorPanel() {
     openFile,
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
+  const buildCompleted = useChatStore((s) => s.buildCompleted);
+  const isStreaming = useChatStore((s) => s.isStreaming);
+  const agentPhase = useChatStore((s) => s.agentPhase);
+  const aiFlowActive = isStreaming || agentPhase !== 'idle';
+  const readOnlyUntilInitialBuildComplete = !buildCompleted;
+  const editorReadOnly = readOnlyUntilInitialBuildComplete || aiFlowActive;
+  const readOnlyMessage = readOnlyUntilInitialBuildComplete
+    ? t('editor.readOnlyUntilFirstAiResponse')
+    : t('editor.readOnlyWhileAiWorking');
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
@@ -53,7 +63,12 @@ export function EditorPanel() {
   );
 
   const editorTheme = useEditorPanelTheme();
-  const { saveStatus, handleEditorChange } = useEditorPanelSave(activeFilePath, updateFileContent, saveFile);
+  const { saveStatus, handleEditorChange } = useEditorPanelSave(
+    activeFilePath,
+    updateFileContent,
+    saveFile,
+    editorReadOnly
+  );
 
   useEditorPendingReveal(
     editorRef,
@@ -164,7 +179,7 @@ export function EditorPanel() {
 
         {leftTab === 'files' ? (
           <div style={{ flex: 1, overflow: 'auto' }}>
-            <FileTree />
+            <FileTree readOnly={editorReadOnly} readOnlyMessage={readOnlyMessage} />
           </div>
         ) : (
           <EditorSearchPanel
@@ -208,9 +223,14 @@ export function EditorPanel() {
                 </>
               ) : (
                 <>
-                  <Check size={10} className="text-green-400" /> {t('editor.saved')}
+                  <Check size={10} className="text-success" /> {t('editor.saved')}
                 </>
               )}
+            </div>
+          )}
+          {editorReadOnly && (
+            <div className="px-3 text-[11px] text-muted-foreground shrink-0">
+              {readOnlyMessage}
             </div>
           )}
         </div>
@@ -225,7 +245,7 @@ export function EditorPanel() {
               onChange={handleEditorChange}
               beforeMount={handleBeforeMount}
               onMount={handleMonacoEditorMount}
-              options={EDITOR_MONACO_OPTIONS}
+              options={{ ...EDITOR_MONACO_OPTIONS, readOnly: editorReadOnly }}
             />
           </div>
         ) : (
