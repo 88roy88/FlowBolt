@@ -47,14 +47,25 @@ export function PromptInput() {
   const disabled = isBusy || !projectId;
   const canSend = !!value.trim() && !disabled;
 
-  // Global keyboard shortcut: Cmd+K or / to focus
+  // Global keyboard shortcut: Cmd+K or / to focus chat (skip when typing in editor/preview)
   useEffect(() => {
+    const isTypingElsewhere = (e: KeyboardEvent) => {
+      const el = (e.target instanceof HTMLElement ? e.target : null)
+        ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      if (!el) return false;
+      const tag = el.tagName;
+      if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'IFRAME') return true;
+      if (el.isContentEditable) return true;
+      return !!el.closest('.monaco-editor');
+    };
+
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         textareaRef.current?.focus();
+        return;
       }
-      if (e.key === '/' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT') {
+      if (e.key === '/' && !isTypingElsewhere(e)) {
         e.preventDefault();
         textareaRef.current?.focus();
       }
