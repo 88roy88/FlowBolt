@@ -1,5 +1,7 @@
 """Tests for FileSystemMixin — all real I/O, no mocks."""
 
+import os
+
 import pytest
 
 from .conftest import DummySandbox
@@ -129,6 +131,8 @@ class TestPathTraversal:
 
     async def test_symlink_escape_blocked(self, sandbox: DummySandbox, tmp_path) -> None:  # type: ignore[type-arg]
         """Test that symlinks pointing outside workspace are blocked."""
+        if os.name == "nt":
+            pytest.skip("Creating symlinks requires elevated privileges on Windows")
         # Create a symlink pointing outside the workspace
         outside_file = tmp_path.parent / "outside.txt"
         outside_file.write_text("sensitive data")

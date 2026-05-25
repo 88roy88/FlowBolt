@@ -11,6 +11,7 @@ from flow44.api.sandbox import get_sandbox
 from flow44.main import app
 from flow44.sandbox.base import BaseSandbox, SandboxInfo
 from flow44.sandbox.filesystem_mixin import FileSystemMixin
+from flow44.sandbox.search_mixin import GrepMatch, SearchToolError
 
 PROJECT_ID = "test-project-files-api"
 
@@ -131,5 +132,46 @@ def test_upload_entry_writes_binary_and_conflict(tmp_path: Path) -> None:
             headers={"Content-Type": "application/octet-stream"},
         )
         assert conflict_response.status_code == 409
+    finally:
+        app.dependency_overrides.pop(get_sandbox, None)
+
+
+def test_search_entry_returns_matches(tmp_path: Path) -> None:
+    class SearchSandbox(APITestSandbox):
+        async def grep(self, *args, **kwargs):  # type: ignore[override]  # noqa: ANN002, ANN003
+            return [GrepMatch(file="/src/types.ts", line=1, column=18, content="export interface Todo {")]
+
+    info = SandboxInfo(project_id=PROJECT_ID, workspace_dir=str(tmp_path), port=0)
+    sandbox = SearchSandbox(info)
+    app.dependency_overrides[get_sandbox] = lambda project_id: sandbox
+    try:
+        response = client.post(
+            f"/api/files/{PROJECT_ID}/search",
+            json={"query": "Todo", "case_sensitive": False, "word_match": False, "use_regex": False, "max_results": 100},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["results"]
+        assert payload["results"][0]["path"] == "/src/types.ts"
+        assert payload["results"][0]["hits"][0]["preview"] == "export interface Todo {"
+    finally:
+        app.dependency_overrides.pop(get_sandbox, None)
+
+
+def test_search_entry_returns_503_when_search_tool_is_unavailable(tmp_path: Path) -> None:
+    class SearchUnavailableSandbox(APITestSandbox):
+        async def grep(self, *args, **kwargs):  # type: ignore[override]  # noqa: ANN002, ANN003
+            raise SearchToolError("ripgrep (rg) is required for search but was not found in PATH")
+
+    info = SandboxInfo(project_id=PROJECT_ID, workspace_dir=str(tmp_path), port=0)
+    sandbox = SearchUnavailableSandbox(info)
+    app.dependency_overrides[get_sandbox] = lambda project_id: sandbox
+    try:
+        response = client.post(
+            f"/api/files/{PROJECT_ID}/search",
+            json={"query": "Todo", "case_sensitive": False, "word_match": False, "use_regex": False, "max_results": 100},
+        )
+        assert response.status_code == 503
+        assert "ripgrep (rg) is required for search" in response.json()["detail"]
     finally:
         app.dependency_overrides.pop(get_sandbox, None)

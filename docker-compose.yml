@@ -15,17 +15,6 @@ x-minio-shared: &minio-shared
   S3_BUCKET_NAME: &s3-bucket flow44
 
 services:
-  frontend:
-    build:
-      context: ./frontend
-    expose:
-      - "80"
-    networks:
-      - internal
-    depends_on:
-      - backend
-    restart: unless-stopped
-
   backend:
     build:
       context: ./backend
@@ -61,7 +50,9 @@ services:
       start_period: 5s
       retries: 3
     networks:
-      - internal
+      internal:
+        aliases:
+          - base-backend.base
     depends_on:
       - postgres
       - minio
@@ -83,14 +74,14 @@ services:
       - internal
     restart: unless-stopped
 
-  nginx:
-    image: nginx:alpine
+  frontend:
+    build: ./frontend
+    user: root
     ports:
       - "8888:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - frontend
       - backend
     networks:
       - internal
