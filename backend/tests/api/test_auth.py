@@ -62,6 +62,8 @@ def test_no_token_no_require_returns_anonymous(mock_settings):
 @patch("flow44.api.auth.settings")
 def test_jwt_url_unique_id_claim_returned(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-123"})
     assert extract_user_id(token) == "user-123"
 
@@ -69,6 +71,8 @@ def test_jwt_url_unique_id_claim_returned(mock_settings):
 @patch("flow44.api.auth.settings")
 def test_jwt_first_matching_url_claim_wins(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     token = _make_jwt(
         {
             "https://other.example/claims/UniqueID": "first",
@@ -90,8 +94,10 @@ def test_jwt_missing_unique_id_claim_raises_when_required(mock_settings):
 
 @patch("flow44.api.auth.settings")
 def test_jwt_expired_still_extracts_when_exp_verification_disabled(mock_settings):
-    """Unsigned decode skips exp check; claim still readable."""
+    """Decode skips exp check; claim still readable on signed-but-expired token."""
     mock_settings.AUTH_REQUIRE_JWT = True
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     token = _make_jwt(
         {
             CLAIM_UNIQUE_ID_URL: "user-x",
@@ -128,6 +134,8 @@ def test_jwt_no_unique_id_no_require_returns_raw_token(mock_settings):
 @patch("flow44.api.auth.settings")
 def test_jwt_valid_claim_no_require_returns_uid(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     token = _make_jwt({CLAIM_UNIQUE_ID_URL: "dev-user"})
     assert extract_user_id(token) == "dev-user"
 
@@ -141,8 +149,10 @@ def test_jwt_malformed_no_require_returns_raw_string(mock_settings):
 
 @patch("flow44.api.auth.settings")
 def test_jwt_require_true_accepts_unsigned_payload_with_claim(mock_settings):
-    """Parse-only mode: HS256 token verifies without secret when claim present."""
+    """Signed HS256 token with claim returns uid under strict mode."""
     mock_settings.AUTH_REQUIRE_JWT = True
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     forged = _make_jwt({CLAIM_UNIQUE_ID_URL: "parsed-user"})
     assert _jwt_shaped(forged)
     assert extract_user_id(forged) == "parsed-user"

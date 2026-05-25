@@ -63,8 +63,8 @@ class SearchIndexSettings(Flow44BaseSettings):
 
 
 class AuthSettings(Flow44BaseSettings):
-    # JWT public key or secret for token validation (optional - if not set, only checks structure/expiry)
-    AUTH_JWT_PUBLIC_KEY: str | None = None
+    # JWT public key or HMAC secret used to verify token signatures (required)
+    AUTH_JWT_PUBLIC_KEY: str
     # JWT algorithm (default: HS256 for HMAC, use RS256 for RSA)
     AUTH_JWT_ALGORITHM: str = "RS256"
     # Require JWT format (vs allowing opaque tokens)
