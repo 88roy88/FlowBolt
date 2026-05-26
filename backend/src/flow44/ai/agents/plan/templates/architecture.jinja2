@@ -26,7 +26,7 @@ Rules:
 - All file paths are relative to the project root (e.g. src/App.tsx)
 - Include only the files that need to be created or modified
 - **CRITICAL**: ONLY use the pre-installed packages (react, react-dom, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss). Do NOT suggest adding other packages or dependencies. All functionality must be implemented using built-in browser APIs and these pre-configured packages only unless listed packages that are allowed.
-- **Multi-page / navigation**: include `src/pages/*` in `file_structure`. Flow44 installs `react-router-dom` and router infrastructure automatically
+- **Multi-page / navigation**: include `src/pages/*` in `file_structure`. Flow44 installs `react-router-dom`; follow `ROUTING.md` and `src/platform/routerBasename.ts` for basename
 
 {% if data_source_contexts %}
 

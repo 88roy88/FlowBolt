@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -6,7 +7,7 @@ from abc import ABC
 from pydantic import BaseModel
 
 from flow44.config import settings
-from flow44.paths import preview_base_path, sandbox_path_env, set_index_base_href
+from flow44.paths import sandbox_path_env
 from flow44.sandbox.base import BaseSandbox
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,6 @@ class BuildCommandResult(BaseModel):
 
 
 class PnpmMixin(BaseSandbox, ABC):
-    _ROUTING_STUB_DIR = "routing-stub"
-
     # TODO: change to configure_npmrc
     def configure_npmrc(self) -> None:
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
@@ -43,7 +42,6 @@ class PnpmMixin(BaseSandbox, ABC):
             template_dir,
             self.workspace_dir,
             dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns(self._ROUTING_STUB_DIR),
         )
 
         self._stamp_vite_config(template_dir)
@@ -53,23 +51,22 @@ class PnpmMixin(BaseSandbox, ABC):
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
 
-    def _has_client_routing(self) -> bool:
-        router_file = os.path.join(self.workspace_dir, "src", "router", "AppRouter.tsx")
-        return os.path.isfile(router_file)
+    def _has_react_router_dom(self) -> bool:
+        pkg_path = os.path.join(self.workspace_dir, "package.json")
+        if not os.path.isfile(pkg_path):
+            return False
+        with open(pkg_path, encoding="utf-8") as handle:
+            pkg = json.load(handle)
+        return "react-router-dom" in pkg.get("dependencies", {})
 
     async def enable_client_routing(self, template_dir: str) -> None:
-        """Install react-router-dom and copy the fixed AppRouter stub into the workspace."""
-        if self._has_client_routing():
+        """Install react-router-dom when the app plan requires client-side routing."""
+        del template_dir  # routing files are owned by the template / AI generator
+        if self._has_react_router_dom():
             return
 
         async for line in self.exec("pnpm add react-router-dom 2>&1"):
             logger.info("[routing] %s", line.rstrip())
-
-        stub_src = os.path.join(template_dir, self._ROUTING_STUB_DIR)
-        dest = os.path.join(self.workspace_dir, "src", "router")
-        os.makedirs(dest, exist_ok=True)
-        for name in os.listdir(stub_src):
-            shutil.copy2(os.path.join(stub_src, name), os.path.join(dest, name))
 
     def _stamp_vite_config(self, template_dir: str) -> None:
         template_path = os.path.join(template_dir, "vite.config.ts")
@@ -98,7 +95,6 @@ class PnpmMixin(BaseSandbox, ABC):
             handle.write(self._apply_vite_config_stamps(content))
 
     def _configure_preview_paths(self) -> None:
-        set_index_base_href(self.workspace_dir, preview_base_path(self.project_id))
         self._write_sandbox_env_file(".env.local")
 
     def _write_sandbox_env_file(self, filename: str) -> None:

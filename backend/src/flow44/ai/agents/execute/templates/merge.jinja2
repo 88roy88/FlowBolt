@@ -41,12 +41,12 @@ Rules:
 - Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS) Optional to install react-router-dom
 - Do NOT include tasks for installing dependencies or running the dev server
 - Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
-- Do NOT include `src/main.tsx`, `vite.config.ts`, `index.html`, `src/router/AppRouter.tsx`, or `src/utils/routerBasename.ts` in task files — they are pre-configured
+- Do NOT include `src/main.tsx`, `vite.config.ts`, `index.html`, or `src/platform/routerBasename.ts` in task files — they are pre-configured
 - Set `"uses_routing": true` when the app has multiple pages, navigation, or a navbar with links between pages
 - When `"uses_routing": true`:
   - Create tasks for `src/pages/*`, `src/components/Navbar.tsx`, and a final `src/App.tsx` wiring task
-  - Flow44 installs `react-router-dom` and `src/router/AppRouter.tsx` automatically — do NOT recreate router infrastructure
-  - Final App.tsx task must use `AppRouter`, `Routes`, `Route`, `Link`, and lazy-load secondary pages with `React.lazy` + `Suspense`
+  - Flow44 installs `react-router-dom` only — implement routing per `ROUTING.md` using `getRouterBasename()` from `src/platform/routerBasename.ts`
+  - Final App.tsx task must use `BrowserRouter` (or `createBrowserRouter`) with `basename={getRouterBasename()}`, plus `Routes`, `Route`, `Link`, and lazy-load secondary pages with `React.lazy` + `Suspense`
 - When `"uses_routing": false`: single-page app in `App.tsx` only — no `src/pages/` tasks
 {% if has_data_sources %}
 

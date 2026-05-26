@@ -95,8 +95,12 @@ class TestPromptRendering:
             ux_design={},
             uses_routing=True,
         )
-        assert "AppRouter" in result
+        assert "BrowserRouter" in result
+        assert "getRouterBasename" in result
+        assert "src/platform/routerBasename" in result
+        assert "ROUTING.md" in result
         assert "react-router-dom" in result
+        assert "flowbolt" not in result.lower()
         assert "lazy(() => import" in result
         assert "Suspense" in result
         assert '<a href="/' in result or "never `<a href=\"/…\">`" in result or 'never `<a href="/' in result

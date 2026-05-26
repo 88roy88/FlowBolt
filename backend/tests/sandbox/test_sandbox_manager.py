@@ -84,26 +84,37 @@ class TestSandboxManagerLifecycle:
 
 
 class TestStampViteConfig:
-    def test_replaces_placeholder(self, tmp_path) -> None:  # type: ignore[type-arg]
+    def test_replaces_auth_placeholders(self, tmp_path) -> None:  # type: ignore[type-arg]
         template_dir = tmp_path / "template"
         template_dir.mkdir()
-        (template_dir / "vite.config.ts").write_text("base: '/{{PROJECT_ID}}/'")
+        template_content = (
+            "base: env.VITE_PUBLIC_BASE_PATH,\n"
+            "auth: '{{AUTH_PROVIDER_URL}}' {{AUTH_STORAGE_KEY}} {{AUTH_USE_IFRAME}}"
+        )
+        (template_dir / "vite.config.ts").write_text(template_content)
 
         workspace_dir = tmp_path / "workspace"
         workspace_dir.mkdir()
-        (workspace_dir / "vite.config.ts").write_text("base: '/{{PROJECT_ID}}/'")
+        (workspace_dir / "vite.config.ts").write_text(template_content)
 
         sandbox = DummySandbox(SandboxInfo(project_id="abc123", workspace_dir=str(workspace_dir), port=0))
-        sandbox._stamp_vite_config(str(template_dir))
+        with patch("flow44.sandbox.pnpm_mixin.settings") as mock_settings:
+            mock_settings.SANDBOX_AUTH_PROVIDER_URL = "http://auth.example/sso"
+            mock_settings.SANDBOX_AUTH_STORAGE_KEY = "TestAuth"
+            mock_settings.SANDBOX_AUTH_USE_IFRAME = False
+            sandbox._stamp_vite_config(str(template_dir))
 
         result = (workspace_dir / "vite.config.ts").read_text()
-        assert "abc123" in result
-        assert "{{PROJECT_ID}}" not in result
+        assert "http://auth.example/sso" in result
+        assert "TestAuth" in result
+        assert "false" in result
+        assert "{{AUTH_PROVIDER_URL}}" not in result
+        assert "VITE_PUBLIC_BASE_PATH" in result
 
     def test_leaves_other_content_unchanged(self, tmp_path) -> None:  # type: ignore[type-arg]
         template_dir = tmp_path / "template"
         template_dir.mkdir()
-        content = "export default { base: '/{{PROJECT_ID}}/', plugins: [] }"
+        content = "export default { base: env.VITE_PUBLIC_BASE_PATH, plugins: [] }"
         (template_dir / "vite.config.ts").write_text(content)
 
         workspace_dir = tmp_path / "workspace"
@@ -115,4 +126,4 @@ class TestStampViteConfig:
 
         result = (workspace_dir / "vite.config.ts").read_text()
         assert "plugins: []" in result
-        assert "proj42" in result
+        assert "VITE_PUBLIC_BASE_PATH" in result

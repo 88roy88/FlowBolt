@@ -93,14 +93,15 @@ Rules:
 4. Write clean, production-quality code with modern, polished UI/UX.
 5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/config.ts`, or `src/main.tsx`.
 {% if uses_routing %}
-6. **Multi-page app**: `react-router-dom` is installed. Do NOT overwrite `src/router/AppRouter.tsx` or `src/utils/routerBasename.ts`.
-7. Import `Routes`, `Route`, `Link`, `NavLink`, `useNavigate`, and lazy-load helpers from `react` / `react-router-dom` only.
-8. Wire `App.tsx` like this pattern (lazy-load secondary pages):
+6. **Multi-page app**: `react-router-dom` is installed. Follow `ROUTING.md` in the project root.
+7. Do NOT overwrite `src/platform/routerBasename.ts`. Use `getRouterBasename()` from `./platform/routerBasename` for every router `basename`.
+8. Import `Routes`, `Route`, `Link`, `NavLink`, `useNavigate`, and lazy-load helpers from `react` / `react-router-dom` only.
+9. Wire `App.tsx` with `BrowserRouter basename={getRouterBasename()}` (or `createBrowserRouter` with the same basename). Example:
 
 ```tsx
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
-import { AppRouter } from './router/AppRouter';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { getRouterBasename } from './platform/routerBasename';
 import HomePage from './pages/HomePage';
 import Navbar from './components/Navbar';
 
@@ -108,7 +109,7 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 
 export default function App() {
   return (
-    <AppRouter>
+    <BrowserRouter basename={getRouterBasename()}>
       <Navbar />
       <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading…</div>}>
         <Routes>
@@ -116,18 +117,19 @@ export default function App() {
           <Route path="/about" element={<AboutPage />} />
         </Routes>
       </Suspense>
-    </AppRouter>
+    </BrowserRouter>
   );
 }
 ```
 
-9. Route paths are app-relative: `/`, `/about`. Use `<Link to="/about">` — never `<a href="/…">`.
-10. Lazy-load pages beyond the home route with `lazy(() => import('./pages/…'))` wrapped in `<Suspense>`.
-11. Do NOT edit `vite.config.ts`, `index.html`, or env files.
+10. Route paths are app-relative: `/`, `/about`. Use `<Link to="/about">` — never `<a href="/…">`.
+11. Do not hardcode `/api/preview/...` or `/api/export/...`. Do not add `<base href>` to `index.html`.
+12. Lazy-load pages beyond the home route with `lazy(() => import('./pages/…'))` wrapped in `<Suspense>`.
+13. Do NOT edit `vite.config.ts`, `index.html`, `src/platform/routerBasename.ts`, or env files.
 {% else %}
 6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, react-router-dom, etc.).
 7. Single-page app only — do NOT create `src/pages/` or navigation/routing.
-8. Do NOT edit `src/router/*` or `src/utils/routerBasename.ts`.
+8. Do NOT edit `src/platform/routerBasename.ts` unless changing platform support.
 {% endif %}
 {% if uses_routing %}
 12. Import from already-completed files using their exact export names.

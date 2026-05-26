@@ -1,4 +1,4 @@
-"""Tests for optional react-router scaffolding in PnpmMixin."""
+"""Tests for optional react-router package install in PnpmMixin."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 import pytest
 
 from flow44.config import settings
+from flow44.paths import export_published_base_path, preview_base_path
 from flow44.sandbox.base import SandboxInfo
 from flow44.sandbox.pnpm_mixin import PnpmMixin
 
@@ -59,19 +60,44 @@ def template_workspace(tmp_path):  # type: ignore[type-arg]
     return str(template_dir), str(workspace_dir)
 
 
+def _read_env_file(workspace_dir: str, filename: str) -> dict[str, str]:
+    env_path = os.path.join(workspace_dir, filename)
+    assert os.path.isfile(env_path)
+    result: dict[str, str] = {}
+    with open(env_path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            result[key] = value
+    return result
+
+
 class TestPnpmRouting:
     @pytest.mark.asyncio
-    async def test_scaffold_skips_routing_stub(self, template_workspace) -> None:
+    async def test_scaffold_includes_platform_router_basename(self, template_workspace) -> None:
         template_dir, workspace_dir = template_workspace
         sandbox = RoutingTestSandbox(workspace_dir, template_dir)
         await sandbox.scaffold(template_dir)
 
-        assert not os.path.isdir(os.path.join(workspace_dir, "routing-stub"))
-        assert os.path.isfile(os.path.join(workspace_dir, "src", "utils", "routerBasename.ts"))
-        assert not os.path.isfile(os.path.join(workspace_dir, "src", "router", "AppRouter.tsx"))
+        assert not os.path.isdir(os.path.join(workspace_dir, "flowbolt-stub"))
+        assert not os.path.isdir(os.path.join(workspace_dir, "platform-stub"))
+        basename_file = os.path.join(workspace_dir, "src", "platform", "routerBasename.ts")
+        assert os.path.isfile(basename_file)
+        assert not os.path.isfile(os.path.join(workspace_dir, "src", "platform", "AppRouter.tsx"))
+        assert not os.path.isdir(os.path.join(workspace_dir, "src", "flowbolt"))
+
+        with open(basename_file, encoding="utf-8") as handle:
+            content = handle.read()
+        assert "BASE_URL" in content
+        assert "flowbolt" not in content.lower()
+
+        env = _read_env_file(workspace_dir, ".env.local")
+        assert env["VITE_PUBLIC_BASE_PATH"] == preview_base_path("routing-test")
 
     @pytest.mark.asyncio
-    async def test_enable_client_routing_installs_and_copies(self, template_workspace) -> None:
+    async def test_enable_client_routing_installs_only_package(self, template_workspace) -> None:
         template_dir, workspace_dir = template_workspace
         sandbox = RoutingTestSandbox(workspace_dir, template_dir)
         await sandbox.scaffold(template_dir)
@@ -79,12 +105,7 @@ class TestPnpmRouting:
         await sandbox.enable_client_routing(template_dir)
 
         assert any("pnpm add react-router-dom" in cmd for cmd in sandbox.exec_commands)
-        router_file = os.path.join(workspace_dir, "src", "router", "AppRouter.tsx")
-        assert os.path.isfile(router_file)
-        with open(router_file, encoding="utf-8") as handle:
-            content = handle.read()
-        assert "BrowserRouter" in content
-        assert "getRouterBasename" in content
+        assert not os.path.isfile(os.path.join(workspace_dir, "src", "platform", "AppRouter.tsx"))
 
         with open(os.path.join(workspace_dir, "package.json"), encoding="utf-8") as handle:
             pkg = json.load(handle)
@@ -101,3 +122,19 @@ class TestPnpmRouting:
 
         add_commands = [cmd for cmd in sandbox.exec_commands if "pnpm add react-router-dom" in cmd]
         assert len(add_commands) == 1
+
+
+class TestSandboxEnv:
+    @pytest.mark.asyncio
+    async def test_scaffold_writes_preview_env_local(self, template_workspace) -> None:
+        template_dir, workspace_dir = template_workspace
+        sandbox = RoutingTestSandbox(workspace_dir, template_dir)
+        await sandbox.scaffold(template_dir)
+
+        env = _read_env_file(workspace_dir, ".env.local")
+        assert env["VITE_PUBLIC_BASE_PATH"] == preview_base_path("routing-test")
+        assert "VITE_API_BASE" in env
+
+    def test_publish_env_values(self) -> None:
+        project_id = "routing-test"
+        assert export_published_base_path(project_id) == "/api/export/routing-test/published/"

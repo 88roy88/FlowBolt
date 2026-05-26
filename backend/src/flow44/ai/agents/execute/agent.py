@@ -25,6 +25,7 @@ from flow44.ai.state import BuildState
 from flow44.config import settings
 from flow44.db.project import update_project_summary
 from flow44.sandbox.main import PnpmSandbox
+from flow44.template_guard import is_protected_workspace_path, load_protected_file_paths
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,6 @@ MAX_FIX_ATTEMPTS = 2
 
 class ExecuteAgent(BaseAgent):
     """Receives an approved plan and executes it using Flow orchestration."""
-
-    _ROUTING_GUARD_FILES = ("src/router/AppRouter.tsx", "src/utils/routerBasename.ts")
 
     def __init__(
         self,
@@ -48,6 +47,7 @@ class ExecuteAgent(BaseAgent):
         super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
         self._build_state = state
         self._flow = self._build_flow()
+        self._protected_paths = frozenset(load_protected_file_paths(settings.TEMPLATE_DIR))
 
     def _build_flow(self) -> Flow[ExecutionState]:
         """Build the execution flow with explicit steps and routing."""
@@ -154,8 +154,7 @@ class ExecuteAgent(BaseAgent):
             state.build_state.completed_files = dict(state.build_state.generated_data_source_files)
             state.build_state.task_files = {}
 
-            if state.build_state.work_plan.uses_routing:
-                await self._seed_routing_files(state)
+            await self._seed_platform_files(state)
 
             for layer in state.build_state.work_plan.execution_layers():
                 await asyncio.gather(*[self._execute_task(t, state) for t in layer])
@@ -204,6 +203,8 @@ class ExecuteAgent(BaseAgent):
             parser.flush()
 
             for path, content in generated:
+                if is_protected_workspace_path(path, self._protected_paths):
+                    continue
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
                 await state.emit_fn({"type": "file", "path": path, "content": content})
@@ -222,7 +223,11 @@ class ExecuteAgent(BaseAgent):
                 {
                     "user_request": state.build_state.user_content,
                     "architecture": state.build_state.architecture.model_dump(),
-                    "files_created": list(state.build_state.completed_files.keys()),
+                    "files_created": [
+                        path
+                        for path in state.build_state.completed_files
+                        if not is_protected_workspace_path(path, self._protected_paths)
+                    ],
                 },
                 indent=2,
             )
@@ -328,8 +333,8 @@ class ExecuteAgent(BaseAgent):
 
             dep_files = {p: c for p, c in state.build_state.completed_files.items() if p in dep_paths} or None
             if state.build_state.work_plan.uses_routing:
-                routing_files = self._routing_dependency_files(state)
-                dep_files = {**(dep_files or {}), **routing_files}
+                platform_files = self._platform_dependency_files(state)
+                dep_files = {**(dep_files or {}), **platform_files}
 
             prompt = render_codegen(
                 task_title=task.title,
@@ -338,7 +343,11 @@ class ExecuteAgent(BaseAgent):
                 architecture=state.build_state.work_plan.architecture.model_dump(),
                 ux_design=state.build_state.work_plan.ux_design.model_dump(),
                 dependency_files=dep_files,
-                other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
+                other_completed_files={
+                    p: c
+                    for p, c in state.build_state.completed_files.items()
+                    if p not in dep_paths and not is_protected_workspace_path(p, self._protected_paths)
+                }
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
                 uses_routing=state.build_state.work_plan.uses_routing,
@@ -358,6 +367,8 @@ class ExecuteAgent(BaseAgent):
 
             paths: list[str] = []
             for path, content in generated:
+                if is_protected_workspace_path(path, self._protected_paths):
+                    continue
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
                 paths.append(path)
@@ -375,15 +386,17 @@ class ExecuteAgent(BaseAgent):
         finally:
             span.end()
 
-    async def _seed_routing_files(self, state: ExecutionState) -> None:
-        for path in self._ROUTING_GUARD_FILES:
+    async def _seed_platform_files(self, state: ExecutionState) -> None:
+        """Seed template platform support files for fix context; not recorded in task_files."""
+        for path in self._protected_paths:
             content = await state.sandbox_ref.read_file(path)
             state.build_state.completed_files[path] = content
 
-    def _routing_dependency_files(self, state: ExecutionState) -> dict[str, str]:
+    def _platform_dependency_files(self, state: ExecutionState) -> dict[str, str]:
+        """Expose platform helpers to routing codegen tasks as read-only dependencies."""
         return {
             path: state.build_state.completed_files[path]
-            for path in self._ROUTING_GUARD_FILES
+            for path in self._protected_paths
             if path in state.build_state.completed_files
         }
 

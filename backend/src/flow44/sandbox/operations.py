@@ -10,10 +10,7 @@ from langfuse.decorators import observe
 
 from flow44.config import settings
 from flow44.paths import (
-    export_published_base_path,
-    preview_base_path,
-    sandbox_path_env,
-    set_index_base_href,
+    sandbox_public_base_env,
     strip_export_published_prefix,
 )
 from flow44.sandbox.manager import sandbox_manager
@@ -129,11 +126,13 @@ async def build_dist(project_id: str) -> str:
 
     workspace_dir = sandbox.workspace_dir
     env_file = os.path.join(workspace_dir, ".env.production.local")
-    set_index_base_href(workspace_dir, export_published_base_path(project_id))
     if hasattr(sandbox, "refresh_vite_config_stamps"):
         sandbox.refresh_vite_config_stamps()
     try:
-        env_vars = sandbox_path_env(project_id, api_base_url=settings.EXPORT_API_BASE_URL)
+        env_vars = {
+            **sandbox_public_base_env(project_id, "publish"),
+            "VITE_API_BASE": settings.EXPORT_API_BASE_URL,
+        }
         env_lines = [f"{key}={value}" for key, value in env_vars.items()]
         with open(env_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             f.write("\n".join(env_lines) + "\n")
@@ -143,7 +142,6 @@ async def build_dist(project_id: str) -> str:
             build_output_lines.append(line)
         build_output = "".join(build_output_lines)
     finally:
-        set_index_base_href(workspace_dir, preview_base_path(project_id))
         try:
             os.remove(env_file)
         except OSError:
