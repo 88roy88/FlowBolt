@@ -14,12 +14,13 @@ from fastapi.responses import Response
 
 from flow44.api.deps import SandboxDep
 from flow44.db.project import get_project
+from flow44.paths import EXPORT_API_PREFIX
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.operations import BuildError, build_single_html
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/export/{project_id}", tags=["export"])
+router = APIRouter(prefix=f"{EXPORT_API_PREFIX}/{{project_id}}", tags=["export"])
 
 EXCLUDED_DIRS = {"node_modules", ".git", "dist", ".cache"}
 
