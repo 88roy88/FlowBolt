@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { FileEntry } from '../types';
 import * as api from '../services/api';
 import { useSessionStore } from './session';
+import { queryClient } from '../lib/queryClient';
 
 interface FilesState {
   loadedProjectId: string | null;
@@ -144,7 +145,10 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
     try {
-      const content = await api.fetchFileContent(projectId, normalizedPath);
+      const content = await queryClient.fetchQuery({
+        queryKey: ['file', projectId, normalizedPath],
+        queryFn: () => api.fetchFileContent(projectId, normalizedPath),
+      });
       set((s) => {
         const next = new Map(s.openFiles);
         next.set(normalizedPath, content);
@@ -200,11 +204,18 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       next.set(normalizedPath, content);
       return { openFiles: next };
     });
+    const projectId = useSessionStore.getState().projectId;
+    if (projectId) {
+      queryClient.setQueryData(['file', projectId, normalizedPath], content);
+    }
   },
 
   async refreshOpenFiles() {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
+    // Mark all project files stale without triggering background refetches;
+    // each open file is re-fetched directly below.
+    void queryClient.invalidateQueries({ queryKey: ['file', projectId], refetchType: 'none' });
     const openFiles = get().openFiles;
     for (const path of openFiles.keys()) {
       try {
