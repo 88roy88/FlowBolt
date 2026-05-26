@@ -90,4 +90,22 @@ test.describe('Happy path', () => {
     await expect(page.getByRole('button', { name: /dashboard/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /landing page/i })).toBeVisible();
   });
+
+  test('unknown project id in url redirects to home', async ({ page }) => {
+    const projectsList = page.waitForResponse(
+      (r) => r.request().method() === 'GET' && isProjectsListGet(r.url()) && r.ok(),
+      { timeout: 60_000 }
+    );
+    await page.goto('/#/project/unknown-project-id-404', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    await projectsList;
+
+    await expect
+      .poll(() => page.evaluate(() => window.location.hash))
+      .toMatch(new RegExp(`^#/project/${MOCK_PROJECT.id}$`));
+
+    await expect(page.getByText(MOCK_PROJECT.name)).toBeAttached({ timeout: 30_000 });
+  });
 });
