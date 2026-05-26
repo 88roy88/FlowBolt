@@ -17,6 +17,7 @@ import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { getProjectIdFromHash, isKnownProjectId } from '../../utils/projectRoute';
 
 const SIDEBAR_WIDTH = 280;
 const BOTTOM_MIN = 120;
@@ -91,10 +92,14 @@ export function AppShell() {
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
 
-  // Use cache to determine layout before history loads to prevent flicker
-  // Read project ID from URL hash immediately (don't wait for currentProject to be set)
-  const urlProjectId = window.location.hash.match(/^#\/project\/(.+)$/)?.[1];
-  const projectIdForCache = currentProject?.id || urlProjectId;
+  // Use cache to determine layout before history loads to prevent flicker.
+  // Only trust hash ids that exist in the loaded project list (ignore unknown ids).
+  const urlProjectId = getProjectIdFromHash();
+  const urlProjectIsKnown = urlProjectId
+    ? isKnownProjectId(urlProjectId, projects)
+    : false;
+  const projectIdForCache = currentProject?.id
+    ?? (urlProjectIsKnown ? urlProjectId : null);
   const cachedHasMessages = projectIdForCache ? getProjectHasMessages(projectIdForCache) : null;
 
   const isNewProject = historyLoaded

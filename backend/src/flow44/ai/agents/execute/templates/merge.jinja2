@@ -11,6 +11,7 @@ Respond with ONLY a JSON object:
 
 {
   "summary": "A 1-2 sentence human-readable summary of what will be built",
+  "uses_routing": false,
   "tasks": [
     {
       "id": "task-1",
@@ -37,9 +38,17 @@ Rules:
 - Component tasks depend on their type definitions
 - The final App.tsx integration task depends on all component tasks
 - Keep the total number of tasks reasonable (3-10 for most projects)
-- Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS)
+- Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS) Optional to install react-router-dom
 - Do NOT include tasks for installing dependencies or running the dev server
 - Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
+- Do NOT include `src/main.tsx`, `src/constants/buildInfo.ts`, or `src/components/BuildInfoBadge.tsx` in task files — the build version badge is mounted globally in `main.tsx`
+- Do NOT include `ROUTER_GUIDE.md`, `vite.config.ts`, `index.html`, `src/router/AppRouter.tsx`, or `src/utils/routerBasename.ts` in task files — they are pre-configured
+- Set `"uses_routing": true` when the app has multiple pages, navigation, or a navbar with links between pages
+- When `"uses_routing": true`:
+  - Create tasks for `src/pages/*`, `src/components/Navbar.tsx`, and a final `src/App.tsx` wiring task
+  - Flow44 installs `react-router-dom` and `src/router/AppRouter.tsx` automatically — do NOT recreate router infrastructure
+  - Final App.tsx task description must say: use `AppRouter`, `Routes`, `Route`, and `Link` from `react-router-dom`
+- When `"uses_routing": false`: single-page app in `App.tsx` only — no `src/pages/` tasks
 {% if has_data_sources %}
 
 ## Data Source Integration — Pre-Generated Files

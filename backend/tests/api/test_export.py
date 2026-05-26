@@ -155,3 +155,65 @@ async def test_proxy_published_app_not_found():
         response = client.get(f"/api/export/{project_id}/published")
         assert response.status_code == 404
         assert response.json()["detail"] == "Published app not found or not published yet."
+
+
+@pytest.mark.asyncio
+async def test_proxy_published_asset_basic():
+    project_id = "published-proj"
+    mock_project = AsyncMock()
+    mock_project.published_url = "http://s3.local/my-bucket/published/published-proj/index.html"
+
+    with patch("flow44.api.publish.get_project", return_value=mock_project):
+        with patch(
+            "flow44.api.publish.published_object_url",
+            side_effect=lambda pid, rel: f"http://s3.local/my-bucket/published/{pid}/{rel.lstrip('/')}",
+        ):
+            with patch("httpx.AsyncClient.get") as mock_get:
+                mock_resp = AsyncMock()
+                mock_resp.status_code = 200
+                mock_resp.content = b"console.log('ok')"
+                mock_resp.headers = {"content-type": "application/javascript"}
+                mock_resp.raise_for_status = lambda: None
+                mock_get.return_value = mock_resp
+
+                response = client.get(f"/api/export/{project_id}/published/assets/main.js")
+
+                assert response.status_code == 200
+                assert response.content == b"console.log('ok')"
+                mock_get.assert_called_once_with(
+                    "http://s3.local/my-bucket/published/published-proj/assets/main.js",
+                    timeout=15.0,
+                )
+
+
+@pytest.mark.asyncio
+async def test_proxy_published_spa_route_fallback():
+    project_id = "published-proj"
+    mock_project = AsyncMock()
+    mock_project.published_url = "http://s3.local/my-bucket/published/published-proj/index.html"
+
+    with patch("flow44.api.publish.get_project", return_value=mock_project):
+        with patch(
+            "flow44.api.publish.published_object_url",
+            side_effect=lambda pid, rel: f"http://s3.local/my-bucket/published/{pid}/{rel.lstrip('/')}",
+        ):
+            with patch("httpx.AsyncClient.get") as mock_get:
+                index_resp = AsyncMock()
+                index_resp.status_code = 200
+                index_resp.text = "<html><body>App</body></html>"
+                index_resp.headers = {}
+                index_resp.raise_for_status = lambda: None
+
+                async def _get(url: str, timeout: float) -> AsyncMock:
+                    if url.endswith("/about"):
+                        raise Exception("S3 object not found")
+                    if url.endswith("/index.html"):
+                        return index_resp
+                    raise AssertionError(f"unexpected url: {url}")
+
+                mock_get.side_effect = _get
+
+                response = client.get(f"/api/export/{project_id}/published/about")
+
+                assert response.status_code == 200
+                assert response.text == "<html><body>App</body></html>"

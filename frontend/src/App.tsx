@@ -13,11 +13,13 @@ import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
 import { getAppName } from './utils/easterEgg';
-
-function getProjectIdFromHash(): string | null {
-  const match = window.location.hash.match(/^#\/project\/(.+)$/);
-  return match ? match[1] : null;
-}
+import { clearProjectCaches } from './utils/projectCache';
+import {
+  getProjectIdFromHash,
+  goToAppHome,
+  isKnownProjectId,
+  resolveRouteAction,
+} from './utils/projectRoute';
 
 function hasProjectsCache(): boolean {
   try {
@@ -53,7 +55,7 @@ initializeTheme();
 
 export default function App() {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
+  const { projects, setCurrentProject, loadProjects, createProject } = useSessionStore();
   const loadHistory = useChatStore((s) => s.loadHistory);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
   const resetFiles = useFilesStore((s) => s.reset);
@@ -97,7 +99,15 @@ export default function App() {
   useEffect(() => {
     loadProjects()
       .then(() => {
-        const hasProjects = useSessionStore.getState().projects.length > 0;
+        const hashProjectId = getProjectIdFromHash();
+        const loaded = useSessionStore.getState().projects;
+        // Clearing app storage does not clear the URL hash — fix stale #/project/... here.
+        if (hashProjectId && !isKnownProjectId(hashProjectId, loaded)) {
+          goToAppHome();
+          return;
+        }
+        const hasProjects = loaded.length > 0;
+        if (!hasProjects) clearProjectCaches();
         setHasProjectsCache(hasProjects);
       })
       .catch((error) => {
@@ -110,38 +120,47 @@ export default function App() {
       .finally(() => setLoading(false));
   }, [loadProjects, t]);
 
-  // On load: match URL hash to a project, or auto-select first
-  useEffect(() => {
-    if (loading || projects.length === 0) {
-      if (!loading && projects.length === 0) {
-        setShowNewProject(true);
-        setHasProjectsCache(false); // Clear cache if no projects
-      }
-      return;
-    }
-    if (currentProject) return;
-
+  const syncRouteFromUrl = useCallback(() => {
     const hashProjectId = getProjectIdFromHash();
-    const match = hashProjectId
-      ? projects.find((p) => p.id === hashProjectId)
-      : null;
-    const target = match ?? projects[0];
-    selectProject(target);
-  }, [loading, projects, currentProject, selectProject]);
+    const { projects: loadedProjects, currentProject } = useSessionStore.getState();
+    const action = resolveRouteAction({
+      hashProjectId,
+      projects: loadedProjects,
+      loading,
+      currentProjectId: currentProject?.id ?? null,
+    });
 
-  // Listen for hash changes (back/forward)
+    switch (action.type) {
+      case 'redirect_home':
+        goToAppHome();
+        return;
+      case 'show_empty_state':
+        setShowNewProject(true);
+        setHasProjectsCache(false);
+        return;
+      case 'select_project':
+        setShowNewProject(false);
+        selectProject(action.project);
+        return;
+      case 'none':
+        if (!loading && loadedProjects.length > 0) {
+          setShowNewProject(false);
+        }
+        return;
+    }
+  }, [loading, selectProject]);
+
+  useEffect(() => {
+    syncRouteFromUrl();
+  }, [syncRouteFromUrl, projects]);
+
   useEffect(() => {
     function onHashChange() {
-      const hashProjectId = getProjectIdFromHash();
-      if (!hashProjectId) return;
-      const match = projects.find((p) => p.id === hashProjectId);
-      if (match && match.id !== currentProject?.id) {
-        selectProject(match);
-      }
+      syncRouteFromUrl();
     }
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, [projects, currentProject, selectProject]);
+  }, [syncRouteFromUrl]);
 
   // Auto-recover state when network comes back online
   useEffect(() => {

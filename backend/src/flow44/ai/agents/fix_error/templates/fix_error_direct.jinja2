@@ -42,4 +42,8 @@ Rules:
 3. Do NOT refactor unrelated code
 4. Output complete file contents, not patches
 5. Do NOT include shell actions
+{% if has_react_router %}
+6. `react-router-dom` is installed — use it for routing fixes. Do NOT replace with custom router code.
+{% else %}
 6. **CRITICAL**: Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS). Do NOT import other npm packages.
+{% endif %}

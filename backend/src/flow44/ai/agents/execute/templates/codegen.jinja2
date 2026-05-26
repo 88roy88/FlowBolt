@@ -47,6 +47,7 @@ Sample data structure:
 When implementing components that use data source data:
 - **IMPORTANT**: Import the pre-built hooks — do NOT create custom fetch logic or hooks for data sources.
 - `src/auth/` and `src/config.ts` are pre-existing — do NOT create or modify them.
+- `src/constants/buildInfo.ts` and `src/components/BuildInfoBadge.tsx` are pre-configured — do NOT create or modify them. The build version badge is mounted globally in `src/main.tsx`; do NOT add or remove it from `App.tsx`.
 - Include proper loading and error states using the hook's `isLoading` and `error` fields.
 - Transform the data as needed for display.
 {% endif %}
@@ -91,7 +92,43 @@ Rules:
 2. Use TypeScript, React 18+, and Tailwind CSS v3.
 3. Tailwind CSS is pre-configured - use utility classes extensively for styling.
 4. Write clean, production-quality code with modern, polished UI/UX.
-5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/config.ts` or `src/main.tsx` — they are pre-configured.
-6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
-7. Import from already-completed files using their exact export names.
-8. Do NOT include shell actions — only file actions.
+5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/config.ts`, `src/main.tsx`, `src/constants/buildInfo.ts`, or `src/components/BuildInfoBadge.tsx`. The build version badge lives in `main.tsx`; never wire it through `App.tsx`.
+{% if uses_routing %}
+6. **Multi-page app**: `react-router-dom` is installed. Do NOT overwrite `src/router/AppRouter.tsx` or `src/utils/routerBasename.ts`.
+7. Import `Routes`, `Route`, `Link`, `NavLink`, and `useNavigate` from `react-router-dom` only.
+8. Wire `App.tsx` exactly like this pattern:
+
+```tsx
+import { Routes, Route, Link } from 'react-router-dom';
+import { AppRouter } from './router/AppRouter';
+import HomePage from './pages/HomePage';
+import AboutPage from './pages/AboutPage';
+import Navbar from './components/Navbar';
+
+export default function App() {
+  return (
+    <AppRouter>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/about" element={<AboutPage />} />
+      </Routes>
+    </AppRouter>
+  );
+}
+```
+
+9. Route paths are app-relative: `/`, `/about`. Use `<Link to="/about">` — never `<a href="/…">`.
+10. Do NOT edit `vite.config.ts`, `index.html`, or env files.
+{% else %}
+6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, react-router-dom, etc.).
+7. Single-page app only — do NOT create `src/pages/` or navigation/routing.
+8. Do NOT edit `src/router/*` or `src/utils/routerBasename.ts`.
+{% endif %}
+{% if uses_routing %}
+11. Import from already-completed files using their exact export names.
+12. Do NOT include shell actions — only file actions.
+{% else %}
+9. Import from already-completed files using their exact export names.
+10. Do NOT include shell actions — only file actions.
+{% endif %}

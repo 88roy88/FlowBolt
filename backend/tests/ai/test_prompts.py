@@ -83,6 +83,27 @@ class TestPromptRendering:
         assert "Create Header" in result
         assert "src/Header.tsx" in result
         assert "flowArtifact" in result
+        assert "Single-page app only" in result
+        assert "AppRouter" not in result
+
+    def test_codegen_with_routing(self) -> None:
+        result = render_codegen(
+            task_title="Wire App routes",
+            task_description="Connect pages with react-router-dom",
+            task_files=["src/App.tsx"],
+            architecture={},
+            ux_design={},
+            uses_routing=True,
+        )
+        assert "AppRouter" in result
+        assert "react-router-dom" in result
+        assert "RouterProvider" not in result
+        assert '<a href="/' in result or "never `<a href=\"/…\">`" in result or 'never `<a href="/' in result
+
+    def test_merge_includes_uses_routing(self) -> None:
+        result = render_merge(has_data_sources=False)
+        assert "uses_routing" in result
+        assert "react-router-dom" in result
 
     def test_codegen_with_dependencies(self) -> None:
         result = render_codegen(

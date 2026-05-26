@@ -7,6 +7,7 @@ import base64
 
 import pytest
 
+from flow44.paths import export_published_base_path
 from flow44.sandbox.operations import (
     _inline_css_assets,
     _inline_favicon,
@@ -35,6 +36,15 @@ class TestResolveAssetPath:
         result = _resolve_asset_path(str(dist), "/assets/chunk.js")
         assert result is not None
         assert "chunk.js" in result
+
+    def test_export_prefixed_path(self, tmp_path) -> None:  # type: ignore[type-arg]
+        dist = tmp_path / "dist"
+        (dist / "assets").mkdir(parents=True)
+        (dist / "assets" / "index.js").write_text("console.log('ok')")
+        href = f"{export_published_base_path('proj-123')}assets/index.js"
+        result = _resolve_asset_path(str(dist), href)
+        assert result is not None
+        assert result.endswith("assets/index.js")
 
 
 class TestInlineCssAssets:
