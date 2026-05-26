@@ -9,6 +9,7 @@ from langfuse.decorators import langfuse_context, observe
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
+from flow44.ai.agents.execute.routing_detection import detect_uses_routing
 from flow44.ai.agents.execute.prompts import (
     SUMMARY_PROMPT,
     render_codegen,
@@ -21,6 +22,7 @@ from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
 from flow44.ai.state import BuildState
+from flow44.config import settings
 from flow44.db.project import update_project_summary
 from flow44.sandbox.main import PnpmSandbox
 
@@ -31,6 +33,8 @@ MAX_FIX_ATTEMPTS = 2
 
 class ExecuteAgent(BaseAgent):
     """Receives an approved plan and executes it using Flow orchestration."""
+
+    _ROUTING_GUARD_FILES = ("src/router/AppRouter.tsx", "src/utils/routerBasename.ts")
 
     def __init__(
         self,
@@ -150,6 +154,9 @@ class ExecuteAgent(BaseAgent):
             state.build_state.completed_files = dict(state.build_state.generated_data_source_files)
             state.build_state.task_files = {}
 
+            if state.build_state.work_plan.uses_routing:
+                await self._seed_routing_files(state)
+
             for layer in state.build_state.work_plan.execution_layers():
                 await asyncio.gather(*[self._execute_task(t, state) for t in layer])
         finally:
@@ -178,7 +185,11 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
+        prompt = render_fix_errors(
+            errors=state.all_errors,
+            files=state.build_state.completed_files,
+            has_react_router=state.build_state.work_plan.uses_routing if state.build_state.work_plan else False,
+        )
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
@@ -278,12 +289,21 @@ class ExecuteAgent(BaseAgent):
             for t in plan_data.get("tasks", [])
         ]
 
+        uses_routing = detect_uses_routing(
+            state.build_state.user_content,
+            plan_data,
+            architecture_file_structure=state.build_state.architecture.file_structure,
+        )
+        if uses_routing:
+            await state.sandbox_ref.enable_client_routing(settings.TEMPLATE_DIR)
+
         return WorkPlan(
             id=f"plan-{uuid.uuid4().hex[:8]}",
             summary=plan_data.get("summary", ""),
             architecture=state.build_state.architecture,
             ux_design=state.build_state.ux_design,
             tasks=tasks,
+            uses_routing=uses_routing,
         )
 
     async def _execute_task(self, task: Task, state: ExecutionState) -> None:
@@ -306,16 +326,22 @@ class ExecuteAgent(BaseAgent):
             for dep_id in task.depends_on:
                 dep_paths.update(state.build_state.task_files.get(dep_id, []))
 
+            dep_files = {p: c for p, c in state.build_state.completed_files.items() if p in dep_paths} or None
+            if state.build_state.work_plan.uses_routing:
+                routing_files = self._routing_dependency_files(state)
+                dep_files = {**(dep_files or {}), **routing_files}
+
             prompt = render_codegen(
                 task_title=task.title,
                 task_description=task.description,
                 task_files=task.files,
                 architecture=state.build_state.work_plan.architecture.model_dump(),
                 ux_design=state.build_state.work_plan.ux_design.model_dump(),
-                dependency_files={p: c for p, c in state.build_state.completed_files.items() if p in dep_paths} or None,
+                dependency_files=dep_files,
                 other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
+                uses_routing=state.build_state.work_plan.uses_routing,
             )
 
             generated: list[tuple[str, str]] = []
@@ -348,6 +374,18 @@ class ExecuteAgent(BaseAgent):
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
         finally:
             span.end()
+
+    async def _seed_routing_files(self, state: ExecutionState) -> None:
+        for path in self._ROUTING_GUARD_FILES:
+            content = await state.sandbox_ref.read_file(path)
+            state.build_state.completed_files[path] = content
+
+    def _routing_dependency_files(self, state: ExecutionState) -> dict[str, str]:
+        return {
+            path: state.build_state.completed_files[path]
+            for path in self._ROUTING_GUARD_FILES
+            if path in state.build_state.completed_files
+        }
 
     async def _typecheck(self, state: ExecutionState) -> str:
         """Run TypeScript typecheck."""

@@ -35,6 +35,7 @@ def render_codegen(  # noqa: PLR0913
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
     data_source_contexts: list[dict[str, Any]] | None = None,
+    uses_routing: bool = False,
 ) -> str:
     prepared_sources = None
     if data_source_contexts:
@@ -70,11 +71,12 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
+        uses_routing=uses_routing,
     )
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
-    return render("fix_errors.jinja2", errors=errors, files=files)
+def render_fix_errors(*, errors: str, files: dict[str, str], has_react_router: bool = False) -> str:
+    return render("fix_errors.jinja2", errors=errors, files=files, has_react_router=has_react_router)
 
 
 def _extract_exports(content: str) -> str:

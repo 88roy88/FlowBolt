@@ -15,8 +15,14 @@ def render(template_name: str, **kwargs: Any) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
-    return render("fix_errors.jinja2", errors=errors, files=files)
+def package_has_react_router(files: dict[str, str]) -> bool:
+    return "react-router-dom" in files.get("package.json", "")
+
+
+def render_fix_errors(*, errors: str, files: dict[str, str], has_react_router: bool | None = None) -> str:
+    if has_react_router is None:
+        has_react_router = package_has_react_router(files)
+    return render("fix_errors.jinja2", errors=errors, files=files, has_react_router=has_react_router)
 
 
 def render_fix_error_direct(
@@ -26,7 +32,10 @@ def render_fix_error_direct(
     error_line: int | None = None,
     error_stack: str | None = None,
     files: dict[str, str],
+    has_react_router: bool | None = None,
 ) -> str:
+    if has_react_router is None:
+        has_react_router = package_has_react_router(files)
     return render(
         "fix_error_direct.jinja2",
         error_message=error_message,
@@ -34,4 +43,5 @@ def render_fix_error_direct(
         error_line=error_line,
         error_stack=error_stack,
         files=files,
+        has_react_router=has_react_router,
     )
