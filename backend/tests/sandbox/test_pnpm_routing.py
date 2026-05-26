@@ -94,7 +94,7 @@ class TestPnpmRouting:
         assert "flowbolt" not in content.lower()
 
         env = _read_env_file(workspace_dir, ".env.local")
-        assert env["VITE_PUBLIC_BASE_PATH"] == preview_base_path("routing-test")
+        assert env["VITE_BASE_PATH"] == preview_base_path("routing-test")
 
     @pytest.mark.asyncio
     async def test_enable_client_routing_installs_only_package(self, template_workspace) -> None:
@@ -132,7 +132,7 @@ class TestSandboxEnv:
         await sandbox.scaffold(template_dir)
 
         env = _read_env_file(workspace_dir, ".env.local")
-        assert env["VITE_PUBLIC_BASE_PATH"] == preview_base_path("routing-test")
+        assert env["VITE_BASE_PATH"] == preview_base_path("routing-test")
         assert "VITE_API_BASE" in env
 
     def test_publish_env_values(self) -> None:

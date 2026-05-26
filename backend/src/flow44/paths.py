@@ -37,8 +37,8 @@ def export_published_base_path(project_id: str) -> str:
 def sandbox_public_base_env(project_id: str, mode: SandboxBaseMode) -> dict[str, str]:
     """Vite/React Router public base path for preview or publish builds."""
     if mode == "publish":
-        return {"VITE_PUBLIC_BASE_PATH": export_published_base_path(project_id)}
-    return {"VITE_PUBLIC_BASE_PATH": preview_base_path(project_id)}
+        return {"VITE_BASE_PATH": export_published_base_path(project_id)}
+    return {"VITE_BASE_PATH": preview_base_path(project_id)}
 
 
 def sandbox_path_env(project_id: str, *, api_base_url: str) -> dict[str, str]:

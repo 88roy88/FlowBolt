@@ -27,7 +27,7 @@ def test_routing_md_exists(template_root: Path) -> None:
     routing_md = template_root / "ROUTING.md"
     assert routing_md.is_file()
     content = routing_md.read_text(encoding="utf-8")
-    assert "VITE_PUBLIC_BASE_PATH" in content
+    assert "VITE_BASE_PATH" in content
     assert "import.meta.env.BASE_URL" in content
     assert "getRouterBasename" in content
     assert "src/platform/routerBasename.ts" in content
@@ -51,8 +51,8 @@ def test_no_flowbolt_paths_in_template(template_root: Path) -> None:
 
 def test_vite_config_uses_public_base_path(template_root: Path) -> None:
     content = (template_root / "vite.config.ts").read_text(encoding="utf-8")
-    assert "VITE_PUBLIC_BASE_PATH" in content
-    assert "const base = env.VITE_PUBLIC_BASE_PATH" in content or "env.VITE_PUBLIC_BASE_PATH" in content
+    assert "VITE_BASE_PATH" in content
+    assert "const base = env.VITE_BASE_PATH" in content or "env.VITE_BASE_PATH" in content
     assert "base," in content or "base:" in content
 
 

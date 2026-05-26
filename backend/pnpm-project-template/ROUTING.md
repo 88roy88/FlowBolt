@@ -4,7 +4,7 @@ This template may be served under nested URLs during preview and publish.
 
 Do not hardcode preview or publish paths in React code.
 
-Vite receives the public base path from the backend through `VITE_PUBLIC_BASE_PATH`.
+Vite receives the public base path from the backend through `VITE_BASE_PATH`.
 The Vite config applies it as `base`.
 Inside React code, use Vite's standard `import.meta.env.BASE_URL`.
 

@@ -38,13 +38,13 @@ def test_sandbox_public_base_env() -> None:
     project_id = "abc-123"
     preview = sandbox_public_base_env(project_id, "preview")
     publish = sandbox_public_base_env(project_id, "publish")
-    assert preview["VITE_PUBLIC_BASE_PATH"] == "/api/preview/abc-123/proxy/"
-    assert publish["VITE_PUBLIC_BASE_PATH"] == "/api/export/abc-123/published/"
+    assert preview["VITE_BASE_PATH"] == "/api/preview/abc-123/proxy/"
+    assert publish["VITE_BASE_PATH"] == "/api/export/abc-123/published/"
 
 
 def test_sandbox_path_env() -> None:
     env = sandbox_path_env("abc-123", api_base_url="http://localhost:8000")
-    assert env["VITE_PUBLIC_BASE_PATH"] == "/api/preview/abc-123/proxy/"
+    assert env["VITE_BASE_PATH"] == "/api/preview/abc-123/proxy/"
     assert env["VITE_API_BASE"] == "http://localhost:8000"
 
 

@@ -88,7 +88,7 @@ class TestStampViteConfig:
         template_dir = tmp_path / "template"
         template_dir.mkdir()
         template_content = (
-            "base: env.VITE_PUBLIC_BASE_PATH,\n"
+            "base: env.VITE_BASE_PATH,\n"
             "auth: '{{AUTH_PROVIDER_URL}}' {{AUTH_STORAGE_KEY}} {{AUTH_USE_IFRAME}}"
         )
         (template_dir / "vite.config.ts").write_text(template_content)
@@ -109,12 +109,12 @@ class TestStampViteConfig:
         assert "TestAuth" in result
         assert "false" in result
         assert "{{AUTH_PROVIDER_URL}}" not in result
-        assert "VITE_PUBLIC_BASE_PATH" in result
+        assert "VITE_BASE_PATH" in result
 
     def test_leaves_other_content_unchanged(self, tmp_path) -> None:  # type: ignore[type-arg]
         template_dir = tmp_path / "template"
         template_dir.mkdir()
-        content = "export default { base: env.VITE_PUBLIC_BASE_PATH, plugins: [] }"
+        content = "export default { base: env.VITE_BASE_PATH, plugins: [] }"
         (template_dir / "vite.config.ts").write_text(content)
 
         workspace_dir = tmp_path / "workspace"
@@ -126,4 +126,4 @@ class TestStampViteConfig:
 
         result = (workspace_dir / "vite.config.ts").read_text()
         assert "plugins: []" in result
-        assert "VITE_PUBLIC_BASE_PATH" in result
+        assert "VITE_BASE_PATH" in result

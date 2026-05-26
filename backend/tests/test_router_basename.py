@@ -12,6 +12,6 @@ def test_router_basename_uses_base_url() -> None:
     content = path.read_text(encoding="utf-8")
     assert "getRouterBasename" in content
     assert "import.meta.env.BASE_URL" in content
-    assert "VITE_PUBLIC_BASE_PATH" not in content
+    assert "VITE_BASE_PATH" not in content
     assert "querySelector('base')" not in content
     assert "replace(/" in content and "/+$/" in content

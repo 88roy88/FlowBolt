@@ -126,15 +126,12 @@ export default function App() {
 11. Do not hardcode `/api/preview/...` or `/api/export/...`. Do not add `<base href>` to `index.html`.
 12. Lazy-load pages beyond the home route with `lazy(() => import('./pages/…'))` wrapped in `<Suspense>`.
 13. Do NOT edit `vite.config.ts`, `index.html`, `src/platform/routerBasename.ts`, or env files.
+14. Import from already-completed files using their exact export names.
+15. Do NOT include shell actions — only file actions.
 {% else %}
 6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, react-router-dom, etc.).
 7. Single-page app only — do NOT create `src/pages/` or navigation/routing.
 8. Do NOT edit `src/platform/routerBasename.ts` unless changing platform support.
-{% endif %}
-{% if uses_routing %}
-12. Import from already-completed files using their exact export names.
-13. Do NOT include shell actions — only file actions.
-{% else %}
 9. Import from already-completed files using their exact export names.
 10. Do NOT include shell actions — only file actions.
 {% endif %}
