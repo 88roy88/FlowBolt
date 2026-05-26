@@ -107,12 +107,16 @@ api_router = APIRouter(dependencies=[Depends(get_user_id)])
 api_router.include_router(projects.router)
 api_router.include_router(files.router)
 api_router.include_router(preview.router)
-api_router.include_router(models.router)
 api_router.include_router(export.router)
 api_router.include_router(publish.router)
 api_router.include_router(data_source_api.router)
 api_router.include_router(chat.http_router)
 app.include_router(api_router)
+
+# Public HTTP REST routes — no auth required
+public_router = APIRouter()
+public_router.include_router(models.router)
+app.include_router(public_router)
 
 # WS routers — handle their own auth
 app.include_router(chat.router)
