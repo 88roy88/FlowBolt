@@ -51,7 +51,7 @@ class PnpmMixin(BaseSandbox, ABC):
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
 
-    def _has_react_router_dom(self) -> bool:
+    def _react_router_dom_installed(self) -> bool:
         pkg_path = os.path.join(self.workspace_dir, "package.json")
         if not os.path.isfile(pkg_path):
             return False
@@ -60,9 +60,13 @@ class PnpmMixin(BaseSandbox, ABC):
         return "react-router-dom" in pkg.get("dependencies", {})
 
     async def enable_client_routing(self, template_dir: str) -> None:
-        """Install react-router-dom when the app plan requires client-side routing."""
+        """Install react-router-dom when ``uses_routing`` is true on the work plan.
+
+        Does not copy router files — the AI generator writes normal React Router
+        code; the template only provides ``src/platform/routerBasename.ts``.
+        """
         del template_dir  # routing files are owned by the template / AI generator
-        if self._has_react_router_dom():
+        if self._react_router_dom_installed():
             return
 
         async for line in self.exec("pnpm add react-router-dom 2>&1"):

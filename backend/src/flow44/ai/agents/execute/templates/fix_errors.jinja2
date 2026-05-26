@@ -30,6 +30,6 @@ Rules:
 2. Do NOT change functionality — only fix type errors.
 3. Output complete file contents, not patches.
 4. Do NOT include shell actions.
-{% if has_react_router %}
-5. `react-router-dom` is installed — use it for routing fixes. Do NOT replace with custom router code.
+{% if uses_routing %}
+5. Plan capability `uses_routing`: `react-router-dom` is installed — use it for routing fixes. Do NOT replace with custom router code.
 {% endif %}

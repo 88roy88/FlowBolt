@@ -42,12 +42,12 @@ Rules:
 - Do NOT include tasks for installing dependencies or running the dev server
 - Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
 - Do NOT include `src/main.tsx`, `vite.config.ts`, `index.html`, or `src/platform/routerBasename.ts` in task files — they are pre-configured
-- Set `"uses_routing": true` when the app has multiple pages, navigation, or a navbar with links between pages
+- Set `"uses_routing": true` when the generated app needs client-side routing (multiple pages, navigation, or links between pages). This is a plan capability flag — not backend-owned routing.
 - When `"uses_routing": true`:
   - Create tasks for `src/pages/*`, `src/components/Navbar.tsx`, and a final `src/App.tsx` wiring task
-  - Flow44 installs `react-router-dom` only — implement routing per `ROUTING.md` using `getRouterBasename()` from `src/platform/routerBasename.ts`
+  - Flow44 installs `react-router-dom` only (dependency prep) — you write normal React Router code per `ROUTING.md` and `getRouterBasename()` from `src/platform/routerBasename.ts`
   - Final App.tsx task must use `BrowserRouter` (or `createBrowserRouter`) with `basename={getRouterBasename()}`, plus `Routes`, `Route`, `Link`, and lazy-load secondary pages with `React.lazy` + `Suspense`
-- When `"uses_routing": false`: single-page app in `App.tsx` only — no `src/pages/` tasks
+- When `"uses_routing": false`: single-page app in `App.tsx` only — no `src/pages/`, no `react-router-dom`, no router wrappers
 {% if has_data_sources %}
 
 ## Data Source Integration — Pre-Generated Files

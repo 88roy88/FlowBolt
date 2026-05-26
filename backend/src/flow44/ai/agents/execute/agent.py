@@ -187,7 +187,7 @@ class ExecuteAgent(BaseAgent):
         prompt = render_fix_errors(
             errors=state.all_errors,
             files=state.build_state.completed_files,
-            has_react_router=state.build_state.work_plan.uses_routing if state.build_state.work_plan else False,
+            uses_routing=state.build_state.work_plan.uses_routing if state.build_state.work_plan else False,
         )
         try:
             generated: list[tuple[str, str]] = []
@@ -300,6 +300,7 @@ class ExecuteAgent(BaseAgent):
             architecture_file_structure=state.build_state.architecture.file_structure,
         )
         if uses_routing:
+            # Plan capability only: install react-router-dom; AI writes router code.
             await state.sandbox_ref.enable_client_routing(settings.TEMPLATE_DIR)
 
         return WorkPlan(
@@ -393,7 +394,7 @@ class ExecuteAgent(BaseAgent):
             state.build_state.completed_files[path] = content
 
     def _platform_dependency_files(self, state: ExecutionState) -> dict[str, str]:
-        """Expose platform helpers to routing codegen tasks as read-only dependencies."""
+        """Expose platform helpers when ``uses_routing`` codegen needs ``getRouterBasename``."""
         return {
             path: state.build_state.completed_files[path]
             for path in self._protected_paths

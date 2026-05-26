@@ -29,6 +29,7 @@ class WorkPlan(BaseModel):
     architecture: ArchitectureDesign
     ux_design: UXDesign
     tasks: list[Task]
+    # Plan capability: generated app needs client-side routing (not backend-owned routing).
     uses_routing: bool = False
 
     def execution_layers(self) -> list[list[Task]]:

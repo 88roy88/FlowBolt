@@ -93,7 +93,7 @@ Rules:
 4. Write clean, production-quality code with modern, polished UI/UX.
 5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/config.ts`, or `src/main.tsx`.
 {% if uses_routing %}
-6. **Multi-page app**: `react-router-dom` is installed. Follow `ROUTING.md` in the project root.
+6. **Multi-page app** (`uses_routing` plan capability): `react-router-dom` is installed. Follow `ROUTING.md` — write normal React Router code; backend does not own your routes.
 7. Do NOT overwrite `src/platform/routerBasename.ts`. Use `getRouterBasename()` from `./platform/routerBasename` for every router `basename`.
 8. Import `Routes`, `Route`, `Link`, `NavLink`, `useNavigate`, and lazy-load helpers from `react` / `react-router-dom` only.
 9. Wire `App.tsx` with `BrowserRouter basename={getRouterBasename()}` (or `createBrowserRouter` with the same basename). Example:

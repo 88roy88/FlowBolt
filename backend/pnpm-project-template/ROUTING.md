@@ -2,6 +2,8 @@
 
 This template may be served under nested URLs during preview and publish.
 
+When the work plan sets `"uses_routing": true`, the generated app needs client-side routing. That flag is a plan capability only: the backend installs `react-router-dom` and does not own your route definitions. Single-page apps keep `"uses_routing": false` and render without React Router.
+
 Do not hardcode preview or publish paths in React code.
 
 Vite receives the public base path from the backend through `VITE_BASE_PATH`.

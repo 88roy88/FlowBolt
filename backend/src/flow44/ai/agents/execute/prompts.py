@@ -75,8 +75,8 @@ def render_codegen(  # noqa: PLR0913
     )
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str], has_react_router: bool = False) -> str:
-    return render("fix_errors.jinja2", errors=errors, files=files, has_react_router=has_react_router)
+def render_fix_errors(*, errors: str, files: dict[str, str], uses_routing: bool = False) -> str:
+    return render("fix_errors.jinja2", errors=errors, files=files, uses_routing=uses_routing)
 
 
 def _extract_exports(content: str) -> str:
