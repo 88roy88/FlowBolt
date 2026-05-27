@@ -31,7 +31,17 @@ def test_routing_md_exists(template_root: Path) -> None:
     assert "import.meta.env.BASE_URL" in content
     assert "getRouterBasename" in content
     assert "src/platform/routerBasename.ts" in content
+    assert "Link" in content
+    assert "Never remove" in content or "never remove" in content.lower()
+    assert "vite.config.ts" in content
+    assert "Never use `<a href=\"/…\">`" in content or "never `<a href=\"/…\">`" in content.lower()
     assert "/api/preview" not in content or "Do not hardcode" in content
+
+
+def test_vite_config_does_not_override_base_url_define(template_root: Path) -> None:
+    content = (template_root / "vite.config.ts").read_text(encoding="utf-8")
+    assert "import.meta.env.BASE_URL" not in content
+    assert "env.BASE_URL" not in content
 
 
 def test_no_flowbolt_stub(template_root: Path) -> None:

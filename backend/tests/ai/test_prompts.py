@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from flow44.ai.agents.execute.prompts import render_codegen, render_merge, render_summary
+from flow44.ai.agents.execute.prompts import render_codegen, render_fix_errors, render_merge, render_summary
+from flow44.ai.agents.fix_error.prompts import render_fix_errors as render_fix_error_agent_errors
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
 
@@ -83,6 +84,44 @@ class TestPromptRendering:
         assert "Create Header" in result
         assert "src/Header.tsx" in result
         assert "flowArtifact" in result
+        assert "Single-page app only" in result
+        assert "AppRouter" not in result
+
+    def test_codegen_with_routing(self) -> None:
+        result = render_codegen(
+            task_title="Wire App routes",
+            task_description="Connect pages with react-router-dom",
+            task_files=["src/App.tsx"],
+            architecture={},
+            ux_design={},
+            uses_routing=True,
+        )
+        assert "BrowserRouter" in result
+        assert "getRouterBasename" in result
+        assert "src/platform/routerBasename" in result
+        assert "ROUTING.md" in result
+        assert "react-router-dom" in result
+        assert "flowbolt" not in result.lower()
+        assert "lazy(() => import" in result
+        assert "Suspense" in result
+        assert "Router contract" in result
+        assert "Never edit" in result and "vite.config.ts" in result
+        assert "basename={getRouterBasename()}" in result
+        assert "Never" in result and '<a href="/' in result
+        assert "Link to=" in result
+
+    def test_codegen_with_routing_forbids_href_in_fix_errors(self) -> None:
+        execute_fix = render_fix_errors(errors="TS1234", files={}, uses_routing=True)
+        agent_fix = render_fix_error_agent_errors(errors="TS1234", files={"package.json": '"react-router-dom"'})
+        for prompt in (execute_fix, agent_fix):
+            assert "Never edit" in prompt and "vite.config.ts" in prompt
+            assert "getRouterBasename" in prompt
+            assert "never `<a href=\"/…\">`" in prompt or "never `<a href=\"/…\">`" in prompt.lower()
+
+    def test_merge_includes_uses_routing(self) -> None:
+        result = render_merge(has_data_sources=False)
+        assert "uses_routing" in result
+        assert "react-router-dom" in result
 
     def test_codegen_with_dependencies(self) -> None:
         result = render_codegen(

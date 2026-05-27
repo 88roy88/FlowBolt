@@ -91,7 +91,13 @@ Rules:
 2. Use TypeScript, React 18+, and Tailwind CSS v3.
 3. Tailwind CSS is pre-configured - use utility classes extensively for styling.
 4. Write clean, production-quality code with modern, polished UI/UX.
-5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/config.ts` or `src/main.tsx` — they are pre-configured.
-6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
-7. Import from already-completed files using their exact export names.
-8. Do NOT include shell actions — only file actions.
+5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/config.ts`, or `src/main.tsx`.
+{% if uses_routing %}
+{% include "codegen_routing.jinja2" %}
+{% else %}
+6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, react-router-dom, etc.).
+7. Single-page app only — do NOT create `src/pages/` or navigation/routing.
+8. Do NOT edit `src/platform/routerBasename.ts` unless changing platform support.
+9. Import from already-completed files using their exact export names.
+10. Do NOT include shell actions — only file actions.
+{% endif %}
