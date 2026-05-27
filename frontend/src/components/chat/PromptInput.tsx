@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useChatStore } from '../../stores/chat';
+import { useChatStore, useIsAwaitingPlanApproval } from '../../stores/chat';
+import { AGENT_PHASE } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
@@ -43,7 +44,7 @@ export function PromptInput() {
     }
   };
 
-  const isBusy = isStreaming || (agentPhase !== 'idle' && agentPhase !== 'complete');
+  const isBusy = isStreaming || (agentPhase !== AGENT_PHASE.IDLE && agentPhase !== AGENT_PHASE.COMPLETE);
   const disabled = isBusy || !projectId;
   const canSend = !!value.trim() && !disabled;
 
@@ -59,20 +60,21 @@ export function PromptInput() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  const awaitingPlan = useIsAwaitingPlanApproval();
+
   const placeholder = !projectId
     ? t('chat.placeholder.selectProject')
-    : agentPhase === 'awaiting_approval'
+    : awaitingPlan
       ? t('chat.placeholder.reviewPlan')
       : isBusy
         ? t('chat.placeholder.working')
         : t('chat.placeholder.default');
 
   const busyLabel =
-    agentPhase === 'classifying' ? t('chat.phase.analyzing') :
-    agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
-    agentPhase === 'designing' ? t('chat.phase.designing') :
-    agentPhase === 'planning' ? t('chat.phase.planning') :
-    agentPhase === 'executing' ? t('chat.phase.building') :
+    agentPhase === AGENT_PHASE.FETCHING_DATA_SOURCES ? t('chat.phase.fetchingDataSources') :
+    agentPhase === AGENT_PHASE.DESIGNING ? t('chat.phase.designing') :
+    agentPhase === AGENT_PHASE.PLANNING ? t('chat.phase.planning') :
+    agentPhase === AGENT_PHASE.EXECUTING ? t('chat.phase.building') :
     t('chat.phase.thinking');
 
   return (
@@ -103,7 +105,7 @@ export function PromptInput() {
       )}
 
       {/* Busy/awaiting indicator */}
-      {agentPhase === 'awaiting_approval' ? (
+      {awaitingPlan ? (
         <div className="flex items-center justify-center gap-1.5 text-xs text-warning mb-2">
           <span>↑ {t('chat.placeholder.reviewPlan')}</span>
         </div>

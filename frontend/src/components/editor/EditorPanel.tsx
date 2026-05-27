@@ -6,7 +6,7 @@ import * as monaco from 'monaco-editor';
 loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
-import { useChatStore } from '../../stores/chat';
+import { useChatStore, useIsAgentWorking } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
@@ -43,9 +43,7 @@ export function EditorPanel() {
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
-  const isStreaming = useChatStore((s) => s.isStreaming);
-  const agentPhase = useChatStore((s) => s.agentPhase);
-  const aiFlowActive = isStreaming || agentPhase !== 'idle';
+  const aiFlowActive = useIsAgentWorking();
   const readOnlyUntilInitialBuildComplete = !buildCompleted;
   const editorReadOnly = readOnlyUntilInitialBuildComplete || aiFlowActive;
   const readOnlyMessage = readOnlyUntilInitialBuildComplete

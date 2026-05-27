@@ -71,7 +71,6 @@ export interface DataSourceSearchRecord {
 // Agent types
 export type AgentPhase =
   | 'idle'
-  | 'classifying'
   | 'fetching_data_sources'
   | 'designing'
   | 'planning'
@@ -80,6 +79,9 @@ export type AgentPhase =
   | 'fixing'
   | 'exploring'
   | 'complete';
+
+/** SCREAMING_SNAKE_CASE form of a string union (e.g. `idle` → `IDLE`). */
+export type CapitalChars<T extends string> = Uppercase<T>;
 
 // User-facing plan overview (shown during approval)
 export interface PlanFeature {

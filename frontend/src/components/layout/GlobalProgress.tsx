@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
-import { useChatStore } from '../../stores/chat';
+import { useChatStore, useIsAgentWorking } from '../../stores/chat';
+import { AGENT_PHASE } from '../../stores/chatAgentState';
 
 export function GlobalProgress() {
   const agentPhase = useChatStore((s) => s.agentPhase);
   const tasks = useChatStore((s) => s.executionTasks);
   const [visible, setVisible] = useState(false);
 
+  const working = useIsAgentWorking();
+
   const progress =
-    agentPhase === 'idle' ? 0 :
-    agentPhase === 'classifying' ? 5 :
-    agentPhase === 'fetching_data_sources' ? 10 :
-    agentPhase === 'designing' ? 15 :
-    agentPhase === 'planning' ? 30 :
-    agentPhase === 'awaiting_approval' ? 35 :
-    agentPhase === 'executing' ? 40 + (tasks.filter((t) => t.status === 'completed').length / Math.max(tasks.length, 1)) * 55 :
-    agentPhase === 'fixing' ? 50 :
-    agentPhase === 'exploring' ? 50 :
-    agentPhase === 'complete' ? 100 : 0;
+    !working ? 0 :
+    agentPhase === AGENT_PHASE.IDLE ? 3 :
+    agentPhase === AGENT_PHASE.FETCHING_DATA_SOURCES ? 10 :
+    agentPhase === AGENT_PHASE.DESIGNING ? 15 :
+    agentPhase === AGENT_PHASE.PLANNING ? 30 :
+    agentPhase === AGENT_PHASE.AWAITING_APPROVAL ? 35 :
+    agentPhase === AGENT_PHASE.EXECUTING ? 40 + (tasks.filter((t) => t.status === 'completed').length / Math.max(tasks.length, 1)) * 55 :
+    agentPhase === AGENT_PHASE.FIXING ? 50 :
+    agentPhase === AGENT_PHASE.EXPLORING ? 50 :
+    agentPhase === AGENT_PHASE.COMPLETE ? 100 : 0;
 
   // Show when active, hide after completion with a brief delay
   useEffect(() => {
