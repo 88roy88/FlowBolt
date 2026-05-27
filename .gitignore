@@ -38,6 +38,12 @@ docker-compose.override.yml
 
 # Claude Code
 .claude/
+CLAUDE.md
+
+# Cursor
+.cursor/
+.cursorignore
+AGENTS.md
 
 # Scratch / review notes
 CODE_REVIEW*.md
@@ -55,3 +61,8 @@ AI_INSTRUCTIONS.md
 
 /2026-03-28-011929-local-command-caveatcaveat-the-messages-below-w-review.txt
 /2026-03-28-012016-our-current-test-coverage-is-quite-low-pydantic-ai-work.txt
+
+# Antigravity
+.agent
+.antigravity
+.antigravityignore

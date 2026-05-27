@@ -2,7 +2,7 @@
 name = "flow-44-backend"
 version = "0.1.0"
 description = "AI Web App Builder - Backend"
-requires-python = ">=3.12"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "aiosqlite>=0.20.0",
     "alembic>=1.18.4",
@@ -57,19 +57,19 @@ build-backend = "hatchling.build"
 
 
 [tool.taskipy.tasks]
-ruff = "bash -c 'ruff format --config ruff.toml \"$@\" && ruff check --config ruff.toml \"$@\"' --"
-ruff-all = "task ruff src/"
-ruff-dry = "bash -c 'ruff format --check --config ruff.toml \"$@\" && ruff check --no-fix --config ruff.toml \"$@\"' --"
-ruff-dry-all = "task ruff-dry src/"
+ruff = "ruff format --config ruff.toml src/ && ruff check --config ruff.toml src/"
+ruff-all = "task ruff"
+ruff-dry = "ruff format --check --config ruff.toml src/ && ruff check --no-fix --config ruff.toml src/"
+ruff-dry-all = "task ruff-dry"
 
-mypy = "mypy --config-file mypy.toml \"$@\""
-mypy-all = "task mypy src/"
+mypy = "mypy --config-file mypy.toml src/"
+mypy-all = "task mypy"
 
-lint = "bash -c 'task mypy \"$@\" && task ruff \"$@\"' --"
-lint-all = "task lint src/"
+lint = "task mypy && task ruff"
+lint-all = "task lint"
 
 tests = "pytest"
 tests-all = "task tests"
 
-benchmark = "python -m benchmarks.src -c \"$@\""
+benchmark = "python -m benchmarks.src -c"
 benchmark-main = "task benchmark config.yaml"

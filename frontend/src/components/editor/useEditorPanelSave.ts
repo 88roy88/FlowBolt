@@ -4,7 +4,8 @@ import { useFilesStore } from '../../stores/files';
 export function useEditorPanelSave(
   activeFilePath: string | null,
   updateFileContent: (path: string, content: string) => void,
-  saveFile: (path: string) => Promise<void>
+  saveFile: (path: string) => Promise<void>,
+  readOnly: boolean
 ) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -24,6 +25,7 @@ export function useEditorPanelSave(
 
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
+      if (readOnly) return;
       if (!activeFilePath || value === undefined) return;
       updateFileContent(activeFilePath, value);
 
@@ -35,7 +37,7 @@ export function useEditorPanelSave(
         doSave(activeFilePath);
       }, 1000);
     },
-    [activeFilePath, updateFileContent, doSave]
+    [activeFilePath, updateFileContent, doSave, readOnly]
   );
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function useEditorPanelSave(
 
   useEffect(() => {
     function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (readOnly) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         const path = useFilesStore.getState().activeFilePath;
@@ -59,7 +62,7 @@ export function useEditorPanelSave(
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [doSave]);
+  }, [doSave, readOnly]);
 
   return { saveStatus, handleEditorChange, doSave, saveTimerRef };
 }
