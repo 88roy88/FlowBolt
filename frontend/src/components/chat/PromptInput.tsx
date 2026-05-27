@@ -47,14 +47,10 @@ export function PromptInput() {
   const disabled = isBusy || !projectId;
   const canSend = !!value.trim() && !disabled;
 
-  // Global keyboard shortcut: Cmd+K or / to focus
+  // Global keyboard shortcut: Cmd+K to focus chat
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        textareaRef.current?.focus();
-      }
-      if (e.key === '/' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
         textareaRef.current?.focus();
       }

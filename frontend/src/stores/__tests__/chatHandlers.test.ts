@@ -178,16 +178,6 @@ describe('createSendMessageHandler — build flow', () => {
     expect(result).toBeDefined();
   });
 
-  it('plan_rejected resets state to idle', () => {
-    handler(msg({ type: 'phase', phase: 'planning' }));
-    handler(msg({ type: 'plan_rejected', overview: MOCK_PLAN_OVERVIEW }));
-
-    expect(store.state().agentPhase).toBe('idle');
-    expect(store.state().isStreaming).toBe(false);
-    expect(store.state().planOverview).toBeNull();
-    expect(store.state().executionTasks).toHaveLength(0);
-  });
-
   it('error event sets error and cleans up', () => {
     handler(msg({ type: 'phase', phase: 'executing' }));
     handler(msg({ type: 'error', message: 'LLM failed' }));

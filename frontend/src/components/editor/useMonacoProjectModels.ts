@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Monaco } from '@monaco-editor/react';
 import type { FileEntry } from '../../types';
-import { fetchFileContent } from '../../services/api';
+import { useFilesStore } from '../../stores/files';
 import {
   toMonacoUri,
   normalizeProjectPath,
@@ -11,25 +11,25 @@ import { getEditorLanguageForPath } from './editorLanguage';
 import { installMonacoProjectTypes } from './monacoProjectSetup';
 import { MONACO_REACT_VITE_DTS_URI, MONACO_REACT_VITE_JS_DTS_URI } from './monacoAmbientTypes';
 
+function syncModelContent(m: Monaco, storePath: string, content: string) {
+  const uri = m.Uri.parse(toMonacoUri(normalizeProjectPath(storePath)));
+  const model = m.editor.getModel(uri);
+  if (model && model.getValue() !== content) {
+    model.setValue(content);
+  }
+}
+
 export function useMonacoProjectModels(
   projectId: string | null,
   fileTree: FileEntry[],
-  openFiles: Map<string, string>
 ) {
   const monacoRef = useRef<Monaco | null>(null);
-  const hydratedModelsRef = useRef<Set<string>>(new Set());
   const indexedFilesRef = useRef<Set<string>>(new Set());
-  const openFilesRef = useRef(openFiles);
-
-  useEffect(() => {
-    openFilesRef.current = openFiles;
-  }, [openFiles]);
 
   useEffect(() => {
     const m = monacoRef.current;
     if (!m) return;
 
-    hydratedModelsRef.current.clear();
     indexedFilesRef.current.clear();
 
     // Dispose models for previous project
@@ -64,8 +64,6 @@ export function useMonacoProjectModels(
     const m = monacoRef.current;
     if (!m || !projectId || fileTree.length === 0) return;
 
-    let cancelled = false;
-
     const files = flattenFileTreeEntries(fileTree)
       .map((p: string) => normalizeProjectPath(p))
       .filter((p: string) => /\.(ts|tsx|js|jsx|mjs|cjs|json|css|scss|sass|less)$/.test(p));
@@ -76,35 +74,23 @@ export function useMonacoProjectModels(
       m.editor.createModel('', getEditorLanguageForPath(path), uri);
     }
 
-    const hydrateModels = async () => {
-      const tasks = files.map(async (path: string) => {
-        const uri = toMonacoUri(path);
-        if (hydratedModelsRef.current.has(uri) || openFilesRef.current.has(path)) return;
-
-        try {
-          const content = await fetchFileContent(projectId, path);
-          if (cancelled) return;
-
-          const model = m.editor.getModel(m.Uri.parse(uri));
-          if (!model) return;
-          if (model.getValue() !== content) {
-            model.setValue(content);
-          }
-          hydratedModelsRef.current.add(uri);
-        } catch {
-          // ignore
-        }
-      });
-
-      await Promise.allSettled(tasks);
-    };
-
-    void hydrateModels();
-
-    return () => {
-      cancelled = true;
-    };
+    // Sync files already open in the store (e.g. tabs restored from localStorage
+    // before this effect ran).
+    for (const [storePath, content] of useFilesStore.getState().openFiles) {
+      syncModelContent(m, storePath, content);
+    }
   }, [projectId, fileTree]);
+
+  useEffect(() => {
+    return useFilesStore.subscribe((state, prevState) => {
+      const m = monacoRef.current;
+      if (!m || state.openFiles === prevState.openFiles) return;
+      for (const [storePath, content] of state.openFiles) {
+        if (prevState.openFiles.get(storePath) === content) continue;
+        syncModelContent(m, storePath, content);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     indexedFilesRef.current = new Set(
