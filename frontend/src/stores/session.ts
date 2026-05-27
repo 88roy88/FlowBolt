@@ -3,6 +3,7 @@ import type { Project } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
 import { useChatStore } from './chat';
+import { clearProjectCaches } from '../utils/projectCache';
 
 interface SessionState {
   currentProject: Project | null;
@@ -58,6 +59,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
     await api.deleteProject(id);
     const projects = get().projects.filter((p) => p.id !== id);
+    if (projects.length === 0) clearProjectCaches();
     const current = get().currentProject;
     if (current?.id === id) {
       const next = projects[0] ?? null;

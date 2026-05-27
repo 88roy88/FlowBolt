@@ -90,4 +90,26 @@ test.describe('Happy path', () => {
     await expect(page.getByRole('button', { name: /dashboard/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /landing page/i })).toBeVisible();
   });
+
+  test('unknown project id in url redirects to home', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    const projectsList = page.waitForResponse(
+      (r) => r.request().method() === 'GET' && isProjectsListGet(r.url()) && r.ok(),
+      { timeout: 60_000 }
+    );
+    await page.goto('/#/project/unknown-project-id-404', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    await projectsList;
+
+    await page.waitForURL(
+      (url) => url.hash === `#/project/${MOCK_PROJECT.id}`,
+      { timeout: 60_000 },
+    );
+
+    // Collapsed sidebar shows initials, not the full project name.
+    await expect(page.getByRole('button', { name: 'ET' })).toBeVisible({ timeout: 30_000 });
+  });
 });

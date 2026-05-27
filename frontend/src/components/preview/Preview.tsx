@@ -6,6 +6,7 @@ import { useConsoleStore } from '../../stores/console';
 import { RefreshCw, ExternalLink, Globe, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { publishToS3 } from '../../services/api';
+import { exportPublishedPath, previewBasePath } from '../../constants/paths';
 import { PublishModal } from '../ui/PublishModal';
 
 export function Preview() {
@@ -28,7 +29,7 @@ export function Preview() {
       return;
     }
     setLoading(true);
-    const url = `/api/preview/${projectId}/proxy/`;
+    const url = previewBasePath(projectId);
     setPreviewUrl(url);
     setLoading(false);
     console.debug('[Preview] refresh — reason: project changed', { projectId, refreshKey });
@@ -104,7 +105,7 @@ export function Preview() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`/api/export/${projectId}/published`, '_blank')}
+              onClick={() => window.open(exportPublishedPath(projectId), '_blank')}
               title={t('preview.viewPublishedApp')}
             >
               <ExternalLink size={14} />
