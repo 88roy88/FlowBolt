@@ -9,6 +9,10 @@ import re
 from langfuse.decorators import observe
 
 from flow44.config import settings
+from flow44.paths import (
+    sandbox_public_base_env,
+    strip_export_published_prefix,
+)
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -73,7 +77,7 @@ def _inline_js_assets(html: str, dist_dir: str) -> str:
 
 
 def _resolve_asset_path(dist_dir: str, href: str) -> str | None:
-    cleaned = href.lstrip("/\\")
+    cleaned = strip_export_published_prefix(href.lstrip("/\\"))
     candidate = os.path.join(dist_dir, cleaned)
     try:
         if os.path.commonpath([os.path.realpath(dist_dir), os.path.realpath(candidate)]) != os.path.realpath(dist_dir):
@@ -114,21 +118,24 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
     )
 
 
-@observe(name="build-single-html")  # type: ignore[untyped-decorator]
-async def build_single_html(project_id: str) -> str:
-    """Build the project and return a single self-contained HTML string."""
+async def build_dist(project_id: str) -> str:
+    """Build the project and return the dist directory path."""
     sandbox = sandbox_manager.get_sandbox(project_id)
     if sandbox is None:
         raise ValueError(f"No sandbox found for project {project_id}")
 
     workspace_dir = sandbox.workspace_dir
-
-    # Write a temporary .env.production.local so vite picks up overrides
-    api_base = settings.EXPORT_API_BASE_URL
     env_file = os.path.join(workspace_dir, ".env.production.local")
+    if hasattr(sandbox, "refresh_vite_config_stamps"):
+        sandbox.refresh_vite_config_stamps()
     try:
+        env_vars = {
+            **sandbox_public_base_env(project_id, "publish"),
+            "VITE_API_BASE": settings.EXPORT_API_BASE_URL,
+        }
+        env_lines = [f"{key}={value}" for key, value in env_vars.items()]
         with open(env_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
-            f.write(f"VITE_BASE=/\nVITE_API_BASE={api_base}\n")
+            f.write("\n".join(env_lines) + "\n")
 
         build_output_lines: list[str] = []
         async for line in sandbox.exec("pnpm build"):
@@ -142,9 +149,22 @@ async def build_single_html(project_id: str) -> str:
 
     dist_dir = os.path.join(workspace_dir, "dist")
     index_path = os.path.join(dist_dir, "index.html")
-
     if not os.path.isfile(index_path):  # noqa: ASYNC240
         raise BuildError(f"Build failed or dist/index.html not found.\n\n{build_output}")
+
+    return dist_dir
+
+
+@observe(name="build-single-html")  # type: ignore[untyped-decorator]
+async def build_single_html(project_id: str) -> str:
+    """Build the project and return a single self-contained HTML string."""
+    dist_dir = await build_dist(project_id)
+    sandbox = sandbox_manager.get_sandbox(project_id)
+    if sandbox is None:
+        raise ValueError(f"No sandbox found for project {project_id}")
+
+    workspace_dir = sandbox.workspace_dir
+    index_path = os.path.join(dist_dir, "index.html")
 
     with open(index_path, encoding="utf-8", errors="replace") as f:  # noqa: ASYNC230
         html = f.read()
