@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
 
-def _collect_paths(plan_data: dict, architecture_file_structure: list[str] | None) -> list[str]:
+
+def _collect_paths(plan_data: dict[str, Any], architecture_file_structure: list[str] | None) -> list[str]:
     paths: list[str] = []
     for task in plan_data.get("tasks", []):
         paths.extend(task.get("files", []))
@@ -14,7 +16,7 @@ def _collect_paths(plan_data: dict, architecture_file_structure: list[str] | Non
 
 def detect_uses_routing(
     user_content: str,
-    plan_data: dict,
+    plan_data: dict[str, Any],
     *,
     architecture_file_structure: list[str] | None = None,
 ) -> bool:

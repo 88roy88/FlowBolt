@@ -15,9 +15,7 @@ PREVIEW_PROXY_PATH_ROUTE = f"/{{project_id}}/{PREVIEW_PROXY_SEGMENT}/{{path:path
 EXPORT_PUBLISHED_ROUTE = f"/{EXPORT_PUBLISHED_SEGMENT}"
 EXPORT_PUBLISHED_PATH_ROUTE = f"/{EXPORT_PUBLISHED_SEGMENT}/{{path:path}}"
 
-_EXPORT_PUBLISHED_PREFIX = re.compile(
-    rf"^{EXPORT_API_PREFIX.lstrip('/')}/[^/]+/{EXPORT_PUBLISHED_SEGMENT}/"
-)
+_EXPORT_PUBLISHED_PREFIX = re.compile(rf"^{EXPORT_API_PREFIX.lstrip('/')}/[^/]+/{EXPORT_PUBLISHED_SEGMENT}/")
 
 SandboxBaseMode = Literal["preview", "publish"]
 

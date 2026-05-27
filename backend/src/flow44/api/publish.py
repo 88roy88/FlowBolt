@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=f"{EXPORT_API_PREFIX}/{{project_id}}", tags=["publish"])
 
-_STATIC_EXTENSIONS = frozenset({".css", ".ico", ".jpeg", ".jpg", ".js", ".json", ".map", ".png", ".svg", ".webp", ".woff", ".woff2"})
+_STATIC_EXTENSIONS = frozenset(
+    {".css", ".ico", ".jpeg", ".jpg", ".js", ".json", ".map", ".png", ".svg", ".webp", ".woff", ".woff2"}
+)
 
 
 def _is_static_asset(path: str) -> bool:

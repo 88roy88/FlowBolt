@@ -9,13 +9,13 @@ from langfuse.decorators import langfuse_context, observe
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
-from flow44.ai.agents.execute.routing_detection import detect_uses_routing
 from flow44.ai.agents.execute.prompts import (
     SUMMARY_PROMPT,
     render_codegen,
     render_fix_errors,
     render_merge,
 )
+from flow44.ai.agents.execute.routing_detection import detect_uses_routing
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
