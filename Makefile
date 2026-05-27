@@ -1,11 +1,10 @@
 .PHONY: dev dev-backend dev-frontend dev-mocks kill-ports build run install stop
 
 # Local dev: mock (flapi-mock), FastAPI, Vite — free these before (re)starting
-DEV_PORT_LEGACY := 4000
 DEV_PORT_BACKEND := 8000
 DEV_PORT_FRONTEND := 5173
 DEV_PORT_MOCKS := 6001
-DEV_PORTS := $(DEV_PORT_LEGACY) $(DEV_PORT_BACKEND) $(DEV_PORT_FRONTEND) $(DEV_PORT_MOCKS)
+DEV_PORTS := $(DEV_PORT_BACKEND) $(DEV_PORT_FRONTEND) $(DEV_PORT_MOCKS)
 
 # All three at once: backend blocks forever if run sequentially, so we use parallel sub-makes (GNU Make).
 # Single service: make dev-backend | make dev-frontend | make dev-mocks
@@ -14,7 +13,7 @@ dev: kill-ports
 
 ifeq ($(OS),Windows_NT)
 kill-ports:
-	@$(MAKE) -s kill-port-$(DEV_PORT_LEGACY) kill-port-$(DEV_PORT_BACKEND) kill-port-$(DEV_PORT_FRONTEND) kill-port-$(DEV_PORT_MOCKS)
+	@$(MAKE) -s kill-port-$(DEV_PORT_BACKEND) kill-port-$(DEV_PORT_FRONTEND) kill-port-$(DEV_PORT_MOCKS)
 
 kill-port-%:
 	@powershell -NoProfile -Command "$$p = $*; $$seen = @{}; Get-NetTCPConnection -LocalPort $$p -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $$id = [int]$$_.OwningProcess; if ($$id -gt 0 -and -not $$seen.ContainsKey($$id)) { $$seen[$$id] = $$true; Write-Host ('Stopping process tree PID ' + $$id + ' (port ' + $$p + ')'); & taskkill /PID $$id /F /T 2>$$null } }"
