@@ -15,7 +15,9 @@ export function goToAppHome(): void {
   if (!getProjectIdFromHash()) return;
   clearProjectCaches();
   const home = `${window.location.pathname}${window.location.search}`;
-  window.location.replace(home);
+  window.history.replaceState(null, '', home);
+  // replaceState does not fire hashchange; re-run App routing for auto-select on bare home.
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
 export type RouteSyncInput = {

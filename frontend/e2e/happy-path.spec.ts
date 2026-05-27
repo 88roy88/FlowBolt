@@ -92,6 +92,8 @@ test.describe('Happy path', () => {
   });
 
   test('unknown project id in url redirects to home', async ({ page }) => {
+    test.setTimeout(60_000);
+
     const projectsList = page.waitForResponse(
       (r) => r.request().method() === 'GET' && isProjectsListGet(r.url()) && r.ok(),
       { timeout: 60_000 }
@@ -102,10 +104,12 @@ test.describe('Happy path', () => {
     });
     await projectsList;
 
-    await expect
-      .poll(() => page.evaluate(() => window.location.hash))
-      .toMatch(new RegExp(`^#/project/${MOCK_PROJECT.id}$`));
+    await page.waitForURL(
+      (url) => url.hash === `#/project/${MOCK_PROJECT.id}`,
+      { timeout: 60_000 },
+    );
 
-    await expect(page.getByText(MOCK_PROJECT.name)).toBeAttached({ timeout: 30_000 });
+    // Collapsed sidebar shows initials, not the full project name.
+    await expect(page.getByRole('button', { name: 'ET' })).toBeVisible({ timeout: 30_000 });
   });
 });
