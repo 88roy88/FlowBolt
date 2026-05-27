@@ -1,13 +1,13 @@
-import { Check, X, Sparkles, ArrowRight } from 'lucide-react';
+import { Check, Sparkles, ArrowRight } from 'lucide-react';
 import type { PlanOverview } from '../../../types';
 import { CardWrapper } from './CardWrapper';
 
-export function PlanOverviewCard({ overview, accepted }: { overview: PlanOverview; accepted: boolean }) {
+export function PlanOverviewCard({ overview }: { overview: PlanOverview }) {
   return (
     <CardWrapper accent="primary">
-      <div className={`flex items-center gap-1.5 mb-2 text-xs ${accepted ? 'text-success' : 'text-muted-foreground'}`}>
-        {accepted ? <Check size={12} /> : <X size={12} />}
-        {accepted ? 'Plan accepted' : 'Plan rejected'}
+      <div className="flex items-center gap-1.5 mb-2 text-xs text-success">
+        <Check size={12} />
+        Plan accepted
       </div>
       <p className="mb-2 leading-normal">{overview.summary}</p>
       {overview.features && overview.features.length > 0 && (

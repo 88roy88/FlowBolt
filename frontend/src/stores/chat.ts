@@ -26,7 +26,7 @@ export interface ChatState {
   buildCompleted: boolean;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
-  respondToPlan: (action: 'accept' | 'reject' | 'modify', feedback?: string) => void;
+  respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
   loadHistory: (projectId: string) => Promise<void>;
@@ -176,15 +176,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ selectedDataSources: [] });
   },
 
-  respondToPlan(action: 'accept' | 'reject' | 'modify', feedback?: string) {
+  respondToPlan(action: 'accept' | 'modify', feedback?: string) {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
 
     const socket = getChatSocket(projectId);
     socket.send({ type: 'plan_response', action, feedback });
 
-    // The backend will emit plan_accepted/plan_rejected events which the
-    // handler will process to add the appropriate message and update state.
+    // The backend will emit plan_accepted which the handler processes to add
+    // the appropriate message and update state.
     // For 'modify', just show planning state while the plan is being rebuilt.
     if (action === 'modify') {
       set({ isStreaming: true, agentPhase: 'planning' });
