@@ -63,13 +63,13 @@ export function ChatPanel() {
     }
   }, [historyLoaded, scrollToBottom]);
 
-  const showDesignProgress = agentPhase === AGENT_PHASE.DESIGNING;
+  const showDesignProgress = agentPhase === AGENT_PHASE.designing;
   const showOverview = awaitingPlanApproval;
-  const showTaskProgress = (agentPhase === AGENT_PHASE.EXECUTING || agentPhase === AGENT_PHASE.COMPLETE) && executionTasks.length > 0;
+  const showTaskProgress = (agentPhase === AGENT_PHASE.executing || agentPhase === AGENT_PHASE.complete) && executionTasks.length > 0;
   const showFixProgress = fixSteps.length > 0 && agentWorking;
   const showFollowUpProgress = followUpSteps.length > 0 && agentWorking;
   const showStreamingMessage = agentWorking && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
-  const showPhaseIndicator = agentPhase === AGENT_PHASE.PLANNING || (agentPhase === AGENT_PHASE.EXPLORING && followUpSteps.length === 0);
+  const showPhaseIndicator = agentPhase === AGENT_PHASE.planning || (agentPhase === AGENT_PHASE.exploring && followUpSteps.length === 0);
   const showTypingDots = agentWorking && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
 
   return (

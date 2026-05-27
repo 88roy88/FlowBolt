@@ -80,8 +80,8 @@ export type AgentPhase =
   | 'exploring'
   | 'complete';
 
-/** SCREAMING_SNAKE_CASE form of a string union (e.g. `idle` → `IDLE`). */
-export type CapitalChars<T extends string> = Uppercase<T>;
+/** Each phase key must map to itself (`idle` → `'idle'`, not any other phase). */
+export type AgentPhaseConstMap = { readonly [K in AgentPhase]: K };
 
 // User-facing plan overview (shown during approval)
 export interface PlanFeature {

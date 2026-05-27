@@ -75,7 +75,7 @@ function handleText(msg: { content: string }, set: SetState) {
 }
 
 function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
-  set({ error: msg.message, isStreaming: false, agentPhase: AGENT_PHASE.IDLE });
+  set({ error: msg.message, isStreaming: false, agentPhase: AGENT_PHASE.idle });
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
   }
@@ -164,7 +164,7 @@ export function createFixErrorHandler(
             actions: [],
             fixSteps: [],
             isStreaming: false,
-            agentPhase: AGENT_PHASE.IDLE,
+            agentPhase: AGENT_PHASE.idle,
             buildCompleted: true,
           }));
         } else {
@@ -172,7 +172,7 @@ export function createFixErrorHandler(
             currentAssistantMessage: '',
             actions: [],
             isStreaming: false,
-            agentPhase: AGENT_PHASE.IDLE,
+            agentPhase: AGENT_PHASE.idle,
             buildCompleted: true,
           });
         }
@@ -212,7 +212,7 @@ export function createSendMessageHandler(
         set({
           planOverview: msg.overview,
           isStreaming: false,
-          agentPhase: AGENT_PHASE.AWAITING_APPROVAL,
+          agentPhase: AGENT_PHASE.awaiting_approval,
         });
         break;
 
@@ -227,7 +227,7 @@ export function createSendMessageHandler(
         set((s) => ({
           messages: _skipMessages ? s.messages : [...s.messages, acceptedMsg],
           isStreaming: true,
-          agentPhase: AGENT_PHASE.PLANNING,
+          agentPhase: AGENT_PHASE.planning,
           planOverview: null,
         }));
         break;
@@ -296,7 +296,7 @@ function handlePhaseChange(
 ) {
   const prevPhase = get().agentPhase;
 
-  if (prevPhase === AGENT_PHASE.DESIGNING && msg.phase === AGENT_PHASE.PLANNING) {
+  if (prevPhase === AGENT_PHASE.designing && msg.phase === AGENT_PHASE.planning) {
     const dp = get().designProgress;
     const designMsg: Message = {
       id: generateId(),
@@ -316,7 +316,7 @@ function handlePhaseChange(
     agentPhase: msg.phase,
     ...(ACTIVE_AGENT_PHASES.includes(msg.phase) ? { isStreaming: true } : {}),
   });
-  if (msg.phase === AGENT_PHASE.EXECUTING) {
+  if (msg.phase === AGENT_PHASE.executing) {
     requestPermissionIfNeeded();
   }
 }
@@ -484,7 +484,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     currentAssistantMessage: '',
     actions: [],
     isStreaming: false,
-    agentPhase: AGENT_PHASE.IDLE,
+    agentPhase: AGENT_PHASE.idle,
     planOverview: null,
     executionTasks: [],
     fixSteps: [],

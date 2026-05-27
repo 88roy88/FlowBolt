@@ -44,7 +44,7 @@ export function PromptInput() {
     }
   };
 
-  const isBusy = isStreaming || (agentPhase !== AGENT_PHASE.IDLE && agentPhase !== AGENT_PHASE.COMPLETE);
+  const isBusy = isStreaming || (agentPhase !== AGENT_PHASE.idle && agentPhase !== AGENT_PHASE.complete);
   const disabled = isBusy || !projectId;
   const canSend = !!value.trim() && !disabled;
 
@@ -71,10 +71,10 @@ export function PromptInput() {
         : t('chat.placeholder.default');
 
   const busyLabel =
-    agentPhase === AGENT_PHASE.FETCHING_DATA_SOURCES ? t('chat.phase.fetchingDataSources') :
-    agentPhase === AGENT_PHASE.DESIGNING ? t('chat.phase.designing') :
-    agentPhase === AGENT_PHASE.PLANNING ? t('chat.phase.planning') :
-    agentPhase === AGENT_PHASE.EXECUTING ? t('chat.phase.building') :
+    agentPhase === AGENT_PHASE.fetching_data_sources ? t('chat.phase.fetchingDataSources') :
+    agentPhase === AGENT_PHASE.designing ? t('chat.phase.designing') :
+    agentPhase === AGENT_PHASE.planning ? t('chat.phase.planning') :
+    agentPhase === AGENT_PHASE.executing ? t('chat.phase.building') :
     t('chat.phase.thinking');
 
   return (

@@ -373,16 +373,16 @@ describe('createFixErrorHandler', () => {
 
 describe('chatAgentState helpers', () => {
   it('isAwaitingPlanApproval requires phase and overview', () => {
-    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.AWAITING_APPROVAL, planOverview: MOCK_PLAN_OVERVIEW })).toBe(true);
-    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.AWAITING_APPROVAL, planOverview: null })).toBe(false);
-    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.PLANNING, planOverview: MOCK_PLAN_OVERVIEW })).toBe(false);
+    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: MOCK_PLAN_OVERVIEW })).toBe(true);
+    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: null })).toBe(false);
+    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.planning, planOverview: MOCK_PLAN_OVERVIEW })).toBe(false);
   });
 
   it('shouldResetOnConnectionLost skips awaiting approval', () => {
-    expect(shouldResetOnConnectionLost({ isStreaming: true, agentPhase: AGENT_PHASE.EXECUTING, planOverview: null })).toBe(true);
+    expect(shouldResetOnConnectionLost({ isStreaming: true, agentPhase: AGENT_PHASE.executing, planOverview: null })).toBe(true);
     expect(shouldResetOnConnectionLost({
       isStreaming: false,
-      agentPhase: AGENT_PHASE.AWAITING_APPROVAL,
+      agentPhase: AGENT_PHASE.awaiting_approval,
       planOverview: MOCK_PLAN_OVERVIEW,
     })).toBe(false);
   });
@@ -419,13 +419,13 @@ describe('finalizeHistoryReplayState', () => {
   it('keeps awaiting approval state when plan overview is pending', () => {
     const store = createTestStore({
       ...INITIAL_STATE,
-      agentPhase: AGENT_PHASE.AWAITING_APPROVAL,
+      agentPhase: AGENT_PHASE.awaiting_approval,
       planOverview: MOCK_PLAN_OVERVIEW,
     });
     const events = [{ type: 'plan_overview' }];
     const didReset = finalizeHistoryReplayState(store.set, store.get, events);
     expect(didReset).toBe(false);
-    expect(store.state().agentPhase).toBe(AGENT_PHASE.AWAITING_APPROVAL);
+    expect(store.state().agentPhase).toBe(AGENT_PHASE.awaiting_approval);
     expect(store.state().planOverview).toEqual(MOCK_PLAN_OVERVIEW);
   });
 });

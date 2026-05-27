@@ -11,15 +11,15 @@ export function GlobalProgress() {
 
   const progress =
     !working ? 0 :
-    agentPhase === AGENT_PHASE.IDLE ? 3 :
-    agentPhase === AGENT_PHASE.FETCHING_DATA_SOURCES ? 10 :
-    agentPhase === AGENT_PHASE.DESIGNING ? 15 :
-    agentPhase === AGENT_PHASE.PLANNING ? 30 :
-    agentPhase === AGENT_PHASE.AWAITING_APPROVAL ? 35 :
-    agentPhase === AGENT_PHASE.EXECUTING ? 40 + (tasks.filter((t) => t.status === 'completed').length / Math.max(tasks.length, 1)) * 55 :
-    agentPhase === AGENT_PHASE.FIXING ? 50 :
-    agentPhase === AGENT_PHASE.EXPLORING ? 50 :
-    agentPhase === AGENT_PHASE.COMPLETE ? 100 : 0;
+    agentPhase === AGENT_PHASE.idle ? 3 :
+    agentPhase === AGENT_PHASE.fetching_data_sources ? 10 :
+    agentPhase === AGENT_PHASE.designing ? 15 :
+    agentPhase === AGENT_PHASE.planning ? 30 :
+    agentPhase === AGENT_PHASE.awaiting_approval ? 35 :
+    agentPhase === AGENT_PHASE.executing ? 40 + (tasks.filter((t) => t.status === 'completed').length / Math.max(tasks.length, 1)) * 55 :
+    agentPhase === AGENT_PHASE.fixing ? 50 :
+    agentPhase === AGENT_PHASE.exploring ? 50 :
+    agentPhase === AGENT_PHASE.complete ? 100 : 0;
 
   // Show when active, hide after completion with a brief delay
   useEffect(() => {

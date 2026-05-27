@@ -1,21 +1,24 @@
-import type { AgentPhase, CapitalChars } from '../types';
+import type { AgentPhase, AgentPhaseConstMap } from '../types';
 import type { ChatState } from './chat';
 
+/** Every `AgentPhase` as an identity key/value pair; mismatched values fail type-check. */
 export const AGENT_PHASE = {
-  IDLE: 'idle',
-  FETCHING_DATA_SOURCES: 'fetching_data_sources',
-  DESIGNING: 'designing',
-  PLANNING: 'planning',
-  AWAITING_APPROVAL: 'awaiting_approval',
-  EXECUTING: 'executing',
-  FIXING: 'fixing',
-  EXPLORING: 'exploring',
-  COMPLETE: 'complete',
-} as const satisfies Record<CapitalChars<AgentPhase>, AgentPhase>;
+  idle: 'idle',
+  fetching_data_sources: 'fetching_data_sources',
+  designing: 'designing',
+  planning: 'planning',
+  awaiting_approval: 'awaiting_approval',
+  executing: 'executing',
+  fixing: 'fixing',
+  exploring: 'exploring',
+  complete: 'complete',
+} as const satisfies AgentPhaseConstMap;
+
+export type AgentPhaseMap = typeof AGENT_PHASE;
 
 /** Agent is paused until the user accepts or modifies the work plan. */
 export const PLAN_AWAITING_AGENT_PHASES: readonly AgentPhase[] = [
-  AGENT_PHASE.AWAITING_APPROVAL,
+  AGENT_PHASE.awaiting_approval,
 ];
 
 /** WS events that end an in-flight run while the user must review the plan. */
@@ -29,17 +32,17 @@ export const TERMINAL_EVENT_TYPES = [
 ] as const;
 
 export const ACTIVE_AGENT_PHASES: AgentPhase[] = [
-  AGENT_PHASE.FETCHING_DATA_SOURCES,
-  AGENT_PHASE.DESIGNING,
-  AGENT_PHASE.PLANNING,
-  AGENT_PHASE.EXECUTING,
-  AGENT_PHASE.FIXING,
-  AGENT_PHASE.EXPLORING,
+  AGENT_PHASE.fetching_data_sources,
+  AGENT_PHASE.designing,
+  AGENT_PHASE.planning,
+  AGENT_PHASE.executing,
+  AGENT_PHASE.fixing,
+  AGENT_PHASE.exploring,
 ];
 
 export const TRANSIENT_RESET: Partial<ChatState> = {
   isStreaming: false,
-  agentPhase: AGENT_PHASE.IDLE,
+  agentPhase: AGENT_PHASE.idle,
   currentAssistantMessage: '',
   actions: [],
   followUpSteps: [],

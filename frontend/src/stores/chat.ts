@@ -80,7 +80,7 @@ const RESET_STATE = {
   followUpSteps: [] as FollowUpStep[],
   followUpDiffs: [] as FileDiff[],
   error: null,
-  agentPhase: AGENT_PHASE.IDLE,
+  agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [] as ExecutionTask[],
 };
@@ -94,7 +94,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   models: [],
   selectedModel: null,
-  agentPhase: AGENT_PHASE.IDLE,
+  agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [],
   fixSteps: [],
@@ -195,7 +195,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // the appropriate message and update state.
     // For 'modify', just show planning state while the plan is being rebuilt.
     if (action === 'modify') {
-      set({ isStreaming: true, agentPhase: AGENT_PHASE.PLANNING });
+      set({ isStreaming: true, agentPhase: AGENT_PHASE.planning });
     }
   },
 
