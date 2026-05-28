@@ -75,6 +75,11 @@ class _DateRangeValue(BaseModel):
     To: str
 
 
+class _TimebackValue(BaseModel):
+    TimeBackValue: int | float
+    TimeBackUnit: Literal["second", "minute", "hour", "day", "week", "month", "year"]
+
+
 class _TimestampRelative(BaseModel):
     Unit: Literal["seconds", "minutes", "hours", "days", "weeks", "months", "years"]
     Value: int
@@ -91,6 +96,7 @@ QuickParamScalar: TypeAlias = str | int | float | bool
 QuickParamValue: TypeAlias = (
     list[_TextValueItem]
     | _DateRangeValue
+    | _TimebackValue
     | list[_GeographicValueItem]
     | list[datetime | Literal["now"] | _TimestampRelative]
     | QuickParamScalar

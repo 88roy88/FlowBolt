@@ -18,7 +18,9 @@ _FLOW_PARAM_VALUE_TYPE_DEF = """\
 type BooleanValue = boolean;
 type TextValue = { Name: string; Value: string }[];
 type ISODateString = string;
-type DateRangeValue = { From: ISODateString; To: ISODateString };
+type DateRangeValue = 
+    | { From: ISODateString; To: ISODateString }
+    | { TimeBackValue: number; TimeBackUnit: "second" | "minute" | "hour" | "day" | "week" | "month" | "year" }; 
 type TimestampValue = (Date | "now" | {
     Unit: "seconds" | "minutes" | "hours" | "days" | "weeks" | "months" | "years";
     Value: number;

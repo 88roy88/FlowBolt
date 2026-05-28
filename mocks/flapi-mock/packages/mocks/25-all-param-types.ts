@@ -63,8 +63,13 @@ export default new MockPackage({
       ? (quickParams.label as { Value: string }[]).map((v) => v.Value).join(', ')
       : null;
 
-    const date_range =
-      quickParams.date_range != null ? (quickParams.date_range as { To: string }).To : null;
+    const date_range = (() => {
+      if (quickParams.date_range == null) return null;
+      const d = quickParams.date_range as
+        | { From: string; To: string }
+        | { TimeBackValue: number; TimeBackUnit: string };
+      return 'To' in d ? d.To : new Date().toISOString().slice(0, 10);
+    })();
 
     const recorded_at =
       quickParams.recorded_at != null ? JSON.stringify(quickParams.recorded_at) : null;
