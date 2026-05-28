@@ -53,7 +53,7 @@ _FLAPI_PARAM_TYPE: dict[flapi_models.ParamType, ParamType] = {
     "Int": "int",
     "Double": "double",
     "Boolean": "bool",
-    "DateTime": "datetime",
+    "Datetime": "datetime",
     "Timestamp": "timestamp",
     "Haphoch": "geographic",
 }
