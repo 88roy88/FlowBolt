@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, WebSocket
 
-from flow44.api.auth import ProjectDep, extract_user_id, get_project, get_ws_project
+from flow44.api.auth import ProjectDep, get_project, get_user_id, get_ws_user_id
 from flow44.db.project import Project
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
@@ -24,8 +24,14 @@ SandboxDep = Annotated[PnpmSandbox, Depends(get_sandbox)]
 
 async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox | None:
     """Convenience for WebSockets to get sandbox while enforcing ownership via query token."""
-    project = await get_ws_project(websocket, project_id)
-    if project is None:
+    user_id = await get_ws_user_id(websocket)
+    if user_id is None:
+        return None
+
+    try:
+        await get_project(project_id, user_id)
+    except HTTPException:
+        await websocket.close(code=1008, reason="Unauthorized")
         return None
 
     try:
@@ -53,7 +59,7 @@ async def read_auth_frame(websocket: WebSocket) -> dict[str, object] | None:
 async def _authorize_ws_project(websocket: WebSocket, project_id: str, auth_frame: dict[str, object]) -> Project | None:
     token = auth_frame.get("userAuthorization")
     try:
-        user_id = extract_user_id(token if isinstance(token, str) else None)
+        user_id = get_user_id(token if isinstance(token, str) else None)
         return await get_project(project_id, user_id)
     except HTTPException:
         await websocket.close(code=1008, reason="Unauthorized")

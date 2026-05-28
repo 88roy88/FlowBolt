@@ -7,6 +7,7 @@ from typing import Annotated, cast
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, WebSocket
 from jwt.types import Options
+from pydantic import BaseModel, ConfigDict, model_validator
 from starlette.datastructures import MutableHeaders
 
 from flow44.config import settings
@@ -22,16 +23,41 @@ _DECODE_OPTIONS = {
     "verify_aud": False,
 }
 
+def _claim_with_suffix(payload: dict[str, object], suffix: str) -> str | None:
+    """Return the first claim value whose key ends with ``suffix`` (e.g. ``/UniqueID``)."""
+    for key, value in payload.items():
+        if isinstance(key, str) and key.endswith(suffix) and isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
-def _find_unique_id(payload: dict[str, object]) -> str | None:
-    return next((str(v) for k, v in payload.items() if k.endswith("/UniqueID")), None)
+
+class TokenPayload(BaseModel):
+    """JWT payload. Custom claims arrive URL-prefixed (e.g. ``.../UniqueID``);
+    the validator surfaces them as clean attributes. Unknown claims pass through."""
+
+    model_config = ConfigDict(extra="allow")
+
+    iss: str | None = None
+    exp: int | None = None
+    unique_id: str | None = None
+    given_name: str | None = None
+    surname: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _surface_url_claims(cls, data: dict[str, object]) -> dict[str, object]:
+        return data | {
+            "unique_id": _claim_with_suffix(data, "/UniqueID"),
+            "given_name": _claim_with_suffix(data, "/givenname"),
+            "surname": _claim_with_suffix(data, "/surname"),
+        }
 
 
 def get_authorization_header(
     authorization: str | None = Header(None, alias="Authorization"),
-    fb_token: str | None = Cookie(None),
+    flow44_token: str | None = Cookie(None),
 ) -> str | None:
-    raw = (authorization or fb_token or "").strip()
+    raw = (authorization or flow44_token or "").strip()
     if not raw:
         return None
     return raw[7:].strip() if raw.lower().startswith("bearer ") else raw
@@ -40,8 +66,23 @@ def get_authorization_header(
 TokenDep = Annotated[str | None, Depends(get_authorization_header)]
 
 
-def extract_user_id(token: str | None) -> str:
-    """Resolve token to user_id. JWT payload parsed unsigned; uid from ``/UniqueID`` claim."""
+def decode_token(token: str) -> TokenPayload | None:
+    """Verify signature and parse the payload into a TokenPayload. Returns None on any failure."""
+    try:
+        decoded = jwt.decode(
+            token,
+            settings.AUTH_JWT_PUBLIC_KEY,
+            algorithms=[settings.AUTH_JWT_ALGORITHM],
+            options=cast(Options, _DECODE_OPTIONS),
+        )
+    except jwt.PyJWTError as e:
+        logger.debug("JWT decode failed: %s", e)
+        return None
+    return TokenPayload.model_validate(decoded)
+
+
+def get_user_id(token: TokenDep) -> str:
+    """Resolve a raw token to a user_id under the dual-mode policy."""
     if not token:
         if settings.AUTH_REQUIRE_JWT:
             raise HTTPException(status_code=401, detail="Authorization required")
@@ -50,33 +91,17 @@ def extract_user_id(token: str | None) -> str:
     is_jwt = token.count(".") == 2
 
     if is_jwt:
-        try:
-            decoded = jwt.decode(
-                token,
-                settings.AUTH_JWT_PUBLIC_KEY,
-                algorithms=[settings.AUTH_JWT_ALGORITHM],
-                options=cast(Options, _DECODE_OPTIONS),
-            )
-            uid = _find_unique_id(decoded) if isinstance(decoded, dict) else None
-        except jwt.PyJWTError as e:
-            logger.debug("JWT parse failed: %s", e)
-            uid = None
-
-        if uid:
-            return uid
-
+        payload = decode_token(token)
+        if payload and payload.unique_id:
+            return payload.unique_id
         if settings.AUTH_REQUIRE_JWT:
             raise HTTPException(status_code=401, detail="Token missing user identification")
         return token
 
-    elif settings.AUTH_REQUIRE_JWT:
+    if settings.AUTH_REQUIRE_JWT:
         raise HTTPException(status_code=401, detail="JWT token required")
 
     return token
-
-
-def get_user_id(authorization: TokenDep) -> str:
-    return extract_user_id(authorization)
 
 
 UserDep = Annotated[str, Depends(get_user_id)]
@@ -92,12 +117,10 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_ws_project(websocket: WebSocket, project_id: str) -> Project | None:
-    """WS auth via query param or cookie."""
-    token = websocket.query_params.get("token") or websocket.cookies.get("fb_token")
+async def get_ws_user_id(websocket: WebSocket) -> str | None:
+    """Resolve a user_id from the WebSocket's flow44_token cookie. Closes the socket on failure."""
     try:
-        user_id = extract_user_id(token)
-        return await get_project(project_id, user_id)
+        return get_user_id(websocket.cookies.get("flow44_token"))
     except HTTPException:
         await websocket.close(code=1008, reason="Unauthorized")
         return None
@@ -115,7 +138,7 @@ async def preview_token_cookie(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    """Scope ?token= to preview proxy: inject as fb_token cookie so sub-resources authenticate."""
+    """Scope ?token= to preview proxy: inject as flow44_token cookie so sub-resources authenticate."""
     token = request.query_params.get("token")
     project_id = _preview_project_id(request.url.path) if token else None
 
@@ -125,5 +148,5 @@ async def preview_token_cookie(
     MutableHeaders(scope=request.scope)["authorization"] = f"Bearer {token}"
 
     response = await call_next(request)
-    response.set_cookie("fb_token", token, path=f"/api/preview/{project_id}/proxy", httponly=True, samesite="lax")
+    response.set_cookie("flow44_token", token, path=f"/api/preview/{project_id}/proxy", httponly=True, samesite="lax")
     return response

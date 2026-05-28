@@ -130,7 +130,7 @@ def test_auth_wrong_owner_gets_not_found():
     project = _mock_project(user_id="owner-user")
 
     with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=project), \
-         patch("flow44.api.chat.extract_user_id", return_value="other-user"), \
+         patch("flow44.api.chat.get_user_id", return_value="other-user"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         try:
@@ -150,7 +150,7 @@ def test_auth_wrong_owner_gets_not_found():
 def test_auth_unknown_project_gets_not_found():
     """A valid token for a project that doesn't exist should get 'Project not found'."""
     with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=None), \
-         patch("flow44.api.chat.extract_user_id", return_value="some-user"), \
+         patch("flow44.api.chat.get_user_id", return_value="some-user"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         try:
@@ -200,7 +200,7 @@ def test_sandbox_not_found_after_auth_sends_error():
     project = _mock_project(user_id="user-a")
 
     with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=project), \
-         patch("flow44.api.chat.extract_user_id", return_value="user-a"), \
+         patch("flow44.api.chat.get_user_id", return_value="user-a"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         mock_mgr.get_sandbox.side_effect = SandboxNotFoundError("proj-123")

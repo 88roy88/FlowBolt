@@ -1,10 +1,11 @@
-"""Tests for extract_user_id behavior (unsigned JWT payload parsing).
+"""Tests for get_user_id behavior, decode_token, and TokenPayload parsing.
 
 Covers the behavior matrix in auth.py:
 - No token + AUTH_REQUIRE_JWT on/off
 - JWT-shaped + URL ``/UniqueID`` claim present / missing / undecodable
 - JWT-shaped + AUTH_REQUIRE_JWT on/off (strict vs dev fallback)
 - Opaque token + AUTH_REQUIRE_JWT on/off
+- TokenPayload lifts URL-suffixed claims and preserves extras
 """
 
 import time
@@ -14,7 +15,7 @@ import jwt
 import pytest
 from fastapi import HTTPException
 
-from flow44.api.auth import extract_user_id
+from flow44.api.auth import TokenPayload, decode_token, get_user_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,14 +45,14 @@ def _jwt_shaped(raw: str) -> bool:
 def test_no_token_require_jwt_raises(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     with pytest.raises(HTTPException) as exc:
-        extract_user_id(None)
+        get_user_id(None)
     assert exc.value.status_code == 401
 
 
 @patch("flow44.api.auth.settings")
 def test_no_token_no_require_returns_anonymous(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
-    assert extract_user_id(None) == "anonymous"
+    assert get_user_id(None) == "anonymous"
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +66,7 @@ def test_jwt_url_unique_id_claim_returned(mock_settings):
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
     mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-123"})
-    assert extract_user_id(token) == "user-123"
+    assert get_user_id(token) == "user-123"
 
 
 @patch("flow44.api.auth.settings")
@@ -79,7 +80,7 @@ def test_jwt_first_matching_url_claim_wins(mock_settings):
             CLAIM_UNIQUE_ID_URL: "second",
         }
     )
-    assert extract_user_id(token) == "first"
+    assert get_user_id(token) == "first"
 
 
 @patch("flow44.api.auth.settings")
@@ -87,7 +88,7 @@ def test_jwt_missing_unique_id_claim_raises_when_required(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     token = _make_jwt({"sub": "ignored", "role": "admin"})
     with pytest.raises(HTTPException) as exc:
-        extract_user_id(token)
+        get_user_id(token)
     assert exc.value.status_code == 401
     assert "missing user identification" in exc.value.detail.lower()
 
@@ -104,7 +105,7 @@ def test_jwt_expired_still_extracts_when_exp_verification_disabled(mock_settings
             "exp": int(time.time()) - 10,
         }
     )
-    assert extract_user_id(token) == "user-x"
+    assert get_user_id(token) == "user-x"
 
 
 @patch("flow44.api.auth.settings")
@@ -113,7 +114,7 @@ def test_jwt_malformed_raises_when_required(mock_settings):
     # Exactly two dots; payload segment decodes to non-JSON bytes.
     bad = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.YWFh.YWFh"
     with pytest.raises(HTTPException) as exc:
-        extract_user_id(bad)
+        get_user_id(bad)
     assert exc.value.status_code == 401
 
 
@@ -126,7 +127,7 @@ def test_jwt_malformed_raises_when_required(mock_settings):
 def test_jwt_no_unique_id_no_require_returns_raw_token(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
     token = _make_jwt({"sub": "user-local"})
-    result = extract_user_id(token)
+    result = get_user_id(token)
     assert result == token
     assert result != "user-local"
 
@@ -137,14 +138,14 @@ def test_jwt_valid_claim_no_require_returns_uid(mock_settings):
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
     mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     token = _make_jwt({CLAIM_UNIQUE_ID_URL: "dev-user"})
-    assert extract_user_id(token) == "dev-user"
+    assert get_user_id(token) == "dev-user"
 
 
 @patch("flow44.api.auth.settings")
 def test_jwt_malformed_no_require_returns_raw_string(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
     raw = "x.y.z"
-    assert extract_user_id(raw) == raw
+    assert get_user_id(raw) == raw
 
 
 @patch("flow44.api.auth.settings")
@@ -155,7 +156,7 @@ def test_jwt_require_true_accepts_unsigned_payload_with_claim(mock_settings):
     mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     forged = _make_jwt({CLAIM_UNIQUE_ID_URL: "parsed-user"})
     assert _jwt_shaped(forged)
-    assert extract_user_id(forged) == "parsed-user"
+    assert get_user_id(forged) == "parsed-user"
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +168,7 @@ def test_jwt_require_true_accepts_unsigned_payload_with_claim(mock_settings):
 def test_opaque_token_require_jwt_raises(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     with pytest.raises(HTTPException) as exc:
-        extract_user_id("some-opaque-api-key")
+        get_user_id("some-opaque-api-key")
     assert exc.value.status_code == 401
     assert "JWT" in exc.value.detail
 
@@ -175,4 +176,67 @@ def test_opaque_token_require_jwt_raises(mock_settings):
 @patch("flow44.api.auth.settings")
 def test_opaque_token_no_require_returns_as_user_id(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
-    assert extract_user_id("my-opaque-key") == "my-opaque-key"
+    assert get_user_id("my-opaque-key") == "my-opaque-key"
+
+
+# ---------------------------------------------------------------------------
+# decode_token + TokenPayload
+# ---------------------------------------------------------------------------
+
+
+CLAIM_PREFIX = "https://issuer.example/v1/claims/"
+
+
+@patch("flow44.api.auth.settings")
+def test_decode_token_returns_payload_on_valid_jwt(mock_settings):
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
+    token = _make_jwt({CLAIM_UNIQUE_ID_URL: "u-1", "iss": "test-issuer"})
+    payload = decode_token(token)
+    assert isinstance(payload, TokenPayload)
+    assert payload.unique_id == "u-1"
+    assert payload.iss == "test-issuer"
+
+
+@patch("flow44.api.auth.settings")
+def test_decode_token_returns_none_on_garbage(mock_settings):
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
+    assert decode_token("not-a-jwt") is None
+    assert decode_token("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.YWFh.YWFh") is None
+
+
+def test_token_payload_lifts_all_url_suffixed_claims():
+    payload = TokenPayload.model_validate(
+        {
+            CLAIM_PREFIX + "UniqueID": "user-42",
+            CLAIM_PREFIX + "givenname": "Ada",
+            CLAIM_PREFIX + "surname": "Lovelace",
+            "iss": "ex",
+            "exp": 1700000000,
+        }
+    )
+    assert payload.unique_id == "user-42"
+    assert payload.given_name == "Ada"
+    assert payload.surname == "Lovelace"
+    assert payload.iss == "ex"
+    assert payload.exp == 1700000000
+
+
+def test_token_payload_preserves_unknown_claims_via_extra():
+    payload = TokenPayload.model_validate(
+        {CLAIM_PREFIX + "UniqueID": "u", "custom_role": "admin", "sub": "ignored-by-model"}
+    )
+    dumped = payload.model_dump()
+    assert dumped["custom_role"] == "admin"
+    assert dumped["sub"] == "ignored-by-model"
+
+
+def test_token_payload_first_url_suffix_match_wins():
+    payload = TokenPayload.model_validate(
+        {
+            "https://other.example/claims/UniqueID": "first",
+            CLAIM_PREFIX + "UniqueID": "second",
+        }
+    )
+    assert payload.unique_id == "first"

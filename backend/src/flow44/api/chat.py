@@ -12,7 +12,7 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.auth import ProjectDep, extract_user_id, get_project
+from flow44.api.auth import ProjectDep, get_project, get_user_id
 from flow44.api.sandbox import read_auth_frame
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
@@ -69,7 +69,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
     user_token = first.get("userAuthorization")
 
     try:
-        caller_id = extract_user_id(user_token if isinstance(user_token, str) else None)
+        caller_id = get_user_id(user_token if isinstance(user_token, str) else None)
     except HTTPException as exc:
         await websocket.send_json({"type": "error", "message": exc.detail})
         await websocket.close()
