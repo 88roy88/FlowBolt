@@ -25,7 +25,7 @@ type TimestampValue = (Date | "now" | {
     Direction: "before" | "after";
 })[];
 type WKT = string;
-type GeographicValue = { value: WKT[], radius: 0 | number }[];
+type GeographicValue = { value: WKT[], radius?: 0 | number }[];
 
 type FlowParamValue = BooleanValue | TextValue | DateRangeValue | TimestampValue | GeographicValue;"""
 

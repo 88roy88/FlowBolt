@@ -83,7 +83,7 @@ class _TimestampRelative(BaseModel):
 
 class _GeographicValueItem(BaseModel):
     value: str | list[str]
-    radius: float = 0
+    radius: float | None = None
 
 
 QuickParamScalar: TypeAlias = str | int | float | bool
