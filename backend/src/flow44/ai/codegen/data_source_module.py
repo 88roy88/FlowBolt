@@ -2,9 +2,8 @@
 
 Emits a single file per data source at ``src/dataSources/{Sanitized}.ts``
 containing both the response type and an async function that calls the
-FLAPI run endpoint. The function's signature mirrors the data source's
-quick-params: required params become positional typed arguments; optional
-params are collected in a trailing options object.
+FLAPI run endpoint. The function's signature uses a named-parameters object
+where every param is typed as ``FlowParamValue``.
 """
 
 from __future__ import annotations
@@ -13,15 +12,13 @@ import re
 from typing import Any
 
 from flow44.ai.codegen.ts_types import generate_ts_interfaces
-from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition, ParamType
+from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition
 
-_PARAM_TYPE_TO_TS: dict[ParamType, str] = {
-    "string": "string",
-    "int": "number",
-    "double": "number",
-    "bool": "boolean",
-    "datetime": "string",
-}
+_FLOW_PARAM_VALUE_TYPE_DEF = """\
+type TextValue = { Name: string; Value: string }[];
+type DateRangeValue = { From: string; To: string };
+
+type FlowParamValue = TextValue | DateRangeValue;"""
 
 # Param names that would clip a JS/TS reserved word when used as a parameter
 # or property identifier. A trailing underscore is appended to avoid the clash
@@ -61,6 +58,7 @@ def generate_data_source_module(  # noqa: PLR0913
 
     return (
         "import { fetchWithAuth } from '../api/client';\n\n"
+        f"{_FLOW_PARAM_VALUE_TYPE_DEF}\n\n"
         f"{types_block}\n\n"
         f"{signature} {{\n{body}}}\n"
     )
@@ -76,14 +74,19 @@ def _build_signature(
     optional: list[ParamDefinition],
     response_type: str,
 ) -> str:
-    parts: list[str] = []
+    all_params = required + optional
+    if not all_params:
+        return f"export async function {function_name}(): Promise<{response_type}>"
+
+    param_names = ", ".join(_ts_ident(p.name) for p in all_params)
+    fields: list[str] = []
     for p in required:
-        parts.append(f"{_ts_ident(p.name)}: {_ts_type(p)}")
-    if optional:
-        opt_fields = ", ".join(f"{_ts_ident(p.name)}?: {_ts_type(p)}" for p in optional)
-        parts.append(f"options?: {{ {opt_fields} }}")
-    args = ", ".join(parts)
-    return f"export async function {function_name}({args}): Promise<{response_type}>"
+        fields.append(f"{_ts_ident(p.name)}: FlowParamValue")
+    for p in optional:
+        fields.append(f"{_ts_ident(p.name)}?: FlowParamValue")
+    type_body = "; ".join(fields)
+
+    return f"export async function {function_name}({{ {param_names} }}: {{ {type_body} }}): Promise<{response_type}>"
 
 
 def _build_body(
@@ -110,18 +113,13 @@ def _build_body(
         for p in optional:
             ident = _ts_ident(p.name)
             lines.append(
-                f"  if (options?.{ident} !== undefined) body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = options.{ident};\n"
+                f"  if ({ident} !== undefined) body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {ident};\n"
             )
         lines.append(f"  const res = await fetchWithAuth('{path}', body);\n")
 
     lines.append(f"  const envelope = (await res.json()) as {{ data: {response_type} }};\n")
     lines.append("  return envelope.data;\n")
     return "".join(lines)
-
-
-def _ts_type(p: ParamDefinition) -> str:
-    base = _PARAM_TYPE_TO_TS[p.type]
-    return f"{base}[]" if not p.is_single_value else base
 
 
 def _ts_ident(name: str) -> str:

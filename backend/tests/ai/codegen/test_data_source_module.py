@@ -71,6 +71,7 @@ class TestRequiredParam:
                     is_required=True,
                     is_single_value=True,
                     options=[],
+                    cube_id="people",
                 )
             ],
             require_any=False,
@@ -82,8 +83,8 @@ class TestRequiredParam:
             sample_data=None,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson(personId: number): Promise<PersonResponse>" in result
-        assert "body['person_id'] = personId;" in result
+        assert "export async function dataSourcePerson({ personId }: { personId: FlowParamValue }): Promise<PersonResponse>" in result
+        assert "body['people']['person_id'] = personId;" in result
         assert "fetchWithAuth('/api/data-source/7/run', body);" in result
 
     def test_schema_only_response_type_when_no_sample(self) -> None:
@@ -112,6 +113,7 @@ class TestMixedParams:
                     is_required=True,
                     is_single_value=True,
                     options=[],
+                    cube_id="tasks",
                 ),
                 ParamDefinition(
                     name="priority",
@@ -120,6 +122,7 @@ class TestMixedParams:
                     is_required=False,
                     is_single_value=False,
                     options=[ParamOption(name="low", value="low")],
+                    cube_id="tasks",
                 ),
                 ParamDefinition(
                     name="created_after",
@@ -128,6 +131,7 @@ class TestMixedParams:
                     is_required=False,
                     is_single_value=True,
                     options=[],
+                    cube_id="tasks",
                 ),
             ],
             require_any=False,
@@ -139,10 +143,10 @@ class TestMixedParams:
             sample_data=None,
             queries=_queries("mixed"),
         )
-        assert "dataSourceMixed(type: string, options?: { priority?: string[], createdAfter?: string })" in result
-        assert "body['type'] = type;" in result
-        assert "if (options?.priority !== undefined) body['priority'] = options.priority;" in result
-        assert "if (options?.createdAfter !== undefined) body['created_after'] = options.createdAfter;" in result
+        assert "dataSourceMixed({ type, priority, createdAfter }: { type: FlowParamValue; priority?: FlowParamValue; createdAfter?: FlowParamValue })" in result
+        assert "body['tasks']['type'] = type;" in result
+        assert "if (priority !== undefined) body['tasks']['priority'] = priority;" in result
+        assert "if (createdAfter !== undefined) body['tasks']['created_after'] = createdAfter;" in result
 
 
 class TestArrayParam:
@@ -167,7 +171,7 @@ class TestArrayParam:
             sample_data=None,
             queries=_queries("tagged"),
         )
-        assert "dataSourceTagged(tags: string[])" in result
+        assert "dataSourceTagged({ tags }: { tags: FlowParamValue })" in result
 
 
 class TestTypeCoercion:
@@ -192,7 +196,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "active: boolean" in result
+        assert "active: FlowParamValue" in result
 
     def test_date_maps_to_string(self) -> None:
         params = DataSourceParamsInfo(
@@ -215,7 +219,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "startDate: string" in result
+        assert "startDate: FlowParamValue" in result
 
 
 class TestReservedWordParamName:
@@ -232,6 +236,7 @@ class TestReservedWordParamName:
                     is_required=True,
                     is_single_value=True,
                     options=[],
+                    cube_id="events",
                 ),
                 ParamDefinition(
                     name="delete",
@@ -240,6 +245,7 @@ class TestReservedWordParamName:
                     is_required=False,
                     is_single_value=True,
                     options=[],
+                    cube_id="events",
                 ),
             ],
             require_any=False,
@@ -251,11 +257,11 @@ class TestReservedWordParamName:
             sample_data=None,
             queries=_queries("r"),
         )
-        assert "from_: string" in result
-        assert "delete_?: boolean" in result
+        assert "from_: FlowParamValue" in result
+        assert "delete_?: FlowParamValue" in result
         # The body keys still use the FLAPI names.
-        assert "body['from'] = from_;" in result
-        assert "body['delete'] = options.delete_;" in result
+        assert "body['events']['from'] = from_;" in result
+        assert "if (delete_ !== undefined) body['events']['delete'] = delete_;" in result
 
 
 class TestRequireAnyGroup:
@@ -291,4 +297,4 @@ class TestRequireAnyGroup:
         # Both require_any params are treated as required positional for TS typing
         # (runtime OR-validation is the caller's concern; the prompt tells the LLM
         # at least one must be provided).
-        assert "dataSourceContact(email: string, phone: string)" in result
+        assert "dataSourceContact({ email, phone }: { email: FlowParamValue; phone: FlowParamValue })" in result
