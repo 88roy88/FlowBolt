@@ -56,13 +56,14 @@ def generate_data_source_module(  # noqa: PLR0913
 ) -> str:
     """Build the full .ts content for a data source."""
     response_type = f"{sanitized_name}Response"
+    results_type = f"{sanitized_name}Results"
     types_block = generate_ts_interfaces(sample_data, sanitized_name, queries=queries).rstrip()
 
     function_name = _function_name(sanitized_name)
     required = [p for p in params_info.parameters if p.is_required or p.is_require_any]
     optional = [p for p in params_info.parameters if not (p.is_required or p.is_require_any)]
 
-    signature = _build_signature(function_name, required, optional, response_type)
+    signature = _build_signature(function_name, required, optional, results_type)
     body = _build_body(data_source_id, required, optional, response_type)
 
     return (
@@ -159,7 +160,7 @@ def _build_body(
             )
         lines.append(f"  const res = await fetchWithAuth('{path}', body);\n")
 
-    lines.append(f"  const envelope = (await res.json()) as {{ data: {response_type} }};\n")
+    lines.append(f"  const envelope = (await res.json()) as {response_type};\n")
     lines.append("  return envelope.data;\n")
     return "".join(lines)
 

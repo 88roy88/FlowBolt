@@ -40,7 +40,7 @@ class TestNoParams:
             queries=None,
         )
         assert "import { fetchWithAuth } from '../api/client';" in result
-        assert "export async function dataSourceSales(): Promise<SalesResponse>" in result
+        assert "export async function dataSourceSales(): Promise<SalesResults>" in result
         assert "/api/data-source/42/run" in result
         # No body built; fetchWithAuth called with just the path.
         assert "fetchWithAuth('/api/data-source/42/run')" in result
@@ -56,7 +56,7 @@ class TestEnvelopeUnwrap:
             sample_data=None,
             queries=_queries("x"),
         )
-        assert "{ data: XResponse }" in result
+        assert "(await res.json()) as XResponse" in result
         assert "return envelope.data;" in result
 
 
@@ -83,7 +83,7 @@ class TestRequiredParam:
             sample_data=None,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson({ personId }: { personId: TextValue }): Promise<PersonResponse>" in result
+        assert "export async function dataSourcePerson({ personId }: { personId: TextValue }): Promise<PersonResults>" in result
         assert "body['people']['person_id'] = personId;" in result
         assert "fetchWithAuth('/api/data-source/7/run', body);" in result
 
