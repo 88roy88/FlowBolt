@@ -145,7 +145,13 @@
       "designing": "מעצב",
       "planning": "מתכנן",
       "building": "בונה",
-      "thinking": "חושב"
+      "thinking": "חושב",
+      "designingApplication": "מעצב את האפליקציה...",
+      "buildingWorkPlan": "בונה תוכנית עבודה...",
+      "reviewPlanBelow": "עיין בתוכנית למטה",
+      "fixing": "מתקן שגיאה...",
+      "exploring": "סורק את בסיס הקוד...",
+      "done": "הושלם!"
     },
     "plan": {
       "whatYouWillGet": "מה תקבל",

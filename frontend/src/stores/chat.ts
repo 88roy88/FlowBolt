@@ -3,7 +3,15 @@ import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, Exe
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
-import { createFixErrorHandler, createSendMessageHandler } from './chatHandlers';
+import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState } from './chatHandlers';
+import {
+  AGENT_PHASE,
+  getTransientReset,
+  selectIsAgentWorking,
+  selectIsAwaitingPlanApproval,
+  shouldResetOnConnectionLost,
+} from './chatAgentState';
+import { registerChatConnectionLostHandler } from './chatConnection';
 
 export interface ChatState {
   messages: Message[];
@@ -72,7 +80,7 @@ const RESET_STATE = {
   followUpSteps: [] as FollowUpStep[],
   followUpDiffs: [] as FileDiff[],
   error: null,
-  agentPhase: 'idle' as AgentPhase,
+  agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [] as ExecutionTask[],
 };
@@ -86,7 +94,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   models: [],
   selectedModel: null,
-  agentPhase: 'idle',
+  agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [],
   fixSteps: [],
@@ -187,7 +195,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // the appropriate message and update state.
     // For 'modify', just show planning state while the plan is being rebuilt.
     if (action === 'modify') {
-      set({ isStreaming: true, agentPhase: 'planning' });
+      set({ isStreaming: true, agentPhase: AGENT_PHASE.planning });
     }
   },
 
@@ -213,8 +221,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const events = await fetchAgentEvents(projectId);
       for (const evt of events) {
-        handler(evt as import('../types').WSMessage);
+        handler(evt as WSMessage);
       }
+
+      finalizeHistoryReplayState(set, get, events);
 
       set({ historyLoaded: true });
     } catch (err) {
@@ -279,3 +289,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 }));
+
+registerChatConnectionLostHandler(() => {
+  const state = useChatStore.getState();
+  if (shouldResetOnConnectionLost(state)) {
+    useChatStore.setState(getTransientReset());
+  }
+});
+
+export function useIsAwaitingPlanApproval(): boolean {
+  return useChatStore(selectIsAwaitingPlanApproval);
+}
+
+export function useIsAgentWorking(): boolean {
+  return useChatStore(selectIsAgentWorking);
+}

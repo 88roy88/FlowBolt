@@ -6,7 +6,14 @@
  * No React rendering, no browser — pure logic tests.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSendMessageHandler, createFixErrorHandler, setReplayMode } from '../chatHandlers';
+import { createSendMessageHandler, createFixErrorHandler, setReplayMode, finalizeHistoryReplayState } from '../chatHandlers';
+import {
+  AGENT_PHASE,
+  isAgentWorking,
+  isAwaitingPlanApproval,
+  isHistoryRunComplete,
+  shouldResetOnConnectionLost,
+} from '../chatAgentState';
 import type { ChatState } from '../chat';
 import type { WSMessage, PlanOverview, ProjectSummary } from '../../types';
 
@@ -188,6 +195,13 @@ describe('createSendMessageHandler — build flow', () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
+  it('exploring phase sets isStreaming so follow-up progress is visible', () => {
+    handler(msg({ type: 'phase', phase: 'exploring' }));
+    expect(store.state().agentPhase).toBe('exploring');
+    expect(store.state().isStreaming).toBe(true);
+    expect(isAgentWorking(store.state())).toBe(true);
+  });
+
   it('data_sources_fetched creates a card with data source info', () => {
     handler(msg({
       type: 'data_sources_fetched',
@@ -354,6 +368,65 @@ describe('createFixErrorHandler', () => {
     expect(store.state().agentPhase).toBe('idle');
     expect(store.state().currentAssistantMessage).toBe('');
     expect(cleanup).toHaveBeenCalledOnce();
+  });
+});
+
+describe('chatAgentState helpers', () => {
+  it('isAwaitingPlanApproval requires phase and overview', () => {
+    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: MOCK_PLAN_OVERVIEW })).toBe(true);
+    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: null })).toBe(false);
+    expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.planning, planOverview: MOCK_PLAN_OVERVIEW })).toBe(false);
+  });
+
+  it('shouldResetOnConnectionLost skips awaiting approval', () => {
+    expect(shouldResetOnConnectionLost({ isStreaming: true, agentPhase: AGENT_PHASE.executing, planOverview: null })).toBe(true);
+    expect(shouldResetOnConnectionLost({
+      isStreaming: false,
+      agentPhase: AGENT_PHASE.awaiting_approval,
+      planOverview: MOCK_PLAN_OVERVIEW,
+    })).toBe(false);
+  });
+});
+
+describe('finalizeHistoryReplayState', () => {
+  it('detects completed runs from terminal events', () => {
+    expect(isHistoryRunComplete([{ type: 'action_complete' }])).toBe(true);
+    expect(isHistoryRunComplete([{ type: 'plan_overview' }])).toBe(true);
+    expect(isHistoryRunComplete([{ type: 'followup_step' }])).toBe(false);
+  });
+
+  it('clears stale exploring state after interrupted follow-up replay', () => {
+    const store = createTestStore();
+    const handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void);
+    const events = [
+      { type: 'user_message', content: 'fix product page' },
+      { type: 'phase', phase: 'exploring' },
+      { type: 'followup_step', tool: 'glob', args: {}, status: 'running', iteration: 0 },
+      { type: 'followup_step', tool: 'glob', args: {}, status: 'completed', iteration: 0 },
+    ] as Record<string, unknown>[];
+
+    for (const evt of events) {
+      handler(evt as WSMessage);
+    }
+    expect(store.state().agentPhase).toBe('exploring');
+
+    const didReset = finalizeHistoryReplayState(store.set, store.get, events);
+    expect(didReset).toBe(true);
+    expect(store.state().agentPhase).toBe('idle');
+    expect(store.state().followUpSteps).toHaveLength(0);
+  });
+
+  it('keeps awaiting approval state when plan overview is pending', () => {
+    const store = createTestStore({
+      ...INITIAL_STATE,
+      agentPhase: AGENT_PHASE.awaiting_approval,
+      planOverview: MOCK_PLAN_OVERVIEW,
+    });
+    const events = [{ type: 'plan_overview' }];
+    const didReset = finalizeHistoryReplayState(store.set, store.get, events);
+    expect(didReset).toBe(false);
+    expect(store.state().agentPhase).toBe(AGENT_PHASE.awaiting_approval);
+    expect(store.state().planOverview).toEqual(MOCK_PLAN_OVERVIEW);
   });
 });
 

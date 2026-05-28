@@ -1,6 +1,7 @@
 import type { WSMessage } from '../../types';
 import type { ChatSocket } from './types';
 import { readDataSourceAuthorization } from '../dataSourceAuth';
+import { notifyChatConnectionLost } from '../../stores/chatConnection';
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 const chatSockets = new Map<string, ChatSocket>();
@@ -21,6 +22,11 @@ export function getChatSocket(projectId: string): ChatSocket {
     });
   };
 
+  // createReconnectingSocket calls this on every WebSocket `close`, including
+  // before an automatic reconnect. That is intentional: a backend reload or
+  // crash drops the socket while the in-memory agent task is gone, so we clear
+  // stale "thinking" UI via notifyChatConnectionLost → chat store reset.
+
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${projectId}`,
     () => {
@@ -39,7 +45,7 @@ export function getChatSocket(projectId: string): ChatSocket {
         handlers.forEach((h) => h(msg));
       } catch {}
     },
-    undefined,
+    notifyChatConnectionLost,
     () => {
       if (typeof window !== 'undefined') {
         import('../../stores/errors').then(({ useErrorStore }) => {
