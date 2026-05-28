@@ -83,7 +83,7 @@ class TestRequiredParam:
             sample_data=None,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson({ personId }: { personId: FlowParamValue }): Promise<PersonResponse>" in result
+        assert "export async function dataSourcePerson({ personId }: { personId: TextValue }): Promise<PersonResponse>" in result
         assert "body['people']['person_id'] = personId;" in result
         assert "fetchWithAuth('/api/data-source/7/run', body);" in result
 
@@ -143,7 +143,7 @@ class TestMixedParams:
             sample_data=None,
             queries=_queries("mixed"),
         )
-        assert "dataSourceMixed({ type, priority, createdAfter }: { type: FlowParamValue; priority?: FlowParamValue; createdAfter?: FlowParamValue })" in result
+        assert "dataSourceMixed({ type, priority, createdAfter }: { type: TextValue; priority?: TextValue; createdAfter?: DateRangeValue })" in result
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) body['tasks']['priority'] = priority;" in result
         assert "if (createdAfter !== undefined) body['tasks']['created_after'] = createdAfter;" in result
@@ -171,7 +171,7 @@ class TestArrayParam:
             sample_data=None,
             queries=_queries("tagged"),
         )
-        assert "dataSourceTagged({ tags }: { tags: FlowParamValue })" in result
+        assert "dataSourceTagged({ tags }: { tags: TextValue })" in result
 
 
 class TestTypeCoercion:
@@ -196,7 +196,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "active: FlowParamValue" in result
+        assert "active: TextValue" in result
 
     def test_date_maps_to_string(self) -> None:
         params = DataSourceParamsInfo(
@@ -219,7 +219,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "startDate: FlowParamValue" in result
+        assert "startDate: DateRangeValue" in result
 
 
 class TestReservedWordParamName:
@@ -257,8 +257,8 @@ class TestReservedWordParamName:
             sample_data=None,
             queries=_queries("r"),
         )
-        assert "from_: FlowParamValue" in result
-        assert "delete_?: FlowParamValue" in result
+        assert "from_: DateRangeValue" in result
+        assert "delete_?: TextValue" in result
         # The body keys still use the FLAPI names.
         assert "body['events']['from'] = from_;" in result
         assert "if (delete_ !== undefined) body['events']['delete'] = delete_;" in result
@@ -297,4 +297,4 @@ class TestRequireAnyGroup:
         # Both require_any params are treated as required positional for TS typing
         # (runtime OR-validation is the caller's concern; the prompt tells the LLM
         # at least one must be provided).
-        assert "dataSourceContact({ email, phone }: { email: FlowParamValue; phone: FlowParamValue })" in result
+        assert "dataSourceContact({ email, phone }: { email: TextValue; phone: TextValue })" in result

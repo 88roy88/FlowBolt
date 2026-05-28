@@ -9,10 +9,10 @@ where every param is typed as ``FlowParamValue``.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, assert_never
 
 from flow44.ai.codegen.ts_types import generate_ts_interfaces
-from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition
+from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition, ParamType
 
 _FLOW_PARAM_VALUE_TYPE_DEF = """\
 type TextValue = { Name: string; Value: string }[];
@@ -68,6 +68,16 @@ def _function_name(sanitized_name: str) -> str:
     return "dataSource" + sanitized_name
 
 
+def _param_type_to_ts(param_type: ParamType) -> str:
+    match param_type:
+        case "string" | "int" | "double" | "bool":
+            return "TextValue"
+        case "datetime":
+            return "DateRangeValue"
+        case _ as unreachable:
+            assert_never(unreachable)
+
+
 def _build_signature(
     function_name: str,
     required: list[ParamDefinition],
@@ -81,9 +91,9 @@ def _build_signature(
     param_names = ", ".join(_ts_ident(p.name) for p in all_params)
     fields: list[str] = []
     for p in required:
-        fields.append(f"{_ts_ident(p.name)}: FlowParamValue")
+        fields.append(f"{_ts_ident(p.name)}: {_param_type_to_ts(p.type)}")
     for p in optional:
-        fields.append(f"{_ts_ident(p.name)}?: FlowParamValue")
+        fields.append(f"{_ts_ident(p.name)}?: {_param_type_to_ts(p.type)}")
     type_body = "; ".join(fields)
 
     return f"export async function {function_name}({{ {param_names} }}: {{ {type_body} }}): Promise<{response_type}>"
