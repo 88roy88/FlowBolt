@@ -31,10 +31,9 @@ The following data sources have **pre-generated** async API functions that you s
 **Relevant Fields:** {{ ctx.relevant_fields }}
 **Data Characteristics:** {{ ctx.data_characteristics }}
 
-Pre-generated module: `import { dataSource{{ ctx.sanitized_name }} } from '../dataSources/{{ ctx.sanitized_name }}';`
-The module also exports the response type `{{ ctx.sanitized_name }}Response`.
+Pre-generated module: `import { dataSource{{ ctx.sanitized_name }}, type {{ ctx.sanitized_name }}Results } from '../dataSources/{{ ctx.sanitized_name }}';`
 
-This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Response>`. You are responsible for calling it (from `useEffect`, an event handler, or a loader) and for holding the result in `useState`.
+This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Results>`. You are responsible for calling it (from `useEffect`, an event handler, or a loader) and for holding the result in `useState`.
 
 **Response schema (queries/cubes):**
 {% for q in ctx.queries %}
@@ -53,7 +52,15 @@ This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Respon
   (At least one of the `require-any` params must be provided.)
 {% endif %}
 
-The function takes required params as typed positional arguments (camelCase) followed by an optional `options` object for optional params. If the data source requires user input and you don't yet have it, collect it via a form and only call the function once the required values are present.
+The function's parameters are **strongly typed** — pass values that match the shape exactly:
+- `string` / `int` / `double` → `[{ Name: "label", Value: "actual-value" }]` (array of one or more name/value pairs)
+- `bool` → `true` or `false`
+- `datetime` → `{ From: "YYYY-MM-DD", To: "YYYY-MM-DD" }` (absolute ISO date range) **or** `{ TimeBackValue: 7, TimeBackUnit: "day" }` (relative lookback — prefer this only when the intent is "last N days/weeks/etc." rather than a fixed calendar range)
+- `timestamp` → `["now"]` or `["YYYY-MM-DDTHH:mm:ssZ"]` or `[{ Unit: "days", Value: 7, Direction: "before" }]`
+- `geographic` → `[{ value: ["POINT(lon lat)"], radius?: number }]` (array of WKT strings; only provide `radius` if the user specifically requests it)
+
+If user input is required and not yet available, collect it via a form and call the function only once all required values are present.
+
 {% else %}
 None — call `dataSource{{ ctx.sanitized_name }}()` with no arguments.
 {% endif %}
