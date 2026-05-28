@@ -264,6 +264,66 @@ class TestReservedWordParamName:
         assert "if (delete_ !== undefined) body['events']['delete'] = delete_;" in result
 
 
+class TestAllParamTypes:
+    def test_all_four_param_types_map_to_correct_ts_types(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="label",
+                    display_name="Label",
+                    type="string",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="geo",
+                ),
+                ParamDefinition(
+                    name="valid_from",
+                    display_name="Valid from",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="geo",
+                ),
+                ParamDefinition(
+                    name="recorded_at",
+                    display_name="Recorded at",
+                    type="timestamp",
+                    is_required=False,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="geo",
+                ),
+                ParamDefinition(
+                    name="area",
+                    display_name="Area",
+                    type="geographic",
+                    is_required=False,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="geo",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="99",
+            sanitized_name="GeoEvent",
+            params_info=params,
+            sample_data=None,
+            queries=_queries("geo_event"),
+        )
+        assert "label: TextValue" in result
+        assert "validFrom: DateRangeValue" in result
+        assert "recordedAt?: TimestampValue" in result
+        assert "area?: GeographicValue" in result
+        assert "body['geo']['label'] = label;" in result
+        assert "body['geo']['valid_from'] = validFrom;" in result
+        assert "if (recordedAt !== undefined) body['geo']['recorded_at'] = recordedAt;" in result
+        assert "if (area !== undefined) body['geo']['area'] = area;" in result
+
+
 class TestRequireAnyGroup:
     def test_require_any_params_are_positional_required(self) -> None:
         params = DataSourceParamsInfo(
