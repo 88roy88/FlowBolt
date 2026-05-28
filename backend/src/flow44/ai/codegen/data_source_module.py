@@ -16,7 +16,8 @@ from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, Par
 
 _FLOW_PARAM_VALUE_TYPE_DEF = """\
 type TextValue = { Name: string; Value: string }[];
-type DateRangeValue = { From: string; To: string };
+type ISODateString = string;
+type DateRangeValue = { From: ISODateString; To: ISODateString };
 type TimestampValue = (Date | "now" | {
     Unit: "seconds" | "minutes" | "hours" | "days" | "weeks" | "months" | "years";
     Value: number;
