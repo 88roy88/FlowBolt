@@ -22,8 +22,10 @@ type TimestampValue = (Date | "now" | {
     Value: number;
     Direction: "before" | "after";
 })[];
+type WKT = string;
+type GeographicValue = { value: WKT }[];
 
-type FlowParamValue = TextValue | DateRangeValue | TimestampValue;"""
+type FlowParamValue = TextValue | DateRangeValue | TimestampValue | GeographicValue;"""
 
 # Param names that would clip a JS/TS reserved word when used as a parameter
 # or property identifier. A trailing underscore is appended to avoid the clash
@@ -81,6 +83,8 @@ def _param_type_to_ts(param_type: ParamType) -> str:
             return "DateRangeValue"
         case "timestamp":
             return "TimestampValue"
+        case "geographic":
+            return "GeographicValue"
         case _ as unreachable:
             assert_never(unreachable)
 

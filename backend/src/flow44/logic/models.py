@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, RootModel, computed_field
 
 # Domain-side vocabulary. The FLAPI adapter translates into these;
 # the rest of the app is agnostic to FLAPI's wire spellings.
-ParamType = Literal["string", "int", "double", "bool", "datetime", "timestamp"]
+ParamType = Literal["string", "int", "double", "bool", "datetime", "timestamp", "geographic"]
 FieldType = Literal["string", "int", "double", "bool", "datetime", "wkt"]
 
 ParamScalar: TypeAlias = str | int | float | bool
@@ -46,7 +46,7 @@ class ParamDefinition(BaseModel):
 def parse_param_value(value: str, param_type: ParamType) -> ParamScalar:
     # Option values arrive as strings; the caller needs them typed.
     match param_type:
-        case "string" | "datetime" | "timestamp":
+        case "string" | "datetime" | "timestamp" | "geographic":
             return value
         case "int":
             try:
