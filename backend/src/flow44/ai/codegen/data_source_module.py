@@ -89,6 +89,21 @@ def _param_type_to_ts(param_type: ParamType) -> str:
             assert_never(unreachable)
 
 
+def _unique_idents(params: list[ParamDefinition]) -> dict[int, str]:
+    """Return a TS identifier for each param, prefixing with camelCase cube_id on collision."""
+    base = {id(p): _ts_ident(p.name) for p in params}
+    counts: dict[str, int] = {}
+    for ident in base.values():
+        counts[ident] = counts.get(ident, 0) + 1
+    result: dict[int, str] = {}
+    for p in params:
+        ident = base[id(p)]
+        if counts[ident] > 1:
+            ident = _ts_ident(p.cube_id) + "_" + ident
+        result[id(p)] = ident
+    return result
+
+
 def _build_signature(
     function_name: str,
     required: list[ParamDefinition],
@@ -99,12 +114,13 @@ def _build_signature(
     if not all_params:
         return f"export async function {function_name}(): Promise<{response_type}>"
 
-    param_names = ", ".join(_ts_ident(p.name) for p in all_params)
+    idents = _unique_idents(all_params)
+    param_names = ", ".join(idents[id(p)] for p in all_params)
     fields: list[str] = []
     for p in required:
-        fields.append(f"{_ts_ident(p.name)}: {_param_type_to_ts(p.type)}")
+        fields.append(f"{idents[id(p)]}: {_param_type_to_ts(p.type)}")
     for p in optional:
-        fields.append(f"{_ts_ident(p.name)}?: {_param_type_to_ts(p.type)}")
+        fields.append(f"{idents[id(p)]}?: {_param_type_to_ts(p.type)}")
     type_body = "; ".join(fields)
 
     return f"export async function {function_name}({{ {param_names} }}: {{ {type_body} }}): Promise<{response_type}>"
@@ -123,16 +139,17 @@ def _build_body(
         lines.append(f"  const res = await fetchWithAuth('{path}');\n")
     else:
         all_params = required + optional
+        idents = _unique_idents(all_params)
         cube_ids = sorted({p.cube_id for p in all_params})
         lines.append("  const body: Record<string, Record<string, unknown>> = {};\n")
         for cube_id in cube_ids:
             lines.append(f"  body[{_js_string(cube_id)}] = {{}};\n")
         for p in required:
             lines.append(
-                f"  body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {_ts_ident(p.name)};\n"
+                f"  body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {idents[id(p)]};\n"
             )
         for p in optional:
-            ident = _ts_ident(p.name)
+            ident = idents[id(p)]
             lines.append(
                 f"  if ({ident} !== undefined) body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {ident};\n"
             )

@@ -264,6 +264,59 @@ class TestReservedWordParamName:
         assert "if (delete_ !== undefined) body['events']['delete'] = delete_;" in result
 
 
+class TestCubeIdDisambiguation:
+    def test_same_param_name_in_different_cubes_gets_cube_prefix(self) -> None:
+        # Both cubes expose a param called "start_date"; the generated identifiers
+        # must not collide, and each must be wired to the correct cube's body key.
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="reports",
+                ),
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="filters",
+                ),
+                ParamDefinition(
+                    name="limit",
+                    display_name="Limit",
+                    type="int",
+                    is_required=False,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="reports",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="10",
+            sanitized_name="Report",
+            params_info=params,
+            sample_data=None,
+            queries=_queries("report"),
+        )
+        # Colliding names get cube_id prefix; unique names stay as-is.
+        assert "reports_startDate: DateRangeValue" in result
+        assert "filters_startDate: DateRangeValue" in result
+        assert "limit?: TextValue" in result
+        # Each is wired to the correct cube in the body.
+        assert "body['reports']['start_date'] = reports_startDate;" in result
+        assert "body['filters']['start_date'] = filters_startDate;" in result
+        assert "if (limit !== undefined) body['reports']['limit'] = limit;" in result
+
+
 class TestAllParamTypes:
     def test_all_four_param_types_map_to_correct_ts_types(self) -> None:
         params = DataSourceParamsInfo(
