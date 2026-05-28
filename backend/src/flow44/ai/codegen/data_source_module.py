@@ -17,8 +17,13 @@ from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, Par
 _FLOW_PARAM_VALUE_TYPE_DEF = """\
 type TextValue = { Name: string; Value: string }[];
 type DateRangeValue = { From: string; To: string };
+type TimestampValue = (Date | "now" | {
+    Unit: "seconds" | "minutes" | "hours" | "days" | "weeks" | "months" | "years";
+    Value: number;
+    Direction: "before" | "after";
+})[];
 
-type FlowParamValue = TextValue | DateRangeValue;"""
+type FlowParamValue = TextValue | DateRangeValue | TimestampValue;"""
 
 # Param names that would clip a JS/TS reserved word when used as a parameter
 # or property identifier. A trailing underscore is appended to avoid the clash
@@ -74,6 +79,8 @@ def _param_type_to_ts(param_type: ParamType) -> str:
             return "TextValue"
         case "datetime":
             return "DateRangeValue"
+        case "timestamp":
+            return "TimestampValue"
         case _ as unreachable:
             assert_never(unreachable)
 

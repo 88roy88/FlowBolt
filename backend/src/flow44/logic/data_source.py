@@ -54,6 +54,7 @@ _FLAPI_PARAM_TYPE: dict[flapi_models.ParamType, ParamType] = {
     "Double": "double",
     "Boolean": "bool",
     "DateTime": "datetime",
+    "Timestamp": "timestamp",
 }
 
 _FLAPI_FIELD_TYPE: dict[str, FieldType] = {
