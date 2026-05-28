@@ -284,7 +284,7 @@ export function AppShell() {
                 Describe what you want to build and the AI will design, plan,
                 and code it for you.
               </p>
-              <div className="w-full rounded-2xl bg-surface/80 border border-border/50 shadow-[0_2px_20px_color-mix(in_srgb,var(--primary)_4%,transparent)] [&>div]:border-t-0 [&>div]:rounded-2xl">
+              <div className="w-full rounded-2xl bg-surface/80 border border-primary/20 shadow-[0_2px_24px_color-mix(in_srgb,var(--primary)_8%,transparent)] [&>div]:border-t-0 [&>div]:rounded-2xl">
                 <PromptInput />
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
@@ -292,7 +292,7 @@ export function AppShell() {
                   <button
                     key={hint}
                     onClick={() => useChatStore.getState().sendMessage(hint)}
-                    className="px-3 py-1.5 text-xs text-muted-foreground/70 border border-border/50 rounded-full hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
+                    className="px-3 py-1.5 text-xs bg-primary/5 text-primary/60 border border-primary/20 rounded-full hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
                   >
                     {hint}
                   </button>

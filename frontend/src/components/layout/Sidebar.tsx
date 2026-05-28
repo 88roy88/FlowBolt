@@ -156,12 +156,12 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
         <div className="flex items-center gap-0.5">
           {onPin && !isPinned && (
             <Button variant="ghost" size="icon-sm" onClick={onPin} title={t('sidebar.pinSidebar')}>
-              <Pin size={14} />
+              <Pin size={14} className="text-primary/60" />
             </Button>
           )}
           {isPinned && onCloseSidebar && (
             <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title={t('sidebar.unpinSidebar')}>
-              <PinOff size={14} />
+              <PinOff size={14} className="text-primary/60" />
             </Button>
           )}
         </div>
@@ -191,7 +191,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
             disabled={isCreating}
             className="w-full justify-start gap-2"
           >
-            <Plus size={14} />
+            <Plus size={14} className="text-primary" />
             {t('sidebar.newProject')}
           </Button>
         )}
@@ -200,7 +200,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
       {/* Creating indicator */}
       {isCreating && (
         <div className="flex items-center gap-2 mx-3 px-2 py-2.5 mb-2 rounded-md bg-background border border-border text-[13px] text-muted-foreground">
-          <Loader2 size={14} className="shrink-0 animate-spin" />
+          <Loader2 size={14} className="shrink-0 animate-spin text-primary" />
           {t('sidebar.scaffolding')}
         </div>
       )}
@@ -294,8 +294,8 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
 
       {/* Bottom: Settings */}
       <div className="border-t border-border px-3 py-2">
-        <Button variant="ghost" size="sm" onClick={onOpenSettings} className="w-full justify-start gap-2 text-muted-foreground">
-          <Settings size={14} />
+        <Button variant="ghost" size="sm" onClick={onOpenSettings} className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+          <Settings size={14} className="text-primary/70" />
           <span className="text-[13px]">{t('common.settings')}</span>
         </Button>
       </div>
