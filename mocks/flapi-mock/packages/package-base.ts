@@ -90,7 +90,7 @@ export interface QuickParamOptions {
   name: string;
   displayName?: string;
   // Quick-param types are PascalCase on the wire (FLAPI contract).
-  type?: 'String' | 'Int' | 'Double' | 'Boolean' | 'DateTime';
+  type?: 'String' | 'Int' | 'Double' | 'Boolean' | 'DateTime' | 'Timestamp' | 'Haphoch';
   defaultValues?: (string | number | boolean)[];
   required?: boolean;
   requireAny?: boolean;

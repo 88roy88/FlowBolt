@@ -20,6 +20,8 @@ const ParamType = Type.Union([
   Type.Literal('Double'),
   Type.Literal('Boolean'),
   Type.Literal('DateTime'),
+  Type.Literal('Timestamp'),
+  Type.Literal('Haphoch'),
 ]);
 
 const OntologyType = Type.Union([
@@ -42,6 +44,7 @@ export const ErrorBodySchema = Type.Object({
     details: Type.Optional(Type.Unknown()),
   }),
 });
+
 
 export type ErrorBody = Static<typeof ErrorBodySchema>;
 

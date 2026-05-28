@@ -1,5 +1,6 @@
 # Mirrors mocks/flapi-mock/schemas.ts. Contract tests in
 # tests/integrations/flapi/test_models_contract.py guard against drift.
+from datetime import datetime
 from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
@@ -64,8 +65,36 @@ class QuickParamsInfo(RootModel[dict[CubeId, list[QuickParamDefinition]]]):
 # -- Run: POST /package/v3/{id} ------------------------------------------
 
 
+class _TextValueItem(BaseModel):
+    Name: str
+    Value: str
+
+
+class _DateRangeValue(BaseModel):
+    From: str
+    To: str
+
+
+class _TimestampRelative(BaseModel):
+    Unit: Literal["seconds", "minutes", "hours", "days", "weeks", "months", "years"]
+    Value: int
+    Direction: Literal["before", "after"]
+
+
+class _GeographicValueItem(BaseModel):
+    value: str
+
+
 QuickParamScalar: TypeAlias = str | int | float | bool
-QuickParamValue: TypeAlias = QuickParamScalar | list[QuickParamScalar]
+
+QuickParamValue: TypeAlias = (
+    list[_TextValueItem]
+    | _DateRangeValue
+    | list[_GeographicValueItem]
+    | list[datetime | Literal["now"] | _TimestampRelative]
+    | QuickParamScalar
+    | list[QuickParamScalar]
+)
 
 
 class QuickParams(RootModel[dict[CubeId, dict[str, QuickParamValue]]]):
