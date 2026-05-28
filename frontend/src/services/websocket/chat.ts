@@ -26,7 +26,6 @@ export function getChatSocket(projectId: string): ChatSocket {
   // before an automatic reconnect. That is intentional: a backend reload or
   // crash drops the socket while the in-memory agent task is gone, so we clear
   // stale "thinking" UI via notifyChatConnectionLost → chat store reset.
-  const onSocketDisconnect = notifyChatConnectionLost;
 
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${projectId}`,
@@ -46,7 +45,7 @@ export function getChatSocket(projectId: string): ChatSocket {
         handlers.forEach((h) => h(msg));
       } catch {}
     },
-    onSocketDisconnect,
+    notifyChatConnectionLost,
     () => {
       if (typeof window !== 'undefined') {
         import('../../stores/errors').then(({ useErrorStore }) => {

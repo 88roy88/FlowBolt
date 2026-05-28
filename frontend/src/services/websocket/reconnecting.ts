@@ -3,11 +3,6 @@ export function getWsBase(): string {
   return `${protocol}//${window.location.host}`;
 }
 
-/**
- * @param onClose Called on every WebSocket `close`, including transient closes
- *   before an automatic reconnect. Callers use this for side effects that must
- *   run when the peer drops (e.g. clearing stale UI after a backend reload).
- */
 export function createReconnectingSocket(
   url: string,
   onOpen?: () => void,

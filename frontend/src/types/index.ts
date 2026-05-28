@@ -80,7 +80,6 @@ export type AgentPhase =
   | 'exploring'
   | 'complete';
 
-/** Each phase key must map to itself (`idle` → `'idle'`, not any other phase). */
 export type AgentPhaseConstMap = { readonly [K in AgentPhase]: K };
 
 // User-facing plan overview (shown during approval)

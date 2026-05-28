@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import type { AgentPhase } from '../../types';
 import { useChatStore, useIsAwaitingPlanApproval } from '../../stores/chat';
 import { AGENT_PHASE } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
@@ -7,6 +9,21 @@ import { ArrowUp, Loader2, Database, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
+
+function getBusyLabel(agentPhase: AgentPhase, t: TFunction): string {
+  switch (agentPhase) {
+    case AGENT_PHASE.fetching_data_sources:
+      return t('chat.phase.fetchingDataSources');
+    case AGENT_PHASE.designing:
+      return t('chat.phase.designing');
+    case AGENT_PHASE.planning:
+      return t('chat.phase.planning');
+    case AGENT_PHASE.executing:
+      return t('chat.phase.building');
+    default:
+      return t('chat.phase.thinking');
+  }
+}
 
 export function PromptInput() {
   const { t } = useTranslation();
@@ -70,12 +87,7 @@ export function PromptInput() {
         ? t('chat.placeholder.working')
         : t('chat.placeholder.default');
 
-  const busyLabel =
-    agentPhase === AGENT_PHASE.fetching_data_sources ? t('chat.phase.fetchingDataSources') :
-    agentPhase === AGENT_PHASE.designing ? t('chat.phase.designing') :
-    agentPhase === AGENT_PHASE.planning ? t('chat.phase.planning') :
-    agentPhase === AGENT_PHASE.executing ? t('chat.phase.building') :
-    t('chat.phase.thinking');
+  const busyLabel = getBusyLabel(agentPhase, t);
 
   return (
     <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
