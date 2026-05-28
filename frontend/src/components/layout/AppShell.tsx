@@ -1,52 +1,61 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ChevronUp } from 'lucide-react';
-import { Sidebar } from './Sidebar';
-import { Resizer } from './Resizer';
-import { GlobalProgress } from './GlobalProgress';
-import { SettingsModal } from './SettingsModal';
-import { ClassicLayout } from './ClassicLayout';
-import { FlexibleLayout } from './FlexibleLayout';
-import { MobileLayout } from './MobileLayout';
-import { Terminal } from '../terminal/Terminal';
-import { ServerLog } from '../terminal/ServerLog';
-import { Console } from '../terminal/Console';
-import { FlowBrand, FlowLogo } from '../ui/flow-logo';
-import { PromptInput } from '../chat/PromptInput';
-import { useChatStore } from '../../stores/chat';
-import { useSessionStore } from '../../stores/session';
-import { useFilesStore } from '../../stores/files';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { ChevronUp } from "lucide-react";
+import { Sidebar } from "./Sidebar";
+import { Resizer } from "./Resizer";
+import { GlobalProgress } from "./GlobalProgress";
+import { ThemeToggle } from "./ThemeToggle";
+import { ClassicLayout } from "./ClassicLayout";
+import { FlexibleLayout } from "./FlexibleLayout";
+import { MobileLayout } from "./MobileLayout";
+import { Terminal } from "../terminal/Terminal";
+import { ServerLog } from "../terminal/ServerLog";
+import { Console } from "../terminal/Console";
+import { FlowBrand, FlowLogo } from "../ui/flow-logo";
+import { PromptInput } from "../chat/PromptInput";
+import { useChatStore } from "../../stores/chat";
+import { useSessionStore } from "../../stores/session";
+import { useFilesStore } from "../../stores/files";
+import { useIsMobile } from "../../hooks/useIsMobile";
+import { pollFileTree } from "../../utils/pollFileTree";
 
 const SIDEBAR_WIDTH = 280;
 const BOTTOM_MIN = 120;
 const BOTTOM_MAX = 600;
 
-type BottomTab = 'terminal' | 'server' | 'console';
-type LayoutMode = 'classic' | 'flexible';
+type BottomTab = "terminal" | "server" | "console";
+type LayoutMode = "classic" | "flexible";
 
 function loadLayoutMode(): LayoutMode {
   try {
-    const v = localStorage.getItem('layout-mode');
-    if (v === 'classic' || v === 'flexible') return v;
+    const v = localStorage.getItem("layout-mode");
+    if (v === "classic" || v === "flexible") return v;
   } catch {}
-  return 'classic';
+  return "classic";
 }
 
-function getProjectHasMessages(projectId: string): boolean | null {
+function loadSidebarPinned(): boolean {
   try {
-    const v = localStorage.getItem(`project-has-messages:${projectId}`);
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-    return null; // No cache
+    const v = localStorage.getItem("sidebar-pinned");
+    if (v === "false") return false;
+    return true;
   } catch {
-    return null;
+    return true;
   }
+}
+
+function saveSidebarPinned(pinned: boolean) {
+  try {
+    localStorage.setItem("sidebar-pinned", pinned ? "true" : "false");
+  } catch {}
 }
 
 function setProjectHasMessages(projectId: string, hasMessages: boolean) {
   try {
-    localStorage.setItem(`project-has-messages:${projectId}`, hasMessages ? 'true' : 'false');
+    localStorage.setItem(
+      `project-has-messages:${projectId}`,
+      hasMessages ? "true" : "false",
+    );
   } catch {}
 }
 
@@ -56,7 +65,7 @@ export function AppShell() {
 
   // All hooks must be called before any conditional returns
   // Sidebar
-  const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(loadSidebarPinned);
   const [sidebarHover, setSidebarHover] = useState(false);
   const [sidebarClosing, setSidebarClosing] = useState(false);
   const [sidebarBusy, setSidebarBusy] = useState(false);
@@ -64,24 +73,29 @@ export function AppShell() {
 
   const closeSidebar = () => {
     setSidebarPinned(false);
+    saveSidebarPinned(false);
     setSidebarHover(false);
     setSidebarClosing(true);
     hoverLockRef.current = true;
-    setTimeout(() => { setSidebarClosing(false); hoverLockRef.current = false; }, 250);
+    setTimeout(() => {
+      setSidebarClosing(false);
+      hoverLockRef.current = false;
+    }, 250);
   };
 
   // Bottom drawer
   const [bottomOpen, setBottomOpen] = useState(false);
-  const [bottomTab, setBottomTab] = useState<BottomTab>('server');
+  const [bottomTab, setBottomTab] = useState<BottomTab>("server");
   const [bottomHeight, setBottomHeight] = useState(250);
 
-  // Layout + settings
+  // Layout
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(loadLayoutMode);
-  const [showSettings, setShowSettings] = useState(false);
 
   const switchLayout = (mode: LayoutMode) => {
     setLayoutMode(mode);
-    try { localStorage.setItem('layout-mode', mode); } catch {}
+    try {
+      localStorage.setItem("layout-mode", mode);
+    } catch {}
   };
 
   // Shared state
@@ -90,17 +104,71 @@ export function AppShell() {
   const historyLoaded = useChatStore((s) => s.historyLoaded);
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
+  const createProject = useSessionStore((s) => s.createProject);
+  const pendingRenameProjectId = useSessionStore(
+    (s) => s.pendingRenameProjectId,
+  );
+  const setPendingRenameProjectId = useSessionStore(
+    (s) => s.setPendingRenameProjectId,
+  );
 
-  // Use cache to determine layout before history loads to prevent flicker
-  // Read project ID from URL hash immediately (don't wait for currentProject to be set)
-  const urlProjectId = window.location.hash.match(/^#\/project\/(.+)$/)?.[1];
-  const projectIdForCache = currentProject?.id || urlProjectId;
-  const cachedHasMessages = projectIdForCache ? getProjectHasMessages(projectIdForCache) : null;
+  // ---------- Router-driven render gate ----------
+  // Track the project ID from the URL hash reactively. This is the single
+  // source of truth for whether to show the project view or the landing screen.
+  // Using state (not a plain variable) ensures a re-render fires on every
+  // hashchange, including programmatic changes made during project creation.
+  const parseHashProjectId = () =>
+    window.location.hash.match(/^#\/project\/(.+)$/)?.[1] ?? null;
 
-  const isNewProject = historyLoaded
-    ? (messages.length === 0 && !isStreaming)
-    : (cachedHasMessages !== true); // Show empty state unless cache explicitly says has messages
+  const [urlProjectId, setUrlProjectId] = useState<string | null>(
+    parseHashProjectId,
+  );
+
+  useEffect(() => {
+    const sync = () => setUrlProjectId(parseHashProjectId());
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  // Show the landing screen only when there is no project ID in the URL.
+  // currentProject?.id is used as a fallback for the rare moment between a
+  // programmatic navigation and the hashchange event firing.
+  const isInProject = !!(urlProjectId || currentProject?.id);
+  const isNewProject = !isInProject;
   const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
+
+  // Auto-open the sidebar when rename is triggered so the user sees it
+  useEffect(() => {
+    if (pendingRenameProjectId && !sidebarPinned) {
+      setSidebarHover(true);
+    }
+  }, [pendingRenameProjectId, sidebarPinned]);
+
+  // Create an "Untitled" project, navigate to it, then send the first message.
+  // Called when the user submits a prompt from the home screen (no active project).
+  // createProject sets the hash to the temp ID immediately (before the API call),
+  // so urlProjectId updates and the project view renders without waiting.
+  const handleCreateAndSend = useCallback(
+    async (message: string) => {
+      await createProject(t("sidebar.untitledProject"));
+      const session = useSessionStore.getState();
+      if (session.currentProject) {
+        // Hash is already set/updated inside createProject (temp → real ID swap)
+        useFilesStore.getState().reset();
+        useChatStore.getState().loadHistory(session.currentProject.id);
+        pollFileTree();
+        // Persist cache so next load skips the spinner
+        try {
+          localStorage.setItem("has-projects", "true");
+        } catch {}
+        // Signal sidebar to enter rename mode for the new project
+        setPendingRenameProjectId(session.currentProject.id);
+        // Send the user's message into the new project
+        useChatStore.getState().sendMessage(message);
+      }
+    },
+    [createProject, setPendingRenameProjectId, t],
+  );
 
   // Update cache after history loads
   useEffect(() => {
@@ -108,10 +176,12 @@ export function AppShell() {
       const hasMessages = messages.length > 0;
       setProjectHasMessages(currentProject.id, hasMessages);
     }
-  }, [historyLoaded, messages.length, currentProject?.id]);
+  }, [historyLoaded, messages.length, currentProject?.id, currentProject]);
 
   const handleBottomResize = useCallback((delta: number) => {
-    setBottomHeight((h) => Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h - delta)));
+    setBottomHeight((h) =>
+      Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h - delta)),
+    );
   }, []);
 
   // Project colors + initials for icon rail
@@ -128,16 +198,19 @@ export function AppShell() {
 
   function getColor(name: string) {
     let h = 0;
-    for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+    for (let i = 0; i < name.length; i++)
+      h = ((h << 5) - h + name.charCodeAt(i)) | 0;
     return PROJECT_COLORS[Math.abs(h) % PROJECT_COLORS.length];
   }
 
   function getInitials(name: string) {
     const w = name.trim().split(/\s+/);
-    return w.length >= 2 ? (w[0][0] + w[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
+    return w.length >= 2
+      ? (w[0][0] + w[1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
   }
 
-  const handleRailSelect = (p: typeof projects[number]) => {
+  const handleRailSelect = (p: (typeof projects)[number]) => {
     useSessionStore.getState().setCurrentProject(p);
     window.location.hash = `#/project/${p.id}`;
     useFilesStore.getState().reset();
@@ -176,19 +249,36 @@ export function AppShell() {
         role="button"
         tabIndex={0}
         onClick={() => setBottomOpen((v) => !v)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setBottomOpen((v) => !v); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") setBottomOpen((v) => !v);
+        }}
         className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer"
       >
-        <ChevronUp size={14} className={`transition-transform duration-200 ${!bottomOpen ? '' : 'rotate-180'}`} />
-        <span className="font-medium">{bottomTab === 'server' ? t('terminal.serverLog') : bottomTab === 'console' ? t('terminal.console') : t('terminal.terminal')}</span>
+        <ChevronUp
+          size={14}
+          className={`transition-transform duration-200 ${!bottomOpen ? "" : "rotate-180"}`}
+        />
+        <span className="font-medium">
+          {bottomTab === "server"
+            ? t("terminal.serverLog")
+            : bottomTab === "console"
+              ? t("terminal.console")
+              : t("terminal.terminal")}
+        </span>
         {!bottomOpen && (
           <div className="flex gap-2 ms-auto">
-            {(['server', 'terminal', 'console'] as BottomTab[]).map((tab) => (
+            {(["server", "terminal", "console"] as BottomTab[]).map((tab) => (
               <button
                 key={tab}
-                onClick={(e) => { e.stopPropagation(); setBottomTab(tab); setBottomOpen(true); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBottomTab(tab);
+                  setBottomOpen(true);
+                }}
                 className={`px-2 py-0.5 rounded text-[11px] capitalize ${
-                  bottomTab === tab ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  bottomTab === tab
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab}
@@ -200,24 +290,37 @@ export function AppShell() {
       {bottomOpen && (
         <>
           <div className="flex items-center border-t border-border shrink-0">
-            {(['server', 'terminal', 'console'] as BottomTab[]).map((tab) => (
+            {(["server", "terminal", "console"] as BottomTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setBottomTab(tab)}
                 className={`px-4 py-1.5 text-[13px] font-medium border-b-2 transition-colors duration-150 capitalize ${
                   bottomTab === tab
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab === 'server' ? t('terminal.server') : tab === 'console' ? t('terminal.console') : t('terminal.terminal')}
+                {tab === "server"
+                  ? t("terminal.server")
+                  : tab === "console"
+                    ? t("terminal.console")
+                    : t("terminal.terminal")}
               </button>
             ))}
           </div>
           <div style={{ height: bottomHeight }}>
             <Resizer direction="vertical" onDrag={handleBottomResize} />
-            <div style={{ height: bottomHeight - 1 }} className="overflow-hidden">
-              {bottomTab === 'terminal' ? <Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
+            <div
+              style={{ height: bottomHeight - 1 }}
+              className="overflow-hidden"
+            >
+              {bottomTab === "terminal" ? (
+                <Terminal />
+              ) : bottomTab === "console" ? (
+                <Console />
+              ) : (
+                <ServerLog />
+              )}
             </div>
           </div>
         </>
@@ -228,20 +331,37 @@ export function AppShell() {
   if (isMobile) return <MobileLayout />;
 
   return (
-    <div className="flex flex-row h-full w-full overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}>
+    <div
+      className="flex flex-row h-full w-full overflow-hidden"
+      style={{ boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.03)" }}
+    >
       {/* Sidebar */}
       {sidebarPinned ? (
         <div
           className="shrink-0 bg-surface border-e border-border flex flex-col animate-[slideIn_0.25s_ease-out]"
           style={{ width: SIDEBAR_WIDTH }}
         >
-          <Sidebar onCloseSidebar={closeSidebar} isPinned={true} onPin={() => setSidebarPinned(true)} onOpenSettings={() => setShowSettings(true)} onBusyChange={setSidebarBusy} />
+          <Sidebar
+            onCloseSidebar={closeSidebar}
+            isPinned={true}
+            onPin={() => {
+              setSidebarPinned(true);
+              saveSidebarPinned(true);
+            }}
+            layoutMode={layoutMode}
+            onLayoutChange={switchLayout}
+            onBusyChange={setSidebarBusy}
+          />
         </div>
       ) : (
         <div
           className="relative shrink-0"
-          onMouseEnter={() => { if (!hoverLockRef.current) setSidebarHover(true); }}
-          onMouseLeave={() => { if (!sidebarBusy) closeSidebar(); }}
+          onMouseEnter={() => {
+            if (!hoverLockRef.current) setSidebarHover(true);
+          }}
+          onMouseLeave={() => {
+            if (!sidebarBusy) closeSidebar();
+          }}
         >
           <div className="w-14 h-full bg-surface border-e border-border flex flex-col">
             <IconRail />
@@ -249,18 +369,32 @@ export function AppShell() {
           {(sidebarHover || sidebarClosing) && (
             <div
               className={`absolute top-0 start-0 z-30 h-full bg-surface border-e border-border shadow-[var(--shadow-lg)] ${
-                sidebarClosing ? 'animate-[slideOut_0.2s_ease-in_forwards]' : 'animate-[slideIn_0.25s_ease-out]'
+                sidebarClosing
+                  ? "animate-[slideOut_0.2s_ease-in_forwards]"
+                  : "animate-[slideIn_0.25s_ease-out]"
               }`}
               style={{ width: SIDEBAR_WIDTH }}
             >
-              <Sidebar onCloseSidebar={closeSidebar} isPinned={false} onPin={() => { setSidebarPinned(true); setSidebarHover(false); }} onOpenSettings={() => setShowSettings(true)} onBusyChange={setSidebarBusy} />
+              <Sidebar
+                onCloseSidebar={closeSidebar}
+                isPinned={false}
+                onPin={() => {
+                  setSidebarPinned(true);
+                  saveSidebarPinned(true);
+                  setSidebarHover(false);
+                }}
+                layoutMode={layoutMode}
+                onLayoutChange={switchLayout}
+                onBusyChange={setSidebarBusy}
+              />
             </div>
           )}
         </div>
       )}
 
       {/* Main content */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden relative">
+        <ThemeToggle />
         <GlobalProgress />
 
         {isNewProject ? (
@@ -281,17 +415,28 @@ export function AppShell() {
                 </div>
               </div>
               <p className="text-base text-muted-foreground max-w-md text-center leading-relaxed">
-                Describe what you want to build and the AI will design, plan,
-                and code it for you.
+                {t("onboarding.tagline")}
               </p>
               <div className="w-full rounded-2xl bg-surface/80 border border-border/50 shadow-[0_2px_20px_color-mix(in_srgb,var(--primary)_4%,transparent)] [&>div]:border-t-0 [&>div]:rounded-2xl">
-                <PromptInput />
+                <PromptInput
+                  onFirstSubmit={
+                    !currentProject ? handleCreateAndSend : undefined
+                  }
+                />
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
-                {['A dashboard with charts', 'A todo app with drag & drop', 'A landing page with animations'].map((hint) => (
+                {[
+                  t("onboarding.hintDashboard"),
+                  t("onboarding.hintTodoApp"),
+                  t("onboarding.hintLandingPage"),
+                ].map((hint) => (
                   <button
                     key={hint}
-                    onClick={() => useChatStore.getState().sendMessage(hint)}
+                    onClick={() =>
+                      !currentProject
+                        ? handleCreateAndSend(hint)
+                        : useChatStore.getState().sendMessage(hint)
+                    }
                     className="px-3 py-1.5 text-xs text-muted-foreground/70 border border-border/50 rounded-full hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
                   >
                     {hint}
@@ -302,19 +447,12 @@ export function AppShell() {
           </div>
         ) : (
           <>
-            {layoutMode === 'classic' ? <ClassicLayout /> : <FlexibleLayout />}
+            {layoutMode === "classic" ? <ClassicLayout /> : <FlexibleLayout />}
             {!isNewProject && !isEmptyState && <BottomDrawer />}
           </>
         )}
       </div>
 
-      {showSettings && (
-        <SettingsModal
-          layoutMode={layoutMode}
-          onLayoutChange={switchLayout}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
     </div>
   );
 }

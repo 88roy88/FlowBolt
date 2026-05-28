@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Loader2 } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
+import { useSessionStore } from '../../stores/session';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
 import { WorkPlanView } from './WorkPlanView';
@@ -17,6 +18,7 @@ export function ChatPanel() {
     messages, isStreaming, currentAssistantMessage, actions, error, clearError,
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs, historyLoaded,
   } = useChatStore();
+  const isCreating = useSessionStore((s) => s.isCreating);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -74,6 +76,12 @@ export function ChatPanel() {
 
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-auto p-4 flex flex-col gap-4 scroll-smooth">
+        {isCreating && messages.length === 0 && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">{t('chat.settingUpProject')}</span>
+          </div>
+        )}
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}

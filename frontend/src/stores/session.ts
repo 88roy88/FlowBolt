@@ -1,21 +1,24 @@
-import { create } from 'zustand';
-import type { Project } from '../types';
-import * as api from '../services/api';
-import { closeChatSocket } from '../services/websocket';
-import { useChatStore } from './chat';
+import { create } from "zustand";
+import type { Project } from "../types";
+import * as api from "../services/api";
+import { closeChatSocket } from "../services/websocket";
+import { useChatStore } from "./chat";
 
 interface SessionState {
   currentProject: Project | null;
   projects: Project[];
   projectId: string | null;
   isCreating: boolean;
+  pendingRenameProjectId: string | null;
   setCurrentProject: (project: Project) => void;
+  goHome: () => void;
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
   updateProjectSummary: (projectId: string, summary: string) => void;
   setProjectPublishedUrl: (projectId: string, url: string) => void;
+  setPendingRenameProjectId: (id: string | null) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -23,6 +26,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   projects: [],
   projectId: null,
   isCreating: false,
+  pendingRenameProjectId: null,
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, projectId: project.id });
@@ -33,19 +37,63 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     useChatStore.getState().clearDataSources();
   },
 
+  goHome() {
+    set({ currentProject: null, projectId: null });
+    useChatStore.getState().clearMessages();
+    window.location.hash = "";
+  },
+
   async loadProjects() {
     const projects = await api.fetchProjects();
     // Newest first
-    projects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    projects.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
     set({ projects });
   },
 
   async createProject(name: string) {
-    set({ isCreating: true });
+    // Optimistic: immediately add a temp project so the UI transitions before the API responds
+    const tempId = crypto.randomUUID();
+    const tempProject: Project = {
+      id: tempId,
+      name,
+      created_at: new Date().toISOString(),
+    };
+    set({
+      projects: [tempProject, ...get().projects],
+      currentProject: tempProject,
+      projectId: tempId,
+      isCreating: true,
+    });
+    window.location.hash = `#/project/${tempId}`;
+
     try {
       const project = await api.createProject(name);
-      const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
-      set({ projects, currentProject: project, projectId: project.id });
+      // Swap the temp entry with the real project
+      set((state) => ({
+        projects: state.projects.map((p) => (p.id === tempId ? project : p)),
+        currentProject:
+          state.currentProject?.id === tempId ? project : state.currentProject,
+        projectId: state.projectId === tempId ? project.id : state.projectId,
+      }));
+      // Update URL hash from temp ID to real ID
+      if (window.location.hash === `#/project/${tempId}`) {
+        window.location.hash = `#/project/${project.id}`;
+      }
+    } catch (err) {
+      // Roll back the optimistic update on failure
+      set((state) => ({
+        projects: state.projects.filter((p) => p.id !== tempId),
+        currentProject:
+          state.currentProject?.id === tempId ? null : state.currentProject,
+        projectId: state.projectId === tempId ? null : state.projectId,
+      }));
+      if (window.location.hash === `#/project/${tempId}`) {
+        window.location.hash = "";
+      }
+      throw err;
     } finally {
       set({ isCreating: false });
     }
@@ -74,10 +122,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   async renameProject(id: string, name: string) {
     await api.renameProject(id, name);
     set((state) => {
-      const projects = state.projects.map((p) => p.id === id ? { ...p, name } : p);
-      const currentProject = state.currentProject?.id === id
-        ? { ...state.currentProject, name }
-        : state.currentProject;
+      const projects = state.projects.map((p) =>
+        p.id === id ? { ...p, name } : p,
+      );
+      const currentProject =
+        state.currentProject?.id === id
+          ? { ...state.currentProject, name }
+          : state.currentProject;
       return { projects, currentProject };
     });
   },
@@ -85,23 +136,29 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   updateProjectSummary(projectId: string, summary: string) {
     set((state) => {
       const projects = state.projects.map((p) =>
-        p.id === projectId ? { ...p, summary } : p
+        p.id === projectId ? { ...p, summary } : p,
       );
-      const currentProject = state.currentProject?.id === projectId
-        ? { ...state.currentProject, summary }
-        : state.currentProject;
+      const currentProject =
+        state.currentProject?.id === projectId
+          ? { ...state.currentProject, summary }
+          : state.currentProject;
       return { projects, currentProject };
     });
+  },
+
+  setPendingRenameProjectId(id: string | null) {
+    set({ pendingRenameProjectId: id });
   },
 
   setProjectPublishedUrl(projectId: string, url: string) {
     set((state) => {
       const projects = state.projects.map((p) =>
-        p.id === projectId ? { ...p, published_url: url } : p
+        p.id === projectId ? { ...p, published_url: url } : p,
       );
-      const currentProject = state.currentProject?.id === projectId
-        ? { ...state.currentProject, published_url: url }
-        : state.currentProject;
+      const currentProject =
+        state.currentProject?.id === projectId
+          ? { ...state.currentProject, published_url: url }
+          : state.currentProject;
       return { projects, currentProject };
     });
   },

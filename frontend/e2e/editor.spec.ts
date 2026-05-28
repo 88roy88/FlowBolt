@@ -5,7 +5,7 @@ import { test, expect } from './fixtures';
 import { PROJECT_ID } from './mocks/data';
 
 async function goToEditor(page: import('@playwright/test').Page) {
-  await page.goto(`/#/project/${PROJECT_ID}`);
+  await page.goto(`/#/project/${PROJECT_ID}`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Code' }).click({ timeout: 20_000 });
   await page.getByText('App.tsx', { exact: true }).first().click();
   const host = page.getByTestId('monaco-editor-host');

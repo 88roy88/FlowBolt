@@ -22,6 +22,14 @@
     "retryConnection": "Retry Connection",
     "createFirstProject": "Create your first project to get started"
   },
+  "onboarding": {
+    "tagline": "Describe what you want to build and the AI will design, plan, and code it for you.",
+    "renameNudge": "Give your project a name",
+    "creatingProject": "Creating project...",
+    "hintDashboard": "A dashboard with charts",
+    "hintTodoApp": "A todo app with drag & drop",
+    "hintLandingPage": "A landing page with animations"
+  },
   "sidebar": {
     "pinSidebar": "Pin sidebar open",
     "unpinSidebar": "Unpin sidebar",
@@ -30,7 +38,12 @@
     "scaffolding": "Scaffolding project...",
     "rename": "Rename",
     "summary": "Summary",
-    "confirmDelete": "Confirm delete?"
+    "confirmDelete": "Confirm delete?",
+    "untitledProject": "Untitled",
+    "untitledProjectDefault": "Untitled Project",
+    "renameProject": "Rename project",
+    "nameYourProject": "Name your project",
+    "createProjectError": "Failed to create project. Please try again."
   },
   "settings": {
     "title": "Settings",
@@ -133,6 +146,7 @@
     "send": "send",
     "newLine": "new line",
     "scrollToBottom": "Scroll to bottom",
+    "settingUpProject": "Setting up your project…",
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept or modify",

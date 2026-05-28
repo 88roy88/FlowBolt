@@ -12,21 +12,24 @@ test.describe('Empty state', () => {
 
   test('shows welcome screen with no projects', async ({ page }) => {
     await page.goto('/');
-    // Should show the empty state prompt — no project in sidebar
-    await expect(page.getByText(/create your first project/i)).toBeVisible({ timeout: 10_000 });
+    // Landing screen is shown — prompt input is visible with no project selected
+    await expect(page.getByPlaceholder(/describe what you want/i)).toBeVisible({ timeout: 10_000 });
   });
 
   test('can create first project from empty state', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/create your first project/i)).toBeVisible({ timeout: 10_000 });
+    // Landing screen shows the prompt input as the entry point
+    const promptInput = page.getByPlaceholder(/describe what you want/i);
+    await expect(promptInput).toBeVisible({ timeout: 10_000 });
 
-    // The empty state should have a name input and create button
-    const nameInput = page.getByPlaceholder('Project name');
-    await nameInput.fill('My First Project');
-    await nameInput.press('Enter');
+    // Submitting a message creates the project and navigates to it
+    await promptInput.fill('My First Project');
+    await promptInput.press('Enter');
 
-    // After creation, the chat input should appear
-    await expect(page.getByPlaceholder(/describe what you want/i)).toBeVisible({ timeout: 10_000 });
+    // After creation the project view renders with Preview/Code tabs
+    await expect(
+      page.getByRole('button', { name: /^(Preview|Code)$/i }).first()
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -34,10 +37,12 @@ test.describe('Delete project', () => {
   test('can delete a project from sidebar', async ({ page }) => {
     await page.goto('/');
 
-    // Wait for project to load
-    await expect(page.getByRole('button', { name: 'ET' })).toBeVisible({ timeout: 10_000 });
+    // Wait for project to load — sidebar may be pinned (row visible) or collapsed (icon-rail button visible)
+    const rail = page.getByRole('button', { name: 'ET', exact: true });
+    const row = page.getByTestId(`project-item-${MOCK_PROJECT.id}`);
+    await expect(rail.or(row)).toBeVisible({ timeout: 10_000 });
 
-    // Expand sidebar
+    // Expand if collapsed
     const expandBtn = page.getByRole('button', { name: 'Expand sidebar' });
     if (await expandBtn.isVisible()) {
       await expandBtn.click();

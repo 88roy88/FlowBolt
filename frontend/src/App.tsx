@@ -8,7 +8,6 @@ import { useErrorStore } from './stores/errors';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorToast } from './components/errors/ErrorToast';
 import { useErrorCapture } from './hooks/useErrorCapture';
-import { pollFileTree } from './utils/pollFileTree';
 import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
@@ -53,15 +52,12 @@ initializeTheme();
 
 export default function App() {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
+  const { projects, currentProject, setCurrentProject, loadProjects } = useSessionStore();
   const loadHistory = useChatStore((s) => s.loadHistory);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
   const resetFiles = useFilesStore((s) => s.reset);
   useErrorCapture();
-  const [newProjectName, setNewProjectName] = useState('');
-  const [showNewProject, setShowNewProject] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [backendAvailable, setBackendAvailable] = useState(true);
   const [checkingBackend, setCheckingBackend] = useState(true);
   const hasCache = hasProjectsCache();
 
@@ -81,7 +77,6 @@ export default function App() {
   useEffect(() => {
     async function checkBackend() {
       const isAvailable = await api.checkBackendHealth();
-      setBackendAvailable(isAvailable);
       setCheckingBackend(false);
 
       if (!isAvailable) {
@@ -114,7 +109,6 @@ export default function App() {
   useEffect(() => {
     if (loading || projects.length === 0) {
       if (!loading && projects.length === 0) {
-        setShowNewProject(true);
         setHasProjectsCache(false); // Clear cache if no projects
       }
       return;
@@ -125,8 +119,8 @@ export default function App() {
     const match = hashProjectId
       ? projects.find((p) => p.id === hashProjectId)
       : null;
-    const target = match ?? projects[0];
-    selectProject(target);
+    if (!match) return;
+    selectProject(match);
   }, [loading, projects, currentProject, selectProject]);
 
   // Listen for hash changes (back/forward)
@@ -156,107 +150,12 @@ export default function App() {
     return () => window.removeEventListener('online', handleOnline);
   }, [loadHistory, loadFileTree]);
 
-  const handleCreate = async () => {
-    const name = newProjectName.trim() || 'My Project';
-    await createProject(name);
-    setNewProjectName('');
-    setShowNewProject(false);
-    setHasProjectsCache(true); // Update cache after creating project
-    // After creation, the session store already has the new project selected.
-    // Set the hash URL and start polling for files (scaffold takes a few seconds).
-    const session = useSessionStore.getState();
-    if (session.currentProject) {
-      window.location.hash = `#/project/${session.currentProject.id}`;
-      resetFiles();
-      loadHistory(session.currentProject.id);
-      pollFileTree();
-    }
-  };
-
   // Only show loading screen if no cache exists
   if ((loading || checkingBackend) && !hasCache) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
         <FlowBrand size="lg" />
         <Loader2 size={20} className="animate-spin text-brand" />
-      </div>
-    );
-  }
-
-  if (showNewProject && projects.length === 0) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        gap: '16px',
-      }}>
-        <FlowBrand size="lg" />
-        {!backendAvailable ? (
-          <>
-            <div style={{
-              padding: '16px 24px',
-              background: 'var(--surface)',
-              border: '2px solid var(--danger)',
-              borderRadius: '8px',
-              maxWidth: '500px',
-              textAlign: 'center',
-            }}>
-              <p style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' }}>
-                {t('app.backendUnavailable')}
-              </p>
-              <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>
-                {t('app.cannotConnect')}
-              </p>
-            </div>
-            <button
-              onClick={() => window.location.reload()}
-              style={{
-                padding: '8px 16px',
-                background: 'var(--accent)',
-                color: 'var(--bg)',
-                borderRadius: '6px',
-                fontWeight: 600,
-              }}
-            >
-              {t('app.retryConnection')}
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={{ color: 'var(--text-dim)' }}>{t('app.createFirstProject')}</p>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder={t('common.projectName')}
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-                style={{
-                  padding: '8px 12px',
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '6px',
-                  width: '250px',
-                }}
-              />
-              <button
-                onClick={handleCreate}
-                style={{
-                  padding: '8px 16px',
-                  background: 'var(--accent)',
-                  color: 'var(--bg)',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                }}
-              >
-                {t('common.create')}
-              </button>
-            </div>
-          </>
-        )}
       </div>
     );
   }
