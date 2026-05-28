@@ -59,16 +59,23 @@ export default new MockPackage({
     },
   ]),
   getResults(quickParams) {
-    return {
-      echo: [
-        {
-          label: quickParams.label ?? null,
-          date_range: quickParams.date_range ?? null,
-          recorded_at: quickParams.recorded_at ?? null,
-          area: quickParams.area ?? null,
-          is_active: quickParams.is_active ?? null,
-        },
-      ],
-    };
+    const label = Array.isArray(quickParams.label)
+      ? (quickParams.label as { Value: string }[]).map((v) => v.Value).join(', ')
+      : null;
+
+    const date_range =
+      quickParams.date_range != null ? (quickParams.date_range as { To: string }).To : null;
+
+    const recorded_at =
+      quickParams.recorded_at != null ? JSON.stringify(quickParams.recorded_at) : null;
+
+    const area = Array.isArray(quickParams.area)
+      ? ((quickParams.area as { value: string }[])[0]?.value ?? null)
+      : null;
+
+    const is_active =
+      quickParams.is_active != null ? Boolean(quickParams.is_active) : null;
+
+    return { echo: [{ label, date_range, recorded_at, area, is_active }] };
   },
 });
