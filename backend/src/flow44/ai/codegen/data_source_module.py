@@ -15,6 +15,7 @@ from flow44.ai.codegen.ts_types import generate_ts_interfaces
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition, ParamType
 
 _FLOW_PARAM_VALUE_TYPE_DEF = """\
+type BooleanValue = boolean;
 type TextValue = { Name: string; Value: string }[];
 type ISODateString = string;
 type DateRangeValue = { From: ISODateString; To: ISODateString };
@@ -26,7 +27,7 @@ type TimestampValue = (Date | "now" | {
 type WKT = string;
 type GeographicValue = { value: WKT }[];
 
-type FlowParamValue = TextValue | DateRangeValue | TimestampValue | GeographicValue;"""
+type FlowParamValue = BooleanValue | TextValue | DateRangeValue | TimestampValue | GeographicValue;"""
 
 # Param names that would clip a JS/TS reserved word when used as a parameter
 # or property identifier. A trailing underscore is appended to avoid the clash
@@ -78,8 +79,10 @@ def _function_name(sanitized_name: str) -> str:
 
 def _param_type_to_ts(param_type: ParamType) -> str:
     match param_type:
-        case "string" | "int" | "double" | "bool":
+        case "string" | "int" | "double":
             return "TextValue"
+        case "bool":
+            return "BooleanValue"
         case "datetime":
             return "DateRangeValue"
         case "timestamp":

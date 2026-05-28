@@ -196,7 +196,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "active: TextValue" in result
+        assert "active: BooleanValue" in result
 
     def test_date_maps_to_string(self) -> None:
         params = DataSourceParamsInfo(
@@ -258,7 +258,7 @@ class TestReservedWordParamName:
             queries=_queries("r"),
         )
         assert "from_: DateRangeValue" in result
-        assert "delete_?: TextValue" in result
+        assert "delete_?: BooleanValue" in result
         # The body keys still use the FLAPI names.
         assert "body['events']['from'] = from_;" in result
         assert "if (delete_ !== undefined) body['events']['delete'] = delete_;" in result
@@ -357,6 +357,15 @@ class TestAllParamTypes:
                     options=[],
                     cube_id="geo",
                 ),
+                ParamDefinition(
+                    name="is_active",
+                    display_name="Is active",
+                    type="bool",
+                    is_required=False,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="geo",
+                ),
             ],
             require_any=False,
         )
@@ -371,10 +380,12 @@ class TestAllParamTypes:
         assert "validFrom: DateRangeValue" in result
         assert "recordedAt?: TimestampValue" in result
         assert "area?: GeographicValue" in result
+        assert "isActive?: BooleanValue" in result
         assert "body['geo']['label'] = label;" in result
         assert "body['geo']['valid_from'] = validFrom;" in result
         assert "if (recordedAt !== undefined) body['geo']['recorded_at'] = recordedAt;" in result
         assert "if (area !== undefined) body['geo']['area'] = area;" in result
+        assert "if (isActive !== undefined) body['geo']['is_active'] = isActive;" in result
 
 
 class TestRequireAnyGroup:

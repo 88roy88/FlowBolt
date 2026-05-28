@@ -7,6 +7,7 @@ const sampleData = {
       date_range: '2025-01-01',
       recorded_at: '2025-01-01T00:00:00Z',
       area: 'POINT(0 0)',
+      is_active: true,
     },
   ],
 };
@@ -48,6 +49,14 @@ export default new MockPackage({
       singleValue: true,
       description: 'A geographic area in WKT (GeographicValue).',
     },
+    {
+      name: 'is_active',
+      displayName: 'Is active',
+      type: 'Boolean',
+      required: false,
+      singleValue: true,
+      description: 'A boolean flag (BooleanValue).',
+    },
   ]),
   getResults(quickParams) {
     return {
@@ -57,6 +66,7 @@ export default new MockPackage({
           date_range: quickParams.date_range ?? null,
           recorded_at: quickParams.recorded_at ?? null,
           area: quickParams.area ?? null,
+          is_active: quickParams.is_active ?? null,
         },
       ],
     };
