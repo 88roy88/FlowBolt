@@ -70,7 +70,7 @@ export default new MockPackage({
       quickParams.recorded_at != null ? JSON.stringify(quickParams.recorded_at) : null;
 
     const area = Array.isArray(quickParams.area)
-      ? ((quickParams.area as { value: string }[])[0]?.value ?? null)
+      ? ((quickParams.area as { value: string[]; radius: number }[])[0]?.value?.[0] ?? null)
       : null;
 
     const is_active =
