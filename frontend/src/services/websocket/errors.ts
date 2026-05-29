@@ -1,14 +1,12 @@
-import { createReconnectingSocket, getWsBase, sendWsAuth } from './reconnecting';
+import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 export function createErrorSocket(
   projectId: string,
   onError: (data: unknown) => void,
 ): { close(): void } {
-  const { sendOrQueue, close } = createReconnectingSocket(
+  const { close } = createReconnectingSocket(
     `${getWsBase()}/ws/errors/${projectId}`,
-    async () => {
-      await sendWsAuth(sendOrQueue);
-    },
+    undefined,
     (data) => {
       try {
         onError(JSON.parse(data));

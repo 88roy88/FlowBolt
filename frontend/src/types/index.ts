@@ -130,7 +130,6 @@ export interface FollowUpStep {
 }
 
 export type WSMessage =
-  | { type: 'auth'; dataSourceAuthorization?: string; userAuthorization?: string }
   | { type: 'message'; content: string; model?: string; dataSourceIds?: number[] }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }

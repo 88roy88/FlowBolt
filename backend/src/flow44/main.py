@@ -24,7 +24,7 @@ from flow44.api import (
     server_log,
     terminal,
 )
-from flow44.api.auth import get_user_id, preview_token_cookie
+from flow44.api.auth import get_user_id
 from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
@@ -88,9 +88,6 @@ async def health_check() -> dict[str, str]:
 @app.exception_handler(SandboxNotFoundError)
 async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError) -> JSONResponse:
     return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
-app.middleware("http")(preview_token_cookie)
 
 
 # CORS — allow all origins in development

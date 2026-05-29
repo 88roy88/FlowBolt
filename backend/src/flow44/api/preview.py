@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import Response
 
 from flow44.api.auth import ProjectDep
-from flow44.api.sandbox import SandboxDep, get_ws_sandbox
+from flow44.api.sandbox import SandboxDep, WsSandboxDep
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +97,9 @@ async def proxy_to_sandbox(  # noqa: E501
 
 @router.websocket("/{project_id}/proxy/")
 @router.websocket("/{project_id}/proxy")
-async def proxy_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
+async def proxy_ws(websocket: WebSocket, project_id: str, sandbox: WsSandboxDep) -> None:  # noqa: C901
     """Proxy WebSocket connections for Vite HMR."""
     await websocket.accept()
-    sandbox = await get_ws_sandbox(websocket, project_id)
-    if sandbox is None:
-        return
 
     import asyncio  # noqa: PLC0415
 

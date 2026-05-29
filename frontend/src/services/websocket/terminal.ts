@@ -1,5 +1,5 @@
 import type { TerminalSocket } from './types';
-import { getWsBase, sendWsAuth } from './reconnecting';
+import { getWsBase } from './reconnecting';
 
 export function createTerminalSocket(projectId: string): TerminalSocket {
   const handlers: Array<(data: string) => void> = [];
@@ -22,9 +22,8 @@ export function createTerminalSocket(projectId: string): TerminalSocket {
     ws.binaryType = 'arraybuffer';
     socket = ws;
 
-    ws.addEventListener('open', async () => {
+    ws.addEventListener('open', () => {
       retryDelay = 1000;
-      await sendWsAuth((data) => ws.send(data));
       flushQueue();
     });
 

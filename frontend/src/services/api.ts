@@ -1,6 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
 import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
-import { readDataSourceAuthorization } from './dataSourceAuth';
 
 const BASE = '/api';
 
@@ -158,7 +157,7 @@ export async function fetchDefaultModel(): Promise<string> {
 
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
   const headers: Record<string, string> = {};
-  const auth = await readDataSourceAuthorization();
+  const auth = await authSession.ensureFreshToken();
   if (auth) headers.Authorization = auth;
   const res = await fetch(`${BASE}/data-source/search/${encodeURIComponent(queryOrId)}`, { headers });
   const text = await res.text();

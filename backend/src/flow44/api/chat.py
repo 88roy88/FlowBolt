@@ -3,17 +3,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Cookie, WebSocket, WebSocketDisconnect
 
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.auth import ProjectDep, get_project, get_user_id
-from flow44.api.sandbox import read_auth_frame
+from flow44.api.auth import ProjectDep, WsProjectDep
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -25,7 +24,7 @@ logger = logging.getLogger(__name__)
 # HTTP routes — included in main's protected api_router
 http_router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# WebSocket route — registered directly on app (browser WS can't send headers)
+# WebSocket router — auth via Depends() + Cookie() on each endpoint
 router = APIRouter()
 
 
@@ -56,31 +55,17 @@ async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
 
 
 @router.websocket("/ws/chat/{project_id}")
-async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901, PLR0915
+async def chat_ws(  # noqa: C901, PLR0915
+    websocket: WebSocket,
+    project_id: str,
+    project: WsProjectDep,
+    flow44_token: Annotated[str | None, Cookie()] = None,
+) -> None:
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", project_id)
 
-    first = await read_auth_frame(websocket)
-    if first is None:
-        return
-
-    raw_ds_auth = first.get("dataSourceAuthorization")
-    data_source_authorization: str | None = raw_ds_auth.strip() or None if isinstance(raw_ds_auth, str) else None
-    user_token = first.get("userAuthorization")
-
-    try:
-        caller_id = get_user_id(user_token if isinstance(user_token, str) else None)
-    except HTTPException as exc:
-        await websocket.send_json({"type": "error", "message": exc.detail})
-        await websocket.close()
-        return
-
-    try:
-        project = await get_project(project_id, caller_id)
-    except HTTPException:
-        await websocket.send_json({"type": "error", "message": "Project not found"})
-        await websocket.close()
-        return
+    # Data source API expects the raw JWT (no "Bearer " prefix).
+    data_source_authorization = flow44_token
 
     try:
         sandbox = sandbox_manager.get_sandbox(project_id)

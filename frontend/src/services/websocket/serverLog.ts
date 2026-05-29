@@ -1,5 +1,5 @@
 import type { ReadOnlySocket } from './types';
-import { getWsBase, sendWsAuth } from './reconnecting';
+import { getWsBase } from './reconnecting';
 
 export function createServerLogSocket(projectId: string): ReadOnlySocket {
   const handlers: Array<(data: string) => void> = [];
@@ -12,10 +12,6 @@ export function createServerLogSocket(projectId: string): ReadOnlySocket {
     const ws = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
     ws.binaryType = 'arraybuffer';
     socket = ws;
-
-    ws.addEventListener('open', async () => {
-      await sendWsAuth((data) => ws.send(data));
-    });
 
     ws.addEventListener('message', (event) => {
       const text = event.data instanceof ArrayBuffer

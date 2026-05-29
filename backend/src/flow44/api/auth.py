@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
 from typing import Annotated, cast
 
 import jwt
-from fastapi import Cookie, Depends, Header, HTTPException, Request, Response, WebSocket
+from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
 from jwt.types import Options
 from pydantic import BaseModel, ConfigDict, model_validator
-from starlette.datastructures import MutableHeaders
 
 from flow44.config import settings
 from flow44.db.project import Project
@@ -117,36 +115,22 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_ws_user_id(websocket: WebSocket) -> str | None:
-    """Resolve a user_id from the WebSocket's flow44_token cookie. Closes the socket on failure."""
+async def get_ws_user_id(flow44_token: Annotated[str | None, Cookie()] = None) -> str:
+    """WS variant of get_user_id: raises WebSocketException so FastAPI rejects the handshake before accept."""
     try:
-        return get_user_id(websocket.cookies.get("flow44_token"))
+        return get_user_id(flow44_token)
     except HTTPException:
-        await websocket.close(code=1008, reason="Unauthorized")
-        return None
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
 
 
-def _preview_project_id(path: str) -> str | None:
-    # nginx guarantees /api/preview/{id}/proxy/... structure before routing here
-    if not path.startswith("/api/preview/"):
-        return None
-    project_id, _, _ = path.removeprefix("/api/preview/").partition("/")
-    return project_id or None
+WsUserDep = Annotated[str, Depends(get_ws_user_id)]
 
 
-async def preview_token_cookie(
-    request: Request,
-    call_next: Callable[[Request], Awaitable[Response]],
-) -> Response:
-    """Scope ?token= to preview proxy: inject as flow44_token cookie so sub-resources authenticate."""
-    token = request.query_params.get("token")
-    project_id = _preview_project_id(request.url.path) if token else None
+async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
+    try:
+        return await get_project(project_id, user_id)
+    except HTTPException:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
 
-    if not project_id or not token:
-        return await call_next(request)
 
-    MutableHeaders(scope=request.scope)["authorization"] = f"Bearer {token}"
-
-    response = await call_next(request)
-    response.set_cookie("flow44_token", token, path=f"/api/preview/{project_id}/proxy", httponly=True, samesite="lax")
-    return response
+WsProjectDep = Annotated[Project, Depends(get_ws_project)]
