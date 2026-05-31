@@ -332,9 +332,7 @@ class ExecuteAgent(BaseAgent):
                 architecture=state.build_state.work_plan.architecture.model_dump(),
                 ux_design=state.build_state.work_plan.ux_design.model_dump(),
                 dependency_files=dep_files,
-                other_completed_files={
-                    p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths
-                }
+                other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
                 uses_routing=state.build_state.work_plan.uses_routing,
