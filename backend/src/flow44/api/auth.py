@@ -21,6 +21,7 @@ _DECODE_OPTIONS = {
     "verify_aud": False,
 }
 
+
 def _claim_with_suffix(payload: dict[str, object], suffix: str) -> str | None:
     """Return the first claim value whose key ends with ``suffix`` (e.g. ``/UniqueID``)."""
     for key, value in payload.items():
