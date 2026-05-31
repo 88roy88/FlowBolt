@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from flow44.api.auth import TokenDep
+from flow44.api.deps import TokenDep
 from flow44.integrations.flapi_api import FlapiUpstreamError, data_source_client
 
 router = APIRouter(prefix="/api/data-source", tags=["data-source"])

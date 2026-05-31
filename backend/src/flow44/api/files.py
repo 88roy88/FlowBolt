@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from flow44.api.sandbox import SandboxDep
+from flow44.api.deps import SandboxDep
 from flow44.sandbox.search_mixin import SearchToolError
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])

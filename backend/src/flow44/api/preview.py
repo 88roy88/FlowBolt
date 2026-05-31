@@ -13,8 +13,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 
-from flow44.api.auth import ProjectDep
-from flow44.api.sandbox import SandboxDep, WsSandboxDep
+from flow44.api.deps import ProjectDep, SandboxDep, WsSandboxDep
 
 logger = logging.getLogger(__name__)
 

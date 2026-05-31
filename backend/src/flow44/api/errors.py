@@ -9,7 +9,7 @@ import os
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.api.sandbox import WsSandboxDep
+from flow44.api.deps import WsSandboxDep
 from flow44.errors.parser import BuildError, is_error_line, parse_error_block, should_ignore, strip_ansi
 
 logger = logging.getLogger(__name__)

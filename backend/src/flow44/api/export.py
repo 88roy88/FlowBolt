@@ -11,8 +11,7 @@ import zipfile
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from flow44.api.auth import ProjectDep
-from flow44.api.sandbox import SandboxDep
+from flow44.api.deps import ProjectDep, SandboxDep
 from flow44.sandbox.operations import BuildError, build_single_html
 
 logger = logging.getLogger(__name__)

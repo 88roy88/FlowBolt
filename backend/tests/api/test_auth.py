@@ -15,7 +15,7 @@ import jwt
 import pytest
 from fastapi import HTTPException
 
-from flow44.api.auth import TokenPayload, decode_token, get_user_id
+from flow44.api.deps import TokenPayload, decode_token, get_user_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,7 +41,7 @@ def _jwt_shaped(raw: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_no_token_require_jwt_raises(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     with pytest.raises(HTTPException) as exc:
@@ -49,7 +49,7 @@ def test_no_token_require_jwt_raises(mock_settings):
     assert exc.value.status_code == 401
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_no_token_no_require_returns_anonymous(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
     assert get_user_id(None) == "anonymous"
@@ -60,7 +60,7 @@ def test_no_token_no_require_returns_anonymous(mock_settings):
 # ---------------------------------------------------------------------------
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_url_unique_id_claim_returned(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
@@ -69,7 +69,7 @@ def test_jwt_url_unique_id_claim_returned(mock_settings):
     assert get_user_id(token) == "user-123"
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_first_matching_url_claim_wins(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
@@ -83,7 +83,7 @@ def test_jwt_first_matching_url_claim_wins(mock_settings):
     assert get_user_id(token) == "first"
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_missing_unique_id_claim_raises_when_required(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     token = _make_jwt({"sub": "ignored", "role": "admin"})
@@ -93,7 +93,7 @@ def test_jwt_missing_unique_id_claim_raises_when_required(mock_settings):
     assert "missing user identification" in exc.value.detail.lower()
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_expired_still_extracts_when_exp_verification_disabled(mock_settings):
     """Decode skips exp check; claim still readable on signed-but-expired token."""
     mock_settings.AUTH_REQUIRE_JWT = True
@@ -108,7 +108,7 @@ def test_jwt_expired_still_extracts_when_exp_verification_disabled(mock_settings
     assert get_user_id(token) == "user-x"
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_malformed_raises_when_required(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     # Exactly two dots; payload segment decodes to non-JSON bytes.
@@ -123,7 +123,7 @@ def test_jwt_malformed_raises_when_required(mock_settings):
 # ---------------------------------------------------------------------------
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_no_unique_id_no_require_returns_raw_token(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
     token = _make_jwt({"sub": "user-local"})
@@ -132,7 +132,7 @@ def test_jwt_no_unique_id_no_require_returns_raw_token(mock_settings):
     assert result != "user-local"
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_valid_claim_no_require_returns_uid(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
@@ -141,14 +141,14 @@ def test_jwt_valid_claim_no_require_returns_uid(mock_settings):
     assert get_user_id(token) == "dev-user"
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_malformed_no_require_returns_raw_string(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
     raw = "x.y.z"
     assert get_user_id(raw) == raw
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_jwt_require_true_accepts_unsigned_payload_with_claim(mock_settings):
     """Signed HS256 token with claim returns uid under strict mode."""
     mock_settings.AUTH_REQUIRE_JWT = True
@@ -164,7 +164,7 @@ def test_jwt_require_true_accepts_unsigned_payload_with_claim(mock_settings):
 # ---------------------------------------------------------------------------
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_opaque_token_require_jwt_raises(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = True
     with pytest.raises(HTTPException) as exc:
@@ -173,7 +173,7 @@ def test_opaque_token_require_jwt_raises(mock_settings):
     assert "JWT" in exc.value.detail
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_opaque_token_no_require_returns_as_user_id(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
     assert get_user_id("my-opaque-key") == "my-opaque-key"
@@ -187,7 +187,7 @@ def test_opaque_token_no_require_returns_as_user_id(mock_settings):
 CLAIM_PREFIX = "https://issuer.example/v1/claims/"
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_decode_token_returns_payload_on_valid_jwt(mock_settings):
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
     mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
@@ -198,7 +198,7 @@ def test_decode_token_returns_payload_on_valid_jwt(mock_settings):
     assert payload.iss == "test-issuer"
 
 
-@patch("flow44.api.auth.settings")
+@patch("flow44.api.deps.settings")
 def test_decode_token_returns_none_on_garbage(mock_settings):
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
     mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM

@@ -12,7 +12,7 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.auth import ProjectDep, WsProjectDep
+from flow44.api.deps import ProjectDep, WsProjectDep
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan

@@ -51,8 +51,8 @@ def _handshake_rejected(path: str, token: str | None) -> bool:
 
 def test_missing_cookie_rejected_when_required():
     """No cookie + AUTH_REQUIRE_JWT=true → handshake rejected before any backend logic runs."""
-    with patch("flow44.api.auth.settings") as mock_settings, \
-         patch("flow44.api.auth.db_get_project", new_callable=AsyncMock) as mock_get, \
+    with patch("flow44.api.deps.settings") as mock_settings, \
+         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock) as mock_get, \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         mock_settings.AUTH_REQUIRE_JWT = True
@@ -66,8 +66,8 @@ def test_missing_cookie_rejected_when_required():
 def test_wrong_owner_rejected():
     """Valid token whose user_id doesn't own the project → handshake rejected, sandbox untouched."""
     project = _mock_project(user_id="owner-user")
-    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=project), \
-         patch("flow44.api.auth.get_user_id", return_value="other-user"), \
+    with patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project), \
+         patch("flow44.api.deps.get_user_id", return_value="other-user"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         assert _handshake_rejected("/ws/chat/proj-123", "any-token")
@@ -76,8 +76,8 @@ def test_wrong_owner_rejected():
 
 def test_unknown_project_rejected():
     """Valid token for a non-existent project → handshake rejected, sandbox untouched."""
-    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=None), \
-         patch("flow44.api.auth.get_user_id", return_value="some-user"), \
+    with patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=None), \
+         patch("flow44.api.deps.get_user_id", return_value="some-user"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         assert _handshake_rejected("/ws/chat/proj-ghost", "any-token")
@@ -87,9 +87,9 @@ def test_unknown_project_rejected():
 def test_sandbox_not_touched_before_auth():
     """Failed auth must never invoke the sandbox manager."""
     mock_mgr = MagicMock()
-    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock) as mock_get, \
+    with patch("flow44.api.deps.db_get_project", new_callable=AsyncMock) as mock_get, \
          patch("flow44.api.chat.sandbox_manager", mock_mgr), \
-         patch("flow44.api.auth.settings") as mock_settings:
+         patch("flow44.api.deps.settings") as mock_settings:
 
         mock_settings.AUTH_REQUIRE_JWT = True
         mock_settings.AUTH_JWT_PUBLIC_KEY = "some-secret"  # noqa: S105
@@ -108,8 +108,8 @@ def test_sandbox_not_touched_before_auth():
 def test_sandbox_not_found_after_auth_sends_error():
     """After successful auth, a missing sandbox is surfaced as a JSON error frame."""
     project = _mock_project(user_id="user-a")
-    with patch("flow44.api.auth.db_get_project", new_callable=AsyncMock, return_value=project), \
-         patch("flow44.api.auth.get_user_id", return_value="user-a"), \
+    with patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project), \
+         patch("flow44.api.deps.get_user_id", return_value="user-a"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
         mock_mgr.get_sandbox.side_effect = SandboxNotFoundError("proj-123")

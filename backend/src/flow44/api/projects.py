@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from flow44.api.auth import ProjectDep, UserDep
+from flow44.api.deps import ProjectDep, UserDep
 from flow44.config import settings
 from flow44.db.project import (
     create_project,

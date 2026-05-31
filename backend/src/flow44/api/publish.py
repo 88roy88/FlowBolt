@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 
-from flow44.api.auth import ProjectDep
+from flow44.api.deps import ProjectDep
 from flow44.config import settings
 from flow44.db.project import update_project_published_url
 from flow44.integrations.s3 import deploy_single_html

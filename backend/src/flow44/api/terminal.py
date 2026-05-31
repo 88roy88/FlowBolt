@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.api.sandbox import WsSandboxDep
+from flow44.api.deps import WsSandboxDep
 from flow44.sandbox.pty import BasePTY
 
 logger = logging.getLogger(__name__)

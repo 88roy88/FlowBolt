@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
-from flow44.api.auth import get_project
+from flow44.api.deps import get_project
 from flow44.db.project import create_project
 
 

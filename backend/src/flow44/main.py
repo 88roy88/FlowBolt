@@ -24,7 +24,7 @@ from flow44.api import (
     server_log,
     terminal,
 )
-from flow44.api.auth import get_user_id
+from flow44.api.deps import get_user_id
 from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects

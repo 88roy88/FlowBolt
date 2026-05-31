@@ -8,7 +8,7 @@ import os
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.api.sandbox import WsSandboxDep
+from flow44.api.deps import WsSandboxDep
 
 logger = logging.getLogger(__name__)
 

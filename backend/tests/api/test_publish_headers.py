@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from flow44.api.auth import get_project
+from flow44.api.deps import get_project
 from flow44.config import settings
 from flow44.main import app
 
