@@ -12,6 +12,7 @@ class ArchitectureComponent(BaseModel):
 
 
 class ArchitectureDesign(BaseModel):
+    uses_routing: bool = False
     components: list[ArchitectureComponent] = Field(default_factory=list)
     data_flow: str = ""
     file_structure: list[str] = Field(default_factory=list)

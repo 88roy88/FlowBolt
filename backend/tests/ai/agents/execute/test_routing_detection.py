@@ -9,6 +9,9 @@ class TestDetectUsesRouting:
     def test_merge_flag(self) -> None:
         assert detect_uses_routing("Simple todo app", {"uses_routing": True, "tasks": []})
 
+    def test_architecture_flag(self) -> None:
+        assert detect_uses_routing("Build a landing page", {"tasks": []}, architecture_uses_routing=True)
+
     def test_task_pages_fallback(self) -> None:
         plan = {"tasks": [{"files": ["src/pages/HomePage.tsx"]}]}
         assert detect_uses_routing("Build a landing page", plan)

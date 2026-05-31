@@ -14,6 +14,7 @@ class TestPromptRendering:
         assert "software architect" in result
         assert "JSON" in result
         assert "components" in result
+        assert "uses_routing" in result
 
     def test_architecture_with_data_sources(self) -> None:
         sources = [
@@ -98,13 +99,20 @@ class TestPromptRendering:
         )
         assert "BrowserRouter" in result
         assert "getRouterBasename" in result
-        assert "src/platform/routerBasename" in result
+        assert "src/platform/" in result
         assert "ROUTING.md" in result
         assert "react-router-dom" in result
         assert "flowbolt" not in result.lower()
         assert "lazy(() => import" in result
         assert "Suspense" in result
         assert "Router contract" in result
+        router_idx = result.index("## Router contract")
+        rules_idx = result.index("Rules:")
+        rule_5_idx = result.index("5. Only output the files listed above")
+        rule_6_idx = result.index("6. **Multi-page app**")
+        assert router_idx < rules_idx
+        assert rule_5_idx < rule_6_idx
+        assert result.find("##", rule_5_idx, rule_6_idx) == -1
         assert "Never edit" in result and "vite.config.ts" in result
         assert "basename={getRouterBasename()}" in result
         assert "Never" in result and '<a href="/' in result

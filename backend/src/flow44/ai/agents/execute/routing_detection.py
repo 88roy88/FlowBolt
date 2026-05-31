@@ -19,6 +19,7 @@ def detect_uses_routing(
     plan_data: dict[str, Any],
     *,
     architecture_file_structure: list[str] | None = None,
+    architecture_uses_routing: bool = False,
 ) -> bool:
     """Return whether the AI plan marks this app as needing client-side routing.
 
@@ -27,6 +28,6 @@ def detect_uses_routing(
     tells codegen to write normal React Router code in the generated app.
     """
     del user_content  # merge plan + file structure are the source of truth
-    if plan_data.get("uses_routing"):
+    if plan_data.get("uses_routing") or architecture_uses_routing:
         return True
     return any(path.startswith("src/pages/") for path in _collect_paths(plan_data, architecture_file_structure))

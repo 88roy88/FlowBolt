@@ -41,12 +41,12 @@ Rules:
 - Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS) Optional to install react-router-dom
 - Do NOT include tasks for installing dependencies or running the dev server
 - Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
-- Do NOT include `src/main.tsx`, `vite.config.ts`, `index.html`, or `src/platform/routerBasename.ts` in task files — they are pre-configured
-- Set `"uses_routing": true` when the generated app needs client-side routing (multiple pages, navigation, or links between pages). This is a plan capability flag — not backend-owned routing.
+- Do NOT include `src/main.tsx`, `vite.config.ts`, `index.html`, or any file under `src/platform/` in task files — they are pre-configured
+- Set `"uses_routing": true` when the generated app needs client-side routing (multiple pages, navigation, or links between pages). This is a plan capability flag — not backend-owned routing. Honor `uses_routing` from the architecture design when it is `true`.
 - When `"uses_routing": true`:
   - Create tasks for `src/pages/*`, `src/components/Navbar.tsx`, and a final `src/App.tsx` wiring task
   - `react-router-dom` is installed automatically (dependency prep) — you write normal React Router code per `ROUTING.md` and `getRouterBasename()` from `src/platform/routerBasename.ts`
-  - Final `src/App.tsx` task is mandatory: `BrowserRouter basename={getRouterBasename()}`, `Routes`, `Route`, `Link`/`NavLink` (never `<a href="/…">`), lazy-loaded `src/pages/*` — do NOT include `vite.config.ts`, `index.html`, `main.tsx`, or `src/platform/routerBasename.ts` in any task (platform-owned; never remove Vite `base`)
+  - Final `src/App.tsx` task is mandatory: `BrowserRouter basename={getRouterBasename()}`, `Routes`, `Route`, `Link`/`NavLink` (never `<a href="/…">`), lazy-loaded `src/pages/*` — do NOT include `vite.config.ts`, `index.html`, `main.tsx`, or platform-owned files under `src/platform/` in any task (never remove Vite `base`)
 - When `"uses_routing": false`: single-page app in `App.tsx` only — no `src/pages/`, no `react-router-dom`, no router wrappers
 {% if has_data_sources %}
 

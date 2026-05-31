@@ -85,6 +85,9 @@ placeholders or ellipses.
   </flowAction>
 </flowArtifact>
 ```
+{% if uses_routing %}
+{% include "codegen_routing_context.jinja2" %}
+{% endif %}
 
 Rules:
 1. All file paths are relative to the project root (e.g. src/App.tsx).
@@ -97,7 +100,7 @@ Rules:
 {% else %}
 6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, react-router-dom, etc.).
 7. Single-page app only — do NOT create `src/pages/` or navigation/routing.
-8. Do NOT edit `src/platform/routerBasename.ts` unless changing platform support.
+8. Do NOT edit files under `src/platform/`.
 9. Import from already-completed files using their exact export names.
 10. Do NOT include shell actions — only file actions.
 {% endif %}

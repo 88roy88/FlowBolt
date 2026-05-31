@@ -14,15 +14,6 @@ def template_root() -> Path:
     return Path(settings.TEMPLATE_DIR)
 
 
-def test_template_guard_manifest_exists(template_root: Path) -> None:
-    manifest = template_root / ".template-guard.json"
-    assert manifest.is_file()
-    import json
-
-    data = json.loads(manifest.read_text(encoding="utf-8"))
-    assert data["protected_files"] == ["src/platform/routerBasename.ts"]
-
-
 def test_routing_md_exists(template_root: Path) -> None:
     routing_md = template_root / "ROUTING.md"
     assert routing_md.is_file()

@@ -69,7 +69,7 @@ For **every in-app route** (`/`, `/cart`, `/category/foo`, 404 “back home”, 
 
 External URLs (another domain, `mailto:`, `tel:`) may use `<a href="https://…">` with a full absolute URL.
 
-Do not remove files under `src/platform/` unless intentionally changing platform support.
+Do not remove or rewrite files under `src/platform/` unless intentionally changing platform support.
 
 Do not hardcode `/api/preview/...` or `/api/export/...` in React code.
 
