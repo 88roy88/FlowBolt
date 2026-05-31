@@ -42,4 +42,9 @@ Rules:
 3. Do NOT refactor unrelated code
 4. Output complete file contents, not patches
 5. Do NOT include shell actions
+{% if uses_routing %}
+6. `react-router-dom` is installed — fix routing in `App.tsx` only; **never edit** `vite.config.ts` (keep `base` from `VITE_BASE_PATH`), `index.html`, or files under `src/platform/`.
+7. `App.tsx` must use `<BrowserRouter basename={getRouterBasename()}>`; in-app nav via `Link`/`useNavigate` only — never `<a href="/…">`.
+{% else %}
 6. **CRITICAL**: Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS). Do NOT import other npm packages.
+{% endif %}

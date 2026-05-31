@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -6,6 +7,7 @@ from abc import ABC
 from pydantic import BaseModel
 
 from flow44.config import settings
+from flow44.paths import sandbox_path_env
 from flow44.sandbox.base import BaseSandbox
 
 logger = logging.getLogger(__name__)
@@ -36,27 +38,74 @@ class PnpmMixin(BaseSandbox, ABC):
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)
-        shutil.copytree(template_dir, self.workspace_dir, dirs_exist_ok=True)
+        shutil.copytree(
+            template_dir,
+            self.workspace_dir,
+            dirs_exist_ok=True,
+        )
 
         self._stamp_vite_config(template_dir)
+        self._configure_preview_paths()
         self.configure_npmrc()
 
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
 
+    def _react_router_dom_installed(self) -> bool:
+        pkg_path = os.path.join(self.workspace_dir, "package.json")
+        if not os.path.isfile(pkg_path):
+            return False
+        with open(pkg_path, encoding="utf-8") as handle:
+            pkg = json.load(handle)
+        return "react-router-dom" in pkg.get("dependencies", {})
+
+    async def enable_client_routing(self, template_dir: str) -> None:
+        """Install react-router-dom when ``uses_routing`` is true on the work plan.
+
+        Does not copy router files — the AI generator writes normal React Router
+        code; the template only provides ``src/platform/routerBasename.ts``.
+        """
+        del template_dir  # routing files are owned by the template / AI generator
+        if self._react_router_dom_installed():
+            return
+
+        async for line in self.exec("pnpm add react-router-dom 2>&1"):
+            logger.info("[routing] %s", line.rstrip())
+
     def _stamp_vite_config(self, template_dir: str) -> None:
         template_path = os.path.join(template_dir, "vite.config.ts")
         with open(template_path, encoding="utf-8") as f:
             content = f.read()
-        content = (
-            content.replace("{{PROJECT_ID}}", self.project_id)
-            .replace("{{AUTH_PROVIDER_URL}}", settings.SANDBOX_AUTH_PROVIDER_URL)
-            .replace("{{AUTH_STORAGE_KEY}}", settings.SANDBOX_AUTH_STORAGE_KEY)
-            .replace("{{AUTH_USE_IFRAME}}", str(settings.SANDBOX_AUTH_USE_IFRAME).lower())
-        )
+        content = self._apply_vite_config_stamps(content)
         dest_path = os.path.join(self.workspace_dir, "vite.config.ts")
         with open(dest_path, "w", encoding="utf-8") as f:
             f.write(content)
+
+    def _apply_vite_config_stamps(self, content: str) -> str:
+        return (
+            content.replace("{{AUTH_PROVIDER_URL}}", settings.SANDBOX_AUTH_PROVIDER_URL)
+            .replace("{{AUTH_STORAGE_KEY}}", settings.SANDBOX_AUTH_STORAGE_KEY)
+            .replace("{{AUTH_USE_IFRAME}}", str(settings.SANDBOX_AUTH_USE_IFRAME).lower())
+        )
+
+    def refresh_vite_config_stamps(self) -> None:
+        """Re-apply Flow44 env stamps to workspace vite.config.ts (e.g. before publish build)."""
+        vite_path = os.path.join(self.workspace_dir, "vite.config.ts")
+        if not os.path.isfile(vite_path):
+            return
+        with open(vite_path, encoding="utf-8") as handle:
+            content = handle.read()
+        with open(vite_path, "w", encoding="utf-8") as handle:
+            handle.write(self._apply_vite_config_stamps(content))
+
+    def _configure_preview_paths(self) -> None:
+        self._write_sandbox_env_file(".env.local")
+
+    def _write_sandbox_env_file(self, filename: str) -> None:
+        env_path = os.path.join(self.workspace_dir, filename)
+        env_vars = sandbox_path_env(self.project_id, api_base_url=settings.EXPORT_API_BASE_URL)
+        with open(env_path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(f"{key}={value}" for key, value in env_vars.items()) + "\n")
 
     # TODO: rename is_scaffold_complete or something?
     async def is_scaffolded(self) -> bool:
@@ -115,7 +164,9 @@ class PnpmMixin(BaseSandbox, ABC):
     async def start_dev_server(self) -> None:
         await self.stop_background_process("dev-server")
 
+        self._configure_preview_paths()
         env = os.environ.copy()
+        env.update(sandbox_path_env(self.project_id, api_base_url=settings.EXPORT_API_BASE_URL))
         env["FORCE_COLOR"] = "1"
 
         cmd = f"pnpm dev --port {self.port} --strictPort --host 0.0.0.0"

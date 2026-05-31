@@ -169,7 +169,8 @@ class SandboxManager:
         """Re-stamp vite configs and restart dev servers for all scaffolded sandboxes."""
         for sandbox in self._sandboxes.values():
             if await sandbox.is_scaffolded():
-                sandbox._stamp_vite_config(settings.TEMPLATE_DIR)  # Re-stamp after restart
+                sandbox._stamp_vite_config(settings.TEMPLATE_DIR)
+                sandbox._configure_preview_paths()
                 asyncio.create_task(sandbox.start_dev_server())
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:

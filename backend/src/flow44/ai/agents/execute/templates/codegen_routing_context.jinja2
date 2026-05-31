@@ -1,0 +1,33 @@
+## Router contract
+
+Preview and publish serve the app under a **nested URL**. Routing only works when **both** layers are correct:
+
+| Layer | Who sets it | Your job |
+|-------|-------------|----------|
+| **Vite `base`** | Backend writes `VITE_BASE_PATH`; `vite.config.ts` already has `const base = env.VITE_BASE_PATH \|\| '/'` | **Never edit** `vite.config.ts`, `index.html`, or env files |
+| **React Router `basename`** | `getRouterBasename()` reads `import.meta.env.BASE_URL` (from Vite `base`) | **Always** wrap routes in `BrowserRouter basename={getRouterBasename()}` |
+
+### `App.tsx` example (copy this router shape)
+
+```tsx
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { getRouterBasename } from './platform/routerBasename';
+
+const HomePage = lazy(() => import('./pages/HomePage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+
+export default function App() {
+  return (
+    <BrowserRouter basename={getRouterBasename()}>
+      <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading…</div>}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="*" element={<div className="p-8 text-center"><Link to="/">Back home</Link></div>} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
+```

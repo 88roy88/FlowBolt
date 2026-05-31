@@ -1,0 +1,4 @@
+5. `react-router-dom` is installed — fix routing in `App.tsx` / page components only.
+6. **Never edit** `vite.config.ts`, `index.html`, files under `src/platform/`, or `.env*` — do not remove Vite `base`, do not hardcode `base: '/'`, do not add `<base href>`, do not redefine `import.meta.env.BASE_URL` in `define`.
+7. **`App.tsx` must have** `<BrowserRouter basename={getRouterBasename()}>` with `import { getRouterBasename } from './platform/routerBasename'`. Do not put `BrowserRouter` in `main.tsx`. Do not use `HashRouter`.
+8. In-app links: `Link` / `NavLink` / `useNavigate` with app-relative `to` paths — never `<a href="/…">` for app routes.

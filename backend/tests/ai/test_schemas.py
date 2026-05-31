@@ -25,6 +25,11 @@ class TestArchitectureDesign:
         assert len(result.components) == 1
         assert result.components[0].name == "Header"
         assert result.state_management == "useState for local state"
+        assert result.uses_routing is False
+
+    def test_uses_routing_field(self) -> None:
+        result = ArchitectureDesign.model_validate({"uses_routing": True})
+        assert result.uses_routing is True
 
     def test_extra_fields_ignored(self) -> None:
         """LLM sometimes adds fields not in our schema — should not crash."""

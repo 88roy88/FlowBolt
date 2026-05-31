@@ -1,0 +1,14 @@
+6. **Multi-page app**: `react-router-dom` is installed. Follow `ROUTING.md`. Backend does not define your routes — you wire `App.tsx` only.
+7. **Do NOT overwrite** files under `src/platform/`.
+8. **`App.tsx` must include** (non-negotiable):
+   - `import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'`
+   - `import { getRouterBasename } from './platform/routerBasename'`
+   - `<BrowserRouter basename={getRouterBasename()}>` wrapping `<Routes>` (not in `main.tsx`, not `HashRouter`, never omit `basename`)
+   - App-relative routes only: `path="/"`, `path="/cart"`, `path="/category/:id"` — never full preview/export URLs
+9. **Never** edit `vite.config.ts`: do not remove `base`, do not hardcode `base: '/'`, do not add `env.BASE_URL`, do not add `define` for `import.meta.env.BASE_URL` — Vite sets `BASE_URL` from `base` automatically.
+10. **Never** add `<base href>` to `index.html` — that breaks the platform contract.
+11. **In-app navigation**: use `<Link to="…">`, `<NavLink>`, or `useNavigate()` only — **never** `<a href="/…">` for app paths (navigates to host `/`, leaves preview).
+12. Lazy-load secondary pages: `lazy(() => import('./pages/…'))` inside `<Suspense>`.
+13. Import `Routes`, `Route`, `Link`, `NavLink`, `useNavigate` from `react-router-dom` only — no custom routers.
+14. Import from already-completed files using their exact export names.
+15. Do NOT include shell actions — only file actions.

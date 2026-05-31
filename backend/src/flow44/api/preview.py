@@ -1,6 +1,6 @@
 """Preview management and reverse proxy endpoint.
 
-Vite is configured with ``base: '/api/preview/{project_id}/proxy/'`` so all
+Vite is configured with ``base: '/api/preview/{project_id}/proxy/'`` inject from the env so all
 generated asset paths already include the proxy prefix.  The proxy is a simple
 passthrough — no response rewriting required.
 """
@@ -15,11 +15,12 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import Response
 
 from flow44.api.deps import SandboxDep, get_ws_sandbox
+from flow44.paths import PREVIEW_API_PREFIX, PREVIEW_PROXY_PATH_ROUTE, PREVIEW_PROXY_ROUTE, preview_proxy_path
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/preview", tags=["preview"])
+router = APIRouter(prefix=PREVIEW_API_PREFIX, tags=["preview"])
 
 
 @router.get("/{project_id}/port")
@@ -34,7 +35,7 @@ async def get_preview_port(project_id: str, sandbox: Annotated[PnpmSandbox, Sand
 
 
 @router.api_route(
-    "/{project_id}/proxy/{path:path}",
+    PREVIEW_PROXY_PATH_ROUTE,
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
 async def proxy_to_sandbox(  # noqa: E501
@@ -46,7 +47,7 @@ async def proxy_to_sandbox(  # noqa: E501
     full prefixed path to the upstream server.
     """
 
-    proxy_prefix = f"/api/preview/{project_id}/proxy"
+    proxy_prefix = preview_proxy_path(project_id)
     target_url = f"http://127.0.0.1:{sandbox.port}{proxy_prefix}/{path}"
     if request.url.query:
         target_url += f"?{request.url.query}"
@@ -96,8 +97,8 @@ async def proxy_to_sandbox(  # noqa: E501
 # ---------------------------------------------------------------------------
 
 
-@router.websocket("/{project_id}/proxy/")
-@router.websocket("/{project_id}/proxy")
+@router.websocket(f"{PREVIEW_PROXY_ROUTE}/")
+@router.websocket(PREVIEW_PROXY_ROUTE)
 async def proxy_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
     """Proxy WebSocket connections for Vite HMR."""
     sandbox = await get_ws_sandbox(websocket, project_id)
@@ -110,7 +111,7 @@ async def proxy_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
 
     import websockets  # noqa: PLC0415
 
-    proxy_prefix = f"/api/preview/{project_id}/proxy"
+    proxy_prefix = preview_proxy_path(project_id)
     query = websocket.scope.get("query_string", b"").decode()
     target_url = f"ws://127.0.0.1:{sandbox.port}{proxy_prefix}"
     if query:
