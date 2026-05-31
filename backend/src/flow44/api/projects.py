@@ -14,10 +14,10 @@ from flow44.config import settings
 from flow44.db.project import (
     create_project,
     delete_project,
-    list_user_projects,
     rename_project,
     update_project_model,
 )
+from flow44.db.project import list_user_projects as db_list_user_projects
 from flow44.db.session import project_registry
 from flow44.sandbox.manager import sandbox_manager
 
@@ -39,8 +39,8 @@ class UpdateProjectModelRequest(BaseModel):
 
 
 @router.get("")
-async def list_my_projects(user_id: UserDep) -> list[dict[str, Any]]:
-    projects = await list_user_projects(user_id)
+async def list_user_projects(user_id: UserDep) -> list[dict[str, Any]]:
+    projects = await db_list_user_projects(user_id)
     return [p.model_dump() for p in projects]
 
 
