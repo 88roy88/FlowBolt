@@ -59,7 +59,6 @@ export function EditorPanel() {
   const { monacoRef, indexedFilesRef, handleBeforeMount } = useMonacoProjectModels(
     projectId,
     fileTree,
-    openFiles
   );
 
   const editorTheme = useEditorPanelTheme();

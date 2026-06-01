@@ -148,7 +148,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     asyncio.create_task(_run_agent_safe(project_id, followup_agent.run(user_content)))
 
             elif msg_type == "plan_response":
-                action = data.get("action", "reject")
+                action = data.get("action")
                 feedback = data.get("feedback")
                 selected_model = data.get("model")
 
@@ -179,11 +179,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                         model=selected_model or state.model,
                     )
                     asyncio.create_task(_run_agent_safe(project_id, plan_agent.rebuild_with_feedback(state, feedback)))
-
-                elif action == "reject":
-                    await delete_pending_plan(project_id)
-                    await emit_event(project_id, {"type": "plan_rejected"})
-                    await emit_event(project_id, {"type": "phase", "phase": "idle"})
 
             elif msg_type == "fix_error":
                 error_message = data.get("error_message", "")
