@@ -8,13 +8,14 @@ const sampleData = {
       recorded_at: '2025-01-01T00:00:00Z',
       area: 'POINT(0 0)',
       is_active: true,
+      count: 42,
     },
   ],
 };
 
 export default new MockPackage({
   metadata: buildMetadata(25, 'All Parameter Types — Echo', sampleData, {
-    description: 'Exercises all four FlowParam value types (TextValue, DateRangeValue, TimestampValue, GeographicValue). Returns whatever values were passed in.',
+    description: 'Exercises all parameter values types and returns whatever values were passed in.',
   }),
   quickParams: quickParamsQuery('echo-query-1', [
     {
@@ -57,11 +58,38 @@ export default new MockPackage({
       singleValue: true,
       description: 'A boolean flag (BooleanValue).',
     },
+    {
+      name: 'count',
+      displayName: 'Count',
+      type: 'Int',
+      required: false,
+      singleValue: true,
+      description: 'An integer value.',
+    },
   ]),
   getResults(quickParams) {
-    const label = Array.isArray(quickParams.label)
-      ? (quickParams.label as { Value: string }[]).map((v) => v.Value).join(', ')
-      : null;
+    const extractString = (v: unknown): string | null => {
+      if (v == null) return null;
+      if (typeof v === 'string') return v;
+      if (Array.isArray(v) && v.length > 0) {
+        const first = v[0];
+        if (typeof first === 'string') return first;
+        if (typeof first === 'object' && first != null && 'Value' in first) return String((first as { Value: unknown }).Value);
+      }
+      return null;
+    };
+    const extractInt = (v: unknown): number | null => {
+      if (v == null) return null;
+      if (typeof v === 'number') return Math.trunc(v);
+      if (Array.isArray(v) && v.length > 0) {
+        const first = v[0];
+        if (typeof first === 'number') return Math.trunc(first);
+        if (typeof first === 'object' && first != null && 'Value' in first) return Math.trunc(Number((first as { Value: unknown }).Value));
+      }
+      return null;
+    };
+
+    const label = extractString(quickParams.label);
 
     const date_range = (() => {
       if (quickParams.date_range == null) return null;
@@ -81,6 +109,8 @@ export default new MockPackage({
     const is_active =
       quickParams.is_active != null ? Boolean(quickParams.is_active) : null;
 
-    return { echo: [{ label, date_range, recorded_at, area, is_active }] };
+    const count = extractInt(quickParams.count);
+
+    return { echo: [{ label, date_range, recorded_at, area, is_active, count }] };
   },
 });
