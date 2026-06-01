@@ -135,7 +135,7 @@
     "scrollToBottom": "Scroll to bottom",
     "placeholder": {
       "selectProject": "Select a project first",
-      "reviewPlan": "Review the plan above, then accept, modify, or reject",
+      "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
       "default": "Describe what you want to build..."
     },
@@ -154,8 +154,7 @@
       "modifyPlaceholder": "What would you like to change? e.g. 'Use a dark theme instead' or 'I prefer local storage over a database'",
       "looksGood": "Looks good, build it",
       "changeSomething": "Change something",
-      "sendFeedback": "Send feedback",
-      "startOver": "Start over"
+      "sendFeedback": "Send feedback"
     },
     "design": {
       "designComplete": "Design complete",

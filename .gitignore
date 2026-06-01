@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 __pycache__/
 *.pyc
 .venv/
@@ -38,6 +39,7 @@ docker-compose.override.yml
 
 # Claude Code
 .claude/
+CLAUDE.md
 
 # Cursor
 .cursor/
