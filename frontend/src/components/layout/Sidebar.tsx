@@ -21,14 +21,14 @@ type SidebarProps = {
 
 // Stable color per project based on name hash
 const PROJECT_COLORS = [
-  'bg-[#89b4fa]/20 text-[#89b4fa]',   // blue
-  'bg-[#a6e3a1]/20 text-[#a6e3a1]',   // green
-  'bg-[#f9e2af]/20 text-[#f9e2af]',   // yellow
-  'bg-[#cba6f7]/20 text-[#cba6f7]',   // purple
-  'bg-[#f38ba8]/20 text-[#f38ba8]',   // pink
-  'bg-[#94e2d5]/20 text-[#94e2d5]',   // teal
-  'bg-[#fab387]/20 text-[#fab387]',   // peach
-  'bg-[#74c7ec]/20 text-[#74c7ec]',   // sky
+  'bg-primary/20 text-primary',
+  'bg-success/20 text-success',
+  'bg-warning/20 text-warning',
+  'bg-project-purple/20 text-project-purple',
+  'bg-destructive/20 text-destructive',
+  'bg-project-teal/20 text-project-teal',
+  'bg-project-peach/20 text-project-peach',
+  'bg-project-sky/20 text-project-sky',
 ];
 
 function getProjectColor(name: string) {

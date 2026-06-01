@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, X, Pencil, Sparkles, ArrowRight } from 'lucide-react';
+import { Check, Pencil, Sparkles, ArrowRight } from 'lucide-react';
 import type { PlanOverview } from '../../types';
 import { useChatStore } from '../../stores/chat';
 import { Button } from '../ui/button';
@@ -91,18 +91,14 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
       )}
 
       {/* Action buttons */}
-      <div className="flex gap-2">
-        <Button variant="success" onClick={() => respondToPlan('accept')} className="hover:-translate-y-0.5 transition-transform duration-150">
+      <div className="flex flex-col sm:flex-row justify-evenly gap-2">
+        <Button variant="success" onClick={() => respondToPlan('accept')} className="w-full sm:w-auto hover:-translate-y-0.5 transition-transform duration-150">
           <Check size={14} />
           {t('chat.plan.looksGood')}
         </Button>
-        <Button variant="warning" onClick={handleModify} className="hover:-translate-y-0.5 transition-transform duration-150">
+        <Button variant="warning" onClick={handleModify} className="w-full sm:w-auto hover:-translate-y-0.5 transition-transform duration-150">
           <Pencil size={14} />
           {modifyMode ? t('chat.plan.sendFeedback') : t('chat.plan.changeSomething')}
-        </Button>
-        <Button variant="outline" onClick={() => respondToPlan('reject')} className="hover:-translate-y-0.5 transition-transform duration-150">
-          <X size={14} />
-          {t('chat.plan.startOver')}
         </Button>
       </div>
     </CardWrapper>

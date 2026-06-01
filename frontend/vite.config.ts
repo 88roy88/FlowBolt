@@ -15,6 +15,18 @@ export default defineConfig({
     },
   },
   server: {
+    watch: {
+      ignored: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/coverage/**',
+        '**/test-results/**',
+        '**/playwright-report/**',
+        '**/backend/**',
+        '**/mocks/**',
+        '**/.git/**',
+      ],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libnl-route-3-200 \
     curl \
     ca-certificates \
+    ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy nsjail binary from builder stage

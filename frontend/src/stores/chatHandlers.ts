@@ -145,6 +145,7 @@ export function createFixErrorHandler(
             fixSteps: [],
             isStreaming: false,
             agentPhase: 'idle',
+            buildCompleted: true,
           }));
         } else {
           set({
@@ -152,6 +153,7 @@ export function createFixErrorHandler(
             actions: [],
             isStreaming: false,
             agentPhase: 'idle',
+            buildCompleted: true,
           });
         }
         if (!_skipMessages) {
@@ -196,7 +198,7 @@ export function createSendMessageHandler(
           role: 'assistant',
           content: '',
           timestamp: getTimestamp(),
-          agentCard: { type: 'plan_overview', overview: msg.overview, accepted: true },
+          agentCard: { type: 'plan_overview', overview: msg.overview },
         };
         set((s) => ({
           messages: _skipMessages ? s.messages : [...s.messages, acceptedMsg],
@@ -207,23 +209,6 @@ export function createSendMessageHandler(
         break;
       }
 
-      case 'plan_rejected': {
-        const rejectedMsg: Message = {
-          id: generateId(),
-          role: 'assistant',
-          content: '',
-          timestamp: getTimestamp(),
-          agentCard: { type: 'plan_overview', overview: msg.overview, accepted: false },
-        };
-        set((s) => ({
-          messages: _skipMessages ? s.messages : [...s.messages, rejectedMsg],
-          agentPhase: 'idle',
-          planOverview: null,
-          executionTasks: [],
-          isStreaming: false,
-        }));
-        break;
-      }
 
       case 'task_list':
         set({ executionTasks: msg.tasks });
@@ -480,6 +465,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     followUpSteps: [],
     followUpDiffs: [],
     projectSummary: null,
+    buildCompleted: true,
   }));
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name);

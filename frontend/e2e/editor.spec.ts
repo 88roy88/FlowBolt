@@ -14,6 +14,67 @@ async function goToEditor(page: import('@playwright/test').Page) {
   await host.click();
 }
 
+function fileTreeContainer(page: import('@playwright/test').Page) {
+  return page.locator('div.py-1').filter({ has: page.getByRole('button', { name: 'Create file' }) }).first();
+}
+
+function fileTreeRowByName(page: import('@playwright/test').Page, name: string) {
+  const tree = fileTreeContainer(page);
+  const label = tree.getByText(name, { exact: true }).first();
+  return label.locator('xpath=ancestor::div[contains(@class,"group")][1]');
+}
+
+async function submitCreateDialog(page: import('@playwright/test').Page, value: string) {
+  const input = page.getByPlaceholder('Enter a new file path');
+  await expect(input).toBeVisible({ timeout: 5_000 });
+  await input.fill(value);
+  const dialog = input.locator('xpath=ancestor::div[contains(@class,"relative")][1]');
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+}
+
+async function submitRenameDialog(page: import('@playwright/test').Page, value: string) {
+  const input = page.getByPlaceholder('Enter a new name');
+  await expect(input).toBeVisible({ timeout: 5_000 });
+  await input.fill(value);
+  const dialog = input.locator('xpath=ancestor::div[contains(@class,"relative")][1]');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+}
+
+async function submitDeleteDialog(page: import('@playwright/test').Page, targetName: string) {
+  const message = page.getByText(`Delete ${targetName}?`);
+  await expect(message).toBeVisible({ timeout: 5_000 });
+  const dialog = message.locator('xpath=ancestor::div[contains(@class,"relative")][1]');
+  await dialog.getByRole('button', { name: 'Delete' }).click();
+}
+
+function trackFileSaveRequests(page: import('@playwright/test').Page) {
+  let putCount = 0;
+  page.on('request', (req) => {
+    if (
+      req.method() === 'PUT' &&
+      req.url().includes('/api/files/') &&
+      req.url().includes('/file/content')
+    ) {
+      putCount += 1;
+    }
+  });
+  return () => putCount;
+}
+
+function trackUploadRequests(page: import('@playwright/test').Page) {
+  let uploadCount = 0;
+  page.on('request', (req) => {
+    if (
+      req.method() === 'POST' &&
+      req.url().includes('/api/files/') &&
+      req.url().includes('/file/upload')
+    ) {
+      uploadCount += 1;
+    }
+  });
+  return () => uploadCount;
+}
+
 test.describe('Editor', () => {
   test.use({ mockOptions: { seedChatHistory: true } });
 
@@ -41,9 +102,9 @@ test.describe('Editor', () => {
     await page.keyboard.press('Control+Shift+F');
     const searchInput = page.getByPlaceholder('Search in files...');
     await expect(searchInput).toBeVisible();
-    await searchInput.fill('E2E_TYPES_MARKER');
+    await searchInput.fill('Hello from E2E');
     await searchInput.press('Enter');
-    await expect(page.getByRole('button', { name: /\/src\/types\.ts/ })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /\/src\/App\.tsx/ })).toBeVisible({ timeout: 10_000 });
   });
 
   test('Ctrl+click on import symbol opens types file', async ({ page }) => {
@@ -56,7 +117,7 @@ test.describe('Editor', () => {
       (req) =>
         req.method() === 'GET' &&
         req.url().includes('/api/files/') &&
-        req.url().includes('/content') &&
+        req.url().includes('/file/content') &&
         decodeURIComponent(req.url()).includes('types.ts'),
       { timeout: 15_000 }
     );
@@ -70,5 +131,352 @@ test.describe('Editor', () => {
       timeout: 5_000,
     });
     await expect(host.getByText('E2E_TYPES_MARKER', { exact: false })).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('can create a new file inside a folder', async ({ page }) => {
+    await goToEditor(page);
+    const srcRow = fileTreeRowByName(page, 'src');
+    await srcRow.hover();
+
+    const createReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      { timeout: 10_000 }
+    );
+    await srcRow.getByTitle('Create file').click();
+    await submitCreateDialog(page, 'created-from-e2e.ts');
+    const req = await createReq;
+    expect(req.postDataJSON()).toMatchObject({
+      path: '/src/created-from-e2e.ts',
+      content: '',
+    });
+
+    await expect(fileTreeContainer(page).getByText('created-from-e2e.ts', { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('div.flex.overflow-auto.border-b').getByText('created-from-e2e.ts', { exact: true })).toBeVisible({
+      timeout: 5_000,
+    });
+  });
+
+  test('can upload an asset from the file tree', async ({ page }) => {
+    await goToEditor(page);
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      { timeout: 10_000 }
+    );
+
+    await fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first().click();
+    await page.getByTestId('file-upload-input').setInputFiles('e2e/editor.spec.ts');
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/editor.spec.ts');
+    await expect(fileTreeContainer(page).getByText('editor.spec.ts', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('can upload an asset into /src/assets folder', async ({ page }) => {
+    await goToEditor(page);
+
+    const srcRow = fileTreeRowByName(page, 'src');
+    await srcRow.hover();
+
+    const createReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      { timeout: 10_000 }
+    );
+    await srcRow.getByTitle('Create file').click();
+    await submitCreateDialog(page, 'assets/.keep');
+    const createRequest = await createReq;
+    expect(createRequest.postDataJSON()).toMatchObject({
+      path: '/src/assets/.keep',
+      content: '',
+    });
+
+    const assetsRow = fileTreeRowByName(page, 'assets');
+    await assetsRow.hover();
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      { timeout: 10_000 }
+    );
+    await assetsRow.getByTitle('Upload files').click();
+    await page.getByTestId('file-upload-input').setInputFiles('e2e/editor.spec.ts');
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/src/assets/editor.spec.ts');
+    await expect(fileTreeContainer(page).getByText('editor.spec.ts', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('can drag and drop a file into a folder', async ({ page }) => {
+    await goToEditor(page);
+    const srcRow = fileTreeRowByName(page, 'src');
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      { timeout: 10_000 }
+    );
+
+    const dataTransfer = await page.evaluateHandle(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['drag-drop-content'], 'dropped.txt', { type: 'text/plain' }));
+      return dt;
+    });
+
+    await srcRow.dispatchEvent('dragover', { dataTransfer });
+    await srcRow.dispatchEvent('drop', { dataTransfer });
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/src/dropped.txt');
+    await expect(fileTreeContainer(page).getByText('dropped.txt', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('can drag and drop a file into root directory', async ({ page }) => {
+    await goToEditor(page);
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      { timeout: 10_000 }
+    );
+
+    const dataTransfer = await page.evaluateHandle(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['root-drop-content'], 'root-dropped.txt', { type: 'text/plain' }));
+      return dt;
+    });
+
+    const rootDropzone = page.getByTestId('file-tree-root-dropzone').first();
+    await rootDropzone.dispatchEvent('dragover', { dataTransfer });
+    await rootDropzone.dispatchEvent('drop', { dataTransfer });
+
+    const req = await uploadReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/root-dropped.txt');
+    await expect(fileTreeContainer(page).getByText('root-dropped.txt', { exact: true })).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('shows error when uploading an existing file', async ({ page }) => {
+    await goToEditor(page);
+
+    const uploadReq = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      { timeout: 10_000 }
+    );
+    await fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first().click();
+    await page.getByTestId('file-upload-input').setInputFiles('package.json');
+
+    await uploadReq;
+    await expect(page.getByText('Upload failed. Please try again.')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('can rename a folder from the file tree', async ({ page }) => {
+    await goToEditor(page);
+    const srcRow = fileTreeRowByName(page, 'src');
+    await srcRow.hover();
+
+    const renameReq = page.waitForRequest(
+      (req) => req.method() === 'PATCH' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      { timeout: 10_000 }
+    );
+    await srcRow.getByTitle('Rename').click();
+    await submitRenameDialog(page, 'src-renamed');
+    const req = await renameReq;
+    expect(req.postDataJSON()).toMatchObject({
+      old_path: '/src',
+      new_path: '/src-renamed',
+    });
+
+    const tree = fileTreeContainer(page);
+    await expect(tree.getByText('src-renamed', { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(tree.getByText('src', { exact: true })).toHaveCount(0);
+  });
+
+  test('renaming an open file updates its open tab label', async ({ page }) => {
+    await goToEditor(page);
+    const appFileRow = fileTreeRowByName(page, 'App.tsx');
+    await appFileRow.hover();
+
+    const renameReq = page.waitForRequest(
+      (req) => req.method() === 'PATCH' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      { timeout: 10_000 }
+    );
+    await appFileRow.getByTitle('Rename').click();
+    await submitRenameDialog(page, 'AppRenamed.tsx');
+    const req = await renameReq;
+    expect(req.postDataJSON()).toMatchObject({
+      old_path: '/src/App.tsx',
+      new_path: '/src/AppRenamed.tsx',
+    });
+
+    const tabs = page.locator('div.flex.overflow-auto.border-b');
+    await expect(tabs.getByText('AppRenamed.tsx', { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(tabs.getByText('App.tsx', { exact: true })).toHaveCount(0);
+  });
+
+  test('can delete a file from the file tree', async ({ page }) => {
+    await goToEditor(page);
+    const appFileRow = fileTreeRowByName(page, 'App.tsx');
+    await appFileRow.hover();
+
+    const deleteReq = page.waitForRequest(
+      (req) => req.method() === 'DELETE' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      { timeout: 10_000 }
+    );
+    await appFileRow.getByTitle('Delete').click();
+    await submitDeleteDialog(page, 'App.tsx');
+    const req = await deleteReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/src/App.tsx');
+
+    const tree = fileTreeContainer(page);
+    await expect(tree.getByText('App.tsx', { exact: true })).toHaveCount(0);
+    const deletedTab = page.locator('[data-file-path="/src/App.tsx"][data-missing="true"]');
+    await expect(deletedTab).toBeVisible({ timeout: 5_000 });
+    await expect(deletedTab.locator('span').first()).toHaveClass(/line-through/);
+  });
+
+  test('can delete a folder from the file tree', async ({ page }) => {
+    await goToEditor(page);
+    const srcRow = fileTreeRowByName(page, 'src');
+    await srcRow.hover();
+
+    const deleteReq = page.waitForRequest(
+      (req) => req.method() === 'DELETE' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      { timeout: 10_000 }
+    );
+    await srcRow.getByTitle('Delete').click();
+    await submitDeleteDialog(page, 'src');
+    const req = await deleteReq;
+    expect(decodeURIComponent(req.url())).toContain('path=/src');
+
+    const tree = fileTreeContainer(page);
+    await expect(tree.getByText('src', { exact: true })).toHaveCount(0);
+    await expect(tree.getByText('package.json', { exact: true })).toBeVisible();
+  });
+});
+
+test.describe('Editor read-only gating', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('has-projects', 'true');
+        localStorage.setItem('language', 'en');
+      } catch {
+        /* ignore */
+      }
+    });
+  });
+
+  test.describe('before initial completion', () => {
+    test.use({
+      mockOptions: {
+        seedEvents: [{ type: 'user_message', content: 'Seed only user event' }],
+      },
+    });
+
+    test('stays locked until action_complete, then enables editing', async ({ page, sendChatEvents }) => {
+      await goToEditor(page);
+
+      await expect(page.getByText('Editing is enabled after the first AI build completes.').first()).toBeVisible();
+
+      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' }).first();
+      await expect(createRoot).toBeDisabled();
+      const srcRow = fileTreeRowByName(page, 'src');
+      await srcRow.hover();
+      await expect(srcRow.getByTitle('Rename')).toBeDisabled();
+      await expect(srcRow.getByTitle('Delete')).toBeDisabled();
+
+      const getPutCount = trackFileSaveRequests(page);
+      const host = page.getByTestId('monaco-editor-host');
+      await host.click();
+      await page.keyboard.type('LOCKED_PHASE');
+      await page.waitForTimeout(1200);
+      expect(getPutCount()).toBe(0);
+
+      await sendChatEvents([{ type: 'action_complete' }], 20);
+      await expect(page.getByText('Editing is enabled after the first AI build completes.')).toHaveCount(0);
+      await expect(createRoot).toBeEnabled({ timeout: 5_000 });
+
+      await host.click();
+      await page.keyboard.type('UNLOCKED_PHASE');
+      await page.waitForTimeout(1200);
+      expect(getPutCount()).toBeGreaterThan(0);
+    });
+
+    test('keeps upload disabled in read-only mode and sends no upload request', async ({ page }) => {
+      await goToEditor(page);
+
+      const getUploadCount = trackUploadRequests(page);
+      const initialUrl = page.url();
+      const initialPageCount = page.context().pages().length;
+      const rootUploadButton = fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first();
+      await expect(rootUploadButton).toBeDisabled();
+
+      const srcRow = fileTreeRowByName(page, 'src');
+      await srcRow.hover();
+      const folderUploadButton = srcRow.getByTitle('Upload files');
+      await expect(folderUploadButton).toBeDisabled();
+
+      const dataTransfer = await page.evaluateHandle(() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['readonly-drop'], 'readonly.txt', { type: 'text/plain' }));
+        return dt;
+      });
+
+      const rootDropzone = page.getByTestId('file-tree-root-dropzone').first();
+      await rootDropzone.dispatchEvent('dragover', { dataTransfer });
+      await rootDropzone.dispatchEvent('drop', { dataTransfer });
+      await srcRow.dispatchEvent('dragover', { dataTransfer });
+      await srcRow.dispatchEvent('drop', { dataTransfer });
+
+      await page.waitForTimeout(500);
+      expect(getUploadCount()).toBe(0);
+      expect(page.url()).toBe(initialUrl);
+      expect(page.context().pages().length).toBe(initialPageCount);
+    });
+  });
+
+  test.describe('after initial completion', () => {
+    test.use({ mockOptions: { seedChatHistory: true } });
+
+    test('locks while AI is working and unlocks again on completion', async ({ page, sendChatEvents }) => {
+      await goToEditor(page);
+
+      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' }).first();
+      await expect(createRoot).toBeEnabled();
+
+      const chatInput = page.getByPlaceholder(/describe what you want/i);
+      await expect(chatInput).toBeVisible({ timeout: 10_000 });
+      await chatInput.fill('Please continue with a tiny follow-up change');
+      await page.getByRole('button', { name: /send message/i }).click();
+
+      await expect(createRoot).toBeDisabled({ timeout: 5_000 });
+
+      await sendChatEvents([{ type: 'action_complete' }], 20);
+      await expect(createRoot).toBeEnabled({ timeout: 5_000 });
+    });
+  });
+});
+
+test.describe('Editor search failures', () => {
+  test.use({ mockOptions: { seedChatHistory: true, searchUnavailable: true } });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('has-projects', 'true');
+        localStorage.setItem('language', 'en');
+      } catch {
+        /* ignore */
+      }
+    });
+  });
+
+  test('shows an error when backend search is unavailable', async ({ page }) => {
+    await goToEditor(page);
+    await page.keyboard.press('Control+Shift+F');
+
+    const searchInput = page.getByPlaceholder('Search in files...');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('Hello from E2E');
+    await searchInput.press('Enter');
+
+    await expect(page.getByText(/Search failed:/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/ripgrep \(rg\) is required for search/i)).toBeVisible({ timeout: 10_000 });
   });
 });

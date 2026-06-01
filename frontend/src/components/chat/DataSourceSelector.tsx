@@ -36,27 +36,37 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
     if (isOpen && inputRef.current) inputRef.current.focus();
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  const handleSearch = async (searchQuery: string) => {
-    setQuery(searchQuery);
-    if (!searchQuery.trim()) {
+  useEffect(() => {
+    if (!query.trim()) {
       setResults([]);
       setShowDropdown(false);
+      setIsLoading(false);
       return;
     }
-    setIsLoading(true);
-    setShowDropdown(true);
-    try {
-      const sources = await searchDataSources(searchQuery);
-      setResults(sources.slice(0, 10));
-    } catch (err) {
-      console.error('Failed to search data sources:', err);
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+    let ignore = false;
+
+    const timer = setTimeout(async () => {
+      setIsLoading(true);
+      setShowDropdown(true);
+      try {
+        const sources = await searchDataSources(query);
+        if (!ignore) setResults(sources.slice(0, 10));
+      } catch (err) {
+        console.error('Failed to search data sources:', err);
+        if (!ignore) setResults([]);
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      ignore = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  if (!isOpen) return null;
 
   const handleSelect = (pkg: DataSourceSearchResult) => {
     addDataSource({ id: pkg.id, name: pkg.name });
@@ -90,7 +100,7 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => handleSearch(e.target.value)}
+          onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
           placeholder={t('chat.dataSource.searchPlaceholder')}
           className="flex-1 text-[13px] bg-transparent"

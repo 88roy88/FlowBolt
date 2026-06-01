@@ -1,13 +1,37 @@
-FROM node:20-slim AS build
-RUN corepack enable && corepack prepare pnpm@latest --activate
+ARG FRONTEND_BASE_IMAGE=node:20-slim
+ARG NGINX_IMAGE=nginx:alpine
+
+FROM ${FRONTEND_BASE_IMAGE} AS build
+
+RUN npm set registry ${NPM_REGISTRY}
+RUN npm config set strict-ssl ${NPM_STRICT_SSL}
+
+RUN npm install -g pnpm
+
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile
 
+USER root
+
 COPY . .
 RUN pnpm build
 
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
+FROM ${NGINX_IMAGE}
+
+RUN rm -f /etc/nginx/conf.d/default.conf
+
+RUN chown -R nginx:nginx /var/cache/nginx /var/run && \
+    chmod 777 /var/cache/nginx /var/run
+
+COPY --chown=nginx:nginx nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chown=nginx:nginx --from=build /app/dist /usr/share/nginx/html
+
+RUN sed -i 's/listen 80;/listen 8080;/' /etc/nginx/conf.d/default.conf
+
+USER nginx
+
 EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

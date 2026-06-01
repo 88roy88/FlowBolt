@@ -1,0 +1,15 @@
+apiVersion: v2
+name: langfuse
+description: Self-hosted Langfuse v3 on managed OpenShift (no root privileges)
+type: application
+version: 0.1.0
+appVersion: "3"
+keywords:
+  - langfuse
+  - llm-observability
+  - opentelemetry
+home: https://langfuse.com
+sources:
+  - https://github.com/langfuse/langfuse
+maintainers:
+  - name: FlowBolt

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "langfuse.fullname" . }}-clickhouse
+  labels:
+    {{- include "langfuse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "langfuse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+      protocol: TCP
+    - name: native
+      port: 9000
+      targetPort: 9000
+      protocol: TCP

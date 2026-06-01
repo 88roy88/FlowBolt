@@ -61,7 +61,7 @@
     "selectFile": "בחר קובץ מהעץ כדי להציג את תוכנו",
     "closeTab": "סגור",
     "searchTab": "חיפוש",
-    "searchInFilesPlaceholder": "חיפוש בקבצים...",
+    "searchInFilesPlaceholder": "חיפוש בקבצים...\u200F",
     "clearSearch": "נקה חיפוש",
     "runSearch": "חפש",
     "searching": "מחפש…",
@@ -74,7 +74,20 @@
     "jumpToMatch": "קפיצה להתאמה",
     "quickOpenPlaceholder": "הקלידי שם קובץ (Ctrl+P)",
     "noMatchingFiles": "אין קבצים תואמים",
-    "searchShortcutTitle": "חיפוש בקבצים (Ctrl+Shift+F)"
+    "searchShortcutTitle": "חיפוש בקבצים (\u2068Ctrl+Shift+F\u2069)\u200F",
+    "createFile": "צור קובץ",
+    "uploadFiles": "העלה קבצים",
+    "renameFile": "שנה שם",
+    "deleteFile": "מחק",
+    "deletedTab": "קובץ נמחק (הלשונית נשארת פתוחה)",
+    "readOnlyUntilFirstAiResponse": "עריכה תופעל רק אחרי שהבנייה הראשונית של ה-\u2068AI\u2069 הושלמה.\u200F",
+    "readOnlyWhileAiWorking": "העריכה נעולה זמנית בזמן שה-\u2068AI\u2069 עובד.\u200F",
+    "newFilePrompt": "הכנס נתיב לקובץ חדש",
+    "renamePrompt": "הכנס שם חדש",
+    "confirmDeleteFile": "למחוק את \u2068{{name}}\u2069?\u200F",
+    "fileNameRequired": "חובה להזין שם קובץ.\u200F",
+    "fileActionFailed": "פעולת קובץ נכשלה. נסה שוב.",
+    "uploadFailed": "העלאה נכשלה. נסה שוב."
   },
   "terminal": {
     "terminal": "טרמינל",
@@ -122,7 +135,7 @@
     "scrollToBottom": "גלול לתחתית",
     "placeholder": {
       "selectProject": "בחר פרויקט תחילה",
-      "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר, שנה או דחה",
+      "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר או שנה",
       "working": "הבינה המלאכותית עובדת...",
       "default": "תאר מה תרצה לבנות..."
     },
@@ -141,8 +154,7 @@
       "modifyPlaceholder": "מה תרצה לשנות? לדוגמה: 'השתמש בערכת נושא כהה במקום' או 'אני מעדיף אחסון מקומי על פני מסד נתונים'",
       "looksGood": "נראה טוב, תבנה את זה",
       "changeSomething": "שנה משהו",
-      "sendFeedback": "שלח משוב",
-      "startOver": "התחל מחדש"
+      "sendFeedback": "שלח משוב"
     },
     "design": {
       "designComplete": "עיצוב הושלם",
