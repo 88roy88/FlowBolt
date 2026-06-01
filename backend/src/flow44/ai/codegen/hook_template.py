@@ -34,7 +34,7 @@ async function fetchWithAuth(url: string): Promise<Response> {{
     headers: token ? {{ Authorization: token }} : undefined,
   }});
   if (res.status === 401) {{
-    await authSession.refreshAfter401();
+    await authSession.refreshCredentials();
     const retryToken = credentialsStore.getValidToken();
     const retry = await fetch(url, {{
       headers: retryToken ? {{ Authorization: retryToken }} : undefined,

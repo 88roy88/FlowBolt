@@ -40,7 +40,7 @@ export const authSession = {
     credentialsStore.save(creds);
   },
 
-  async refreshAfter401(): Promise<void> {
+  async refreshCredentials(): Promise<void> {
     pendingReacquisition ??= reacquireCredentials().finally(() => {
       pendingReacquisition = null;
     });
@@ -50,7 +50,7 @@ export const authSession = {
   async ensureFreshToken(): Promise<string | undefined> {
     const cached = credentialsStore.getValidToken();
     if (cached) return cached;
-    await this.refreshAfter401();
+    await this.refreshCredentials();
     return credentialsStore.getValidToken();
   },
 
