@@ -145,8 +145,8 @@ class TestMixedParams:
         )
         assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: DateRange;" in result
         assert "body['tasks']['type'] = type;" in result
-        assert "if (priority !== undefined) body['tasks']['priority'] = priority;" in result
-        assert "if (createdAfter !== undefined) body['tasks']['created_after'] = createdAfter;" in result
+        assert "if (priority !== undefined) {\n    body['tasks']['priority'] = priority;\n  }" in result
+        assert "if (createdAfter !== undefined) {\n    body['tasks']['created_after'] = createdAfter;\n  }" in result
 
 
 class TestArrayParam:
@@ -323,7 +323,7 @@ class TestReservedWordParamName:
         assert "delete_?: boolean" in result
         # The body keys still use the FLAPI names.
         assert "body['events']['from'] = from_;" in result
-        assert "if (delete_ !== undefined) body['events']['delete'] = delete_;" in result
+        assert "if (delete_ !== undefined) {\n    body['events']['delete'] = delete_;\n  }" in result
 
 
 class TestCubeIdDisambiguation:
@@ -376,7 +376,7 @@ class TestCubeIdDisambiguation:
         # Each is wired to the correct cube in the body.
         assert "body['reports']['start_date'] = reports_startDate;" in result
         assert "body['filters']['start_date'] = filters_startDate;" in result
-        assert "if (limit !== undefined) body['reports']['limit'] = limit;" in result
+        assert "if (limit !== undefined) {\n    body['reports']['limit'] = limit;\n  }" in result
 
 
 class TestAllParamTypes:
@@ -445,9 +445,9 @@ class TestAllParamTypes:
         assert "isActive?: boolean" in result
         assert "body['geo']['label'] = label;" in result
         assert "body['geo']['valid_from'] = validFrom;" in result
-        assert "if (recordedAt !== undefined) body['geo']['recorded_at'] = recordedAt;" in result
-        assert "if (area !== undefined) body['geo']['area'] = area;" in result
-        assert "if (isActive !== undefined) body['geo']['is_active'] = isActive;" in result
+        assert "if (recordedAt !== undefined) {\n    body['geo']['recorded_at'] = recordedAt;\n  }" in result
+        assert "if (area !== undefined) {\n    body['geo']['area'] = area;\n  }" in result
+        assert "if (isActive !== undefined) {\n    body['geo']['is_active'] = isActive;\n  }" in result
 
 
 class TestRequireAnyGroup:
