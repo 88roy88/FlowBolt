@@ -9,6 +9,7 @@ const sampleData = {
       area: 'POINT(0 0)',
       is_active: true,
       count: 42,
+      ratio: 3.14,
     },
   ],
 };
@@ -66,6 +67,14 @@ export default new MockPackage({
       singleValue: true,
       description: 'An integer value.',
     },
+    {
+      name: 'ratio',
+      displayName: 'Ratio',
+      type: 'Double',
+      required: false,
+      singleValue: true,
+      description: 'A double (floating-point) value.',
+    },
   ]),
   getResults(quickParams) {
     const extractString = (v: unknown): string | null => {
@@ -109,8 +118,20 @@ export default new MockPackage({
     const is_active =
       quickParams.is_active != null ? Boolean(quickParams.is_active) : null;
 
-    const count = extractInt(quickParams.count);
+    const extractDouble = (v: unknown): number | null => {
+      if (v == null) return null;
+      if (typeof v === 'number') return v;
+      if (Array.isArray(v) && v.length > 0) {
+        const first = v[0];
+        if (typeof first === 'number') return first;
+        if (typeof first === 'object' && first != null && 'Value' in first) return Number((first as { Value: unknown }).Value);
+      }
+      return null;
+    };
 
-    return { echo: [{ label, date_range, recorded_at, area, is_active, count }] };
+    const count = extractInt(quickParams.count);
+    const ratio = extractDouble(quickParams.ratio);
+
+    return { echo: [{ label, date_range, recorded_at, area, is_active, count, ratio }] };
   },
 });
