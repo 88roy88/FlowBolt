@@ -105,7 +105,7 @@ export function InputPhase({
         <>
           {renderSlugField()}
 
-          {slug && (isEditMode ? slug !== initialSlug : true) && slugStatus === 'available' && (
+          {showHint && slugStatus === 'available' && (
             <SlugPreview slugValue={slug} />
           )}
 

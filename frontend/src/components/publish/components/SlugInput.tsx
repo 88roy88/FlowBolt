@@ -1,4 +1,5 @@
 import React from 'react';
+import { SHARED_PREFIX } from '../../../stores/publish';
 
 interface SlugInputProps {
   value: string;
@@ -11,7 +12,7 @@ export function SlugInput({ value, onChange, placeholder, disabled }: SlugInputP
   return (
     <div className="flex items-center gap-0 rounded-lg border border-border/60 bg-muted/30 overflow-hidden focus-within:ring-1 focus-within:ring-primary/40">
       <span className="px-3 py-2 text-sm text-muted-foreground border-r border-border/40 bg-muted/50 shrink-0 select-none">
-        /shared/
+        {SHARED_PREFIX}
       </span>
       <input
         type="text"

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/export/{project_id}", tags=["publish"])
 
+# Authoritative slug rule — mirrored by SLUG_RE in frontend stores/publish.ts.
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$")
 
 
@@ -22,17 +24,24 @@ class PublishRequest(BaseModel):
     slug: str | None = None
 
 
+async def _slug_status(slug: str, project_id: str) -> Literal["available", "invalid", "taken"]:
+    """Single source of truth for whether a slug may be used by this project."""
+    if not _SLUG_RE.match(slug):
+        return "invalid"
+    if await is_handle_taken(slug, exclude_project_id=project_id):
+        return "taken"
+    return "available"
+
+
 @router.get("/slug/check")
 async def check_slug(project_id: str, slug: str = Query(...)) -> dict[str, bool]:
     """Return whether a slug is available for this project."""
-    if not _SLUG_RE.match(slug):
-        return {"available": False}
-    taken = await is_handle_taken(slug, exclude_project_id=project_id)
-    return {"available": not taken}
+    return {"available": await _slug_status(slug, project_id) == "available"}
 
 
 async def _validate_slug(slug: str, project_id: str) -> None:
-    if not _SLUG_RE.match(slug):
+    status = await _slug_status(slug, project_id)
+    if status == "invalid":
         raise HTTPException(
             status_code=400,
             detail=(
@@ -40,7 +49,7 @@ async def _validate_slug(slug: str, project_id: str) -> None:
                 " (must start and end with a letter or digit)."
             ),
         )
-    if await is_handle_taken(slug, exclude_project_id=project_id):
+    if status == "taken":
         raise HTTPException(status_code=409, detail=f"The slug '{slug}' is already taken.")
 
 
@@ -80,6 +89,9 @@ async def publish_to_s3(project_id: str, body: PublishRequest = PublishRequest()
         raise HTTPException(
             status_code=409, detail=f"The handle '{handle}' was just claimed by another project."
         ) from exc
+
+    if published_at is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
 
     public_path = f"/shared/{handle}"
     logger.info("Published project %s (handle: %s, public: %s)", project_id, handle, public_path)

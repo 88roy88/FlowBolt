@@ -5,7 +5,11 @@ import { DebouncedAction } from '../utils/concurrency';
 
 export type SlugStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
+// UX mirror of backend _SLUG_RE (api/publish.py) — keep in sync.
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
+
+// Public path prefix — must match backend `/shared/{handle}`, nginx, and the vite proxy.
+export const SHARED_PREFIX = '/shared/';
 
 const checker = new DebouncedAction();
 
@@ -51,30 +55,21 @@ export const usePublishStore = create<PublishState>((set, get) => ({
   errorMessage: null,
 
   open(projectId, existingHandle) {
-    // Determine mode
-    const mode = existingHandle ? 'edit' : 'create';
-    
-    // Determine initial slug
     const isDefaultHandle = existingHandle === projectId;
     const initialSlug = isDefaultHandle ? '' : (existingHandle ?? '');
-
-    const current = get();
-    
-    // If we're already open for this project, just show it.
-    // Otherwise, initialize/reset.
-    if (current.projectId !== projectId || !current.isOpen) {
-      set({
-        projectId,
-        mode,
-        initialSlug,
-        slug: current.projectId === projectId ? current.slug : initialSlug,
-        status: current.projectId === projectId ? current.status : 'idle',
-        isPublishing: false,
-        resultUrl: null,
-        errorMessage: null,
-        isOpen: true,
-      });
-    }
+    const sameProject = get().projectId === projectId;
+    set({
+      projectId,
+      mode: existingHandle ? 'edit' : 'create',
+      initialSlug,
+      // Preserve an in-progress draft when reopening the same project.
+      slug: sameProject ? get().slug : initialSlug,
+      status: sameProject ? get().status : 'idle',
+      isPublishing: false,
+      resultUrl: null,
+      errorMessage: null,
+      isOpen: true,
+    });
   },
 
   close() {
@@ -127,13 +122,9 @@ export const usePublishStore = create<PublishState>((set, get) => ({
   },
 
   async performPublish(useSlug: boolean) {
-    const { projectId, slug, isPublishing, initialSlug, status } = get();
+    const { projectId, slug, isPublishing } = get();
     if (!projectId || isPublishing) return;
-    
-    if (useSlug) {
-      const canDo = slug !== '' && (status === 'available' || slug === initialSlug);
-      if (!canDo) return;
-    }
+    if (useSlug && !get().canPublish()) return;
 
     set({ isPublishing: true, errorMessage: null });
     try {
