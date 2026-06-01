@@ -14,15 +14,16 @@ from flow44.ai.agents.plan.prompts import (
     render_data_source_analysis,
     render_user_plan,
 )
-from flow44.ai.codegen.hook_template import generate_data_source_hook
-from flow44.ai.codegen.ts_types import generate_ts_interfaces, sanitize_to_pascal_case
+from flow44.ai.codegen.data_source_module import generate_data_source_module
+from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
 from flow44.db.pending_plan import save_pending_plan
-from flow44.integrations.flapi_api import data_source_client
+from flow44.logic import data_source as ds_logic
+from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,17 @@ class PlanAgent(BaseAgent):
                             "data_source_name": ctx["data_source_name"],
                             "data_schema": ctx.get("data_schema", ""),
                             "relevant_fields": ctx.get("relevant_fields", ""),
+                            "requires_input": not ctx.get("can_run_without_input", True),
+                            "params": [
+                                {
+                                    "name": p["name"],
+                                    "display_name": p["display_name"],
+                                    "type": p["type"],
+                                    "is_required": p["is_required"],
+                                    "is_single_value": p["is_single_value"],
+                                }
+                                for p in ctx.get("params_info", {}).get("parameters", [])
+                            ],
                         }
                         for ctx in state.build_state.data_source_contexts
                     ],
@@ -196,40 +208,52 @@ class PlanAgent(BaseAgent):
     # -- Design --
 
     async def _fetch_and_analyze_data_source(self, data_source_id: str) -> dict[str, Any]:
-        ds_name, sample_data = await data_source_client.fetch_data_source(
-            data_source_id,
-            authorization=self._data_source_authorization,
+        ds_name, usage = await asyncio.gather(
+            ds_logic.get_display_name(data_source_id, authorization=self._data_source_authorization),
+            ds_logic.get_usage(data_source_id, authorization=self._data_source_authorization),
         )
-        analysis = await self._analyze_data_source(ds_name, sample_data)
         sanitized = sanitize_to_pascal_case(ds_name) or f"DataSource{data_source_id}"
+        analysis = await self._analyze_data_source(ds_name, usage.sample, usage.queries, usage.params)
         return {
             "data_source_id": data_source_id,
             "data_source_name": ds_name,
             "sanitized_name": sanitized,
-            "sample_data": sample_data,
+            "queries": [q.model_dump() for q in usage.queries],
+            "params_info": usage.params.model_dump(),
+            "sample_data": usage.sample,
+            "can_run_without_input": usage.can_run,
             **analysis,
         }
 
     @staticmethod
     def _generate_data_source_files(ctx: dict[str, Any]) -> dict[str, str]:
-        """Generate TypeScript types + React hook for a data source."""
+        """Generate a single TypeScript module per data source."""
         sanitized = ctx["sanitized_name"]
-        types_path = f"src/types/dataSource{sanitized}.ts"
-        hook_path = f"src/hooks/useDataSource{sanitized}.ts"
-
-        types_content = generate_ts_interfaces(ctx["sample_data"], sanitized)
-        hook_content = generate_data_source_hook(
+        module_path = f"src/dataSources/{sanitized}.ts"
+        params_info = DataSourceParamsInfo.model_validate(ctx["params_info"])
+        queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.get("queries", [])]
+        content = generate_data_source_module(
             data_source_id=ctx["data_source_id"],
             sanitized_name=sanitized,
-            types_import_path=f"../types/dataSource{sanitized}",
+            params_info=params_info,
+            sample_data=ctx.get("sample_data"),
+            queries=queries,
         )
-        return {types_path: types_content, hook_path: hook_content}
+        return {module_path: content}
 
-    async def _analyze_data_source(self, ds_name: str, sample_data: Any) -> dict[str, Any]:
+    async def _analyze_data_source(
+        self,
+        ds_name: str,
+        sample_data: Any,
+        queries: list[Any],
+        params_info: Any,
+    ) -> dict[str, Any]:
         prompt = render_data_source_analysis(
             user_content=self._state.user_content,
             data_source_name=ds_name,
             sample_data=sample_data,
+            queries=[q.model_dump() for q in queries],
+            params_info=params_info.model_dump(),
         )
         try:
             raw = await complete_chat(
@@ -244,8 +268,14 @@ class PlanAgent(BaseAgent):
             return {
                 "data_schema": "Unknown — analysis failed",
                 "relevant_fields": "See raw data",
-                "data_characteristics": "Fetched from API",
-                "integration_notes": f"Data preview: {json.dumps(sample_data, indent=2)[:500]}",
+                "data_characteristics": (
+                    "Requires user input" if sample_data is None else "Fetched from API"
+                ),
+                "integration_notes": (
+                    f"Data preview: {json.dumps(sample_data, indent=2)[:500]}"
+                    if sample_data is not None
+                    else "No sample available — data source requires parameters."
+                ),
             }
 
     @observe(name="design-architecture")  # type: ignore[untyped-decorator]

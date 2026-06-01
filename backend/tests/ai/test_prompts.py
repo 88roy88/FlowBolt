@@ -24,17 +24,25 @@ class TestPromptRendering:
                 "data_characteristics": "time-series",
                 "sample_data": {"records": [{"date": "2024-01", "amount": 100}]},
                 "integration_notes": "Use fetch",
-                "generated_files": {
-                    "src/types/dataSourceSalesData.ts": "...",
-                    "src/hooks/useDataSourceSalesData.ts": "...",
-                },
+                "queries": [
+                    {
+                        "name": "records",
+                        "display_name": "Records",
+                        "description": "Sales records",
+                        "fields": [
+                            {"name": "date", "display_name": "Date", "type": "datetime", "description": None},
+                            {"name": "amount", "display_name": "Amount", "type": "double", "description": None},
+                        ],
+                    }
+                ],
+                "params_info": {"parameters": [], "require_any": False},
             }
         ]
         result = render_architecture(data_source_contexts=sources)
         assert "Sales Data" in result
         assert "following data sources" in result
-        assert "useDataSourceSalesData" in result
-        assert "Pre-generated files" in result
+        assert "dataSourceSalesData" in result
+        assert "Pre-generated file" in result
 
     def test_architecture_without_data_sources(self) -> None:
         result = render_architecture(data_source_contexts=None)
@@ -47,7 +55,6 @@ class TestPromptRendering:
     def test_merge_with_data_sources(self) -> None:
         result = render_merge(has_data_sources=True)
         assert "Pre-Generated Files" in result
-        assert "useDataSourceMyApi" in result
 
     def test_user_plan_basic(self) -> None:
         result = render_user_plan()
@@ -112,9 +119,21 @@ class TestPromptRendering:
                     "data_characteristics": "Real-time",
                     "sample_data": [{"metric": "users", "value": 100}],
                     "integration_notes": "Poll every 30s",
+                    "queries": [
+                        {
+                            "name": "metrics",
+                            "display_name": "Metrics",
+                            "description": "Per-metric rows",
+                            "fields": [
+                                {"name": "metric", "display_name": "Metric", "type": "string", "description": None},
+                                {"name": "value", "display_name": "Value", "type": "int", "description": None},
+                            ],
+                        }
+                    ],
+                    "params_info": {"parameters": [], "require_any": False},
                 }
             ],
         )
         assert "Analytics" in result
-        assert "useDataSourceAnalytics" in result
-        assert "pre-built hooks" in result.lower() or "pre-generated" in result.lower()
+        assert "dataSourceAnalytics" in result
+        assert "pre-generated" in result.lower()

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import { searchDataSources } from '../../services/api';
-import type { DataSourceSearchRecord } from '../../types';
+import type { DataSourceSearchResult } from '../../types';
 import { X, Search } from 'lucide-react';
 import { Badge } from '../ui/badge';
 
@@ -13,7 +13,7 @@ interface DataSourceSelectorProps {
 export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<DataSourceSearchRecord[]>([]);
+  const [results, setResults] = useState<DataSourceSearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
@@ -68,8 +68,8 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
 
   if (!isOpen) return null;
 
-  const handleSelect = (pkg: DataSourceSearchRecord) => {
-    addDataSource({ id: pkg.Id, name: pkg.Name });
+  const handleSelect = (pkg: DataSourceSearchResult) => {
+    addDataSource({ id: pkg.id, name: pkg.name });
     setQuery('');
     setResults([]);
     setShowDropdown(false);
@@ -116,10 +116,10 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
             <div className="p-3 text-center text-[13px] text-muted-foreground">No data sources found</div>
           ) : (
             results.map((pkg) => {
-              const alreadySelected = selectedIds.has(pkg.Id);
+              const alreadySelected = selectedIds.has(pkg.id);
               return (
                 <button
-                  key={pkg.Id}
+                  key={pkg.id}
                   onClick={() => !alreadySelected && handleSelect(pkg)}
                   disabled={alreadySelected}
                   className={`w-full px-3 py-2.5 text-left border-b border-border transition-colors ${
@@ -127,11 +127,11 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
                   }`}
                 >
                   <div className="text-[13px] font-medium mb-0.5">
-                    {pkg.Name}
+                    {pkg.name}
                     {alreadySelected && <span className="text-muted-foreground font-normal"> (selected)</span>}
                   </div>
-                  {pkg.Description && (
-                    <div className="text-xs text-muted-foreground truncate">{pkg.Description}</div>
+                  {pkg.description && (
+                    <div className="text-xs text-muted-foreground truncate">{pkg.description}</div>
                   )}
                 </button>
               );

@@ -5,7 +5,18 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from flow44.logic.models import DataSourceQuerySchema, FieldType
+
 _MAX_DEPTH = 5
+
+_FIELD_TYPE_TO_TS: dict[FieldType, str] = {
+    "string": "string",
+    "int": "number",
+    "double": "number",
+    "bool": "boolean",
+    "datetime": "string",
+    "wkt": "string",
+}
 
 # Keys that look like identifiers don't need quoting
 _IDENT_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
@@ -26,16 +37,30 @@ def sanitize_to_pascal_case(name: str) -> str:
     return "".join(p[0].upper() + p[1:] if p else "" for p in parts)
 
 
-def generate_ts_interfaces(sample_data: Any, base_name: str) -> str:  # noqa: PLR0911
+def generate_ts_interfaces(
+    sample_data: Any,
+    base_name: str,
+    *,
+    queries: list[DataSourceQuerySchema] | None = None,
+) -> str:
     """Generate TypeScript interfaces from a JSON sample.
+
+    When `sample_data` is None (the data source needs user input and we
+    couldn't run it), `queries` is used instead — each query becomes a
+    cube under the FLAPI-shaped response wrapper.
 
     Returns a complete .ts file string with exported types.
     """
     if not base_name:
         base_name = "DataSource"
 
-    interfaces: list[str] = []
+    if sample_data is None:
+        if not queries:
+            # Shouldn't happen: get_usage raises when metadata is empty.
+            return f"export type {base_name}Response = unknown;\n"
+        return _generate_from_schema(queries, base_name)
 
+    interfaces: list[str] = []
     if isinstance(sample_data, list):
         _generate_from_list(sample_data, base_name, interfaces)
     elif isinstance(sample_data, dict):
@@ -44,6 +69,23 @@ def generate_ts_interfaces(sample_data: Any, base_name: str) -> str:  # noqa: PL
         ts = _infer_primitive(sample_data)
         interfaces.append(f"export type {base_name}Response = {ts};\n")
 
+    return "\n".join(interfaces)
+
+
+def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) -> str:
+    """Build typed interfaces from FLAPI metadata when no sample is available."""
+    interfaces: list[str] = []
+    results_fields: list[str] = []
+    for query in queries:
+        type_name = f"{base_name}{sanitize_to_pascal_case(query.name)}"
+        field_lines = [
+            f"  {_quote_key(field.name)}: {_FIELD_TYPE_TO_TS[field.type]};" for field in query.fields
+        ]
+        body = "\n".join(field_lines) if field_lines else "  [key: string]: unknown;"
+        interfaces.append(f"export interface {type_name} {{\n{body}\n}}\n")
+        results_fields.append(f"  {_quote_key(query.name)}: {type_name}[];")
+    results_body = "\n".join(results_fields)
+    interfaces.append(f"export interface {base_name}Results {{\n{results_body}\n}}\n")
     return "\n".join(interfaces)
 
 
@@ -99,10 +141,7 @@ def _generate_cubes_wrapper(data: dict[str, Any], cubes_key: str, base_name: str
         else:
             results_fields.append(f"  {_quote_key(cube_name)}: unknown[];")
     results_body = "\n".join(results_fields) if results_fields else "  [key: string]: unknown[];"
-    interfaces.append(f"\nexport interface {base_name}Results {{\n{results_body}\n}}\n")
-
-    wrapper_fields = _build_wrapper_fields(data, cubes_key, f"{base_name}Results", base_name, interfaces)
-    interfaces.append(f"\nexport interface {base_name}Response {{\n" + "\n".join(wrapper_fields) + "\n}\n")
+    interfaces.append(f"export interface {base_name}Results {{\n{results_body}\n}}\n")
 
 
 def _generate_array_wrapper(data: dict[str, Any], data_key: str, base_name: str, interfaces: list[str]) -> None:
@@ -110,30 +149,10 @@ def _generate_array_wrapper(data: dict[str, Any], data_key: str, base_name: str,
     arr = data[data_key]
     if arr and isinstance(arr[0], dict):
         _build_interface(arr[0], f"{base_name}Record", interfaces, depth=0)
+        interfaces.append(f"export type {base_name}Results = {base_name}Record[];\n")
     else:
         ts = _infer_primitive(arr[0]) if arr else "unknown"
-        interfaces.append(f"export type {base_name}Record = {ts};\n")
-
-    wrapper_fields = _build_wrapper_fields(data, data_key, f"{base_name}Record[]", base_name, interfaces)
-    interfaces.append(f"\nexport interface {base_name}Response {{\n" + "\n".join(wrapper_fields) + "\n}\n")
-
-
-def _build_wrapper_fields(
-    data: dict[str, Any],
-    special_key: str,
-    special_type: str,
-    base_name: str,
-    interfaces: list[str],
-) -> list[str]:
-    """Build field lines for a wrapper interface, substituting *special_key*."""
-    fields: list[str] = []
-    for key, val in data.items():
-        if key == special_key:
-            fields.append(f"  {_quote_key(key)}: {special_type};")
-        else:
-            ts_type = _infer_type(val, f"{base_name}{_capitalize(key)}", interfaces, depth=1)
-            fields.append(f"  {_quote_key(key)}: {ts_type};")
-    return fields
+        interfaces.append(f"export type {base_name}Results = {ts}[];\n")
 
 
 # ---------------------------------------------------------------------------

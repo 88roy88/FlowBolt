@@ -1,7 +1,3 @@
-"""FastAPI application entry point."""
-
-from __future__ import annotations
-
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -75,6 +71,7 @@ app = FastAPI(
     title="AI Web App Builder",
     version="0.1.0",
     lifespan=lifespan,
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 
@@ -90,6 +87,7 @@ async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError)
 
 
 # CORS — allow all origins in development
+# TODO: limit CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

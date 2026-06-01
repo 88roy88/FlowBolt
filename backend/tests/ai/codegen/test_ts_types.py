@@ -6,7 +6,7 @@ from flow44.ai.codegen.ts_types import (
     generate_ts_interfaces,
     sanitize_to_pascal_case,
 )
-
+from flow44.logic.models import DataSourceFieldSchema, DataSourceQuerySchema
 
 # ---------------------------------------------------------------------------
 # sanitize_to_pascal_case
@@ -194,3 +194,60 @@ class TestGenerateTsInterfacesOther:
         sample = [{"flag": True}]
         result = generate_ts_interfaces(sample, "Flags")
         assert "flag: boolean;" in result
+
+
+# ---------------------------------------------------------------------------
+# generate_ts_interfaces — schema-only fallback (no sample)
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateTsInterfacesSchemaOnly:
+    def test_single_query_produces_cube_and_response(self) -> None:
+        queries = [
+            DataSourceQuerySchema(
+                name="sales",
+                display_name="Sales",
+                description="Sales rows",
+                fields=[
+                    DataSourceFieldSchema(name="id", display_name="ID", type="int"),
+                    DataSourceFieldSchema(name="amount", display_name="Amount", type="double"),
+                    DataSourceFieldSchema(name="active", display_name="Active", type="bool"),
+                    DataSourceFieldSchema(name="created", display_name="Created", type="datetime"),
+                ],
+            )
+        ]
+        result = generate_ts_interfaces(None, "Report", queries=queries)
+        assert "export interface ReportSales" in result
+        assert "id: number;" in result
+        assert "amount: number;" in result
+        assert "active: boolean;" in result
+        assert "created: string;" in result
+        assert "export interface ReportResults" in result
+        assert "sales: ReportSales[];" in result
+        assert "export interface ReportResponse" in result
+        assert "results: ReportResults;" in result
+
+    def test_multi_query_produces_multiple_cubes(self) -> None:
+        queries = [
+            DataSourceQuerySchema(
+                name="orders",
+                display_name="Orders",
+                description="",
+                fields=[DataSourceFieldSchema(name="id", display_name="ID", type="int")],
+            ),
+            DataSourceQuerySchema(
+                name="customers",
+                display_name="Customers",
+                description="",
+                fields=[DataSourceFieldSchema(name="name", display_name="Name", type="string")],
+            ),
+        ]
+        result = generate_ts_interfaces(None, "Multi", queries=queries)
+        assert "export interface MultiOrders" in result
+        assert "export interface MultiCustomers" in result
+        assert "orders: MultiOrders[];" in result
+        assert "customers: MultiCustomers[];" in result
+
+    def test_none_sample_without_queries_falls_back_to_unknown(self) -> None:
+        result = generate_ts_interfaces(None, "X")
+        assert "export type XResponse = unknown;" in result

@@ -3,16 +3,24 @@ import { authConfig } from '../auth/config';
 // List of users who see "FlowBase" instead of "Flow44"
 const SPECIAL_USERS = ['666royz', "dev-user"];
 
-/**
- * Check if the current user should see the "Base" easter egg
- */
+function getUserIdFromJwt(token: string): string | undefined {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return undefined;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.sub === 'string' ? payload.sub : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function isSpecialUser(): boolean {
   try {
     const stored = window.localStorage?.getItem(authConfig.storageKey);
     if (!stored) return false;
 
     const creds = JSON.parse(stored);
-    const userId = creds?.userId;
+    const userId = creds?.userId ?? getUserIdFromJwt(creds?.auth_token ?? '');
 
     return typeof userId === 'string' && SPECIAL_USERS.includes(userId);
   } catch {
