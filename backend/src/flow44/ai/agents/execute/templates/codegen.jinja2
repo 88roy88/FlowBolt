@@ -53,7 +53,7 @@ This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Respon
   (At least one of the `require-any` params must be provided.)
 {% endif %}
 
-The function takes required params as typed positional arguments (camelCase) followed by an optional `options` object for optional params. If the data source requires user input and you don't yet have it, collect it via a form and only call the function once the required values are present.
+The function takes a single destructured object argument — required params are typed without `?`, optional params with `?` (all keys are camelCase). Pass values as the correct TypeScript type declared in the function signature. If the data source requires user input and you don't yet have it, collect it via a form and only call the function once the required values are present.
 {% else %}
 None — call `dataSource{{ ctx.sanitized_name }}()` with no arguments.
 {% endif %}
