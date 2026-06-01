@@ -3,7 +3,7 @@
 Emits a single file per data source at ``src/dataSources/{Sanitized}.ts``
 containing both the response type and an async function that calls the
 FLAPI run endpoint. The function's signature uses a named-parameters object
-where every param is typed as ``FlowParamValue``.
+with each param typed according to its FLAPI type.
 """
 
 from __future__ import annotations
