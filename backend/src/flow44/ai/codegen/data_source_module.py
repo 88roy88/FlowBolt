@@ -14,10 +14,10 @@ from typing import Any, assert_never
 from flow44.ai.codegen.ts_types import generate_ts_interfaces
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition, ParamType
 
-_FLOW_PARAM_VALUE_TYPE_DEF = """\
-type DateRange = { From: Date; To: Date};
-type WKT = string;
-"""
+_TYPE_DEFS: dict[str, str] = {
+    "datetime": "type DateRange = { From: Date; To: Date };",
+    "geographic": "type WKT = string;",
+}
 
 # Param names that would clip a JS/TS reserved word when used as a parameter
 # or property identifier. A trailing underscore is appended to avoid the clash
@@ -56,12 +56,15 @@ def generate_data_source_module(  # noqa: PLR0913
     signature = _build_signature(function_name, required, optional, results_type)
     body = _build_body(data_source_id, required, optional, response_type)
 
-    return (
-        "import { fetchWithAuth } from '../api/client';\n\n"
-        f"{_FLOW_PARAM_VALUE_TYPE_DEF}\n\n"
-        f"{types_block}\n\n"
-        f"{signature} {{\n{body}}}\n"
-    )
+    used_types = {p.type for p in params_info.parameters}
+    type_defs = "\n".join(v for k, v in _TYPE_DEFS.items() if k in used_types)
+
+    parts = ["import { fetchWithAuth } from '../api/client';"]
+    if type_defs:
+        parts.append(type_defs)
+    parts.append(types_block)
+    parts.append(f"{signature} {{\n{body}}}")
+    return "\n\n".join(parts) + "\n"
 
 
 def _function_name(sanitized_name: str) -> str:

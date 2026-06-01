@@ -222,6 +222,44 @@ class TestTypeCoercion:
         assert "startDate: DateRange" in result
 
 
+class TestTypeDefs:
+    def _make(self, param_type: str) -> str:
+        return generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="T",
+            params_info=DataSourceParamsInfo(
+                parameters=[
+                    ParamDefinition(
+                        name="p",
+                        display_name="P",
+                        type=param_type,  # type: ignore[arg-type]
+                        is_required=True,
+                        is_single_value=True,
+                        options=[],
+                    )
+                ],
+                require_any=False,
+            ),
+            sample_data=None,
+            queries=_queries("t"),
+        )
+
+    def test_daterange_typedef_emitted_for_datetime_param(self) -> None:
+        result = self._make("datetime")
+        assert "type DateRange = { From: Date; To: Date };" in result
+        assert "type WKT" not in result
+
+    def test_wkt_typedef_emitted_for_geographic_param(self) -> None:
+        result = self._make("geographic")
+        assert "type WKT = string;" in result
+        assert "type DateRange" not in result
+
+    def test_no_typedefs_for_string_param(self) -> None:
+        result = self._make("string")
+        assert "type DateRange" not in result
+        assert "type WKT" not in result
+
+
 class TestReservedWordParamName:
     def test_reserved_word_gets_trailing_underscore_in_identifier(self) -> None:
         # "from" and "delete" are JS/TS reserved words — we must not emit
