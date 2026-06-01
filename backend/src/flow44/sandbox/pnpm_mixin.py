@@ -53,6 +53,7 @@ class PnpmMixin(BaseSandbox, ABC):
             .replace("{{AUTH_PROVIDER_URL}}", settings.SANDBOX_AUTH_PROVIDER_URL)
             .replace("{{AUTH_STORAGE_KEY}}", settings.SANDBOX_AUTH_STORAGE_KEY)
             .replace("{{AUTH_USE_IFRAME}}", str(settings.SANDBOX_AUTH_USE_IFRAME).lower())
+            .replace("{{AUTH_POST_MESSAGE_TARGET}}", settings.SANDBOX_AUTH_POST_MESSAGE_TARGET)
         )
         dest_path = os.path.join(self.workspace_dir, "vite.config.ts")
         with open(dest_path, "w", encoding="utf-8") as f:

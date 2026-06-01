@@ -21,7 +21,7 @@ class TestGenerateDataSourceHook:
         assert "credentialsStore.getValidToken()" in result
         # 401 retry
         assert "res.status === 401" in result
-        assert "refreshAfter401" in result
+        assert "refreshCredentials" in result
         # Return shape
         assert "return { data, isLoading, error, refetch: fetchData };" in result
 

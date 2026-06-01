@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import litellm
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -24,9 +24,10 @@ from flow44.api import (
     server_log,
     terminal,
 )
+from flow44.api.deps import get_user_id
 from flow44.config import settings
 from flow44.db.database import init_db
-from flow44.db.project import list_projects
+from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import setup_bucket
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
@@ -50,7 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Restoring existing sandbox workspaces...")
 
-    live_projects = await list_projects()
+    live_projects = await list_all_projects()
 
     live_project_ids = {p.id for p in live_projects}
     await sandbox_manager.reconcile_workspaces(live_project_ids)
@@ -98,16 +99,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# REST routers
-app.include_router(projects.router)
-app.include_router(files.router)
-app.include_router(preview.router)
-app.include_router(models.router)
-app.include_router(export.router)
-app.include_router(publish.router)
-app.include_router(data_source_api.router)
+# All HTTP REST routes share a single auth choke-point
+api_router = APIRouter(dependencies=[Depends(get_user_id)])
+api_router.include_router(projects.router)
+api_router.include_router(files.router)
+api_router.include_router(preview.router)
+api_router.include_router(export.router)
+api_router.include_router(publish.router)
+api_router.include_router(data_source_api.router)
+api_router.include_router(chat.http_router)
+app.include_router(api_router)
 
-# WebSocket routers
+# Public HTTP REST routes — no auth required
+public_router = APIRouter()
+public_router.include_router(models.router)
+app.include_router(public_router)
+
+# WS routers — handle their own auth
 app.include_router(chat.router)
 app.include_router(terminal.router)
 app.include_router(server_log.router)

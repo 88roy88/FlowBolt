@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from flow44.api.deps import get_sandbox
+from flow44.api.deps import get_project, get_sandbox
 from flow44.config import settings
 from flow44.main import app
 
@@ -28,42 +28,47 @@ async def test_export_zip(tmp_path):
     mock_sandbox = MagicMock()
     mock_sandbox.workspace_dir = str(workspace_dir)
 
-    mock_project = AsyncMock()
+    mock_project = MagicMock()
     mock_project.name = "Test Project"
 
-    app.dependency_overrides[get_sandbox] = lambda project_id: mock_sandbox
+    app.dependency_overrides[get_sandbox] = lambda: mock_sandbox
+    app.dependency_overrides[get_project] = lambda: mock_project
     try:
-        with patch("flow44.api.export.get_project", return_value=mock_project):
-            response = client.get(f"/api/export/{project_id}/zip")
+        response = client.get(f"/api/export/{project_id}/zip")
 
-            assert response.status_code == 200
-            assert response.headers["Content-Type"] == "application/zip"
-            assert 'attachment; filename="Test Project.zip"' in response.headers["Content-Disposition"]
+        assert response.status_code == 200
+        assert response.headers["Content-Type"] == "application/zip"
+        assert 'attachment; filename="Test Project.zip"' in response.headers["Content-Disposition"]
 
-            with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
-                files = zf.namelist()
-                assert "file1.txt" in files
-                assert "subdir/file2.txt" in files
-                assert "node_modules/secret.txt" not in files
-                assert zf.read("file1.txt") == b"content1"
+        with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+            files = zf.namelist()
+            assert "file1.txt" in files
+            assert "subdir/file2.txt" in files
+            assert "node_modules/secret.txt" not in files
+            assert zf.read("file1.txt") == b"content1"
     finally:
         app.dependency_overrides.pop(get_sandbox, None)
+        app.dependency_overrides.pop(get_project, None)
 
 
 @pytest.mark.asyncio
 async def test_export_zip_no_sandbox():
     project_id = "no-sandbox"
 
-    def _raise(project_id: str) -> None:
+    mock_project = MagicMock()
+
+    def _raise() -> None:
         raise HTTPException(status_code=404, detail=f"No sandbox found for project {project_id}")
 
     app.dependency_overrides[get_sandbox] = _raise
+    app.dependency_overrides[get_project] = lambda: mock_project
     try:
         response = client.get(f"/api/export/{project_id}/zip")
         assert response.status_code == 404
         assert "No sandbox found" in response.json()["detail"]
     finally:
         app.dependency_overrides.pop(get_sandbox, None)
+        app.dependency_overrides.pop(get_project, None)
 
 
 @pytest.mark.asyncio
@@ -73,13 +78,17 @@ async def test_export_zip_missing_workspace(tmp_path):
     mock_sandbox = MagicMock()
     mock_sandbox.workspace_dir = str(workspace_dir)
 
-    app.dependency_overrides[get_sandbox] = lambda project_id: mock_sandbox
+    mock_project = MagicMock()
+
+    app.dependency_overrides[get_sandbox] = lambda: mock_sandbox
+    app.dependency_overrides[get_project] = lambda: mock_project
     try:
         response = client.get(f"/api/export/{project_id}/zip")
         assert response.status_code == 404
         assert response.json()["detail"] == "Workspace directory not found"
     finally:
         app.dependency_overrides.pop(get_sandbox, None)
+        app.dependency_overrides.pop(get_project, None)
 
 
 @pytest.mark.asyncio
@@ -87,38 +96,48 @@ async def test_export_html():
     project_id = "test-proj-456"
     html_content = "<html><body>Hello World</body></html>"
 
-    mock_project = AsyncMock()
+    mock_project = MagicMock()
+    mock_project.id = project_id
     mock_project.name = "HTML Export"
 
-    with (
-        patch("flow44.api.export.build_single_html", return_value=html_content),
-        patch("flow44.api.export.get_project", return_value=mock_project),
-    ):
-        response = client.get(f"/api/export/{project_id}/html")
+    app.dependency_overrides[get_project] = lambda: mock_project
+    try:
+        with patch("flow44.api.export.build_single_html", return_value=html_content):
+            response = client.get(f"/api/export/{project_id}/html")
 
-        assert response.status_code == 200
-        assert response.headers["Content-Type"] == "text/html; charset=utf-8"
-        assert 'attachment; filename="HTML Export.html"' in response.headers["Content-Disposition"]
-        assert response.text == html_content
+            assert response.status_code == 200
+            assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+            assert 'attachment; filename="HTML Export.html"' in response.headers["Content-Disposition"]
+            assert response.text == html_content
+    finally:
+        app.dependency_overrides.pop(get_project, None)
 
 
 @pytest.mark.asyncio
 async def test_export_html_error():
     project_id = "test-proj-err"
 
-    with patch("flow44.api.export.build_single_html", side_effect=ValueError("No sandbox found")):
-        response = client.get(f"/api/export/{project_id}/html")
-        assert response.status_code == 404
-        assert response.json()["detail"] == "No sandbox found"
+    mock_project = MagicMock()
+    mock_project.id = project_id
+
+    app.dependency_overrides[get_project] = lambda: mock_project
+    try:
+        with patch("flow44.api.export.build_single_html", side_effect=ValueError("No sandbox found")):
+            response = client.get(f"/api/export/{project_id}/html")
+            assert response.status_code == 404
+            assert response.json()["detail"] == "No sandbox found"
+    finally:
+        app.dependency_overrides.pop(get_project, None)
 
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_basic():
     project_id = "published-proj"
-    mock_project = AsyncMock()
+    mock_project = MagicMock()
     mock_project.published_url = "http://s3.local/published.html"
 
-    with patch("flow44.api.publish.get_project", return_value=mock_project):
+    app.dependency_overrides[get_project] = lambda: mock_project
+    try:
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_resp = AsyncMock()
             mock_resp.status_code = 200
@@ -133,25 +152,36 @@ async def test_proxy_published_app_basic():
             assert response.text == "<html>S3 Content</html>"
             assert response.headers["ETag"] == "tag123"
             assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
+    finally:
+        app.dependency_overrides.pop(get_project, None)
 
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_fetch_error():
     project_id = "fetch-err"
-    mock_project = AsyncMock()
+    mock_project = MagicMock()
     mock_project.published_url = "http://s3.local/published.html"
 
-    with patch("flow44.api.publish.get_project", return_value=mock_project):
+    app.dependency_overrides[get_project] = lambda: mock_project
+    try:
         with patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")):
             response = client.get(f"/api/export/{project_id}/published")
             assert response.status_code == 502
             assert response.json()["detail"] == "Error fetching published app from S3."
+    finally:
+        app.dependency_overrides.pop(get_project, None)
 
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_not_found():
     project_id = "non-existent"
-    with patch("flow44.api.publish.get_project", return_value=None):
+    mock_project = MagicMock()
+    mock_project.published_url = None
+
+    app.dependency_overrides[get_project] = lambda: mock_project
+    try:
         response = client.get(f"/api/export/{project_id}/published")
         assert response.status_code == 404
         assert response.json()["detail"] == "Published app not found or not published yet."
+    finally:
+        app.dependency_overrides.pop(get_project, None)

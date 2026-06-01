@@ -9,7 +9,7 @@ from flow44.db.project import (
     delete_project,
     get_project,
     get_project_data_sources,
-    list_projects,
+    list_all_projects,
     rename_project,
     update_project_data_source,
     update_project_data_sources,
@@ -25,14 +25,14 @@ from flow44.db.project import (
 
 class TestProjectCRUD:
     async def test_create_project(self, test_db):
-        project = await create_project("My App")
+        project = await create_project("My App", user_id="test-user")
         assert project.name == "My App"
         assert project.id
         assert project.created_at
         assert project.summary == ""
 
     async def test_get_project(self, test_db):
-        created = await create_project("Test")
+        created = await create_project("Test", user_id="test-user")
         fetched = await get_project(created.id)
         assert fetched is not None
         assert fetched.id == created.id
@@ -43,21 +43,21 @@ class TestProjectCRUD:
         assert result is None
 
     async def test_list_projects_empty(self, test_db):
-        projects = await list_projects()
+        projects = await list_all_projects()
         assert projects == []
 
     async def test_list_projects_ordered_newest_first(self, test_db):
-        p1 = await create_project("First")
-        p2 = await create_project("Second")
-        p3 = await create_project("Third")
+        p1 = await create_project("First", user_id="test-user")
+        p2 = await create_project("Second", user_id="test-user")
+        p3 = await create_project("Third", user_id="test-user")
 
-        projects = await list_projects()
+        projects = await list_all_projects()
         assert len(projects) == 3
         assert projects[0].id == p3.id
         assert projects[2].id == p1.id
 
     async def test_rename_project(self, test_db):
-        project = await create_project("Old Name")
+        project = await create_project("Old Name", user_id="test-user")
         await rename_project(project.id, "New Name")
 
         fetched = await get_project(project.id)
@@ -66,7 +66,7 @@ class TestProjectCRUD:
         assert fetched.updated_at > project.updated_at
 
     async def test_update_project_summary(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         await update_project_summary(project.id, "A cool app")
 
         fetched = await get_project(project.id)
@@ -74,7 +74,7 @@ class TestProjectCRUD:
         assert fetched.summary == "A cool app"
 
     async def test_update_project_model(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         await update_project_model(project.id, "claude-sonnet-4-6")
 
         fetched = await get_project(project.id)
@@ -82,7 +82,7 @@ class TestProjectCRUD:
         assert fetched.selected_model == "claude-sonnet-4-6"
 
     async def test_update_project_data_sources(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         ds = [{"data_source_id": "ds1", "schema": "..."}]
         await update_project_data_sources(project.id, ds)
 
@@ -91,7 +91,7 @@ class TestProjectCRUD:
         assert result[0]["data_source_id"] == "ds1"
 
     async def test_get_data_sources_fallback_to_single(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         await update_project_data_source(project.id, "ds-legacy", '{"field": "value"}')
 
         result = await get_project_data_sources(project.id)
@@ -100,19 +100,19 @@ class TestProjectCRUD:
         assert result[0]["field"] == "value"
 
     async def test_get_data_sources_empty(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         result = await get_project_data_sources(project.id)
         assert result == []
 
     async def test_delete_project(self, test_db):
-        project = await create_project("To Delete")
+        project = await create_project("To Delete", user_id="test-user")
         await delete_project(project.id)
 
         fetched = await get_project(project.id)
         assert fetched is None
 
     async def test_update_project_published_url(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         url = "https://s3.amazonaws.com/my-bucket/project-id/index.html"
         await update_project_published_url(project.id, url)
 
@@ -122,7 +122,7 @@ class TestProjectCRUD:
         assert fetched.updated_at > project.updated_at
 
     async def test_delete_project_cascades_messages(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         await save_message(project.id, "user", "Hello")
         await save_message(project.id, "assistant", "Hi!")
 
@@ -139,7 +139,7 @@ class TestProjectCRUD:
 
 class TestChatMessageCRUD:
     async def test_save_and_get_messages(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         m1 = await save_message(project.id, "user", "Hello")
         m2 = await save_message(project.id, "assistant", "Hi there!")
 
@@ -152,13 +152,13 @@ class TestChatMessageCRUD:
         assert messages[1].role == "assistant"
 
     async def test_get_messages_empty(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         messages = await get_messages(project.id)
         assert messages == []
 
     async def test_messages_isolated_by_project(self, test_db):
-        p1 = await create_project("App 1")
-        p2 = await create_project("App 2")
+        p1 = await create_project("App 1", user_id="test-user")
+        p2 = await create_project("App 2", user_id="test-user")
         await save_message(p1.id, "user", "For project 1")
         await save_message(p2.id, "user", "For project 2")
 
@@ -177,7 +177,7 @@ class TestChatMessageCRUD:
 
 class TestAgentEventCRUD:
     async def test_emit_and_get_events(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         await emit_event(project.id, {"type": "phase", "phase": "designing"}, notify=False)
         await emit_event(project.id, {"type": "phase", "phase": "executing"}, notify=False)
 
@@ -188,7 +188,7 @@ class TestAgentEventCRUD:
         assert events[1].payload["phase"] == "executing"
 
     async def test_get_events_after_id(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         await emit_event(project.id, {"type": "phase", "phase": "designing"}, notify=False)
         await emit_event(project.id, {"type": "phase", "phase": "executing"}, notify=False)
 
@@ -200,12 +200,12 @@ class TestAgentEventCRUD:
         assert events_after[0].payload["phase"] == "executing"
 
     async def test_get_events_empty(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         events = await get_events(project.id)
         assert events == []
 
     async def test_clear_events(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         await emit_event(project.id, {"type": "phase", "phase": "designing"}, notify=False)
         await emit_event(project.id, {"type": "action_complete"}, notify=False)
 
@@ -215,8 +215,8 @@ class TestAgentEventCRUD:
         assert events == []
 
     async def test_events_isolated_by_project(self, test_db):
-        p1 = await create_project("App 1")
-        p2 = await create_project("App 2")
+        p1 = await create_project("App 1", user_id="test-user")
+        p2 = await create_project("App 2", user_id="test-user")
         await emit_event(p1.id, {"type": "phase", "phase": "designing"}, notify=False)
         await emit_event(p2.id, {"type": "action_complete"}, notify=False)
 
@@ -228,7 +228,7 @@ class TestAgentEventCRUD:
         assert events2[0].payload["type"] == "action_complete"
 
     async def test_event_payload_preserves_complex_json(self, test_db):
-        project = await create_project("App")
+        project = await create_project("App", user_id="test-user")
         payload = {
             "type": "task_list",
             "tasks": [

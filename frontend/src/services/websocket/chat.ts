@@ -1,6 +1,5 @@
 import type { WSMessage } from '../../types';
 import type { ChatSocket } from './types';
-import { readDataSourceAuthorization } from '../dataSourceAuth';
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 const chatSockets = new Map<string, ChatSocket>();
@@ -12,22 +11,9 @@ export function getChatSocket(projectId: string): ChatSocket {
   const handlers = new Set<(msg: WSMessage) => void>();
   let stopReconnect: (() => void) | null = null;
 
-  const sendAuthMessage = (send: (message: WSMessage) => void) => {
-    const rawToken = readDataSourceAuthorization();
-    const dataSourceAuthorization = rawToken?.trim() || undefined;
-    send({
-      type: 'auth',
-      ...(dataSourceAuthorization && { dataSourceAuthorization }),
-    });
-  };
-
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${projectId}`,
-    () => {
-      sendAuthMessage((message) => {
-        sendOrQueue(JSON.stringify(message));
-      });
-    },
+    undefined,
     (data) => {
       try {
         const msg = JSON.parse(data) as WSMessage;
@@ -55,12 +41,6 @@ export function getChatSocket(projectId: string): ChatSocket {
 
   const socket: ChatSocket = {
     send(message: WSMessage) {
-      // Re-send auth before outbound messages so backend has latest token value.
-      if (message.type !== 'auth') {
-        sendAuthMessage((authMessage) => {
-          sendOrQueue(JSON.stringify(authMessage));
-        });
-      }
       sendOrQueue(JSON.stringify(message));
     },
     onMessage(handler: (msg: WSMessage) => void) {

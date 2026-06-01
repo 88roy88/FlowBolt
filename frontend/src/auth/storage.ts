@@ -1,6 +1,20 @@
 import { authConfig } from './config';
 import type { AuthCredentials } from './types';
 
+const COOKIE_NAME = 'flow44_token';
+const COOKIE_BASE = 'Path=/; SameSite=Strict';
+
+function setAuthCookie(token: string): void {
+  if (typeof document === 'undefined') return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${COOKIE_NAME}=${token}; ${COOKIE_BASE}${secure}`;
+}
+
+function clearAuthCookie(): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${COOKIE_NAME}=; ${COOKIE_BASE}; Max-Age=0`;
+}
+
 function parseStoredCredentials(raw: string): AuthCredentials | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -13,14 +27,8 @@ function parseStoredCredentials(raw: string): AuthCredentials | null {
 }
 
 function parseExpiryTimestamp(creds: AuthCredentials): number | null {
-  for (const key of ['expiresAt', 'expiration', 'tokenExpiry']) {
-    const val = (creds as Record<string, unknown>)[key];
-    if (typeof val === 'string' && val.trim()) {
-      const ms = Date.parse(val.trim());
-      return Number.isFinite(ms) ? ms : null;
-    }
-  }
-  return null;
+  const val = (creds as Record<string, unknown>).exp;
+  return typeof val === 'number' && Number.isFinite(val) ? val * 1000 : null;
 }
 
 export const credentialsStore = {
@@ -41,6 +49,7 @@ export const credentialsStore = {
   save(credentials: AuthCredentials): void {
     try {
       window.localStorage.setItem(authConfig.storageKey, JSON.stringify(credentials));
+      setAuthCookie(credentials.auth_token);
     } catch {
       throw new Error('Failed to persist auth credentials');
     }
@@ -49,6 +58,7 @@ export const credentialsStore = {
   clear(): void {
     try {
       window.localStorage.removeItem(authConfig.storageKey);
+      clearAuthCookie();
       window.dispatchEvent(new Event('auth:credentials-cleared'));
     } catch {
       /* ignore */

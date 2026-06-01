@@ -1,8 +1,9 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from flow44.api.deps import get_project
 from flow44.config import settings
 from flow44.main import app
 
@@ -12,10 +13,11 @@ client = TestClient(app)
 @pytest.mark.asyncio
 async def test_proxy_published_app_headers():
     project_id = "test-project"
-    mock_project = AsyncMock()
+    mock_project = MagicMock()
     mock_project.published_url = "https://example.com/index.html"
 
-    with patch("flow44.api.publish.get_project", return_value=mock_project):
+    app.dependency_overrides[get_project] = lambda: mock_project
+    try:
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_resp = AsyncMock()
             mock_resp.status_code = 200
@@ -31,3 +33,5 @@ async def test_proxy_published_app_headers():
             assert response.headers["ETag"] == '"12345"'
             assert response.headers["Last-Modified"] == "Wed, 21 Oct 2015 07:28:00 GMT"
             assert response.text == "<html>Testing headers</html>"
+    finally:
+        app.dependency_overrides.pop(get_project, None)

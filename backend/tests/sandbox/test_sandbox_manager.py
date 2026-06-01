@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from flow44.config import settings
 from flow44.sandbox.base import SandboxInfo
 from flow44.sandbox.manager import SandboxManager, SandboxNotFoundError
 
@@ -116,3 +117,22 @@ class TestStampViteConfig:
         result = (workspace_dir / "vite.config.ts").read_text()
         assert "plugins: []" in result
         assert "proj42" in result
+
+    def test_replaces_auth_post_message_target(self, tmp_path) -> None:  # type: ignore[type-arg]
+        template_dir = tmp_path / "template"
+        template_dir.mkdir()
+        (template_dir / "vite.config.ts").write_text(
+            "'import.meta.env.VITE_AUTH_POST_MESSAGE_TARGET': JSON.stringify('{{AUTH_POST_MESSAGE_TARGET}}'),"
+        )
+
+        workspace_dir = tmp_path / "workspace"
+        workspace_dir.mkdir()
+        (workspace_dir / "vite.config.ts").write_text("")
+
+        sandbox = DummySandbox(SandboxInfo(project_id="proj", workspace_dir=str(workspace_dir), port=0))
+        with patch.object(settings, "SANDBOX_AUTH_POST_MESSAGE_TARGET", "https://auth.example.com"):
+            sandbox._stamp_vite_config(str(template_dir))
+
+        result = (workspace_dir / "vite.config.ts").read_text()
+        assert "https://auth.example.com" in result
+        assert "{{AUTH_POST_MESSAGE_TARGET}}" not in result

@@ -6,6 +6,19 @@ export { PopupBlockedError };
 
 export type SessionBootstrapResult = 'ready' | 'needs_interactive_sign_in';
 
+let pendingReacquisition: Promise<void> | null = null;
+
+async function reacquireCredentials(): Promise<void> {
+  if (authConfig.useIframe) {
+    // Iframe refresh must be driven by the React layer — clear token so
+    // the UI shows the sign-in state again.
+    credentialsStore.clear();
+    return;
+  }
+  const creds = await new PopupAuthenticator(authConfig).acquireCredentials();
+  credentialsStore.save(creds);
+}
+
 export const authSession = {
   async bootstrap(): Promise<SessionBootstrapResult> {
     if (credentialsStore.getValidToken()) {
@@ -27,15 +40,18 @@ export const authSession = {
     credentialsStore.save(creds);
   },
 
-  async refreshAfter401(): Promise<void> {
-    if (authConfig.useIframe) {
-      // Iframe refresh must be driven by the React layer — clear token so
-      // the UI shows the sign-in state again.
-      credentialsStore.clear();
-      return;
-    }
-    const creds = await new PopupAuthenticator(authConfig).acquireCredentials();
-    credentialsStore.save(creds);
+  async refreshCredentials(): Promise<void> {
+    pendingReacquisition ??= reacquireCredentials().finally(() => {
+      pendingReacquisition = null;
+    });
+    return pendingReacquisition;
+  },
+
+  async ensureFreshToken(): Promise<string | undefined> {
+    const cached = credentialsStore.getValidToken();
+    if (cached) return cached;
+    await this.refreshCredentials();
+    return credentialsStore.getValidToken();
   },
 
   signOut(): void {
