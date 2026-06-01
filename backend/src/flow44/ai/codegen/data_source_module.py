@@ -15,7 +15,6 @@ from flow44.ai.codegen.ts_types import generate_ts_interfaces
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition
 
 _TYPE_DEFS: dict[str, str] = {
-    "datetime": "type DateRange = { From: Date; To: Date };",
     "geographic": "type WKT = string;",
 }
 
@@ -79,7 +78,7 @@ def _ts_type(p: ParamDefinition) -> str:
         case "bool":
             base = "boolean"
         case "datetime":
-            base = "DateRange"
+            base = "{ From: Date; To: Date }"
         case "timestamp":
             base = "Date"
         case "geographic":

@@ -143,7 +143,7 @@ class TestMixedParams:
             sample_data=None,
             queries=_queries("mixed"),
         )
-        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: DateRange;" in result
+        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };" in result
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) {\n    body['tasks']['priority'] = priority;\n  }" in result
         assert "if (createdAfter !== undefined) {\n    body['tasks']['created_after'] = createdAfter;\n  }" in result
@@ -243,7 +243,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "startDate: DateRange" in result
+        assert "startDate: { From: Date; To: Date }" in result
 
 
 class TestTypeDefs:
@@ -270,7 +270,7 @@ class TestTypeDefs:
 
     def test_daterange_typedef_emitted_for_datetime_param(self) -> None:
         result = self._make("datetime")
-        assert "type DateRange = { From: Date; To: Date };" in result
+        assert "{ From: Date; To: Date }" in result
         assert "type WKT" not in result
 
     def test_wkt_typedef_emitted_for_geographic_param(self) -> None:
@@ -319,7 +319,7 @@ class TestReservedWordParamName:
             sample_data=None,
             queries=_queries("r"),
         )
-        assert "from_: DateRange" in result
+        assert "from_: { From: Date; To: Date }" in result
         assert "delete_?: boolean" in result
         # The body keys still use the FLAPI names.
         assert "body['events']['from'] = from_;" in result
@@ -370,8 +370,8 @@ class TestCubeIdDisambiguation:
             queries=_queries("report"),
         )
         # Colliding names get cube_id prefix; unique names stay as-is.
-        assert "reports_startDate: DateRange" in result
-        assert "filters_startDate: DateRange" in result
+        assert "reports_startDate: { From: Date; To: Date }" in result
+        assert "filters_startDate: { From: Date; To: Date }" in result
         assert "limit?: number" in result
         # Each is wired to the correct cube in the body.
         assert "body['reports']['start_date'] = reports_startDate;" in result
@@ -439,7 +439,7 @@ class TestAllParamTypes:
             queries=_queries("geo_event"),
         )
         assert "label: string" in result
-        assert "validFrom: DateRange" in result
+        assert "validFrom: { From: Date; To: Date }" in result
         assert "recordedAt?: Date" in result
         assert "area?: WKT" in result
         assert "isActive?: boolean" in result
