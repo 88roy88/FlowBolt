@@ -113,8 +113,8 @@ class TestProjectCRUD:
 
     async def test_update_project_published_url(self, test_db):
         project = await create_project("App", user_id="test-user")
-        url = "https://s3.amazonaws.com/my-bucket/project-id/index.html"
-        await update_project_published_url(project.id, url)
+        handle = "my-custom-slug"
+        await update_project_published_url(project.id, handle)
 
         fetched = await get_project(project.id)
         assert fetched is not None

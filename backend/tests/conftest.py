@@ -13,6 +13,24 @@ import flow44.db.database  # noqa: E402
 from flow44.db.database import get_engine, init_db, reset  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def auth_test_user():
+    """Authenticate all HTTP TestClient requests as a fixed test user.
+
+    Every REST route is mounted behind ``Depends(get_user_id)`` (the central auth
+    choke-point in ``main.py``). Overriding it here lets endpoint tests exercise
+    routes without minting tokens. Auth unit tests call ``get_user_id`` directly
+    (not through the app) and so are unaffected; WS auth (``get_ws_user_id``) is
+    intentionally left untouched.
+    """
+    from flow44.api.deps import get_user_id  # noqa: PLC0415
+    from flow44.main import app  # noqa: PLC0415
+
+    app.dependency_overrides[get_user_id] = lambda: "test-user"
+    yield
+    app.dependency_overrides.pop(get_user_id, None)
+
+
 @pytest.fixture
 def tmp_dir(tmp_path: Path) -> Path:
     return tmp_path

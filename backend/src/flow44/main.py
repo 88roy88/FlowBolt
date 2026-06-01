@@ -109,6 +109,7 @@ api_router.include_router(export.router)
 api_router.include_router(publish.router)
 api_router.include_router(data_source_api.router)
 api_router.include_router(chat.http_router)
+api_router.include_router(shared.router)
 app.include_router(api_router)
 
 # Public HTTP REST routes — no auth required

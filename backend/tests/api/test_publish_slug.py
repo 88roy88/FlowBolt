@@ -54,6 +54,17 @@ class TestSlugCheck:
 
 
 class TestPublish:
+    @pytest.fixture(autouse=True)
+    def _override_project(self):
+        """publish_to_s3 resolves the project via ProjectDep; supply a stub with a known id."""
+        from flow44.api.deps import get_project  # noqa: PLC0415
+
+        project = AsyncMock()
+        project.id = "proj-1"
+        app.dependency_overrides[get_project] = lambda: project
+        yield
+        app.dependency_overrides.pop(get_project, None)
+
     def _patch_build_and_deploy(self):
         return (
             patch("flow44.api.publish.build_single_html", return_value="<html>ok</html>"),

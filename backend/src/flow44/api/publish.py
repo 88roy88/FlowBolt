@@ -64,7 +64,7 @@ async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishReque
 
     slug = body.slug or None
     if slug:
-        await _validate_slug(slug, project_id)
+        await _validate_slug(slug, project.id)
 
     # Build a single HTML string containing the entire app with inline assets
     try:
@@ -95,6 +95,6 @@ async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishReque
         raise HTTPException(status_code=404, detail="Project not found.")
 
     public_path = f"/shared/{handle}"
-    logger.info("Published project %s (handle: %s, public: %s)", project_id, handle, public_path)
+    logger.info("Published project %s (handle: %s, public: %s)", project.id, handle, public_path)
 
     return {"url": public_path, "handle": handle, "published_at": published_at}
