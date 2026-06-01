@@ -143,7 +143,7 @@ class TestMixedParams:
             sample_data=None,
             queries=_queries("mixed"),
         )
-        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string;\n  createdAfter?: DateRange;" in result
+        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: DateRange;" in result
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) body['tasks']['priority'] = priority;" in result
         assert "if (createdAfter !== undefined) body['tasks']['created_after'] = createdAfter;" in result
@@ -171,7 +171,31 @@ class TestArrayParam:
             sample_data=None,
             queries=_queries("tagged"),
         )
-        assert "dataSourceTagged({\n  tags,\n}: {\n  tags: string;\n})" in result
+        assert "tags: string | string[];" in result
+
+    def test_is_single_value_true_does_not_emit_array(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="tags",
+                    display_name="Tags",
+                    type="string",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                )
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="Tagged",
+            params_info=params,
+            sample_data=None,
+            queries=_queries("tagged"),
+        )
+        assert "tags: string;" in result
+        assert "string[]" not in result
 
 
 class TestTypeCoercion:

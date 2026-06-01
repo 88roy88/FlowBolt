@@ -89,6 +89,11 @@ def _param_type_to_ts(param_type: ParamType) -> str:
             assert_never(unreachable)
 
 
+def _ts_type(p: ParamDefinition) -> str:
+    base = _param_type_to_ts(p.type)
+    return f"{base} | {base}[]" if not p.is_single_value else base
+
+
 def _unique_idents(params: list[ParamDefinition]) -> dict[int, str]:
     """Return a TS identifier for each param, prefixing with camelCase cube_id on collision."""
     base = {id(p): _ts_ident(p.name) for p in params}
@@ -118,9 +123,9 @@ def _build_signature(
     param_names = "".join(f"\n  {idents[id(p)]}," for p in all_params)
     fields: list[str] = []
     for p in required:
-        fields.append(f"\n  {idents[id(p)]}: {_param_type_to_ts(p.type)};")
+        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)};")
     for p in optional:
-        fields.append(f"\n  {idents[id(p)]}?: {_param_type_to_ts(p.type)};")
+        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};")
     type_body = "".join(fields)
 
     return (
