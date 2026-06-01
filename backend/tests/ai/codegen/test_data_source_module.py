@@ -56,7 +56,7 @@ class TestEnvelopeUnwrap:
             sample_data=None,
             queries=_queries("x"),
         )
-        assert "(await res.json()) as XResponse" in result
+        assert "(await res.json()) as { data: XResults }" in result
         assert "return envelope.data;" in result
 
 
@@ -99,7 +99,7 @@ class TestRequiredParam:
         assert "export interface PersonPerson" in result
         assert "id: number;" in result
         assert "label: string;" in result
-        assert "export interface PersonResponse" in result
+        assert "export interface PersonResults" in result
 
 
 class TestMixedParams:

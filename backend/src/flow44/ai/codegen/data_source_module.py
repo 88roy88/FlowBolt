@@ -45,7 +45,6 @@ def generate_data_source_module(  # noqa: PLR0913
     queries: list[DataSourceQuerySchema] | None = None,
 ) -> str:
     """Build the full .ts content for a data source."""
-    response_type = f"{sanitized_name}Response"
     results_type = f"{sanitized_name}Results"
     types_block = generate_ts_interfaces(sample_data, sanitized_name, queries=queries).rstrip()
 
@@ -54,7 +53,7 @@ def generate_data_source_module(  # noqa: PLR0913
     optional = [p for p in params_info.parameters if not (p.is_required or p.is_require_any)]
 
     signature = _build_signature(function_name, required, optional, results_type)
-    body = _build_body(data_source_id, required, optional, response_type)
+    body = _build_body(data_source_id, required, optional, results_type)
 
     used_types = {p.type for p in params_info.parameters}
     type_defs = "\n".join(v for k, v in _TYPE_DEFS.items() if k in used_types)
@@ -133,7 +132,7 @@ def _build_body(
     data_source_id: str,
     required: list[ParamDefinition],
     optional: list[ParamDefinition],
-    response_type: str,
+    results_type: str,
 ) -> str:
     lines: list[str] = []
     path = f"/api/data-source/{data_source_id}/run"
@@ -158,7 +157,7 @@ def _build_body(
             )
         lines.append(f"  const res = await fetchWithAuth('{path}', body);\n")
 
-    lines.append(f"  const envelope = (await res.json()) as {response_type};\n")
+    lines.append(f"  const envelope = (await res.json()) as {{ data: {results_type} }};\n")
     lines.append("  return envelope.data;\n")
     return "".join(lines)
 
