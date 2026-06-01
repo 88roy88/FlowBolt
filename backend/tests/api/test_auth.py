@@ -50,9 +50,9 @@ def test_no_token_require_jwt_raises(mock_settings):
 
 
 @patch("flow44.api.deps.settings")
-def test_no_token_no_require_returns_anonymous(mock_settings):
+def test_no_token_no_require_returns_611noat(mock_settings):
     mock_settings.AUTH_REQUIRE_JWT = False
-    assert get_user_id(None) == "anonymous"
+    assert get_user_id(None) == "611noat"
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,10 @@ def test_jwt_first_matching_url_claim_wins(mock_settings):
 
 @patch("flow44.api.deps.settings")
 def test_jwt_missing_unique_id_claim_raises_when_required(mock_settings):
+    """Validly signed token that decodes but lacks a UniqueID claim."""
     mock_settings.AUTH_REQUIRE_JWT = True
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
     token = _make_jwt({"sub": "ignored", "role": "admin"})
     with pytest.raises(HTTPException) as exc:
         get_user_id(token)
@@ -94,8 +97,8 @@ def test_jwt_missing_unique_id_claim_raises_when_required(mock_settings):
 
 
 @patch("flow44.api.deps.settings")
-def test_jwt_expired_still_extracts_when_exp_verification_disabled(mock_settings):
-    """Decode skips exp check; claim still readable on signed-but-expired token."""
+def test_jwt_expired_rejected_when_required(mock_settings):
+    """Expired token fails decode (exp verified), so strict mode rejects it with 401."""
     mock_settings.AUTH_REQUIRE_JWT = True
     mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
     mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
@@ -105,7 +108,25 @@ def test_jwt_expired_still_extracts_when_exp_verification_disabled(mock_settings
             "exp": int(time.time()) - 10,
         }
     )
-    assert get_user_id(token) == "user-x"
+    with pytest.raises(HTTPException) as exc:
+        get_user_id(token)
+    assert exc.value.status_code == 401
+    assert "invalid or expired" in exc.value.detail.lower()
+
+
+@patch("flow44.api.deps.settings")
+def test_jwt_unexpired_accepted(mock_settings):
+    """A token whose exp is still in the future decodes and yields the uid."""
+    mock_settings.AUTH_REQUIRE_JWT = True
+    mock_settings.AUTH_JWT_PUBLIC_KEY = SECRET
+    mock_settings.AUTH_JWT_ALGORITHM = ALGORITHM
+    token = _make_jwt(
+        {
+            CLAIM_UNIQUE_ID_URL: "user-y",
+            "exp": int(time.time()) + 3600,
+        }
+    )
+    assert get_user_id(token) == "user-y"
 
 
 @patch("flow44.api.deps.settings")

@@ -3,23 +3,35 @@ import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../typ
 
 const BASE = '/api';
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {};
-
+// Fetch with a Bearer token; on a 401, re-acquire credentials and retry once.
+async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry = true): Promise<Response> {
   const token = await authSession.ensureFreshToken();
+  const headers = new Headers(options.headers);
   if (token) {
-    headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    headers.set('Authorization', token.startsWith('Bearer ') ? token : `Bearer ${token}`);
   }
 
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401 && allowRetry) {
+    await authSession.refreshCredentials();
+    if (!authSession.hasValidSession()) {
+      throw new Error('API error 401: authentication required');
+    }
+    return fetchWithAuth(path, options, false);
+  }
+  return res;
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {};
   const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   // Only set JSON Content-Type when body is not FormData.
   if (options?.body && !isFormDataBody) {
     headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch(`${BASE}${path}`, {
-    headers,
-    ...options,
-  });
+
+  const res = await fetchWithAuth(path, { ...options, headers });
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${text}`);
@@ -67,17 +79,13 @@ export async function deleteFileEntry(projectId: string, path: string): Promise<
 }
 
 export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
-  const headers: Record<string, string> = { 'Content-Type': file.type || 'application/octet-stream' };
-  const token = await authSession.ensureFreshToken();
-  if (token) headers['Authorization'] = token;
-
-  const res = await fetch(`${BASE}/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
+  const res = await fetchWithAuth(`/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
     body: file,
   });
-  const text = await res.text();
   if (!res.ok) {
+    const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
 }

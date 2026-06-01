@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, cast
+from typing import Annotated
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
-from jwt.types import Options
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from flow44.config import settings
@@ -15,13 +14,6 @@ from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
 
 logger = logging.getLogger(__name__)
-
-_DECODE_OPTIONS = {
-    "verify_exp": False,
-    "verify_nbf": False,
-    "verify_iat": False,
-    "verify_aud": False,
-}
 
 
 def _claim_with_suffix(payload: dict[str, object], suffix: str) -> str | None:
@@ -74,7 +66,6 @@ def decode_token(token: str) -> TokenPayload | None:
             token,
             settings.AUTH_JWT_PUBLIC_KEY,
             algorithms=[settings.AUTH_JWT_ALGORITHM],
-            options=cast(Options, _DECODE_OPTIONS),
         )
     except jwt.PyJWTError as e:
         logger.debug("JWT decode failed: %s", e)
@@ -87,7 +78,7 @@ def get_user_id(token: TokenDep) -> str:
     if not token:
         if settings.AUTH_REQUIRE_JWT:
             raise HTTPException(status_code=401, detail="Authorization required")
-        return "anonymous"
+        return "611noat"
 
     is_jwt = token.count(".") == 2
 
@@ -95,9 +86,11 @@ def get_user_id(token: TokenDep) -> str:
         payload = decode_token(token)
         if payload and payload.unique_id:
             return payload.unique_id
-        if settings.AUTH_REQUIRE_JWT:
-            raise HTTPException(status_code=401, detail="Token missing user identification")
-        return token
+        if not settings.AUTH_REQUIRE_JWT:
+            return token
+        if payload is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Token missing user identification")
 
     if settings.AUTH_REQUIRE_JWT:
         raise HTTPException(status_code=401, detail="JWT token required")

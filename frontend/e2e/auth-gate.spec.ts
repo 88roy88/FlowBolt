@@ -8,7 +8,7 @@
  * reach the API and unauthenticated requests stay gated in the UI.
  *
  * Strict-JWT smoke (BACKEND_URL + AUTH_REQUIRE_JWT env): verifies the backend
- * rejects unauthenticated requests with 401 rather than allowing anonymous access.
+ * rejects unauthenticated requests with 401 rather than allowing 611noat access.
  */
 import { test, expect, E2E_AUTH_TOKEN, AUTH_STORAGE_KEY } from './fixtures';
 
