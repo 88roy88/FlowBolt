@@ -83,7 +83,7 @@ class TestRequiredParam:
             sample_data=None,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson({ personId }: { personId: TextValue }): Promise<PersonResults>" in result
+        assert "export async function dataSourcePerson({ personId }: { personId: number }): Promise<PersonResults>" in result
         assert "body['people']['person_id'] = personId;" in result
         assert "fetchWithAuth('/api/data-source/7/run', body);" in result
 
@@ -143,7 +143,7 @@ class TestMixedParams:
             sample_data=None,
             queries=_queries("mixed"),
         )
-        assert "dataSourceMixed({ type, priority, createdAfter }: { type: TextValue; priority?: TextValue; createdAfter?: DateRangeValue })" in result
+        assert "dataSourceMixed({ type, priority, createdAfter }: { type: string; priority?: string; createdAfter?: DateRange })" in result
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) body['tasks']['priority'] = priority;" in result
         assert "if (createdAfter !== undefined) body['tasks']['created_after'] = createdAfter;" in result
@@ -171,7 +171,7 @@ class TestArrayParam:
             sample_data=None,
             queries=_queries("tagged"),
         )
-        assert "dataSourceTagged({ tags }: { tags: TextValue })" in result
+        assert "dataSourceTagged({ tags }: { tags: string })" in result
 
 
 class TestTypeCoercion:
@@ -196,7 +196,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "active: BooleanValue" in result
+        assert "active: boolean" in result
 
     def test_date_maps_to_string(self) -> None:
         params = DataSourceParamsInfo(
@@ -219,7 +219,7 @@ class TestTypeCoercion:
             sample_data=None,
             queries=_queries("t"),
         )
-        assert "startDate: DateRangeValue" in result
+        assert "startDate: DateRange" in result
 
 
 class TestReservedWordParamName:
@@ -257,8 +257,8 @@ class TestReservedWordParamName:
             sample_data=None,
             queries=_queries("r"),
         )
-        assert "from_: DateRangeValue" in result
-        assert "delete_?: BooleanValue" in result
+        assert "from_: DateRange" in result
+        assert "delete_?: boolean" in result
         # The body keys still use the FLAPI names.
         assert "body['events']['from'] = from_;" in result
         assert "if (delete_ !== undefined) body['events']['delete'] = delete_;" in result
@@ -308,9 +308,9 @@ class TestCubeIdDisambiguation:
             queries=_queries("report"),
         )
         # Colliding names get cube_id prefix; unique names stay as-is.
-        assert "reports_startDate: DateRangeValue" in result
-        assert "filters_startDate: DateRangeValue" in result
-        assert "limit?: TextValue" in result
+        assert "reports_startDate: DateRange" in result
+        assert "filters_startDate: DateRange" in result
+        assert "limit?: number" in result
         # Each is wired to the correct cube in the body.
         assert "body['reports']['start_date'] = reports_startDate;" in result
         assert "body['filters']['start_date'] = filters_startDate;" in result
@@ -376,11 +376,11 @@ class TestAllParamTypes:
             sample_data=None,
             queries=_queries("geo_event"),
         )
-        assert "label: TextValue" in result
-        assert "validFrom: DateRangeValue" in result
-        assert "recordedAt?: TimestampValue" in result
-        assert "area?: GeographicValue" in result
-        assert "isActive?: BooleanValue" in result
+        assert "label: string" in result
+        assert "validFrom: DateRange" in result
+        assert "recordedAt?: Date" in result
+        assert "area?: WKT" in result
+        assert "isActive?: boolean" in result
         assert "body['geo']['label'] = label;" in result
         assert "body['geo']['valid_from'] = validFrom;" in result
         assert "if (recordedAt !== undefined) body['geo']['recorded_at'] = recordedAt;" in result
@@ -421,4 +421,4 @@ class TestRequireAnyGroup:
         # Both require_any params are treated as required positional for TS typing
         # (runtime OR-validation is the caller's concern; the prompt tells the LLM
         # at least one must be provided).
-        assert "dataSourceContact({ email, phone }: { email: TextValue; phone: TextValue })" in result
+        assert "dataSourceContact({ email, phone }: { email: string; phone: string })" in result
