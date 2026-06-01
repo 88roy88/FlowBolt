@@ -45,7 +45,7 @@ async def complete_chat(
     model: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> str:
-    resolved_model = _normalize_model(model or settings.AI_MODEL)
+    resolved_model = model or settings.AI_MODEL
     full_messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
         *_to_dicts(messages),
@@ -75,7 +75,7 @@ async def complete_chat_with_tools(
     metadata: dict[str, Any] | None = None,
     tool_choice: str = "auto",
 ) -> Any:
-    resolved_model = _normalize_model(model or settings.AI_MODEL)
+    resolved_model = model or settings.AI_MODEL
     full_messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
         *_to_dicts(messages),
@@ -100,7 +100,7 @@ async def stream_chat(
     model: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
-    resolved_model = _normalize_model(model or settings.AI_MODEL)
+    resolved_model = model or settings.AI_MODEL
     full_messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
         *_to_dicts(messages),
