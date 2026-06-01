@@ -12,7 +12,7 @@ import re
 from typing import Any, assert_never
 
 from flow44.ai.codegen.ts_types import generate_ts_interfaces
-from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition, ParamType
+from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition
 
 _TYPE_DEFS: dict[str, str] = {
     "datetime": "type DateRange = { From: Date; To: Date };",
@@ -71,26 +71,22 @@ def _function_name(sanitized_name: str) -> str:
     return "dataSource" + sanitized_name
 
 
-def _param_type_to_ts(param_type: ParamType) -> str:
-    match param_type:
+def _ts_type(p: ParamDefinition) -> str:
+    match p.type:
         case "int" | "double":
-            return "number"
+            base = "number"
         case "string":
-            return "string" 
+            base = "string"
         case "bool":
-            return "boolean"
+            base = "boolean"
         case "datetime":
-            return "DateRange"
+            base = "DateRange"
         case "timestamp":
-            return "Date"
+            base = "Date"
         case "geographic":
-            return "WKT"
+            base = "WKT"
         case _ as unreachable:
             assert_never(unreachable)
-
-
-def _ts_type(p: ParamDefinition) -> str:
-    base = _param_type_to_ts(p.type)
     return f"{base} | {base}[]" if not p.is_single_value else base
 
 
