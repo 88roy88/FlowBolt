@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from flow44.api.deps import ProjectDep
 from flow44.config import settings
 from flow44.db.project import is_handle_taken, update_project_published_url
 from flow44.integrations.s3 import deploy_single_html
@@ -54,7 +55,7 @@ async def _validate_slug(slug: str, project_id: str) -> None:
 
 
 @router.post("/publish")
-async def publish_to_s3(project_id: str, body: PublishRequest = PublishRequest()) -> dict[str, str]:
+async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishRequest()) -> dict[str, str]:
     """Build the project and deploy to S3, returning the public URL."""
 
     if settings.S3_BUCKET_NAME is None:
@@ -67,7 +68,7 @@ async def publish_to_s3(project_id: str, body: PublishRequest = PublishRequest()
 
     # Build a single HTML string containing the entire app with inline assets
     try:
-        html_content = await build_single_html(project_id)
+        html_content = await build_single_html(project.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except BuildError as exc:
@@ -76,16 +77,16 @@ async def publish_to_s3(project_id: str, body: PublishRequest = PublishRequest()
     # Deploy the single HTML to S3 securely without blocking the event loop
     try:
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, deploy_single_html, html_content, project_id)
+        await loop.run_in_executor(None, deploy_single_html, html_content, project.id)
     except Exception as exc:
-        logger.exception("S3 deployment failed for project %s", project_id)
+        logger.exception("S3 deployment failed for project %s", project.id)
         raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}") from exc
 
-    handle = slug or project_id
+    handle = slug or project.id
     try:
-        published_at = await update_project_published_url(project_id, handle)
+        published_at = await update_project_published_url(project.id, handle)
     except IntegrityError as exc:
-        logger.warning("Handle collision for project %s with handle %s: %s", project_id, handle, exc)
+        logger.warning("Handle collision for project %s with handle %s: %s", project.id, handle, exc)
         raise HTTPException(
             status_code=409, detail=f"The handle '{handle}' was just claimed by another project."
         ) from exc

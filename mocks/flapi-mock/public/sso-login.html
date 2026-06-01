@@ -94,6 +94,18 @@
       .info strong {
         color: #2d3748;
       }
+      .error {
+        margin-top: 16px;
+        padding: 10px 12px;
+        background: #fed7d7;
+        color: #9b2c2c;
+        border-radius: 6px;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      .error[hidden] {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -103,27 +115,34 @@
 
       <form id="loginForm">
         <div class="form-group">
-          <label for="token">Token</label>
-          <input
-            type="text"
-            id="token"
-            placeholder="mock-dev-token-123"
-            value="mock-dev-token-123"
-          />
+          <label for="uniqueId">Unique ID</label>
+          <input type="text" id="uniqueId" placeholder="dev-user" value="dev-user" />
         </div>
 
         <div class="form-group">
-          <label for="userId">User ID (optional)</label>
-          <input type="text" id="userId" placeholder="dev-user" value="dev-user" />
+          <label for="givenName">Given Name (optional)</label>
+          <input type="text" id="givenName" placeholder="Dev" value="Dev" />
         </div>
 
         <div class="form-group">
-          <label for="userName">User Name (optional)</label>
-          <input type="text" id="userName" placeholder="Dev User" value="Dev User" />
+          <label for="surname">Surname (optional)</label>
+          <input type="text" id="surname" placeholder="User" value="User" />
+        </div>
+
+        <div class="form-group">
+          <label for="expiresInSeconds">Expires in (seconds, negative = already expired)</label>
+          <input type="number" id="expiresInSeconds" placeholder="3600" value="3600" />
+        </div>
+
+        <div class="form-group">
+          <label for="issuer">Issuer (JWT `iss` claim)</label>
+          <input type="text" id="issuer" placeholder="https://issuer.example" value="https://issuer.example" />
         </div>
 
         <button type="submit">Sign In</button>
       </form>
+
+      <div id="errorMessage" class="error" role="alert" hidden></div>
 
       <div class="info">
         <strong>Dev Mode:</strong> This is a mock authentication page for local development. In
@@ -132,16 +151,32 @@
     </div>
 
     <script>
+      const errorEl = document.getElementById('errorMessage');
+      const showError = (msg) => {
+        errorEl.textContent = msg;
+        errorEl.hidden = false;
+      };
+      const clearError = () => {
+        errorEl.textContent = '';
+        errorEl.hidden = true;
+      };
+
       // Parse URL parameters for pre-filled values
       const params = new URLSearchParams(window.location.search);
-      if (params.has('token')) {
-        document.getElementById('token').value = params.get('token');
+      if (params.has('uniqueId')) {
+        document.getElementById('uniqueId').value = params.get('uniqueId');
       }
-      if (params.has('userId')) {
-        document.getElementById('userId').value = params.get('userId');
+      if (params.has('givenName')) {
+        document.getElementById('givenName').value = params.get('givenName');
       }
-      if (params.has('userName')) {
-        document.getElementById('userName').value = params.get('userName');
+      if (params.has('surname')) {
+        document.getElementById('surname').value = params.get('surname');
+      }
+      if (params.has('expiresInSeconds')) {
+        document.getElementById('expiresInSeconds').value = params.get('expiresInSeconds');
+      }
+      if (params.has('issuer')) {
+        document.getElementById('issuer').value = params.get('issuer');
       }
 
       // Listen for credential requests from parent
@@ -157,40 +192,50 @@
         }
       });
 
-      // Handle form submission
-      document.getElementById('loginForm').addEventListener('submit', (e) => {
+      // Handle form submission — token is signed server-side via POST /sso/token
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearError();
 
-        const token = document.getElementById('token').value.trim();
-        const userId = document.getElementById('userId').value.trim();
-        const userName = document.getElementById('userName').value.trim();
+        const uniqueId = document.getElementById('uniqueId').value.trim();
+        const givenName = document.getElementById('givenName').value.trim();
+        const surname = document.getElementById('surname').value.trim();
+        const expiresInSeconds = Number(document.getElementById('expiresInSeconds').value);
+        const issuer = document.getElementById('issuer').value.trim();
 
-        if (!token) {
-          alert('Token is required');
+        if (!uniqueId) {
+          showError('Unique ID is required');
           return;
         }
 
-        // Build credentials payload
-        const credentials = {
-          type: 'deliverCredentials',
-          auth_token: token,
-        };
+        let token, claims;
+        try {
+          const resp = await fetch('/sso/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uniqueId, givenName, surname, expiresInSeconds, issuer }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            showError(err.error || 'Failed to obtain token');
+            return;
+          }
+          ({ token, claims } = await resp.json());
+        } catch (err) {
+          showError('Network error: ' + err.message);
+          return;
+        }
 
-        if (userId) credentials.userId = userId;
-        if (userName) credentials.userName = userName;
-
-        // Add expiry 1 hour from now
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-        credentials.expiresAt = expiresAt;
+        const credentials = { type: 'deliverCredentials', auth_token: token, ...claims };
 
         const target = window.opener || (window.parent !== window ? window.parent : null);
-        if (target) {
-          const targetOrigin = pendingRequest?.origin || '*';
-          target.postMessage(credentials, targetOrigin);
-          setTimeout(() => window.close(), 100);
-        } else {
-          alert('No parent window found.');
+        if (!target) {
+          showError('No parent window found. Open this page from the SSO popup or iframe.');
+          return;
         }
+        const targetOrigin = pendingRequest?.origin || '*';
+        target.postMessage(credentials, targetOrigin);
+        setTimeout(() => window.close(), 100);
       });
 
       // Auto-submit if ?autoLogin=true
