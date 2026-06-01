@@ -7,6 +7,7 @@
 import { type Page } from '@playwright/test';
 import {
   MOCK_PROJECT,
+  MOCK_PROJECT_WITH_SLUG,
   MOCK_FILE_TREE,
   MOCK_MODELS,
   CHAT_SEED_EVENTS,
@@ -368,6 +369,38 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
       contentType: 'text/html',
       body: '<html><body><h1>Preview</h1></body></html>',
     });
+  });
+
+  // --- Publish & slug check ---
+  await page.route('**/api/export/*/slug/check**', async (route) => {
+    const url = new URL(route.request().url());
+    const slug = url.searchParams.get('slug') ?? '';
+    const projectId = url.pathname.split('/api/export/')[1]?.split('/slug/check')[0] ?? '';
+    const taken = projects.some(
+      (p) => p.published_url === slug && p.id !== projectId
+    );
+    return route.fulfill({ json: { available: !taken } });
+  });
+
+  await page.route('**/api/export/*/publish', async (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fulfill({ status: 405, body: 'Method Not Allowed' });
+    }
+    const url = route.request().url();
+    const projectId = url.split('/api/export/')[1]?.split('/publish')[0] ?? '';
+    let body: { slug?: string | null } = {};
+    try { body = route.request().postDataJSON(); } catch { /* ignore */ }
+    const slug = body.slug ?? undefined;
+
+    const handle = slug || projectId;
+    const proj = projects.find((p) => p.id === projectId);
+    if (proj) {
+      proj.published_url = handle;
+      proj.published_at = new Date().toISOString();
+    }
+
+    const publicPath = `/shared/${handle}`;
+    return route.fulfill({ json: { url: publicPath, handle, published_at: proj?.published_at ?? new Date().toISOString() } });
   });
 
   // --- Data source search ---

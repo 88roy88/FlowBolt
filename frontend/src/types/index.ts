@@ -48,6 +48,7 @@ export interface Project {
   summary?: string;
   selected_model?: string;
   published_url?: string;
+  published_at?: string;
 }
 
 export interface AIModel {

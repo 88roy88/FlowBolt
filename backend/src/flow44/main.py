@@ -22,6 +22,7 @@ from flow44.api import (
     projects,
     publish,
     server_log,
+    shared,
     terminal,
 )
 from flow44.config import settings
@@ -105,6 +106,7 @@ app.include_router(preview.router)
 app.include_router(models.router)
 app.include_router(export.router)
 app.include_router(publish.router)
+app.include_router(shared.router)
 app.include_router(data_source_api.router)
 
 # WebSocket routers

@@ -1,12 +1,14 @@
 import asyncio
 import logging
+import re
+from typing import Literal
 
-import httpx
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from flow44.config import settings
-from flow44.db.project import get_project, update_project_published_url
+from flow44.db.project import is_handle_taken, update_project_published_url
 from flow44.integrations.s3 import deploy_single_html
 from flow44.sandbox.operations import BuildError, build_single_html
 
@@ -14,15 +16,54 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/export/{project_id}", tags=["publish"])
 
+# Authoritative slug rule — mirrored by SLUG_RE in frontend stores/publish.ts.
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$")
+
+
+class PublishRequest(BaseModel):
+    slug: str | None = None
+
+
+async def _slug_status(slug: str, project_id: str) -> Literal["available", "invalid", "taken"]:
+    """Single source of truth for whether a slug may be used by this project."""
+    if not _SLUG_RE.match(slug):
+        return "invalid"
+    if await is_handle_taken(slug, exclude_project_id=project_id):
+        return "taken"
+    return "available"
+
+
+@router.get("/slug/check")
+async def check_slug(project_id: str, slug: str = Query(...)) -> dict[str, bool]:
+    """Return whether a slug is available for this project."""
+    return {"available": await _slug_status(slug, project_id) == "available"}
+
+
+async def _validate_slug(slug: str, project_id: str) -> None:
+    status = await _slug_status(slug, project_id)
+    if status == "invalid":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid slug. Use 3–50 lowercase letters, numbers, and hyphens"
+                " (must start and end with a letter or digit)."
+            ),
+        )
+    if status == "taken":
+        raise HTTPException(status_code=409, detail=f"The slug '{slug}' is already taken.")
+
 
 @router.post("/publish")
-async def publish_to_s3(project_id: str) -> dict[str, str]:
+async def publish_to_s3(project_id: str, body: PublishRequest = PublishRequest()) -> dict[str, str]:
     """Build the project and deploy to S3, returning the public URL."""
 
-    # Ensure the bucket exists with public-read policy
     if settings.S3_BUCKET_NAME is None:
         logger.error("S3_BUCKET_NAME environment variable is not set")
         raise HTTPException(status_code=500, detail="S3_BUCKET_NAME is not set")
+
+    slug = body.slug or None
+    if slug:
+        await _validate_slug(slug, project_id)
 
     # Build a single HTML string containing the entire app with inline assets
     try:
@@ -35,39 +76,24 @@ async def publish_to_s3(project_id: str) -> dict[str, str]:
     # Deploy the single HTML to S3 securely without blocking the event loop
     try:
         loop = asyncio.get_running_loop()
-        s3_url = await loop.run_in_executor(None, deploy_single_html, html_content, project_id)
+        await loop.run_in_executor(None, deploy_single_html, html_content, project_id)
     except Exception as exc:
         logger.exception("S3 deployment failed for project %s", project_id)
         raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}") from exc
 
-    await update_project_published_url(project_id, s3_url)
+    handle = slug or project_id
+    try:
+        published_at = await update_project_published_url(project_id, handle)
+    except IntegrityError as exc:
+        logger.warning("Handle collision for project %s with handle %s: %s", project_id, handle, exc)
+        raise HTTPException(
+            status_code=409, detail=f"The handle '{handle}' was just claimed by another project."
+        ) from exc
 
-    proxy_path = f"/api/export/{project_id}/published"
-    logger.info("Published project %s to %s (proxy: %s)", project_id, s3_url, proxy_path)
+    if published_at is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
 
-    return {"url": proxy_path}
+    public_path = f"/shared/{handle}"
+    logger.info("Published project %s (handle: %s, public: %s)", project_id, handle, public_path)
 
-
-@router.get("/published", response_class=HTMLResponse)
-async def proxy_published_app(project_id: str) -> HTMLResponse:
-    """Proxy route to fetch and serve the published HTML from S3."""
-    project = await get_project(project_id)
-    if not project or not project.published_url:
-        raise HTTPException(status_code=404, detail="Published app not found or not published yet.")
-
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(project.published_url, timeout=15.0)
-            resp.raise_for_status()
-
-            # Forward some headers from S3 for better caching behavior
-            headers = {"Cache-Control": f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"}
-            if "etag" in resp.headers:
-                headers["ETag"] = resp.headers["etag"]
-            if "last-modified" in resp.headers:
-                headers["Last-Modified"] = resp.headers["last-modified"]
-
-            return HTMLResponse(content=resp.text, headers=headers)
-        except Exception:
-            logger.exception("Failed to fetch published app for project %s from %s", project_id, project.published_url)
-            raise HTTPException(status_code=502, detail="Error fetching published app from S3.") from None
+    return {"url": public_path, "handle": handle, "published_at": published_at}

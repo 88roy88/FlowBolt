@@ -171,6 +171,26 @@
     "successfullyPublished": "פורסם בהצלחה!",
     "projectIsLive": "הפרויקט שלך כעת חי. כל מי שיש לו את הקישור הזה יכול לצפות בו.",
     "copyLink": "העתק קישור",
-    "openLive": "פתח גרסה חיה"
+    "openLive": "פתח גרסה חיה",
+    "publishing": "מפרסם...",
+    "chooseSlugTitle": "בחר כתובת URL מותאמת אישית",
+    "chooseSlugSubtitle": "בחר שם קצר וקליט לקישור הציבורי של האפליקציה",
+    "slugLabel": "כתובת URL מותאמת",
+    "slugPlaceholder": "האפליקציה-שלי",
+    "slugAvailable": "זמין",
+    "slugTaken": "כבר תפוס",
+    "slugInvalid": "השתמש ב-3 עד 50 אותיות קטנות, ספרות ומקפים",
+    "slugChecking": "בודק...",
+    "publishWithSlug": "פרסם",
+    "skipSlug": "השתמש בקישור ברירת מחדל",
+    "republishTitle": "פרסם מחדש",
+    "republishSubtitle": "האפליקציה תתעדכן באותה כתובת URL",
+    "currentUrl": "כתובת URL נוכחית",
+    "changeUrl": "שנה כתובת URL",
+    "cancelChange": "ביטול",
+    "republish": "פרסם מחדש",
+    "republishWithNewSlug": "פרסם עם כתובת URL חדשה",
+    "overwriteWarning": "פעולה זו תחליף את הגרסה המפורסמת הנוכחית.",
+    "slugChangeWarning": "שינוי הכתובת ישבית לצמיתות את הקישור הישן."
   }
 }
