@@ -83,7 +83,7 @@ class TestRequiredParam:
             sample_data=None,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson({ personId }: { personId: number }): Promise<PersonResults>" in result
+        assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number;\n}): Promise<PersonResults>" in result
         assert "body['people']['person_id'] = personId;" in result
         assert "fetchWithAuth('/api/data-source/7/run', body);" in result
 
@@ -143,7 +143,7 @@ class TestMixedParams:
             sample_data=None,
             queries=_queries("mixed"),
         )
-        assert "dataSourceMixed({ type, priority, createdAfter }: { type: string; priority?: string; createdAfter?: DateRange })" in result
+        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string;\n  createdAfter?: DateRange;" in result
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) body['tasks']['priority'] = priority;" in result
         assert "if (createdAfter !== undefined) body['tasks']['created_after'] = createdAfter;" in result
@@ -171,7 +171,7 @@ class TestArrayParam:
             sample_data=None,
             queries=_queries("tagged"),
         )
-        assert "dataSourceTagged({ tags }: { tags: string })" in result
+        assert "dataSourceTagged({\n  tags,\n}: {\n  tags: string;\n})" in result
 
 
 class TestTypeCoercion:
@@ -459,4 +459,4 @@ class TestRequireAnyGroup:
         # Both require_any params are treated as required positional for TS typing
         # (runtime OR-validation is the caller's concern; the prompt tells the LLM
         # at least one must be provided).
-        assert "dataSourceContact({ email, phone }: { email: string; phone: string })" in result
+        assert "  email,\n  phone,\n}: {\n  email: string;\n  phone: string;" in result

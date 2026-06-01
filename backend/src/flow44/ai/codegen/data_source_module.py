@@ -115,15 +115,17 @@ def _build_signature(
         return f"export async function {function_name}(): Promise<{response_type}>"
 
     idents = _unique_idents(all_params)
-    param_names = ", ".join(idents[id(p)] for p in all_params)
+    param_names = "".join(f"\n  {idents[id(p)]}," for p in all_params)
     fields: list[str] = []
     for p in required:
-        fields.append(f"{idents[id(p)]}: {_param_type_to_ts(p.type)}")
+        fields.append(f"\n  {idents[id(p)]}: {_param_type_to_ts(p.type)};")
     for p in optional:
-        fields.append(f"{idents[id(p)]}?: {_param_type_to_ts(p.type)}")
-    type_body = "; ".join(fields)
+        fields.append(f"\n  {idents[id(p)]}?: {_param_type_to_ts(p.type)};")
+    type_body = "".join(fields)
 
-    return f"export async function {function_name}({{ {param_names} }}: {{ {type_body} }}): Promise<{response_type}>"
+    return (
+        f"export async function {function_name}({{{param_names}\n}}: {{{type_body}\n}}): Promise<{response_type}>"
+    )
 
 
 def _build_body(
