@@ -37,8 +37,14 @@ class PackageSearchResult(PascalCaseBaseModel):
 
 
 class _OptionValueItem(BaseModel):
-    Name: str
-    Value: int | float | str
+    Name: str | None
+    Value: int | float | str | None = None
+
+
+class _GeoOptionValueItem(BaseModel):
+    Name: str | None
+    Type: str
+    Value: Any
 
 
 class _DateRangeValue(BaseModel):
@@ -75,6 +81,8 @@ QuickParamValue: TypeAlias = (
     | list[_TimebackValue]
     | _GeographicValueItem
     | list[_GeographicValueItem]
+    | _GeoOptionValueItem
+    | list[_GeoOptionValueItem]
     | _TimestampValue
     | list[_TimestampValue]
     | QuickParamScalar
