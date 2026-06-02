@@ -10,10 +10,8 @@ import {
   isAgentAlive,
   selectIsAgentWorking,
   selectIsAwaitingPlanApproval,
-  shouldResetOnConnectionLost,
 } from './chatAgentState';
-import { registerChatConnectionLostHandler } from './chatConnection';
-import { startAgentAlivePolling, stopAgentAlivePolling } from './iaAgentAlive';
+import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
 
 export interface ChatState {
   messages: Message[];
@@ -310,13 +308,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 }));
-
-registerChatConnectionLostHandler(() => {
-  const state = useChatStore.getState();
-  if (shouldResetOnConnectionLost(state)) {
-    useChatStore.setState(getTransientReset());
-  }
-});
 
 export function useIsAwaitingPlanApproval(): boolean {
   return useChatStore(selectIsAwaitingPlanApproval);

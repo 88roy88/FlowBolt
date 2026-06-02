@@ -136,13 +136,13 @@ export async function fetchAgentEvents(projectId: string): Promise<Record<string
   return request(`/chat/${projectId}/events`);
 }
 
-export type IaAgentAliveResponse = {
+export type AgentAliveResponse = {
   alive: boolean;
   phase: string | null;
 };
 
-export async function fetchIaAgentAlive(projectId: string): Promise<IaAgentAliveResponse> {
-  return request<IaAgentAliveResponse>(`/iaagent/${projectId}/alive`);
+export async function fetchAgentAlive(projectId: string): Promise<AgentAliveResponse> {
+  return request<AgentAliveResponse>(`/iaagent/${projectId}/alive`);
 }
 
 export async function fetchModels(): Promise<AIModel[]> {

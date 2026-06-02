@@ -1,4 +1,4 @@
-import { fetchIaAgentAlive } from '../services/api';
+import { fetchAgentAlive } from '../services/api';
 import type { AgentPhase } from '../types';
 import {
   ACTIVE_AGENT_PHASES,
@@ -6,6 +6,7 @@ import {
   isAgentWorking,
   isAwaitingPlanApproval,
   isKnownAgentPhase,
+  shouldResetOnConnectionLost,
 } from './chatAgentState';
 import { useChatStore } from './chat';
 
@@ -14,6 +15,13 @@ const POLL_SLOW_MS = 10000;
 
 let pollTimeout: ReturnType<typeof setTimeout> | null = null;
 let pollProjectId: string | null = null;
+
+export function handleChatConnectionLost(): void {
+  const state = useChatStore.getState();
+  if (shouldResetOnConnectionLost(state)) {
+    useChatStore.setState(getTransientReset());
+  }
+}
 
 function hasInProgressUi(state: ReturnType<typeof useChatStore.getState>): boolean {
   return (
@@ -68,7 +76,7 @@ async function pollOnce(): Promise<void> {
   if (!projectId) return;
 
   try {
-    const { alive, phase } = await fetchIaAgentAlive(projectId);
+    const { alive, phase } = await fetchAgentAlive(projectId);
     if (pollProjectId !== projectId) return;
 
     useChatStore.setState({ agentAlive: alive, agentAlivePhase: phase });
