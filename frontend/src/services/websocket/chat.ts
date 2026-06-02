@@ -22,11 +22,6 @@ export function getChatSocket(projectId: string): ChatSocket {
     });
   };
 
-  // createReconnectingSocket calls this on every WebSocket `close`, including
-  // before an automatic reconnect. That is intentional: a backend reload or
-  // crash drops the socket while the in-memory agent task is gone, so we clear
-  // stale "thinking" UI via notifyChatConnectionLost → chat store reset.
-
   const { sendOrQueue, close } = createReconnectingSocket(
     `${getWsBase()}/ws/chat/${projectId}`,
     () => {
