@@ -64,12 +64,19 @@ class _GeographicValueItem(BaseModel):
 
 QuickParamScalar: TypeAlias = str | int | float | bool
 
+_TimestampValue: TypeAlias = datetime | Literal["now"] | _TimestampRelative
+
 QuickParamValue: TypeAlias = (
-    list[_TextValueItem]
+    _TextValueItem
+    | list[_TextValueItem]
     | _DateRangeValue
+    | list[_DateRangeValue]
     | _TimebackValue
+    | list[_TimebackValue]
+    | _GeographicValueItem
     | list[_GeographicValueItem]
-    | list[datetime | Literal["now"] | _TimestampRelative]
+    | _TimestampValue
+    | list[_TimestampValue]
     | QuickParamScalar
     | list[QuickParamScalar]
 )
