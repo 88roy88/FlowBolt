@@ -79,7 +79,7 @@ _FLAPI_FIELD_TYPE: dict[flapi_models.FieldType, FieldType] = {
 }
 
 
-def _to_domain_field_type(t: str) -> FieldType:
+def _to_domain_field_type(t: flapi_models.FieldType) -> FieldType:
     mapped = _FLAPI_FIELD_TYPE.get(t)
     if mapped is None:
         logger.warning("Unmapped FLAPI field type %r — falling back to 'string'", t)
