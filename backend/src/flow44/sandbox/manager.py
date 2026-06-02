@@ -6,6 +6,7 @@ import socket
 
 from flow44.config import settings
 from flow44.sandbox.base import SandboxInfo
+from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.main import PnpmSandbox, PnpmSandboxNamespace, PnpmSandboxUnix, PnpmSandboxWindows
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ class SandboxManager:
         sandbox = self._sandboxes.get(project_id)
         if sandbox is None:
             raise SandboxNotFoundError(f"No sandbox found for project_id {project_id}")
+        idle_reaper.touch(project_id)
         return sandbox
 
     async def get_or_create_sandbox(self, project_id: str) -> PnpmSandbox:
@@ -93,6 +95,7 @@ class SandboxManager:
             sandbox = self.get_sandbox(project_id)
         except SandboxNotFoundError:
             sandbox = await self.create_sandbox(project_id)
+            idle_reaper.touch(project_id)
         return sandbox
 
     @staticmethod
@@ -107,17 +110,14 @@ class SandboxManager:
             await sandbox.start_dev_server()
 
     async def reconcile_workspaces(self, live_project_ids: set[str]) -> None:
-        """Reconcile workspace state: restore live sandboxes, kill stale processes, delete orphans.
+        """Reconcile workspace state: kill stale processes and delete orphan directories.
 
-        - Kills orphan dev server processes
-        - Deletes workspace directories not in live_project_ids
-        - Restores sandboxes for workspaces that survived restart
-        - Restarts dev servers for scaffolded sandboxes
+        Sandbox objects and ports are NOT pre-allocated — they are created lazily
+        via get_or_create_sandbox() when a user first connects.
         """
         port_start, port_end = settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END
         self._kill_orphan_processes(port_start, port_end)
-        await self._restore_workspaces(live_project_ids)
-        await self._restart_dev_servers()
+        self._delete_orphan_workspaces(live_project_ids)
 
     def _kill_orphan_processes(self, port_start: int, port_end: int) -> None:
         """Kill any processes occupying the sandbox port range from a previous run."""
@@ -126,51 +126,21 @@ class SandboxManager:
             logger.info("Killing orphan process pid %d (port %d)", pid, port)
             sandbox_cls.kill_pid(pid)
 
-    async def _restore_workspaces(self, live_project_ids: set[str]) -> None:
-        """Scan workspace base dir, delete orphans, restore live sandboxes."""
+    def _delete_orphan_workspaces(self, live_project_ids: set[str]) -> None:
+        """Delete workspace directories for projects no longer in the database."""
         base = settings.WORKSPACE_BASE_DIR
-        if not os.path.isdir(base):  # noqa: ASYNC240
+        if not os.path.isdir(base):
             return
 
         for name in os.listdir(base):
             if name.startswith("."):
                 continue
             workspace_dir = os.path.join(base, name)
-            if not os.path.isdir(workspace_dir):  # noqa: ASYNC240
+            if not os.path.isdir(workspace_dir):
                 continue
-            if name in self._sandboxes:
-                continue
-
             if name not in live_project_ids:
                 logger.info("Removing orphan workspace %s", name)
                 shutil.rmtree(workspace_dir, ignore_errors=True)
-                continue
-
-            await self._restore_one(name, workspace_dir)
-
-    async def _restore_one(self, project_id: str, workspace_dir: str) -> None:
-        """Restore a single sandbox from an existing workspace directory."""
-        async with self._lock:
-            if not self._available_ports:
-                logger.warning("No ports left to restore sandbox %s", project_id)
-                return
-            try:
-                port = self._take_available_port()
-            except RuntimeError:
-                logger.warning("No free ports to restore sandbox %s", project_id)
-                return
-
-        info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
-        sandbox = self._create_sandbox_instance(info)
-        self._sandboxes[project_id] = sandbox
-        logger.info("Restored sandbox for session %s (port %d)", project_id, port)
-
-    async def _restart_dev_servers(self) -> None:
-        """Re-stamp vite configs and restart dev servers for all scaffolded sandboxes."""
-        for sandbox in self._sandboxes.values():
-            if await sandbox.is_scaffolded():
-                sandbox._stamp_vite_config(settings.TEMPLATE_DIR)  # Re-stamp after restart
-                asyncio.create_task(sandbox.start_dev_server())
 
     async def destroy_all(self, *, delete_workspaces: bool = False) -> None:
         project_ids = list(self._sandboxes.keys())

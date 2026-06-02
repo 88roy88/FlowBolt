@@ -18,8 +18,8 @@ def get_sandbox(project_id: str) -> PnpmSandbox:
 
 async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox | None:
     try:
-        return sandbox_manager.get_sandbox(project_id)
-    except SandboxNotFoundError:
+        return await sandbox_manager.get_or_create_sandbox(project_id)
+    except Exception:
         await websocket.close(code=1008, reason="No sandbox")
         return None
 

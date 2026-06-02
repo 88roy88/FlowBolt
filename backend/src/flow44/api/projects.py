@@ -19,6 +19,7 @@ from flow44.db.project import (
     update_project_model,
 )
 from flow44.db.session import project_registry
+from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,18 @@ async def update_project_selected_model(project_id: str, body: UpdateProjectMode
     return {"success": True}
 
 
+@router.post("/{project_id}/debug/reap", status_code=200)
+async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
+    """DEBUG: Force-evict a sandbox as if the idle reaper triggered."""
+    if project_id not in sandbox_manager._sandboxes:
+        raise HTTPException(status_code=404, detail="No active sandbox for this project")
+
+    await sandbox_manager.destroy_sandbox(project_id, delete_workspace=False)
+    project_registry.remove(project_id)
+    idle_reaper.remove(project_id)
+    return {"status": "reaped", "project_id": project_id}
+
+
 @router.delete("/{project_id}", status_code=204)
 async def delete_existing_project(project_id: str) -> None:
     project = await get_project(project_id)
@@ -98,4 +111,5 @@ async def delete_existing_project(project_id: str) -> None:
 
     await sandbox_manager.destroy_sandbox(project.id, delete_workspace=True)
     project_registry.remove(project.id)
+    idle_reaper.remove(project.id)
     await delete_project(project_id)
