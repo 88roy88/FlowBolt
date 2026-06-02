@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from flow44.ai.helpers import parse_json_response
 
 

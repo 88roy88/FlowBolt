@@ -139,6 +139,25 @@ test.describe('Auth gate — authenticated state (mock mode)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Mock-mode refresh-on-401
+// A valid token loads the app, but the first /api/projects call returns 401.
+// fetchWithAuth triggers a credential refresh; in the dev server's iframe mode
+// that clears the token and fires auth:credentials-cleared, so the gate returns.
+// ---------------------------------------------------------------------------
+
+test.describe('Auth gate — refresh on 401 (mock mode)', () => {
+  test.skip(!isMock, 'mock-mode only');
+  test.use({ mockOptions: { failProjectsOnce: true } });
+
+  test('a 401 on the projects fetch sends the user back to the sign-in gate', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByText('Sign in to continue')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Real-backend smoke tests — authenticated
 // ---------------------------------------------------------------------------
 

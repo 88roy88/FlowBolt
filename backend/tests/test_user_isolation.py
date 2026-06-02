@@ -2,7 +2,7 @@ import pytest
 from fastapi import HTTPException
 
 from flow44.api.deps import get_project
-from flow44.db.project import create_project
+from flow44.db.project import create_project, list_all_projects, list_user_projects
 
 
 @pytest.mark.asyncio
@@ -26,8 +26,6 @@ async def test_list_projects_isolation(test_db):
     await create_project(name="A1", user_id="user_a")
     await create_project(name="A2", user_id="user_a")
     await create_project(name="B1", user_id="user_b")
-
-    from flow44.db.project import list_all_projects, list_user_projects
 
     projects_a = await list_user_projects(user_id="user_a")
     assert len(projects_a) == 2

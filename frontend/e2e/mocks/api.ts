@@ -119,6 +119,8 @@ export interface MockAPIOptions {
   seedEvents?: Record<string, unknown>[];
   /** Simulate backend search tool failure for editor search. */
   searchUnavailable?: boolean;
+  /** Return 401 on the first GET /api/projects, then succeed — exercises the refresh-on-401 retry. */
+  failProjectsOnce?: boolean;
 }
 
 function escapeRegExp(value: string): string {
@@ -129,6 +131,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   const projects = options.projects ?? [MOCK_PROJECT];
   const fileTree = cloneTree(MOCK_FILE_TREE);
   const fileContents = { ...MOCK_FILE_CONTENTS };
+  let projectsGetCount = 0;
 
   // --- Projects ---
   await page.route('**/api/projects', async (route) => {
@@ -143,6 +146,10 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
       return route.fulfill({ json: newProject });
     }
     // GET — list projects
+    projectsGetCount += 1;
+    if (options.failProjectsOnce && projectsGetCount === 1) {
+      return route.fulfill({ status: 401, body: 'unauthorized' });
+    }
     return route.fulfill({ json: [...projects] });
   });
 

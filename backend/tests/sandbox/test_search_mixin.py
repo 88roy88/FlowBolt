@@ -2,7 +2,9 @@ import pytest
 
 import flow44.sandbox.search_mixin as search_mixin_module
 from flow44.sandbox.search_mixin import SearchToolError
+
 from .conftest import DummySandbox
+
 
 async def _yield_lines(lines: list[str]):
     for line in lines:

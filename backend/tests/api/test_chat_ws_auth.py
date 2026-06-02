@@ -1,7 +1,7 @@
 """Tests for chat WebSocket cookie-based authentication.
 
 Verifies that:
-- Missing flow44_token cookie with AUTH_REQUIRE_JWT=true rejects the handshake before accept
+- Missing flow44_token cookie rejects the handshake before accept
 - Wrong project owner rejects the handshake (sandbox never touched)
 - Unknown project rejects the handshake (sandbox never touched)
 - Valid cookie + missing sandbox connects then sends a JSON error frame
@@ -49,14 +49,10 @@ def _handshake_rejected(path: str, token: str | None) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def test_missing_cookie_rejected_when_required():
-    """No cookie + AUTH_REQUIRE_JWT=true → handshake rejected before any backend logic runs."""
-    with patch("flow44.api.deps.settings") as mock_settings, \
-         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock) as mock_get, \
+def test_missing_cookie_rejected():
+    """No cookie → handshake rejected before any backend logic runs."""
+    with patch("flow44.api.deps.db_get_project", new_callable=AsyncMock) as mock_get, \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
-
-        mock_settings.AUTH_REQUIRE_JWT = True
-        mock_settings.AUTH_JWT_PUBLIC_KEY = "some-secret"  # noqa: S105
 
         assert _handshake_rejected("/ws/chat/proj-123", None)
         mock_get.assert_not_called()
@@ -88,11 +84,7 @@ def test_sandbox_not_touched_before_auth():
     """Failed auth must never invoke the sandbox manager."""
     mock_mgr = MagicMock()
     with patch("flow44.api.deps.db_get_project", new_callable=AsyncMock) as mock_get, \
-         patch("flow44.api.chat.sandbox_manager", mock_mgr), \
-         patch("flow44.api.deps.settings") as mock_settings:
-
-        mock_settings.AUTH_REQUIRE_JWT = True
-        mock_settings.AUTH_JWT_PUBLIC_KEY = "some-secret"  # noqa: S105
+         patch("flow44.api.chat.sandbox_manager", mock_mgr):
 
         assert _handshake_rejected("/ws/chat/proj-123", None)
         mock_get.assert_not_called()
