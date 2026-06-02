@@ -1,3 +1,5 @@
+import { APP_NAME } from '../constants/app';
+
 const STORAGE_KEY = 'notify-on-complete';
 const ATTENTION_COOLDOWN_MS = 5000;
 
@@ -25,7 +27,7 @@ function showBrowserNotification(title: string, body: string): void {
   if (Notification.permission !== 'granted') return;
   if (!document.hidden) return;
 
-  const n = new Notification(title, { body, icon: '/favicon.ico' });
+  const n = new Notification(`${APP_NAME} - ${title}`, { body, icon: '/favicon.ico' });
   n.onclick = () => {
     window.focus();
     n.close();

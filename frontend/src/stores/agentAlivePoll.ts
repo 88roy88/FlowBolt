@@ -8,7 +8,7 @@ import {
 } from './chatAgentState';
 import { useChatStore } from './chat';
 
-const POLL_MS = 2500;
+const POLL_MS = 10000;
 
 export function handleChatConnectionLost(): void {
   const state = useChatStore.getState();
