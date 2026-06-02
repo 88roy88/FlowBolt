@@ -1,7 +1,7 @@
 # Mirrors mocks/flapi-mock/schemas.ts. Contract tests in
 # tests/integrations/flapi/test_models_contract.py guard against drift.
 from datetime import datetime
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 from pydantic.alias_generators import to_pascal
@@ -9,8 +9,11 @@ from pydantic.alias_generators import to_pascal
 # Wire vocabulary — authoritative per FLAPI. Quick-params types are
 # PascalCase; schema field types are lowercase with a few legacy tags.
 ParamType = Literal["String", "Int", "Double", "Boolean", "Datetime", "Timestamp", "Haphoch", "File"]
-FieldType = Literal["string", "int", "double", "float", "bool", "boolean", "date", "datetime", "haphoch", "wkt", "geojson", "geoellipse", "object", "decimal", "dynamic"]
-CubeId: TypeAlias = str
+FieldType = Literal[
+    "string", "int", "double", "float", "bool", "boolean", "date",
+    "datetime", "haphoch", "wkt", "geojson", "geoellipse", "object", "decimal", "dynamic",
+]
+type CubeId = str
 # OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
 
 
@@ -68,11 +71,11 @@ class _GeographicValueItem(BaseModel):
     radius: float | None = None
 
 
-QuickParamScalar: TypeAlias = str | int | float | bool
+type QuickParamScalar = str | int | float | bool
 
-_TimestampValue: TypeAlias = datetime | Literal["now"] | _TimestampRelative
+type _TimestampValue = datetime | Literal["now"] | _TimestampRelative
 
-QuickParamValue: TypeAlias = (
+type QuickParamValue = (
     _OptionValueItem
     | list[_OptionValueItem]
     | _DateRangeValue

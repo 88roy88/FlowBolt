@@ -1,4 +1,4 @@
-from typing import Any, Literal, TypeAlias, assert_never
+from typing import Any, Literal, assert_never
 
 from pydantic import BaseModel, Field, RootModel, computed_field
 
@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field, RootModel, computed_field
 ParamType = Literal["string", "int", "double", "bool", "datetime", "timestamp", "geographic"]
 FieldType = Literal["string", "int", "double", "bool", "datetime", "wkt"]
 
-ParamScalar: TypeAlias = str | int | float | bool
-ParamValue: TypeAlias = ParamScalar | list[ParamScalar]
+type ParamScalar = str | int | float | bool
+type ParamValue = ParamScalar | list[ParamScalar]
 
 
 class DataSource(BaseModel):

@@ -152,7 +152,9 @@ def _build_body(
         for p in optional:
             ident = idents[id(p)]
             lines.append(
-                f"  if ({ident} !== undefined) {{\n    body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {ident};\n  }}\n"
+                f"  if ({ident} !== undefined) {{\n"
+                f"    body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {ident};\n"
+                f"  }}\n"
             )
         lines.append(f"  const res = await fetchWithAuth('{path}', body);\n")
 
