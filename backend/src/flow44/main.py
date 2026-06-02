@@ -17,6 +17,7 @@ from flow44.api import (
     errors,
     export,
     files,
+    iaagent,
     models,
     preview,
     projects,
@@ -106,6 +107,7 @@ app.include_router(models.router)
 app.include_router(export.router)
 app.include_router(publish.router)
 app.include_router(data_source_api.router)
+app.include_router(iaagent.router)
 
 # WebSocket routers
 app.include_router(chat.router)

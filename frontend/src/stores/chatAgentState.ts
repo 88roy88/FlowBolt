@@ -42,6 +42,8 @@ export const ACTIVE_AGENT_PHASES: AgentPhase[] = [
 
 export const TRANSIENT_RESET: Partial<ChatState> = {
   isStreaming: false,
+  agentAlive: false,
+  agentAlivePhase: 'idle',
   agentPhase: AGENT_PHASE.idle,
   currentAssistantMessage: '',
   actions: [],
@@ -71,6 +73,23 @@ export function isAwaitingPlanApproval(state: AwaitingPlanState): boolean {
 
 export function isAgentWorking(state: AgentActivityState): boolean {
   return state.isStreaming || ACTIVE_AGENT_PHASES.includes(state.agentPhase);
+}
+
+export function isKnownAgentPhase(phase: string | null): phase is AgentPhase {
+  return phase !== null && (Object.values(AGENT_PHASE) as string[]).includes(phase);
+}
+
+export type AgentAliveState = AgentActivityState & Pick<ChatState, 'error' | 'agentAlive'>;
+
+/**
+ * True while the backend agent is running.
+ * Uses poll (`agentAlive`) when known; falls back to local WS activity until the first poll.
+ */
+export function isAgentAlive(state: AgentAliveState): boolean {
+  if (state.error) return false;
+  if (state.agentAlive === true) return true;
+  if (state.agentAlive === false) return false;
+  return isAgentWorking(state);
 }
 
 export function shouldResetOnConnectionLost(state: AgentActivityState & AwaitingPlanState): boolean {

@@ -7,11 +7,13 @@ import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayS
 import {
   AGENT_PHASE,
   getTransientReset,
+  isAgentAlive,
   selectIsAgentWorking,
   selectIsAwaitingPlanApproval,
   shouldResetOnConnectionLost,
 } from './chatAgentState';
 import { registerChatConnectionLostHandler } from './chatConnection';
+import { startAgentAlivePolling, stopAgentAlivePolling } from './iaAgentAlive';
 
 export interface ChatState {
   messages: Message[];
@@ -32,6 +34,9 @@ export interface ChatState {
   selectedDataSources: { id: number; name: string }[];
   /** True after the project has completed at least one AI action cycle. */
   buildCompleted: boolean;
+  /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
+  agentAlive: boolean | null;
+  agentAlivePhase: string | null;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
@@ -104,6 +109,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   projectSummary: null,
   selectedDataSources: [],
   buildCompleted: false,
+  agentAlive: null,
+  agentAlivePhase: null,
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const projectId = useSessionStore.getState().projectId;
@@ -120,6 +127,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
+      agentAlive: true,
       ...RESET_STATE,
     }));
 
@@ -160,6 +168,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
+      agentAlive: true,
       ...RESET_STATE,
       designProgress: { architecture: null, ux: null },
     }));
@@ -195,7 +204,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // the appropriate message and update state.
     // For 'modify', just show planning state while the plan is being rebuilt.
     if (action === 'modify') {
-      set({ isStreaming: true, agentPhase: AGENT_PHASE.planning });
+      set({ isStreaming: true, agentAlive: true, agentPhase: AGENT_PHASE.planning });
     }
   },
 
@@ -206,6 +215,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   async loadHistory(projectId: string) {
     // Detach any existing handler from the previous session
     if (activeHandler && activeProjectId && activeProjectId !== projectId) {
+      stopAgentAlivePolling();
       const oldSocket = getChatSocket(activeProjectId);
       detachHandler(oldSocket, activeHandler);
     }
@@ -213,7 +223,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       // Reset state, then replay all events — events are the single source of truth
       // for both user messages and assistant messages/cards
-      set({ messages: [], isStreaming: false, historyLoaded: false, buildCompleted: false, ...RESET_STATE });
+      set({
+        messages: [],
+        isStreaming: false,
+        historyLoaded: false,
+        buildCompleted: false,
+        agentAlive: null,
+        agentAlivePhase: null,
+        ...RESET_STATE,
+      });
 
       const socket = getChatSocket(projectId);
       const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
@@ -227,14 +245,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       finalizeHistoryReplayState(set, get, events);
 
       set({ historyLoaded: true });
+      startAgentAlivePolling(projectId);
     } catch (err) {
       console.error('Failed to load history:', err);
       set({ historyLoaded: true });
+      startAgentAlivePolling(projectId);
     }
   },
 
   clearMessages() {
-    set({ messages: [], historyLoaded: false, buildCompleted: false, ...RESET_STATE });
+    stopAgentAlivePolling();
+    set({ messages: [], historyLoaded: false, buildCompleted: false, agentAlive: null, agentAlivePhase: null, ...RESET_STATE });
   },
 
   clearError() {
@@ -303,4 +324,8 @@ export function useIsAwaitingPlanApproval(): boolean {
 
 export function useIsAgentWorking(): boolean {
   return useChatStore(selectIsAgentWorking);
+}
+
+export function useIsAgentAlive(): boolean {
+  return useChatStore(isAgentAlive);
 }

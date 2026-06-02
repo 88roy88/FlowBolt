@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
-import { useChatStore, useIsAgentWorking, useIsAwaitingPlanApproval } from '../../stores/chat';
-import { AGENT_PHASE } from '../../stores/chatAgentState';
+import { useChatStore, useIsAgentAlive } from '../../stores/chat';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
 import { WorkPlanView } from './WorkPlanView';
@@ -18,8 +17,7 @@ export function ChatPanel() {
     messages, currentAssistantMessage, actions, error, clearError,
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs, historyLoaded,
   } = useChatStore();
-  const awaitingPlanApproval = useIsAwaitingPlanApproval();
-  const agentWorking = useIsAgentWorking();
+  const agentActive = useIsAgentAlive();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -35,7 +33,7 @@ export function ChatPanel() {
     // Only auto-scroll if already near the bottom
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
     if (isNearBottom) scrollToBottom();
-  }, [messages, currentAssistantMessage, agentPhase, awaitingPlanApproval, executionTasks, fixSteps, followUpSteps, scrollToBottom]);
+  }, [messages, currentAssistantMessage, agentPhase, planOverview, executionTasks, fixSteps, followUpSteps, scrollToBottom]);
 
   // Track scroll position to show/hide the button
   useEffect(() => {
@@ -51,10 +49,10 @@ export function ChatPanel() {
 
   // Force scroll to bottom when plan overview appears (including on reconnect)
   useEffect(() => {
-    if (awaitingPlanApproval) {
+    if (agentPhase === 'awaiting_approval' && planOverview) {
       setTimeout(scrollToBottom, 100);
     }
-  }, [awaitingPlanApproval, scrollToBottom]);
+  }, [agentPhase, planOverview, scrollToBottom]);
 
   // Scroll to bottom on initial history load (after page refresh)
   useEffect(() => {
@@ -63,18 +61,17 @@ export function ChatPanel() {
     }
   }, [historyLoaded, scrollToBottom]);
 
-  const showDesignProgress = agentPhase === AGENT_PHASE.designing;
-  const showOverview = awaitingPlanApproval;
-  const showTaskProgress = (agentPhase === AGENT_PHASE.executing || agentPhase === AGENT_PHASE.complete) && executionTasks.length > 0;
-  const showFixProgress = fixSteps.length > 0 && agentWorking;
-  const showFollowUpProgress = followUpSteps.length > 0 && agentWorking;
-  const showStreamingMessage = agentWorking && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
-  const showPhaseIndicator = agentPhase === AGENT_PHASE.planning || (agentPhase === AGENT_PHASE.exploring && followUpSteps.length === 0);
-  const showTypingDots = agentWorking && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
+  const showDesignProgress = agentPhase === 'designing';
+  const showOverview = agentPhase === 'awaiting_approval' && planOverview;
+  const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
+  const showFixProgress = fixSteps.length > 0 && agentActive;
+  const showFollowUpProgress = followUpSteps.length > 0 && agentActive;
+  const showStreamingMessage = agentActive && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
+  const showPhaseIndicator = agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
+  const showTypingDots = agentActive && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
-
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-auto p-4 flex flex-col gap-4 scroll-smooth">
         {messages.map((msg) => (
