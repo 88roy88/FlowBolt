@@ -62,11 +62,19 @@ _FLAPI_FIELD_TYPE: dict[flapi_models.FieldType, FieldType] = {
     "string": "string",
     "int": "int",
     "double": "double",
+    "float": "double",
+    "decimal": "double",
     "bool": "bool",
+    "boolean": "bool",
+    "date": "datetime",
     "datetime": "datetime",
     "wkt": "wkt",
-    # "haphoch" isn't a meaningful type for us — render as plain string.
+    # The following types are not specifically handled by the UI, but could at least be printed.
+    "geojson": "string",
+    "geoellipse": "string",
     "haphoch": "string",
+    "object": "string",
+    "dynamic": "string",
 }
 
 

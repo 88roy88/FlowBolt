@@ -9,7 +9,7 @@ from pydantic.alias_generators import to_pascal
 # Wire vocabulary — authoritative per FLAPI. Quick-params types are
 # PascalCase; schema field types are lowercase with a few legacy tags.
 ParamType = Literal["String", "Int", "Double", "Boolean", "Datetime", "Timestamp", "Haphoch"]
-FieldType = Literal["string", "int", "double", "bool", "datetime", "haphoch", "wkt"]
+FieldType = Literal["string", "int", "double", "float", "bool", "boolean", "date", "datetime", "haphoch", "wkt", "geojson", "geoellipse", "object", "decimal", "dynamic"]
 CubeId: TypeAlias = str
 # OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
 
