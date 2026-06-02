@@ -56,6 +56,7 @@ _FLAPI_PARAM_TYPE: dict[flapi_models.ParamType, ParamType] = {
     "Datetime": "datetime",
     "Timestamp": "timestamp",
     "Haphoch": "geographic",
+    "File": "string",
 }
 
 _FLAPI_FIELD_TYPE: dict[flapi_models.FieldType, FieldType] = {
