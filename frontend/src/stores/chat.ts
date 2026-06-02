@@ -3,7 +3,10 @@ import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, Exe
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
-import { createFixErrorHandler, createSendMessageHandler } from './chatHandlers';
+import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState } from './chatHandlers';
+import { requestPermissionIfNeeded } from '../utils/notifications';
+import { AGENT_PHASE } from './chatAgentState';
+import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
 
 export interface ChatState {
   messages: Message[];
@@ -24,6 +27,8 @@ export interface ChatState {
   selectedDataSources: { id: number; name: string }[];
   /** True after the project has completed at least one AI action cycle. */
   buildCompleted: boolean;
+  /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
+  agentAlive: boolean | null;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
@@ -72,7 +77,7 @@ const RESET_STATE = {
   followUpSteps: [] as FollowUpStep[],
   followUpDiffs: [] as FileDiff[],
   error: null,
-  agentPhase: 'idle' as AgentPhase,
+  agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [] as ExecutionTask[],
 };
@@ -86,7 +91,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   models: [],
   selectedModel: null,
-  agentPhase: 'idle',
+  agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [],
   fixSteps: [],
@@ -96,10 +101,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   projectSummary: null,
   selectedDataSources: [],
   buildCompleted: false,
+  agentAlive: null,
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
+    void requestPermissionIfNeeded();
 
     const userMessage: Message = {
       id: generateId(),
@@ -112,6 +119,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
+      agentAlive: true,
       ...RESET_STATE,
     }));
 
@@ -138,6 +146,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage(content: string) {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
+    void requestPermissionIfNeeded();
 
     const { selectedDataSources, selectedModel } = get();
 
@@ -152,6 +161,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
+      agentAlive: true,
       ...RESET_STATE,
       designProgress: { architecture: null, ux: null },
     }));
@@ -187,7 +197,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // the appropriate message and update state.
     // For 'modify', just show planning state while the plan is being rebuilt.
     if (action === 'modify') {
-      set({ isStreaming: true, agentPhase: 'planning' });
+      set({ isStreaming: true, agentAlive: true, agentPhase: AGENT_PHASE.planning });
     }
   },
 
@@ -198,6 +208,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   async loadHistory(projectId: string) {
     // Detach any existing handler from the previous session
     if (activeHandler && activeProjectId && activeProjectId !== projectId) {
+      stopAgentAlivePolling();
       const oldSocket = getChatSocket(activeProjectId);
       detachHandler(oldSocket, activeHandler);
     }
@@ -205,7 +216,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       // Reset state, then replay all events — events are the single source of truth
       // for both user messages and assistant messages/cards
-      set({ messages: [], isStreaming: false, historyLoaded: false, buildCompleted: false, ...RESET_STATE });
+      set({
+        messages: [],
+        isStreaming: false,
+        historyLoaded: false,
+        buildCompleted: false,
+        agentAlive: null,
+        ...RESET_STATE,
+      });
 
       const socket = getChatSocket(projectId);
       const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
@@ -213,18 +231,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const events = await fetchAgentEvents(projectId);
       for (const evt of events) {
-        handler(evt as import('../types').WSMessage);
+        handler(evt as WSMessage);
       }
 
+      finalizeHistoryReplayState(set, get, events);
+
       set({ historyLoaded: true });
+      startAgentAlivePolling(projectId);
     } catch (err) {
       console.error('Failed to load history:', err);
       set({ historyLoaded: true });
+      startAgentAlivePolling(projectId);
     }
   },
 
   clearMessages() {
-    set({ messages: [], historyLoaded: false, buildCompleted: false, ...RESET_STATE });
+    stopAgentAlivePolling();
+    set({ messages: [], historyLoaded: false, buildCompleted: false, agentAlive: null, ...RESET_STATE });
   },
 
   clearError() {
