@@ -127,9 +127,6 @@ async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-WS_SANDBOX_NOT_FOUND = 4404
-
-
 async def get_sandbox(project: ProjectDep) -> PnpmSandbox:
     try:
         return sandbox_manager.get_sandbox(project.id)
@@ -144,7 +141,7 @@ async def get_ws_sandbox(project: WsProjectDep) -> PnpmSandbox:
     try:
         return sandbox_manager.get_sandbox(project.id)
     except SandboxNotFoundError:
-        raise WebSocketException(code=WS_SANDBOX_NOT_FOUND, reason="Sandbox not found") from None
+        raise WebSocketException(code=4404, reason="Sandbox not found") from None
 
 
 WsSandboxDep = Annotated[PnpmSandbox, Depends(get_ws_sandbox)]
