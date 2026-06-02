@@ -36,9 +36,9 @@ class PackageSearchResult(PascalCaseBaseModel):
 # -- Run: POST /package/v3/{id} ------------------------------------------
 
 
-class _TextValueItem(BaseModel):
+class _OptionValueItem(BaseModel):
     Name: str
-    Value: str
+    Value: int | float | str
 
 
 class _DateRangeValue(BaseModel):
@@ -67,8 +67,8 @@ QuickParamScalar: TypeAlias = str | int | float | bool
 _TimestampValue: TypeAlias = datetime | Literal["now"] | _TimestampRelative
 
 QuickParamValue: TypeAlias = (
-    _TextValueItem
-    | list[_TextValueItem]
+    _OptionValueItem
+    | list[_OptionValueItem]
     | _DateRangeValue
     | list[_DateRangeValue]
     | _TimebackValue

@@ -102,10 +102,10 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
     for cube_id, param_list in info.root.items():
         for p in param_list:
             options = [
-                ParamOption(name=n, value=v)
+                ParamOption(name=n, value=str(v))
                 for item in (p.value if isinstance(p.value, list) else [])
                 if isinstance(n := getattr(item, "Name", None), str)
-                and isinstance(v := getattr(item, "Value", None), str)
+                and (v := getattr(item, "Value", None)) is not None
             ]
             parameters.append(
                 ParamDefinition(
