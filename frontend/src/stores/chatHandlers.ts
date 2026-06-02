@@ -75,7 +75,7 @@ function handleText(msg: { content: string }, set: SetState) {
 }
 
 function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
-  set({ error: msg.message, isStreaming: false, agentPhase: AGENT_PHASE.idle });
+  set({ ...getTransientReset(), error: msg.message });
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
   }
@@ -160,21 +160,11 @@ export function createFixErrorHandler(
           };
           set((s) => ({
             messages: [...s.messages, fixMessage],
-            currentAssistantMessage: '',
-            actions: [],
-            fixSteps: [],
-            isStreaming: false,
-            agentPhase: AGENT_PHASE.idle,
+            ...getTransientReset(),
             buildCompleted: true,
           }));
         } else {
-          set({
-            currentAssistantMessage: '',
-            actions: [],
-            isStreaming: false,
-            agentPhase: AGENT_PHASE.idle,
-            buildCompleted: true,
-          });
+          set({ ...getTransientReset(), buildCompleted: true });
         }
         if (!_skipMessages) {
           notifyBuildComplete(useSessionStore.getState().currentProject?.name);
@@ -210,8 +200,8 @@ export function createSendMessageHandler(
 
       case 'plan_overview':
         set({
+          ...getTransientReset(),
           planOverview: msg.overview,
-          isStreaming: false,
           agentPhase: AGENT_PHASE.awaiting_approval,
         });
         break;
@@ -227,6 +217,7 @@ export function createSendMessageHandler(
         set((s) => ({
           messages: _skipMessages ? s.messages : [...s.messages, acceptedMsg],
           isStreaming: true,
+          agentAlive: true,
           agentPhase: AGENT_PHASE.planning,
           planOverview: null,
         }));
@@ -481,15 +472,8 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
 
   set((s) => ({
     messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
-    currentAssistantMessage: '',
-    actions: [],
-    isStreaming: false,
-    agentPhase: AGENT_PHASE.idle,
+    ...getTransientReset(),
     planOverview: null,
-    executionTasks: [],
-    fixSteps: [],
-    followUpSteps: [],
-    followUpDiffs: [],
     projectSummary: null,
     buildCompleted: true,
   }));

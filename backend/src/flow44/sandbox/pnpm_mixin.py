@@ -30,7 +30,11 @@ class PnpmMixin(BaseSandbox, ABC):
 
         # Ensure store-dir is set so pnpm uses the correct volume path
         if "store-dir" not in existing_content:
-            store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
+            if settings.SANDBOX_MODE == "namespaced":
+                store_path = "/.pnpm-store"
+            else:
+                # Local dev: use a store under workspaces (Docker default path is not writable on macOS)
+                store_path = os.path.join(settings.WORKSPACE_BASE_DIR, ".pnpm-store")
             with open(npmrc, "a", encoding="utf-8") as f:
                 if existing_content and not existing_content.endswith("\n"):
                     f.write("\n")

@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
+from flow44.ai.agent_runtime import mark_agent_finished, mark_agent_started
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
@@ -31,11 +32,15 @@ async def _is_new_project(project_id: str) -> bool:
 
 
 async def _run_agent_safe(project_id: str, coro: Any) -> None:
+    mark_agent_started(project_id)
     try:
         await coro
     except Exception:
         logger.exception("[chat] Background agent failed for session %s", project_id)
+        await emit_event(project_id, {"type": "phase", "phase": "idle"})
         await emit_event(project_id, {"type": "error", "message": "AI processing failed"})
+    finally:
+        mark_agent_finished(project_id)
 
 
 @router.get("/api/chat/{project_id}/history")

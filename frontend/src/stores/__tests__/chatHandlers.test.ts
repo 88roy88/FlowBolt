@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSendMessageHandler, createFixErrorHandler, setReplayMode, finalizeHistoryReplayState } from '../chatHandlers';
 import {
   AGENT_PHASE,
+  isAgentAlive,
   isAgentWorking,
   isAwaitingPlanApproval,
   isHistoryRunComplete,
@@ -65,6 +66,8 @@ const INITIAL_STATE: ChatState = {
   executionTasks: [],
   error: null,
   buildCompleted: false,
+  agentAlive: null,
+  agentAlivePhase: null,
   fixSteps: [],
   followUpSteps: [],
   followUpDiffs: [],
@@ -386,6 +389,40 @@ describe('chatAgentState helpers', () => {
       planOverview: MOCK_PLAN_OVERVIEW,
     })).toBe(false);
   });
+
+  it('isAgentAlive uses poll when known and WS while unknown', () => {
+    expect(isAgentAlive({
+      error: null,
+      agentAlive: null,
+      isStreaming: true,
+      agentPhase: AGENT_PHASE.idle,
+    })).toBe(true);
+    expect(isAgentAlive({
+      error: null,
+      agentAlive: true,
+      isStreaming: false,
+      agentPhase: AGENT_PHASE.idle,
+    })).toBe(true);
+    expect(isAgentAlive({
+      error: null,
+      agentAlive: false,
+      isStreaming: true,
+      agentPhase: AGENT_PHASE.executing,
+    })).toBe(false);
+    expect(isAgentAlive({
+      error: 'failed',
+      agentAlive: true,
+      isStreaming: true,
+      agentPhase: AGENT_PHASE.executing,
+    })).toBe(false);
+    expect(isAgentAlive({
+      error: null,
+      agentAlive: null,
+      isStreaming: false,
+      agentPhase: AGENT_PHASE.idle,
+    })).toBe(false);
+  });
+
 });
 
 describe('finalizeHistoryReplayState', () => {

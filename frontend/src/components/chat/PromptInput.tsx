@@ -1,29 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import type { AgentPhase } from '../../types';
-import { useChatStore, useIsAwaitingPlanApproval } from '../../stores/chat';
-import { AGENT_PHASE } from '../../stores/chatAgentState';
+import { useChatStore, useIsAwaitingPlanApproval, useIsAgentAlive } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
-
-function getBusyLabel(agentPhase: AgentPhase, t: TFunction): string {
-  switch (agentPhase) {
-    case AGENT_PHASE.fetching_data_sources:
-      return t('chat.phase.fetchingDataSources');
-    case AGENT_PHASE.designing:
-      return t('chat.phase.designing');
-    case AGENT_PHASE.planning:
-      return t('chat.phase.planning');
-    case AGENT_PHASE.executing:
-      return t('chat.phase.building');
-    default:
-      return t('chat.phase.thinking');
-  }
-}
 
 export function PromptInput() {
   const { t } = useTranslation();
@@ -32,8 +14,10 @@ export function PromptInput() {
   const [showDsSelector, setShowDsSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
-  const isStreaming = useChatStore((s) => s.isStreaming);
   const agentPhase = useChatStore((s) => s.agentPhase);
+  const agentAlive = useIsAgentAlive();
+  const awaitingPlan = useIsAwaitingPlanApproval();
+  const inputBlocked = agentAlive || awaitingPlan;
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const projectId = useSessionStore((s) => s.projectId);
@@ -48,7 +32,7 @@ export function PromptInput() {
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming || !projectId) return;
+    if (!trimmed || inputBlocked || !projectId) return;
     sendMessage(trimmed);
     setValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -61,8 +45,7 @@ export function PromptInput() {
     }
   };
 
-  const isBusy = isStreaming || (agentPhase !== AGENT_PHASE.idle && agentPhase !== AGENT_PHASE.complete);
-  const disabled = isBusy || !projectId;
+  const disabled = inputBlocked || !projectId;
   const canSend = !!value.trim() && !disabled;
 
   // Global keyboard shortcut: Cmd+K to focus chat
@@ -77,22 +60,27 @@ export function PromptInput() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const awaitingPlan = useIsAwaitingPlanApproval();
-
   const placeholder = !projectId
     ? t('chat.placeholder.selectProject')
     : awaitingPlan
       ? t('chat.placeholder.reviewPlan')
-      : isBusy
+      : inputBlocked
         ? t('chat.placeholder.working')
         : t('chat.placeholder.default');
 
-  const busyLabel = getBusyLabel(agentPhase, t);
+  const busyLabel =
+    agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
+    agentPhase === 'designing' ? t('chat.phase.designing') :
+    agentPhase === 'planning' ? t('chat.phase.planning') :
+    agentPhase === 'executing' ? t('chat.phase.building') :
+    agentPhase === 'fixing' ? t('chat.phase.fixing') :
+    agentPhase === 'exploring' ? t('chat.phase.exploring') :
+    t('chat.phase.thinking');
 
   return (
     <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
       {/* Data source selector */}
-      {!isBusy && projectId && showDsSelector && (
+      {!inputBlocked && projectId && showDsSelector && (
         <div className="mb-2.5 relative">
           <DataSourceSelector isOpen={showDsSelector} />
         </div>
@@ -121,7 +109,7 @@ export function PromptInput() {
         <div className="flex items-center justify-center gap-1.5 text-xs text-warning mb-2">
           <span>↑ {t('chat.placeholder.reviewPlan')}</span>
         </div>
-      ) : isBusy ? (
+      ) : agentAlive ? (
         <div className="flex items-center justify-center gap-1.5 text-xs text-primary mb-2">
           <Loader2 size={13} className="animate-spin" />
           <span>{busyLabel}...</span>
@@ -137,7 +125,7 @@ export function PromptInput() {
         }`}
       >
         {/* Data source selector toggle */}
-        {!isBusy && projectId && (
+        {!inputBlocked && projectId && (
           <button
             onClick={() => setShowDsSelector((v) => !v)}
             className={`relative w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-colors ${
