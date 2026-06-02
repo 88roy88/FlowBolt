@@ -3,17 +3,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Cookie, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.deps import ProjectDep, WsProjectDep
-from flow44.config import settings
+from flow44.api.deps import ProjectDep, TokenDep, WsProjectDep
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -25,7 +24,7 @@ logger = logging.getLogger(__name__)
 # HTTP routes — included in main's protected api_router
 http_router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# WebSocket router — auth via Depends() + Cookie() on each endpoint
+# WebSocket router — auth via Depends() on each endpoint
 router = APIRouter()
 
 
@@ -60,13 +59,10 @@ async def chat_ws(  # noqa: C901, PLR0915
     websocket: WebSocket,
     project_id: str,
     project: WsProjectDep,
-    flow44_token: Annotated[str | None, Cookie(alias=settings.AUTH_COOKIE_NAME)] = None,
+    data_source_authorization: TokenDep = None,
 ) -> None:
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", project_id)
-
-    # Data source API expects the raw JWT (no "Bearer " prefix).
-    data_source_authorization = flow44_token
 
     try:
         sandbox = sandbox_manager.get_sandbox(project_id)
