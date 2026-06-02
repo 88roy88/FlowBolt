@@ -64,7 +64,7 @@ class TestGenerateTsInterfacesSchemaOnly:
         assert "id: number;" in result
         assert "amount: number;" in result
         assert "active: boolean;" in result
-        assert "created: string;" in result
+        assert "created: Date;" in result
         assert "export interface ReportResults" in result
         assert "sales: ReportSales[];" in result
 

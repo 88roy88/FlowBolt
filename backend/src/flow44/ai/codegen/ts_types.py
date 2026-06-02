@@ -11,7 +11,7 @@ _FIELD_TYPE_TO_TS: dict[FieldType, str] = {
     "int": "number",
     "double": "number",
     "bool": "boolean",
-    "datetime": "string",
+    "datetime": "Date",
     "wkt": "string",
 }
 

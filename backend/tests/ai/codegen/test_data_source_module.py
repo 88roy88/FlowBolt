@@ -470,3 +470,46 @@ class TestRequireAnyGroup:
         # (runtime OR-validation is the caller's concern; the prompt tells the LLM
         # at least one must be provided).
         assert "  email,\n  phone,\n}: {\n  email: string;\n  phone: string;" in result
+
+
+class TestDatetimeFieldConversion:
+    def test_datetime_fields_converted_to_date_in_body(self) -> None:
+        queries = [
+            DataSourceQuerySchema(
+                name="events",
+                display_name="Events",
+                description="",
+                fields=[
+                    DataSourceFieldSchema(name="id", display_name="ID", type="int"),
+                    DataSourceFieldSchema(name="created_at", display_name="Created at", type="datetime"),
+                    DataSourceFieldSchema(name="label", display_name="Label", type="string"),
+                    DataSourceFieldSchema(name="updated_at", display_name="Updated at", type="datetime"),
+                ],
+            )
+        ]
+        result = generate_data_source_module(
+            data_source_id="5",
+            sanitized_name="Event",
+            params_info=_empty_params(),
+            queries=queries,
+        )
+        # Interface uses Date
+        assert "created_at: Date;" in result
+        assert "updated_at: Date;" in result
+        # Conversion loops emitted after envelope cast
+        assert "for (const row of envelope.data['events'])" in result
+        assert "row['created_at'] = new Date(row['created_at'] as unknown as string);" in result
+        assert "row['updated_at'] = new Date(row['updated_at'] as unknown as string);" in result
+        # Non-datetime fields don't get a conversion line
+        assert "row['id']" not in result
+        assert "row['label']" not in result
+
+    def test_no_datetime_fields_no_conversion_loop(self) -> None:
+        result = generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="Plain",
+            params_info=_empty_params(),
+            queries=_queries("plain"),
+        )
+        assert "for (const row of" not in result
+        assert "new Date(" not in result

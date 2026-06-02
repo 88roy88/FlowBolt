@@ -51,7 +51,7 @@ def generate_data_source_module(
     optional = [p for p in params_info.parameters if not (p.is_required or p.is_require_any)]
 
     signature = _build_signature(function_name, required, optional, results_type)
-    body = _build_body(data_source_id, required, optional, results_type)
+    body = _build_body(data_source_id, required, optional, results_type, queries)
 
     used_types = {p.type for p in params_info.parameters}
     type_defs = "\n".join(v for k, v in _TYPE_DEFS.items() if k in used_types)
@@ -131,6 +131,7 @@ def _build_body(
     required: list[ParamDefinition],
     optional: list[ParamDefinition],
     results_type: str,
+    queries: list[DataSourceQuerySchema] | None = None,
 ) -> str:
     lines: list[str] = []
     path = f"/api/data-source/{data_source_id}/run"
@@ -156,8 +157,24 @@ def _build_body(
         lines.append(f"  const res = await fetchWithAuth('{path}', body);\n")
 
     lines.append(f"  const envelope = (await res.json()) as {{ data: {results_type} }};\n")
+    if queries:
+        lines.extend(_build_date_conversions(queries))
     lines.append("  return envelope.data;\n")
     return "".join(lines)
+
+
+def _build_date_conversions(queries: list[DataSourceQuerySchema]) -> list[str]:
+    lines: list[str] = []
+    for query in queries:
+        datetime_fields = [f for f in query.fields if f.type == "datetime"]
+        if not datetime_fields:
+            continue
+        lines.append(f"  for (const row of envelope.data[{_js_string(query.name)}]) {{\n")
+        for field in datetime_fields:
+            k = _js_string(field.name)
+            lines.append(f"    if (row[{k}] != null) row[{k}] = new Date(row[{k}] as unknown as string);\n")
+        lines.append("  }\n")
+    return lines
 
 
 def _ts_ident(name: str) -> str:
