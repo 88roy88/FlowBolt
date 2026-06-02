@@ -116,9 +116,9 @@ def _build_signature(
     param_names = "".join(f"\n  {idents[id(p)]}," for p in all_params)
     fields: list[str] = []
     for p in required:
-        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)};")
+        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)}; // {p.display_name}")
     for p in optional:
-        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};")
+        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)}; // {p.display_name}")
     type_body = "".join(fields)
 
     return (
