@@ -58,15 +58,15 @@ _FLAPI_PARAM_TYPE: dict[flapi_models.ParamType, ParamType] = {
     "Haphoch": "geographic",
 }
 
-_FLAPI_FIELD_TYPE: dict[str, FieldType] = {
+_FLAPI_FIELD_TYPE: dict[flapi_models.FieldType, FieldType] = {
     "string": "string",
     "int": "int",
     "double": "double",
     "bool": "bool",
     "datetime": "datetime",
     "wkt": "wkt",
-    # "Haphoch" isn't a meaningful type for us — render as plain string.
-    "Haphoch": "string",
+    # "haphoch" isn't a meaningful type for us — render as plain string.
+    "haphoch": "string",
 }
 
 

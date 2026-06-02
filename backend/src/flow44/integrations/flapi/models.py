@@ -9,7 +9,7 @@ from pydantic.alias_generators import to_pascal
 # Wire vocabulary — authoritative per FLAPI. Quick-params types are
 # PascalCase; schema field types are lowercase with a few legacy tags.
 ParamType = Literal["String", "Int", "Double", "Boolean", "Datetime", "Timestamp", "Haphoch"]
-FieldType = Literal["string", "int", "double", "bool", "datetime", "Haphoch", "wkt"]
+FieldType = Literal["string", "int", "double", "bool", "datetime", "haphoch", "wkt"]
 CubeId: TypeAlias = str
 # OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
 
@@ -131,6 +131,10 @@ class QueryField(PascalCaseBaseModel):
     is_dynamic: bool | None = None
     # attributes: FieldAttributes = Field(default_factory=FieldAttributes)
     description: str | None = None
+
+    @field_validator("type_", mode="before")
+    def _normalize_type(cls, v: object) -> object:
+        return v.lower() if isinstance(v, str) else v
 
 
 class Query(PascalCaseBaseModel):
