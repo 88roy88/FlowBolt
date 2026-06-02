@@ -6,7 +6,6 @@ import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } 
 import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState } from './chatHandlers';
 import {
   AGENT_PHASE,
-  getTransientReset,
   isAgentAlive,
   selectIsAgentWorking,
   selectIsAwaitingPlanApproval,
