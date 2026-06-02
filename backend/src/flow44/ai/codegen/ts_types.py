@@ -23,7 +23,7 @@ def sanitize_to_pascal_case(name: str) -> str:
     """Convert a display name to PascalCase for use in TypeScript identifiers.
 
     >>> sanitize_to_pascal_case("Weather Forecast API")
-    'WeatherForecastApi'
+    'WeatherForecastAPI'
     >>> sanitize_to_pascal_case("my-data_source 2")
     'MyDataSource2'
     """
@@ -56,7 +56,8 @@ def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) 
     for query in queries:
         type_name = f"{base_name}{sanitize_to_pascal_case(query.name)}"
         field_lines = [
-            f"  {_quote_key(field.name)}: {_FIELD_TYPE_TO_TS[field.type]}; // {field.display_name}" for field in query.fields
+            f"  {_quote_key(field.name)}: {_FIELD_TYPE_TO_TS[field.type]}; // {field.display_name}"
+            for field in query.fields
         ]
         body = "\n".join(field_lines) if field_lines else "  [key: string]: unknown;"
         interfaces.append(f"// {query.display_name}\nexport interface {type_name} {{\n{body}\n}}\n")

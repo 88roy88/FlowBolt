@@ -80,7 +80,7 @@ class TestRequiredParam:
             params_info=params,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number;\n}): Promise<PersonResults>" in result
+        assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in result
         assert "body['people']['person_id'] = personId;" in result
         assert "fetchWithAuth('/api/data-source/7/run', body);" in result
 
@@ -138,7 +138,7 @@ class TestMixedParams:
             params_info=params,
             queries=_queries("mixed"),
         )
-        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };" in result
+        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string; // Type\n  priority?: string | string[]; // Priority\n  createdAfter?: { From: Date; To: Date }; // Created after" in result
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) {\n    body['tasks']['priority'] = priority;\n  }" in result
         assert "if (createdAfter !== undefined) {\n    body['tasks']['created_after'] = createdAfter;\n  }" in result
@@ -469,7 +469,7 @@ class TestRequireAnyGroup:
         # Both require_any params are treated as required positional for TS typing
         # (runtime OR-validation is the caller's concern; the prompt tells the LLM
         # at least one must be provided).
-        assert "  email,\n  phone,\n}: {\n  email: string;\n  phone: string;" in result
+        assert "  email,\n  phone,\n}: {\n  email: string; // Email\n  phone: string; // Phone" in result
 
 
 class TestDatetimeFieldConversion:
