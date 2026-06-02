@@ -36,8 +36,7 @@ class TestNoParams:
             data_source_id="42",
             sanitized_name="Sales",
             params_info=_empty_params(),
-            sample_data={"results": {"sales": [{"id": 1, "amount": 100}]}},
-            queries=None,
+            queries=_queries("sales"),
         )
         assert "import { fetchWithAuth } from '../api/client';" in result
         assert "export async function dataSourceSales(): Promise<SalesResults>" in result
@@ -53,7 +52,6 @@ class TestEnvelopeUnwrap:
             data_source_id="1",
             sanitized_name="X",
             params_info=_empty_params(),
-            sample_data=None,
             queries=_queries("x"),
         )
         assert "(await res.json()) as { data: XResults }" in result
@@ -80,7 +78,6 @@ class TestRequiredParam:
             data_source_id="7",
             sanitized_name="Person",
             params_info=params,
-            sample_data=None,
             queries=_queries("person"),
         )
         assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number;\n}): Promise<PersonResults>" in result
@@ -92,7 +89,6 @@ class TestRequiredParam:
             data_source_id="7",
             sanitized_name="Person",
             params_info=_empty_params(),
-            sample_data=None,
             queries=_queries("person"),
         )
         # Schema-based interface is emitted.
@@ -140,7 +136,6 @@ class TestMixedParams:
             data_source_id="55",
             sanitized_name="Mixed",
             params_info=params,
-            sample_data=None,
             queries=_queries("mixed"),
         )
         assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };" in result
@@ -168,7 +163,6 @@ class TestArrayParam:
             data_source_id="1",
             sanitized_name="Tagged",
             params_info=params,
-            sample_data=None,
             queries=_queries("tagged"),
         )
         assert "tags: string | string[];" in result
@@ -191,7 +185,6 @@ class TestArrayParam:
             data_source_id="1",
             sanitized_name="Tagged",
             params_info=params,
-            sample_data=None,
             queries=_queries("tagged"),
         )
         assert "tags: string;" in result
@@ -217,7 +210,6 @@ class TestTypeCoercion:
             data_source_id="1",
             sanitized_name="T",
             params_info=params,
-            sample_data=None,
             queries=_queries("t"),
         )
         assert "active: boolean" in result
@@ -240,7 +232,6 @@ class TestTypeCoercion:
             data_source_id="1",
             sanitized_name="T",
             params_info=params,
-            sample_data=None,
             queries=_queries("t"),
         )
         assert "startDate: { From: Date; To: Date }" in result
@@ -264,7 +255,6 @@ class TestTypeDefs:
                 ],
                 require_any=False,
             ),
-            sample_data=None,
             queries=_queries("t"),
         )
 
@@ -316,7 +306,6 @@ class TestReservedWordParamName:
             data_source_id="1",
             sanitized_name="R",
             params_info=params,
-            sample_data=None,
             queries=_queries("r"),
         )
         assert "from_: { From: Date; To: Date }" in result
@@ -366,7 +355,6 @@ class TestCubeIdDisambiguation:
             data_source_id="10",
             sanitized_name="Report",
             params_info=params,
-            sample_data=None,
             queries=_queries("report"),
         )
         # Colliding names get cube_id prefix; unique names stay as-is.
@@ -435,7 +423,6 @@ class TestAllParamTypes:
             data_source_id="99",
             sanitized_name="GeoEvent",
             params_info=params,
-            sample_data=None,
             queries=_queries("geo_event"),
         )
         assert "label: string" in result
@@ -477,7 +464,6 @@ class TestRequireAnyGroup:
             data_source_id="9",
             sanitized_name="Contact",
             params_info=params,
-            sample_data=None,
             queries=_queries("contact"),
         )
         # Both require_any params are treated as required positional for TS typing

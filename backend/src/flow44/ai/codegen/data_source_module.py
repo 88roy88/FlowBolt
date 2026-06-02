@@ -9,7 +9,7 @@ with each param typed according to its FLAPI type.
 from __future__ import annotations
 
 import re
-from typing import Any, assert_never
+from typing import assert_never
 
 from flow44.ai.codegen.ts_types import generate_ts_interfaces
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition
@@ -35,17 +35,16 @@ _TS_RESERVED: frozenset[str] = frozenset(
 )
 
 
-def generate_data_source_module(  # noqa: PLR0913
+def generate_data_source_module(
     *,
     data_source_id: str,
     sanitized_name: str,
     params_info: DataSourceParamsInfo,
-    sample_data: Any,
     queries: list[DataSourceQuerySchema] | None = None,
 ) -> str:
     """Build the full .ts content for a data source."""
     results_type = f"{sanitized_name}Results"
-    types_block = generate_ts_interfaces(sample_data, sanitized_name, queries=queries).rstrip()
+    types_block = generate_ts_interfaces(sanitized_name, queries=queries).rstrip()
 
     function_name = _function_name(sanitized_name)
     required = [p for p in params_info.parameters if p.is_required or p.is_require_any]

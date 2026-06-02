@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from flow44.logic.models import DataSourceQuerySchema, FieldType
-
-_MAX_DEPTH = 5
 
 _FIELD_TYPE_TO_TS: dict[FieldType, str] = {
     "string": "string",
@@ -38,42 +35,22 @@ def sanitize_to_pascal_case(name: str) -> str:
 
 
 def generate_ts_interfaces(
-    sample_data: Any,
     base_name: str,
     *,
     queries: list[DataSourceQuerySchema] | None = None,
 ) -> str:
-    """Generate TypeScript interfaces from a JSON sample.
-
-    When `sample_data` is None (the data source needs user input and we
-    couldn't run it), `queries` is used instead — each query becomes a
-    cube under the FLAPI-shaped response wrapper.
-
-    Returns a complete .ts file string with exported types.
-    """
+    """Generate TypeScript interfaces from FLAPI query schema."""
     if not base_name:
         base_name = "DataSource"
 
-    if sample_data is None:
-        if not queries:
-            # Shouldn't happen: get_usage raises when metadata is empty.
-            return f"export type {base_name}Response = unknown;\n"
-        return _generate_from_schema(queries, base_name)
+    if not queries:
+        return f"export type {base_name}Response = unknown;\n"
 
-    interfaces: list[str] = []
-    if isinstance(sample_data, list):
-        _generate_from_list(sample_data, base_name, interfaces)
-    elif isinstance(sample_data, dict):
-        _generate_from_dict(sample_data, base_name, interfaces)
-    else:
-        ts = _infer_primitive(sample_data)
-        interfaces.append(f"export type {base_name}Response = {ts};\n")
-
-    return "\n".join(interfaces)
+    return _generate_from_schema(queries, base_name)
 
 
 def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) -> str:
-    """Build typed interfaces from FLAPI metadata when no sample is available."""
+    """Build typed interfaces from FLAPI metadata."""
     interfaces: list[str] = []
     results_fields: list[str] = []
     for query in queries:
@@ -87,162 +64,6 @@ def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) 
     results_body = "\n".join(results_fields)
     interfaces.append(f"export interface {base_name}Results {{\n{results_body}\n}}\n")
     return "\n".join(interfaces)
-
-
-# ---------------------------------------------------------------------------
-# Top-level shape handlers
-# ---------------------------------------------------------------------------
-
-
-def _generate_from_list(data: list[Any], base_name: str, interfaces: list[str]) -> None:
-    """Handle top-level array response."""
-    if not data:
-        interfaces.append(
-            f"// Sample data was an empty array — add fields as needed\n"
-            f"export type {base_name}Record = unknown;\n\n"
-            f"export type {base_name}Response = {base_name}Record[];\n"
-        )
-        return
-    element = data[0]
-    if isinstance(element, dict):
-        _build_interface(element, f"{base_name}Record", interfaces, depth=0)
-    else:
-        interfaces.append(f"export type {base_name}Record = {_infer_primitive(element)};\n")
-    interfaces.append(f"\nexport type {base_name}Response = {base_name}Record[];\n")
-
-
-def _generate_from_dict(data: dict[str, Any], base_name: str, interfaces: list[str]) -> None:
-    """Handle top-level dict response — detects cubes or data-array wrappers."""
-    # FLAPI multi-cube: { results: { cube_name: rows[] } }
-    cubes_key = _find_cubes_dict_key(data)
-    if cubes_key is not None:
-        _generate_cubes_wrapper(data, cubes_key, base_name, interfaces)
-        return
-
-    # Simple wrapper: { data: [...], meta: {...} }
-    data_key = _find_data_array_key(data)
-    if data_key is not None:
-        _generate_array_wrapper(data, data_key, base_name, interfaces)
-        return
-
-    # Plain object
-    _build_interface(data, f"{base_name}Response", interfaces, depth=0)
-
-
-def _generate_cubes_wrapper(data: dict[str, Any], cubes_key: str, base_name: str, interfaces: list[str]) -> None:
-    """Generate types for { results: { cube_name: rows[], ... } } pattern."""
-    cubes = data[cubes_key]
-    results_fields: list[str] = []
-    for cube_name, rows in cubes.items():
-        type_name = f"{base_name}{sanitize_to_pascal_case(cube_name)}"
-        if isinstance(rows, list) and rows and isinstance(rows[0], dict):
-            _build_interface(rows[0], type_name, interfaces, depth=0)
-            results_fields.append(f"  {_quote_key(cube_name)}: {type_name}[];")
-        else:
-            results_fields.append(f"  {_quote_key(cube_name)}: unknown[];")
-    results_body = "\n".join(results_fields) if results_fields else "  [key: string]: unknown[];"
-    interfaces.append(f"export interface {base_name}Results {{\n{results_body}\n}}\n")
-
-
-def _generate_array_wrapper(data: dict[str, Any], data_key: str, base_name: str, interfaces: list[str]) -> None:
-    """Generate types for { data: [...], meta: {...} } pattern."""
-    arr = data[data_key]
-    if arr and isinstance(arr[0], dict):
-        _build_interface(arr[0], f"{base_name}Record", interfaces, depth=0)
-        interfaces.append(f"export type {base_name}Results = {base_name}Record[];\n")
-    else:
-        ts = _infer_primitive(arr[0]) if arr else "unknown"
-        interfaces.append(f"export type {base_name}Results = {ts}[];\n")
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
-def _build_interface(obj: dict[str, Any], name: str, interfaces: list[str], *, depth: int) -> None:
-    """Build a named interface from a dict and append to *interfaces*."""
-    fields: list[str] = []
-    for key, val in obj.items():
-        child_name = f"{name}{_capitalize(key)}"
-        ts_type = _infer_type(val, child_name, interfaces, depth=depth + 1)
-        fields.append(f"  {_quote_key(key)}: {ts_type};")
-    body = "\n".join(fields) if fields else "  [key: string]: unknown;"
-    interfaces.append(f"export interface {name} {{\n{body}\n}}\n")
-
-
-def _infer_type(value: Any, child_name: str, interfaces: list[str], *, depth: int) -> str:  # noqa: PLR0911
-    """Return a TS type string for *value*, potentially creating sub-interfaces."""
-    if value is None:
-        return "unknown"
-    if isinstance(value, bool):
-        return "boolean"
-    if isinstance(value, (int, float)):
-        return "number"
-    if isinstance(value, str):
-        return "string"
-    if isinstance(value, list):
-        return _infer_list_type(value, child_name, interfaces, depth=depth)
-    if isinstance(value, dict):
-        if depth < _MAX_DEPTH:
-            _build_interface(value, child_name, interfaces, depth=depth)
-            return child_name
-        return "Record<string, unknown>"
-    return "unknown"
-
-
-def _infer_list_type(value: list[Any], child_name: str, interfaces: list[str], *, depth: int) -> str:
-    """Infer TypeScript type for a list value."""
-    if not value:
-        return "unknown[]"
-    elem = value[0]
-    if isinstance(elem, dict):
-        if depth < _MAX_DEPTH:
-            _build_interface(elem, child_name, interfaces, depth=depth)
-            return f"{child_name}[]"
-        return "Record<string, unknown>[]"
-    return f"{_infer_primitive(elem)}[]"
-
-
-def _infer_primitive(value: Any) -> str:
-    if value is None:
-        return "unknown"
-    if isinstance(value, bool):
-        return "boolean"
-    if isinstance(value, (int, float)):
-        return "number"
-    if isinstance(value, str):
-        return "string"
-    return "unknown"
-
-
-def _find_cubes_dict_key(obj: dict[str, Any]) -> str | None:
-    """Detect FLAPI multi-cube pattern: { results: { cube: rows[], ... } }.
-
-    Returns the key name if found, else None.
-    """
-    for candidate in ("results", "data", "cubes", "queries"):
-        val = obj.get(candidate)
-        if isinstance(val, dict) and val and all(isinstance(v, list) for v in val.values()):
-            return candidate
-    return None
-
-
-def _find_data_array_key(obj: dict[str, Any]) -> str | None:
-    """Detect a wrapper object with a primary data array.
-
-    Looks for a key named 'data', 'results', 'items', 'records', or 'rows'
-    whose value is a non-empty list.
-    """
-    for candidate in ("data", "results", "items", "records", "rows"):
-        val = obj.get(candidate)
-        if isinstance(val, list) and val:
-            return candidate
-    return None
-
-
-def _capitalize(s: str) -> str:
-    return s[:1].upper() + s[1:] if s else ""
 
 
 def _quote_key(key: str) -> str:

@@ -236,7 +236,6 @@ class PlanAgent(BaseAgent):
             data_source_id=ctx["data_source_id"],
             sanitized_name=sanitized,
             params_info=params_info,
-            sample_data=ctx.get("sample_data"),
             queries=queries,
         )
         return {module_path: content}
