@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import assert_never
 
-from flow44.ai.codegen.ts_types import generate_ts_interfaces
+from flow44.ai.codegen.ts_types import _redundant_display_name, generate_ts_interfaces
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition
 
 _TYPE_DEFS: dict[str, str] = {
@@ -116,9 +116,11 @@ def _build_signature(
     param_names = "".join(f"\n  {idents[id(p)]}," for p in all_params)
     fields: list[str] = []
     for p in required:
-        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)}; // {p.display_name}")
+        comment = "" if _redundant_display_name(p.name, p.display_name) else f" // {p.display_name}"
+        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)};{comment}")
     for p in optional:
-        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)}; // {p.display_name}")
+        comment = "" if _redundant_display_name(p.name, p.display_name) else f" // {p.display_name}"
+        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};{comment}")
     type_body = "".join(fields)
 
     return (

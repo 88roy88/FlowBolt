@@ -49,6 +49,11 @@ def generate_ts_interfaces(
     return _generate_from_schema(queries, base_name)
 
 
+def _redundant_display_name(raw_name: str, display_name: str) -> bool:
+    strip = re.compile(r"[^a-z0-9]")
+    return strip.sub("", raw_name.lower()) == strip.sub("", display_name.lower())
+
+
 def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) -> str:
     """Build typed interfaces from FLAPI metadata."""
     interfaces: list[str] = []
@@ -56,11 +61,13 @@ def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) 
     for query in queries:
         type_name = f"{base_name}{sanitize_to_pascal_case(query.name)}"
         field_lines = [
-            f"  {_quote_key(field.name)}: {_FIELD_TYPE_TO_TS[field.type]}; // {field.display_name}"
+            f"  {_quote_key(field.name)}: {_FIELD_TYPE_TO_TS[field.type]};"
+            + ("" if _redundant_display_name(field.name, field.display_name) else f" // {field.display_name}")
             for field in query.fields
         ]
         body = "\n".join(field_lines) if field_lines else "  [key: string]: unknown;"
-        interfaces.append(f"// {query.display_name}\nexport interface {type_name} {{\n{body}\n}}\n")
+        prefix = "" if _redundant_display_name(query.name, query.display_name) else f"// {query.display_name}\n"
+        interfaces.append(f"{prefix}export interface {type_name} {{\n{body}\n}}\n")
         results_fields.append(f"  {_quote_key(query.name)}: {type_name}[];")
     results_body = "\n".join(results_fields)
     interfaces.append(f"export interface {base_name}Results {{\n{results_body}\n}}\n")
