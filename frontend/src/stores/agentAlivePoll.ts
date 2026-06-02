@@ -10,9 +10,6 @@ import { useChatStore } from './chat';
 
 const POLL_MS = 2500;
 
-let pollTimeout: ReturnType<typeof setTimeout> | null = null;
-let pollProjectId: string | null = null;
-
 export function handleChatConnectionLost(): void {
   const state = useChatStore.getState();
   if (isAgentWorking(state) && !isAwaitingPlanApproval(state)) {
@@ -57,13 +54,10 @@ function reconcileAlive(alive: boolean, phase: string | null): void {
   }
 }
 
-async function pollOnce(): Promise<void> {
-  const projectId = pollProjectId;
-  if (!projectId) return;
-
+async function pollOnce(projectId: string, pollId: number): Promise<void> {
   try {
     const { alive, phase } = await fetchAgentAlive(projectId);
-    if (pollProjectId !== projectId) return;
+    if (useChatStore.getState().agentAlivePollId !== pollId) return;
 
     useChatStore.setState({ agentAlive: alive });
     reconcileAlive(alive, phase);
@@ -71,25 +65,22 @@ async function pollOnce(): Promise<void> {
     console.error('Failed to fetch agent alive status:', err);
   }
 
-  if (pollProjectId === projectId) {
-    pollTimeout = setTimeout(() => {
-      void pollOnce();
+  if (useChatStore.getState().agentAlivePollId === pollId) {
+    setTimeout(() => {
+      void pollOnce(projectId, pollId);
     }, POLL_MS);
   }
 }
 
 export function startAgentAlivePolling(projectId: string): void {
-  stopAgentAlivePolling();
-  pollProjectId = projectId;
-  useChatStore.setState({ agentAlive: null });
-  void pollOnce();
+  const pollId = useChatStore.getState().agentAlivePollId + 1;
+  useChatStore.setState({ agentAlive: null, agentAlivePollId: pollId });
+  void pollOnce(projectId, pollId);
 }
 
 export function stopAgentAlivePolling(): void {
-  if (pollTimeout !== null) {
-    clearTimeout(pollTimeout);
-    pollTimeout = null;
-  }
-  pollProjectId = null;
-  useChatStore.setState({ agentAlive: null });
+  useChatStore.setState((state) => ({
+    agentAlive: null,
+    agentAlivePollId: state.agentAlivePollId + 1,
+  }));
 }

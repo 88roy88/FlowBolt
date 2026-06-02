@@ -29,6 +29,7 @@ export interface ChatState {
   buildCompleted: boolean;
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
   agentAlive: boolean | null;
+  agentAlivePollId: number;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
@@ -102,6 +103,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedDataSources: [],
   buildCompleted: false,
   agentAlive: null,
+  agentAlivePollId: 0,
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const projectId = useSessionStore.getState().projectId;

@@ -66,6 +66,7 @@ const INITIAL_STATE: ChatState = {
   error: null,
   buildCompleted: false,
   agentAlive: null,
+  agentAlivePollId: 0,
   fixSteps: [],
   followUpSteps: [],
   followUpDiffs: [],
