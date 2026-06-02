@@ -102,6 +102,10 @@ class SandboxManager:
     async def ensure_ready(sandbox: PnpmSandbox) -> None:
         if not await sandbox.is_scaffolded():
             await sandbox.scaffold(settings.TEMPLATE_DIR)
+        elif not os.path.isdir(os.path.join(sandbox.workspace_dir, "node_modules")):
+            sandbox.configure_npmrc()
+            async for line in sandbox.exec("pnpm install 2>&1"):
+                logger.info("[ensure_ready] %s", line.rstrip())
 
         sandbox.configure_npmrc()
 

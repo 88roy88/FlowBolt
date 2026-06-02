@@ -65,7 +65,12 @@ async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Resp
 
     if not sandbox.is_dev_server_running():
         await sandbox_manager.ensure_ready(sandbox)
-        return Response(content=_WAKING_UP_HTML, status_code=503, media_type="text/html")
+        return Response(
+            content=_WAKING_UP_HTML,
+            status_code=503,
+            media_type="text/html",
+            headers={"Cache-Control": "no-store", "Retry-After": "3"},
+        )
 
     proxy_prefix = f"/api/preview/{project_id}/proxy"
     target_url = f"http://127.0.0.1:{sandbox.port}{proxy_prefix}/{path}"
@@ -87,7 +92,12 @@ async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Resp
                 content=body if body else None,
             )
     except httpx.ConnectError:
-        return Response(content=_WAKING_UP_HTML, status_code=503, media_type="text/html")
+        return Response(
+            content=_WAKING_UP_HTML,
+            status_code=503,
+            media_type="text/html",
+            headers={"Cache-Control": "no-store", "Retry-After": "3"},
+        )
     except Exception:
         logger.exception("Preview proxy error for session %s", project_id)
         raise HTTPException(status_code=502, detail="Preview proxy error") from None

@@ -45,6 +45,13 @@ async def list_all_projects() -> list[dict[str, Any]]:
     return [p.model_dump() for p in projects]
 
 
+@router.get("/debug/sandboxes", status_code=200)
+async def debug_list_sandboxes() -> dict[str, Any]:
+    """DEBUG: Show active sandbox count and which projects have live sandboxes."""
+    active = list(sandbox_manager._sandboxes.keys())
+    return {"count": len(active), "project_ids": active}
+
+
 @router.post("", status_code=201)
 async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
     project = await create_project(body.name)
