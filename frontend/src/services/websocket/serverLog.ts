@@ -9,24 +9,23 @@ export function createServerLogSocket(projectId: string): ReadOnlySocket {
 
   function connect() {
     if (closed) return;
-    const ws = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
-    ws.binaryType = 'arraybuffer';
-    socket = ws;
+    socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
+    socket.binaryType = 'arraybuffer';
 
-    ws.addEventListener('message', (event) => {
+    socket.addEventListener('message', (event) => {
       const text = event.data instanceof ArrayBuffer
         ? new TextDecoder().decode(event.data)
         : event.data as string;
       handlers.forEach((h) => h(text));
     });
 
-    ws.addEventListener('close', () => {
+    socket.addEventListener('close', () => {
       socket = null;
       if (!closed) setTimeout(connect, 2000);
     });
 
-    ws.addEventListener('error', () => {
-      ws.close();
+    socket.addEventListener('error', () => {
+      socket?.close();
     });
   }
 

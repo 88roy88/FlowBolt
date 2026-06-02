@@ -12,11 +12,6 @@ function parseStoredCredentials(raw: string): AuthCredentials | null {
   }
 }
 
-function parseExpiryTimestamp(creds: AuthCredentials): number | null {
-  const val = (creds as Record<string, unknown>).exp;
-  return typeof val === 'number' && Number.isFinite(val) ? val * 1000 : null;
-}
-
 export const credentialsStore = {
   read(): AuthCredentials | null {
     if (typeof window === 'undefined') return null;
@@ -56,8 +51,7 @@ export const credentialsStore = {
       const token = creds?.auth_token?.trim();
       if (!token) return undefined;
 
-      const expiry = creds ? parseExpiryTimestamp(creds) : null;
-      if (expiry !== null && Date.now() >= expiry) return undefined;
+      if (creds && creds.exp * 1000 <= Date.now()) return undefined;
 
       return token;
     } catch {

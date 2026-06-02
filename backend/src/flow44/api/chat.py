@@ -13,6 +13,7 @@ from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
 from flow44.api.deps import ProjectDep, WsProjectDep
+from flow44.config import settings
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -59,7 +60,7 @@ async def chat_ws(  # noqa: C901, PLR0915
     websocket: WebSocket,
     project_id: str,
     project: WsProjectDep,
-    flow44_token: Annotated[str | None, Cookie()] = None,
+    flow44_token: Annotated[str | None, Cookie(alias=settings.AUTH_COOKIE_NAME)] = None,
 ) -> None:
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", project_id)

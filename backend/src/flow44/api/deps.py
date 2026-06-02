@@ -5,7 +5,7 @@ from typing import Annotated
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from flow44.config import settings
 from flow44.db.project import Project
@@ -31,8 +31,8 @@ class TokenPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     iss: str | None = None
-    exp: int | None = None
-    unique_id: str | None = None
+    exp: int
+    unique_id: str
     given_name: str | None = None
     surname: str | None = None
 
@@ -48,7 +48,7 @@ class TokenPayload(BaseModel):
 
 def get_authorization_header(
     authorization: str | None = Header(None, alias="Authorization"),
-    flow44_token: str | None = Cookie(None),
+    flow44_token: str | None = Cookie(None, alias=settings.AUTH_COOKIE_NAME),
 ) -> str | None:
     raw = (authorization or flow44_token or "").strip()
     if not raw:
@@ -70,7 +70,11 @@ def decode_token(token: str) -> TokenPayload | None:
     except jwt.PyJWTError as e:
         logger.debug("JWT decode failed: %s", e)
         return None
-    return TokenPayload.model_validate(decoded)
+    try:
+        return TokenPayload.model_validate(decoded)
+    except ValidationError as e:
+        logger.debug("Token payload missing required claims: %s", e)
+        return None
 
 
 def get_user_id(token: TokenDep) -> str:
@@ -111,7 +115,9 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_ws_user_id(flow44_token: Annotated[str | None, Cookie()] = None) -> str:
+async def get_ws_user_id(
+    flow44_token: Annotated[str | None, Cookie(alias=settings.AUTH_COOKIE_NAME)] = None,
+) -> str:
     """WS variant of get_user_id: raises WebSocketException so FastAPI rejects the handshake before accept."""
     try:
         return get_user_id(flow44_token)

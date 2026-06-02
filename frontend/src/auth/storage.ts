@@ -1,18 +1,18 @@
 import { authConfig } from './config';
 import type { AuthCredentials } from './types';
 
-const COOKIE_NAME = 'flow44_token';
 const COOKIE_BASE = 'Path=/; SameSite=Strict';
 
-function setAuthCookie(token: string): void {
+function setAuthCookie(credentials: AuthCredentials): void {
   if (typeof document === 'undefined') return;
   const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${COOKIE_NAME}=${token}; ${COOKIE_BASE}${secure}`;
+  const expires = new Date(credentials.exp * 1000).toUTCString();
+  document.cookie = `${authConfig.cookieName}=${credentials.auth_token}; ${COOKIE_BASE}${secure}; Expires=${expires}`;
 }
 
 function clearAuthCookie(): void {
   if (typeof document === 'undefined') return;
-  document.cookie = `${COOKIE_NAME}=; ${COOKIE_BASE}; Max-Age=0`;
+  document.cookie = `${authConfig.cookieName}=; ${COOKIE_BASE}; Max-Age=0`;
 }
 
 function parseStoredCredentials(raw: string): AuthCredentials | null {
@@ -24,11 +24,6 @@ function parseStoredCredentials(raw: string): AuthCredentials | null {
   } catch {
     return null;
   }
-}
-
-function parseExpiryTimestamp(creds: AuthCredentials): number | null {
-  const val = (creds as Record<string, unknown>).exp;
-  return typeof val === 'number' && Number.isFinite(val) ? val * 1000 : null;
 }
 
 export const credentialsStore = {
@@ -49,7 +44,7 @@ export const credentialsStore = {
   save(credentials: AuthCredentials): void {
     try {
       window.localStorage.setItem(authConfig.storageKey, JSON.stringify(credentials));
-      setAuthCookie(credentials.auth_token);
+      setAuthCookie(credentials);
     } catch {
       throw new Error('Failed to persist auth credentials');
     }
@@ -72,8 +67,7 @@ export const credentialsStore = {
       const token = creds?.auth_token?.trim();
       if (!token) return undefined;
 
-      const expiry = creds ? parseExpiryTimestamp(creds) : null;
-      if (expiry !== null && Date.now() >= expiry) return undefined;
+      if (creds && creds.exp * 1000 <= Date.now()) return undefined;
 
       return token;
     } catch {

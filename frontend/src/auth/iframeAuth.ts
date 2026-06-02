@@ -28,7 +28,7 @@ export function listenForIframeCredentials(
       const creds = extractCredentials(event.data as Record<string, unknown>);
       if (!creds) {
         cleanup();
-        reject(new Error('Login response did not include a valid auth_token'));
+        reject(new Error('Login response was missing a valid auth_token, user id, or expiry'));
         return;
       }
       cleanup();

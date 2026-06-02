@@ -69,6 +69,8 @@ class AuthSettings(Flow44BaseSettings):
     AUTH_JWT_ALGORITHM: str = "RS256"
     # Require JWT format (vs allowing opaque tokens)
     AUTH_REQUIRE_JWT: bool = False
+    # Name of the cookie carrying the auth token (must match the frontend's VITE_AUTH_COOKIE_NAME)
+    AUTH_COOKIE_NAME: str = "flow44_token"
 
 
 class FlapiSettings(Flow44BaseSettings):
