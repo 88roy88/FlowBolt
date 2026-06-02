@@ -33,35 +33,6 @@ class PackageSearchResult(PascalCaseBaseModel):
     description: str | None = ""
 
 
-# -- Quick params info: GET /package/v1/quick/{id} -----------------------
-
-
-class QuickParamValueOption(PascalCaseBaseModel):
-    name: str
-    value: str
-
-
-class QuickParamDefinition(PascalCaseBaseModel):
-    name: str
-    display_name: str
-    description: str | None = None
-    type_: ParamType = Field(alias="Type")
-    # ontology_type: OntologyType
-    is_single_value: bool
-    is_required: bool
-    is_require_any: bool = False
-    value: list[QuickParamValueOption]
-
-    @field_validator("type_", mode="before")
-    def _normalize_type(cls, v: object) -> object:
-        return v.capitalize() if isinstance(v, str) else v
-
-
-
-class QuickParamsInfo(RootModel[dict[CubeId, list[QuickParamDefinition]]]):
-    pass
-
-
 # -- Run: POST /package/v3/{id} ------------------------------------------
 
 
@@ -110,6 +81,29 @@ class QuickParams(RootModel[dict[CubeId, dict[str, QuickParamValue]]]):
 
 class DataSourceRunResult(BaseModel):
     results: dict[str, Any]
+
+
+# -- Quick params info: GET /package/v1/quick/{id} -----------------------
+
+
+class QuickParamDefinition(PascalCaseBaseModel):
+    name: str
+    display_name: str
+    description: str | None = None
+    type_: ParamType = Field(alias="Type")
+    # ontology_type: OntologyType
+    is_single_value: bool
+    is_required: bool
+    is_require_any: bool = False
+    value: QuickParamValue
+
+    @field_validator("type_", mode="before")
+    def _normalize_type(cls, v: object) -> object:
+        return v.capitalize() if isinstance(v, str) else v
+
+
+class QuickParamsInfo(RootModel[dict[CubeId, list[QuickParamDefinition]]]):
+    pass
 
 
 # -- Package metadata: GET /package/v3/{id} ------------------------------
