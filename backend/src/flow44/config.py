@@ -63,12 +63,10 @@ class SearchIndexSettings(Flow44BaseSettings):
 
 
 class AuthSettings(Flow44BaseSettings):
-    # JWT public key or HMAC secret used to verify token signatures (required)
+    # JWT public key / HMAC secret for verifying token signatures (required)
     AUTH_JWT_PUBLIC_KEY: str
     # JWT algorithm (default: HS256 for HMAC, use RS256 for RSA)
     AUTH_JWT_ALGORITHM: str = "RS256"
-    # Require JWT format (vs allowing opaque tokens)
-    AUTH_REQUIRE_JWT: bool = False
     # Name of the cookie carrying the auth token (must match the frontend's VITE_AUTH_COOKIE_NAME)
     AUTH_COOKIE_NAME: str = "flow44_token"
 

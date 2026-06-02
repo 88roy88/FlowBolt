@@ -32,7 +32,7 @@ class TokenPayload(BaseModel):
 
     iss: str | None = None
     exp: int
-    unique_id: str
+    unique_id: str | None = None
     given_name: str | None = None
     surname: str | None = None
 
@@ -78,28 +78,17 @@ def decode_token(token: str) -> TokenPayload | None:
 
 
 def get_user_id(token: TokenDep) -> str:
-    """Resolve a raw token to a user_id under the dual-mode policy."""
+    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
     if not token:
-        if settings.AUTH_REQUIRE_JWT:
-            raise HTTPException(status_code=401, detail="Authorization required")
-        return "611noat"
+        raise HTTPException(status_code=401, detail="Authorization required")
 
-    is_jwt = token.count(".") == 2
-
-    if is_jwt:
-        payload = decode_token(token)
-        if payload and payload.unique_id:
-            return payload.unique_id
-        if not settings.AUTH_REQUIRE_JWT:
-            return token
-        if payload is None:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
+    payload = decode_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if not payload.unique_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
 
-    if settings.AUTH_REQUIRE_JWT:
-        raise HTTPException(status_code=401, detail="JWT token required")
-
-    return token
+    return payload.unique_id
 
 
 UserDep = Annotated[str, Depends(get_user_id)]
