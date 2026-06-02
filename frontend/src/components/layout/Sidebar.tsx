@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil } from 'lucide-react';
+import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
 import type { ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
+import { reapProject } from '../../services/api';
 import { pollFileTree } from '../../utils/pollFileTree';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -274,6 +275,18 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                       {t('sidebar.summary')}
                     </button>
                   )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await reapProject(project.id);
+                        setMenuOpenId(null);
+                      } catch { /* sandbox may already be reaped */ }
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <Moon size={13} className="text-muted-foreground" />
+                    Sleep
+                  </button>
                   <button
                     onClick={() => handleDelete(project.id)}
                     className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
