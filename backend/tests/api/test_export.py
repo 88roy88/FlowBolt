@@ -136,24 +136,23 @@ async def test_proxy_published_app_basic():
     mock_project = MagicMock()
     mock_project.published_url = "http://s3.local/published.html"
 
-    app.dependency_overrides[get_project] = lambda: mock_project
-    try:
-        with patch("httpx.AsyncClient.get") as mock_get:
-            mock_resp = AsyncMock()
-            mock_resp.status_code = 200
-            mock_resp.text = "<html>S3 Content</html>"
-            mock_resp.headers = {"etag": "tag123"}
-            mock_resp.raise_for_status = lambda: None
-            mock_get.return_value = mock_resp
+    with (
+        patch("flow44.api.publish.db_get_project", AsyncMock(return_value=mock_project)),
+        patch("httpx.AsyncClient.get") as mock_get,
+    ):
+        mock_resp = AsyncMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "<html>S3 Content</html>"
+        mock_resp.headers = {"etag": "tag123"}
+        mock_resp.raise_for_status = lambda: None
+        mock_get.return_value = mock_resp
 
-            response = client.get(f"/api/export/{project_id}/published")
+        response = client.get(f"/api/export/{project_id}/published")
 
-            assert response.status_code == 200
-            assert response.text == "<html>S3 Content</html>"
-            assert response.headers["ETag"] == "tag123"
-            assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
-    finally:
-        app.dependency_overrides.pop(get_project, None)
+        assert response.status_code == 200
+        assert response.text == "<html>S3 Content</html>"
+        assert response.headers["ETag"] == "tag123"
+        assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
 
 
 @pytest.mark.asyncio
@@ -162,26 +161,20 @@ async def test_proxy_published_app_fetch_error():
     mock_project = MagicMock()
     mock_project.published_url = "http://s3.local/published.html"
 
-    app.dependency_overrides[get_project] = lambda: mock_project
-    try:
-        with patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")):
-            response = client.get(f"/api/export/{project_id}/published")
-            assert response.status_code == 502
-            assert response.json()["detail"] == "Error fetching published app from S3."
-    finally:
-        app.dependency_overrides.pop(get_project, None)
+    with (
+        patch("flow44.api.publish.db_get_project", AsyncMock(return_value=mock_project)),
+        patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")),
+    ):
+        response = client.get(f"/api/export/{project_id}/published")
+        assert response.status_code == 502
+        assert response.json()["detail"] == "Error fetching published app from S3."
 
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_not_found():
     project_id = "non-existent"
-    mock_project = MagicMock()
-    mock_project.published_url = None
 
-    app.dependency_overrides[get_project] = lambda: mock_project
-    try:
+    with patch("flow44.api.publish.db_get_project", AsyncMock(return_value=None)):
         response = client.get(f"/api/export/{project_id}/published")
         assert response.status_code == 404
         assert response.json()["detail"] == "Published app not found or not published yet."
-    finally:
-        app.dependency_overrides.pop(get_project, None)
