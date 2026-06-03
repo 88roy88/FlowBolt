@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 
 from flow44.api.deps import ProjectDep
 from flow44.config import settings
+from flow44.db.project import get_project as db_get_project
 from flow44.db.project import update_project_published_url
 from flow44.integrations.s3 import deploy_single_html
 from flow44.sandbox.operations import BuildError, build_single_html
@@ -14,6 +15,9 @@ from flow44.sandbox.operations import BuildError, build_single_html
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/export/{project_id}", tags=["publish"])
+
+# Served unauthenticated so published apps are shareable via their public link.
+public_router = APIRouter(prefix="/api/export/{project_id}", tags=["publish"])
 
 
 @router.post("/publish")
@@ -49,10 +53,14 @@ async def publish_to_s3(project: ProjectDep) -> dict[str, str]:
     return {"url": proxy_path}
 
 
-@router.get("/published", response_class=HTMLResponse)
-async def proxy_published_app(project: ProjectDep) -> HTMLResponse:
-    """Proxy route to fetch and serve the published HTML from S3."""
-    if not project.published_url:
+@public_router.get("/published", response_class=HTMLResponse)
+async def proxy_published_app(project_id: str) -> HTMLResponse:
+    """Proxy route to fetch and serve the published HTML from S3.
+
+    Public: a published app is shareable by URL, so no auth/ownership check.
+    """
+    project = await db_get_project(project_id)
+    if project is None or not project.published_url:
         raise HTTPException(status_code=404, detail="Published app not found or not published yet.")
 
     async with httpx.AsyncClient() as client:

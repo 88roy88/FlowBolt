@@ -115,6 +115,7 @@ app.include_router(auth_routes)
 # Public HTTP routes
 public_routes = APIRouter()
 public_routes.include_router(models.router)
+public_routes.include_router(publish.public_router)
 app.include_router(public_routes)
 
 # Authenticated WS routes
