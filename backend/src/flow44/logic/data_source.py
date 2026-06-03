@@ -157,10 +157,7 @@ async def run_data_source(
     params: QuickParams | None = None,
 ) -> DataSourceResult:
     raw = await data_source_client.run_data_source(
-        data_source_id,
-        authorization=authorization,
-        quick_params=params,
-        all_queries=True
+        data_source_id, authorization=authorization, quick_params=params, all_queries=True
     )
     return _to_result(raw)
 

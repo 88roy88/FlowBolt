@@ -1,7 +1,8 @@
 from typing import Any, Literal, assert_never
 
-from flow44.integrations.flapi.models import QueryDisplayName
 from pydantic import BaseModel, Field, RootModel, computed_field
+
+from flow44.integrations.flapi.models import QueryDisplayName
 
 # Domain-side vocabulary. The FLAPI adapter translates into these;
 # the rest of the app is agnostic to FLAPI's wire spellings.
