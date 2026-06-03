@@ -10,8 +10,21 @@ from pydantic.alias_generators import to_pascal
 # PascalCase; schema field types are lowercase with a few legacy tags.
 ParamType = Literal["String", "Int", "Double", "Boolean", "Datetime", "Timestamp", "Haphoch", "File"]
 FieldType = Literal[
-    "string", "int", "double", "float", "bool", "boolean", "date",
-    "datetime", "haphoch", "wkt", "geojson", "geoellipse", "object", "decimal", "dynamic",
+    "string",
+    "int",
+    "double",
+    "float",
+    "bool",
+    "boolean",
+    "date",
+    "datetime",
+    "haphoch",
+    "wkt",
+    "geojson",
+    "geoellipse",
+    "object",
+    "decimal",
+    "dynamic",
 ]
 type CubeId = str
 # OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]

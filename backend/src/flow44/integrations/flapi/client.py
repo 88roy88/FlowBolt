@@ -71,21 +71,20 @@ class FlapiClient:
             # Truncate body: responses can be large and may include sensitive fields.
             logger.error(
                 "FLAPI %s on %s %s: %s",
-                resp.status_code, method, path, resp.text[:500],
+                resp.status_code,
+                method,
+                path,
+                resp.text[:500],
             )
         elif resp.status_code >= 400:
             logger.info("FLAPI %s on %s %s", resp.status_code, method, path)
         if resp.status_code >= 400:
-            raise FlapiUpstreamError(
-                f"FLAPI error ({resp.status_code})", status_code=resp.status_code
-            )
+            raise FlapiUpstreamError(f"FLAPI error ({resp.status_code})", status_code=resp.status_code)
         return resp.json()
 
     # -- API methods --
 
-    async def search(
-        self, query_or_id: str | int, *, authorization: str | None = None
-    ) -> list[PackageSearchResult]:
+    async def search(self, query_or_id: str | int, *, authorization: str | None = None) -> list[PackageSearchResult]:
         safe = quote(str(query_or_id), safe="")
         raw: list[dict[str, Any]] = await self._request(
             "GET", f"/package/v1/search/{safe}", authorization=authorization
@@ -121,18 +120,12 @@ class FlapiClient:
         self, data_source_id: str | int, *, authorization: str | None = None
     ) -> QuickParamsInfo:
         safe = quote(str(data_source_id), safe="")
-        raw: dict[str, Any] = await self._request(
-            "GET", f"/package/v1/quick/{safe}", authorization=authorization
-        )
+        raw: dict[str, Any] = await self._request("GET", f"/package/v1/quick/{safe}", authorization=authorization)
         return QuickParamsInfo.model_validate(raw)
 
-    async def get_metadata(
-        self, data_source_id: str | int, *, authorization: str | None = None
-    ) -> PackageMetadata:
+    async def get_metadata(self, data_source_id: str | int, *, authorization: str | None = None) -> PackageMetadata:
         safe = quote(str(data_source_id), safe="")
-        raw: dict[str, Any] = await self._request(
-            "GET", f"/package/v2/{safe}", authorization=authorization
-        )
+        raw: dict[str, Any] = await self._request("GET", f"/package/v2/{safe}", authorization=authorization)
         return PackageMetadata.model_validate(raw)
 
 

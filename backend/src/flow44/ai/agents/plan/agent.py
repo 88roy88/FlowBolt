@@ -267,9 +267,7 @@ class PlanAgent(BaseAgent):
             return {
                 "data_schema": "Unknown — analysis failed",
                 "relevant_fields": "See raw data",
-                "data_characteristics": (
-                    "Requires user input" if sample_data is None else "Fetched from API"
-                ),
+                "data_characteristics": ("Requires user input" if sample_data is None else "Fetched from API"),
                 "integration_notes": (
                     f"Data preview: {json.dumps(sample_data, indent=2)[:500]}"
                     if sample_data is not None

@@ -104,8 +104,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
             options = [
                 ParamOption(name=n, value=str(v))
                 for item in (p.value if isinstance(p.value, list) else [])
-                if isinstance(n := getattr(item, "Name", None), str)
-                and (v := getattr(item, "Value", None)) is not None
+                if isinstance(n := getattr(item, "Name", None), str) and (v := getattr(item, "Value", None)) is not None
             ]
             parameters.append(
                 ParamDefinition(
@@ -147,9 +146,7 @@ async def get_params_info(
     *,
     authorization: str | None = None,
 ) -> DataSourceParamsInfo:
-    info = await data_source_client.get_quick_params_info(
-        data_source_id, authorization=authorization
-    )
+    info = await data_source_client.get_quick_params_info(data_source_id, authorization=authorization)
     return _to_params_info(info)
 
 
@@ -253,9 +250,7 @@ async def get_usage(
     *,
     authorization: str | None = None,
 ) -> DataSourceUsage:
-    metadata = await data_source_client.get_metadata(
-        data_source_id, authorization=authorization
-    )
+    metadata = await data_source_client.get_metadata(data_source_id, authorization=authorization)
     if not metadata.queries:
         # Planner relies on at least one query for its schema-only TS fallback.
         raise FlapiUpstreamError(

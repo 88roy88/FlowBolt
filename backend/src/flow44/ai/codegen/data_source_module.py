@@ -21,6 +21,7 @@ _TYPE_DEFS: dict[str, str] = {
 # Param names that would clip a JS/TS reserved word when used as a parameter
 # or property identifier. A trailing underscore is appended to avoid the clash
 # without mangling the body key (which stays the original FLAPI name).
+# fmt: off
 _TS_RESERVED: frozenset[str] = frozenset(
     {
         "break", "case", "catch", "class", "const", "continue", "debugger",
@@ -33,6 +34,7 @@ _TS_RESERVED: frozenset[str] = frozenset(
         "protected", "public", "await", "async", "from", "as", "of",
     }
 )
+# fmt: on
 
 
 def generate_data_source_module(
@@ -123,9 +125,7 @@ def _build_signature(
         fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};{comment}")
     type_body = "".join(fields)
 
-    return (
-        f"export async function {function_name}({{{param_names}\n}}: {{{type_body}\n}}): Promise<{response_type}>"
-    )
+    return f"export async function {function_name}({{{param_names}\n}}: {{{type_body}\n}}): Promise<{response_type}>"
 
 
 def _build_body(
@@ -148,9 +148,7 @@ def _build_body(
         for cube_id in cube_ids:
             lines.append(f"  body[{_js_string(cube_id)}] = {{}};\n")
         for p in required:
-            lines.append(
-                f"  body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {idents[id(p)]};\n"
-            )
+            lines.append(f"  body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {idents[id(p)]};\n")
         for p in optional:
             ident = idents[id(p)]
             lines.append(

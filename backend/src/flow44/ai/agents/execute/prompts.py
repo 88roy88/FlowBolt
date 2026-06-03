@@ -42,9 +42,7 @@ def render_codegen(  # noqa: PLR0913
             {
                 **ctx,
                 "sample_data_json": (
-                    json.dumps(ctx["sample_data"], indent=2)[:1000]
-                    if ctx.get("sample_data") is not None
-                    else None
+                    json.dumps(ctx["sample_data"], indent=2)[:1000] if ctx.get("sample_data") is not None else None
                 ),
             }
             for ctx in data_source_contexts
