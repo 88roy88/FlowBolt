@@ -26,6 +26,7 @@ def upgrade() -> None:
     op.alter_column('projects', 'published_url',
                existing_type=sa.VARCHAR(),
                nullable=True)
+    op.execute("UPDATE projects SET published_url = NULL WHERE published_url = ''")
     op.create_unique_constraint('uq_projects_published_url', 'projects', ['published_url'])
     # ### end Alembic commands ###
 
