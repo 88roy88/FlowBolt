@@ -8,6 +8,7 @@ from flow44.integrations.flapi import (
     data_source_client,
 )
 from flow44.integrations.flapi import models as flapi_models
+from flow44.integrations.flapi.models import QuickParamValue
 from flow44.logic.models import (
     DataSource,
     DataSourceFieldSchema,
@@ -19,7 +20,6 @@ from flow44.logic.models import (
     ParamDefinition,
     ParamOption,
     ParamType,
-    ParamValue,
     parse_param_value,
 )
 
@@ -188,7 +188,7 @@ async def fetch_data_source(
     return name, result
 
 
-def _default_for(param: ParamDefinition) -> ParamValue | None:
+def _default_for(param: ParamDefinition) -> QuickParamValue | None:
     # Returns the smallest concrete value we can send: a scalar for single-value
     # params, a one-element list for multi-value params. None means the options
     # list is empty or the first option can't be parsed.
@@ -205,7 +205,7 @@ def _minimal_params_for(params_info: DataSourceParamsInfo) -> QuickParams | None
     if not params_info.parameters:
         return QuickParams(root={})
 
-    defaults: dict[str, tuple[str, ParamValue]] = {}
+    defaults: dict[str, tuple[str, QuickParamValue]] = {}
 
     if params_info.require_any:
         satisfied = False
@@ -229,7 +229,7 @@ def _minimal_params_for(params_info: DataSourceParamsInfo) -> QuickParams | None
             return None
         defaults[param.name] = (param.cube_id, value)
 
-    grouped: dict[str, dict[str, ParamValue]] = {}
+    grouped: dict[str, dict[str, QuickParamValue]] = {}
     for name, (cube_id, value) in defaults.items():
         grouped.setdefault(cube_id, {})[name] = value
     return QuickParams(root=grouped)
