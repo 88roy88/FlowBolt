@@ -66,7 +66,7 @@ class TestGenerateTsInterfacesSchemaOnly:
         assert "active: boolean;" in result
         assert "created: Date;" in result
         assert "export interface ReportResults" in result
-        assert "sales: ReportSales[];" in result
+        assert "Sales: ReportSales[];" in result
 
     def test_multi_query_produces_multiple_cubes(self) -> None:
         queries = [
@@ -86,8 +86,8 @@ class TestGenerateTsInterfacesSchemaOnly:
         result = generate_ts_interfaces("Multi", queries=queries)
         assert "export interface MultiOrders" in result
         assert "export interface MultiCustomers" in result
-        assert "orders: MultiOrders[];" in result
-        assert "customers: MultiCustomers[];" in result
+        assert "Orders: MultiOrders[];" in result
+        assert "Customers: MultiCustomers[];" in result
 
     def test_no_queries_falls_back_to_unknown(self) -> None:
         result = generate_ts_interfaces("X")
