@@ -110,8 +110,8 @@ class SandboxManager:
         return sandbox
 
     @staticmethod
-    async def ensure_dev_server(sandbox: PnpmSandbox) -> None:
-        """Start the dev server if it's not already running. Assumes scaffolding is complete."""
+    async def start_dev_server(sandbox: PnpmSandbox) -> None:
+        """Start the dev server if it's not already running."""
         sandbox.configure_npmrc()
         if not sandbox.is_dev_server_running():
             logger.info("Starting sandbox dev server for %s", sandbox.project_id)
