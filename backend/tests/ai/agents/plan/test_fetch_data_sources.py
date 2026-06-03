@@ -34,7 +34,7 @@ def _usage(
             )
         ],
         params=DataSourceParamsInfo(parameters=params, require_any=require_any),
-        minimal_params=minimal,
+        can_run=minimal is not None,
         sample=sample,
     )
 
@@ -71,7 +71,6 @@ class TestFetchAndAnalyze:
         assert ctx["data_source_name"] == "Weather"
         assert ctx["sanitized_name"] == "Weather"
         assert ctx["can_run_without_input"] is True
-        assert ctx["minimal_params"] == {}
         assert ctx["sample_data"] == {"results": {"rows": [{"id": 1}]}}
         assert ctx["params_info"] == {"parameters": [], "require_any": False}
 
@@ -114,7 +113,6 @@ class TestFetchAndAnalyze:
 
         assert ctx["can_run_without_input"] is False
         assert ctx["sample_data"] is None
-        assert ctx["minimal_params"] is None
         assert ctx["params_info"]["parameters"][0]["name"] == "person_id"
 
 
@@ -171,7 +169,7 @@ class TestGenerateDataSourceFiles:
         }
         files = PlanAgent._generate_data_source_files(ctx)
         content = files["src/dataSources/Person.ts"]
-        assert "export async function dataSourcePerson(personId: number)" in content
-        # Schema-based response type since no sample.
-        assert "export interface PersonResponse" in content
-        assert "body['person_id'] = personId;" in content
+        assert "}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in content
+        assert "export interface PersonPerson" in content
+        assert "export interface PersonResults" in content
+        assert "body['']['person_id'] = personId;" in content
