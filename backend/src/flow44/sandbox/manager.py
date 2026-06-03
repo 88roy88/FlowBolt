@@ -73,9 +73,25 @@ class SandboxManager:
         return sandbox
 
     async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
-        """Wake a suspended sandbox: get it and start the dev server."""
+        """Wake a suspended sandbox: get it and start the dev server (non-blocking)."""
         sandbox = await self.get_sandbox(project_id)
         await self.start_dev_server(sandbox)
+        return sandbox
+
+    async def wake_and_wait(self, project_id: str, *, timeout: float = 30.0) -> PnpmSandbox:  # noqa: ASYNC109
+        """Wake a sandbox and wait until the dev server is accepting connections."""
+        sandbox = await self.wake_sandbox(project_id)
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.connect(("127.0.0.1", sandbox.port))
+                sock.close()
+                return sandbox
+            except OSError:
+                sock.close()
+                await asyncio.sleep(0.2)
+        logger.warning("Dev server for %s did not become ready within %.0fs", project_id, timeout)
         return sandbox
 
     async def create_sandbox(self, project_id: str) -> PnpmSandbox:
@@ -102,9 +118,8 @@ class SandboxManager:
         """Permanently destroy a sandbox and delete its workspace from disk."""
         await self.suspend_sandbox(project_id)
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
-        if os.path.isdir(workspace_dir):
+        if os.path.isdir(workspace_dir):  # noqa: ASYNC240
             shutil.rmtree(workspace_dir, ignore_errors=True)
-
 
     @staticmethod
     async def start_dev_server(sandbox: PnpmSandbox) -> None:

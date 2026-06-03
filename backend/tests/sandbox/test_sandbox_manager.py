@@ -32,12 +32,12 @@ class TestSandboxManagerLifecycle:
         assert "proj1" in mgr._sandboxes
         assert mgr._sandboxes["proj1"] is sandbox
 
-    async def test_create_and_get(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_get_idempotent(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            sandbox = await mgr.create_sandbox("proj1")
-            got = await mgr.get_sandbox("proj1")
-        assert got is sandbox
+            s1 = await mgr.get_sandbox("proj1")
+            s2 = await mgr.get_sandbox("proj1")
+        assert s1 is s2
 
     async def test_wake_sandbox_idempotent(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
@@ -49,14 +49,14 @@ class TestSandboxManagerLifecycle:
     async def test_suspend_removes_sandbox(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            await mgr.create_sandbox("proj1")
+            await mgr.get_sandbox("proj1")
             await mgr.suspend_sandbox("proj1")
         assert "proj1" not in mgr._sandboxes
 
     async def test_port_freed_after_suspend(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            sandbox = await mgr.create_sandbox("proj1")
+            sandbox = await mgr.get_sandbox("proj1")
             port = sandbox.port
             assert port not in mgr._available_ports
             await mgr.suspend_sandbox("proj1")
@@ -69,8 +69,8 @@ class TestSandboxManagerLifecycle:
     async def test_suspend_all(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            await mgr.create_sandbox("p1")
-            await mgr.create_sandbox("p2")
+            await mgr.get_sandbox("p1")
+            await mgr.get_sandbox("p2")
             await mgr.suspend_all()
         assert "p1" not in mgr._sandboxes
         assert "p2" not in mgr._sandboxes
@@ -78,7 +78,7 @@ class TestSandboxManagerLifecycle:
     async def test_workspace_dir_is_under_base(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            sandbox = await mgr.create_sandbox("myproject")
+            sandbox = await mgr.get_sandbox("myproject")
         assert sandbox.workspace_dir.startswith(workspace_base)
         assert "myproject" in sandbox.workspace_dir
 

@@ -14,16 +14,16 @@ logger = logging.getLogger(__name__)
 
 async def get_sandbox(project_id: str) -> PnpmSandbox:
     try:
-        return await sandbox_manager.wake_sandbox(project_id)
+        return await sandbox_manager.get_sandbox(project_id)
     except Exception as exc:
         raise HTTPException(status_code=404, detail=f"No sandbox found for project {project_id}") from exc
 
 
 async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox | None:
     try:
-        return await sandbox_manager.wake_sandbox(project_id)
+        return await sandbox_manager.get_sandbox(project_id)
     except Exception:
-        logger.exception("Failed to wake sandbox for project %s", project_id)
+        logger.exception("Failed to get sandbox for project %s", project_id)
         await websocket.close(code=1011, reason="Sandbox error")
         return None
 
