@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from flow44.ai.agent_runtime import mark_agent_finished, mark_agent_started
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
@@ -35,11 +36,19 @@ async def _is_new_project(project_id: str) -> bool:
 
 
 async def _run_agent_safe(project_id: str, coro: Any) -> None:
+    mark_agent_started(project_id)
     try:
         await coro
     except Exception:
         logger.exception("[chat] Background agent failed for session %s", project_id)
+        await emit_event(project_id, {"type": "phase", "phase": "idle"})
         await emit_event(project_id, {"type": "error", "message": "AI processing failed"})
+    finally:
+        mark_agent_finished(project_id)
+
+
+def _start_agent(project_id: str, coro: Any) -> None:
+    asyncio.create_task(_run_agent_safe(project_id, coro))
 
 
 @http_router.get("/{project_id}/history")
@@ -126,14 +135,12 @@ async def chat_ws(  # noqa: C901, PLR0915
                         model=selected_model,
                         data_source_authorization=data_source_authorization,
                     )
-                    asyncio.create_task(
-                        _run_agent_safe(
-                            project.id,
-                            plan_agent.run(
-                                user_content,
-                                data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                            ),
-                        )
+                    _start_agent(
+                        project.id,
+                        plan_agent.run(
+                            user_content,
+                            data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
+                        ),
                     )
                 else:
                     followup_agent = FollowUpAgent(
@@ -141,7 +148,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         sandbox=sandbox,
                         model=selected_model,
                     )
-                    asyncio.create_task(_run_agent_safe(project.id, followup_agent.run(user_content)))
+                    _start_agent(project.id, followup_agent.run(user_content))
 
             elif msg_type == "plan_response":
                 action = data.get("action")
@@ -165,7 +172,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         state=state,
                         model=selected_model or state.model,
                     )
-                    asyncio.create_task(_run_agent_safe(project.id, execute_agent.run()))
+                    _start_agent(project.id, execute_agent.run())
 
                 elif action == "modify" and feedback:
                     # Rebuild plan with feedback using PlanAgent
@@ -174,7 +181,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         sandbox=sandbox,
                         model=selected_model or state.model,
                     )
-                    asyncio.create_task(_run_agent_safe(project.id, plan_agent.rebuild_with_feedback(state, feedback)))
+                    _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
 
             elif msg_type == "fix_error":
                 error_message = data.get("error_message", "")
@@ -210,16 +217,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                     sandbox=sandbox,
                     model=selected_model,
                 )
-                asyncio.create_task(
-                    _run_agent_safe(
-                        project.id,
-                        fix_agent.run(
-                            error_message=error_message,
-                            error_file=error_file,
-                            error_line=error_line,
-                            error_stack=error_stack,
-                        ),
-                    )
+                _start_agent(
+                    project.id,
+                    fix_agent.run(
+                        error_message=error_message,
+                        error_file=error_file,
+                        error_line=error_line,
+                        error_stack=error_stack,
+                    ),
                 )
 
     forward_task = asyncio.create_task(_forward_events())

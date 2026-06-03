@@ -1,11 +1,23 @@
-import type { WSMessage, Message, FollowUpStep } from '../types';
+import type { WSMessage, Message, FollowUpStep, AgentPhase, ProjectSummary } from '../types';
 import { useFilesStore } from './files';
 import { useSessionStore } from './session';
-import { requestPermissionIfNeeded, notifyBuildComplete } from '../utils/notifications';
+import {
+  requestPermissionIfNeeded,
+  notifyAgentNeedsAttention,
+  notifyBuildComplete,
+} from '../utils/notifications';
+import type { ChatState } from './chat';
+import {
+  ACTIVE_AGENT_PHASES,
+  AGENT_PHASE,
+  getTransientReset,
+  isAwaitingPlanApproval,
+  isHistoryRunComplete,
+} from './chatAgentState';
 
-type GetState = () => import('./chat').ChatState;
+type GetState = () => ChatState;
 type SetState = (
-  partial: Partial<import('./chat').ChatState> | ((state: import('./chat').ChatState) => Partial<import('./chat').ChatState>),
+  partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>),
 ) => void;
 
 let _skipMessages = false;
@@ -15,6 +27,18 @@ export function setReplayMode(replay: boolean) {
 }
 
 let _lastEventTs = 0;
+
+/** Clear stale in-progress UI after replaying events from an interrupted run. */
+export function finalizeHistoryReplayState(
+  set: SetState,
+  get: GetState,
+  events: Array<{ type?: string }>,
+): boolean {
+  if (isHistoryRunComplete(events)) return false;
+  if (isAwaitingPlanApproval(get())) return false;
+  set(getTransientReset());
+  return true;
+}
 
 function getTimestamp(msg?: { _ts?: string }): number {
   if (msg?._ts) {
@@ -55,7 +79,7 @@ function handleText(msg: { content: string }, set: SetState) {
 }
 
 function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
-  set({ error: msg.message, isStreaming: false, agentPhase: 'idle' });
+  set({ ...getTransientReset(), error: msg.message });
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
   }
@@ -140,21 +164,11 @@ export function createFixErrorHandler(
           };
           set((s) => ({
             messages: [...s.messages, fixMessage],
-            currentAssistantMessage: '',
-            actions: [],
-            fixSteps: [],
-            isStreaming: false,
-            agentPhase: 'idle',
+            ...getTransientReset(),
             buildCompleted: true,
           }));
         } else {
-          set({
-            currentAssistantMessage: '',
-            actions: [],
-            isStreaming: false,
-            agentPhase: 'idle',
-            buildCompleted: true,
-          });
+          set({ ...getTransientReset(), buildCompleted: true });
         }
         if (!_skipMessages) {
           notifyBuildComplete(useSessionStore.getState().currentProject?.name);
@@ -189,7 +203,14 @@ export function createSendMessageHandler(
         break;
 
       case 'plan_overview':
-        set({ planOverview: msg.overview, isStreaming: false });
+        set({
+          ...getTransientReset(),
+          planOverview: msg.overview,
+          agentPhase: AGENT_PHASE.awaiting_approval,
+        });
+        if (!_skipMessages) {
+          notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
+        }
         break;
 
       case 'plan_accepted': {
@@ -203,7 +224,8 @@ export function createSendMessageHandler(
         set((s) => ({
           messages: _skipMessages ? s.messages : [...s.messages, acceptedMsg],
           isStreaming: true,
-          agentPhase: 'planning',
+          agentAlive: true,
+          agentPhase: AGENT_PHASE.planning,
           planOverview: null,
         }));
         break;
@@ -266,13 +288,13 @@ export function createSendMessageHandler(
 }
 
 function handlePhaseChange(
-  msg: { phase: import('../types').AgentPhase },
+  msg: { phase: AgentPhase },
   set: SetState,
   get: GetState,
 ) {
   const prevPhase = get().agentPhase;
 
-  if (prevPhase === 'designing' && msg.phase === 'planning') {
+  if (prevPhase === AGENT_PHASE.designing && msg.phase === AGENT_PHASE.planning) {
     const dp = get().designProgress;
     const designMsg: Message = {
       id: generateId(),
@@ -288,10 +310,14 @@ function handlePhaseChange(
     if (!_skipMessages) set((s) => ({ messages: [...s.messages, designMsg] }));
   }
 
-  set({ agentPhase: msg.phase });
-  if (msg.phase === 'executing') {
-    set({ isStreaming: true });
+  set({
+    agentPhase: msg.phase,
+    ...(ACTIVE_AGENT_PHASES.includes(msg.phase) ? { isStreaming: true } : {}),
+  });
+  if (msg.phase === AGENT_PHASE.executing) {
     requestPermissionIfNeeded();
+  } else if (msg.phase === AGENT_PHASE.awaiting_approval && !_skipMessages) {
+    notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
   }
 }
 
@@ -321,7 +347,7 @@ function handleTaskUpdate(
 }
 
 function handleProjectSummary(
-  msg: { summary: import('../types').ProjectSummary },
+  msg: { summary: ProjectSummary },
   set: SetState,
 ) {
   // Store summary but don't add card yet — action_complete will add it after task progress
@@ -455,15 +481,8 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
 
   set((s) => ({
     messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
-    currentAssistantMessage: '',
-    actions: [],
-    isStreaming: false,
-    agentPhase: 'idle',
+    ...getTransientReset(),
     planOverview: null,
-    executionTasks: [],
-    fixSteps: [],
-    followUpSteps: [],
-    followUpDiffs: [],
     projectSummary: null,
     buildCompleted: true,
   }));

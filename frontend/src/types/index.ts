@@ -73,7 +73,6 @@ export interface DataSourceSearchRecord {
 // Agent types
 export type AgentPhase =
   | 'idle'
-  | 'classifying'
   | 'fetching_data_sources'
   | 'designing'
   | 'planning'
@@ -82,6 +81,8 @@ export type AgentPhase =
   | 'fixing'
   | 'exploring'
   | 'complete';
+
+export type AgentPhaseConstMap = { readonly [K in AgentPhase]: K };
 
 // User-facing plan overview (shown during approval)
 export interface PlanFeature {

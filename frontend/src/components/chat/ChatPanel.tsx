@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
+import { isAgentAlive } from '../../stores/chatAgentState';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
 import { WorkPlanView } from './WorkPlanView';
@@ -14,9 +15,10 @@ import { FollowUpProgress } from './cards/FollowUpProgress';
 export function ChatPanel() {
   const { t } = useTranslation();
   const {
-    messages, isStreaming, currentAssistantMessage, actions, error, clearError,
+    messages, currentAssistantMessage, actions, error, clearError,
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs, historyLoaded,
   } = useChatStore();
+  const agentActive = useChatStore(isAgentAlive);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -63,15 +65,14 @@ export function ChatPanel() {
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
   const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
-  const showFixProgress = fixSteps.length > 0 && isStreaming;
-  const showFollowUpProgress = followUpSteps.length > 0 && isStreaming;
-  const showStreamingMessage = isStreaming && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
-  const showPhaseIndicator = agentPhase === 'classifying' || agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
-  const showTypingDots = isStreaming && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
+  const showFixProgress = fixSteps.length > 0 && agentActive;
+  const showFollowUpProgress = followUpSteps.length > 0 && agentActive;
+  const showStreamingMessage = agentActive && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
+  const showPhaseIndicator = agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
+  const showTypingDots = agentActive && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
-
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-auto p-4 flex flex-col gap-4 scroll-smooth">
         {messages.map((msg) => (
@@ -80,7 +81,7 @@ export function ChatPanel() {
 
         {showPhaseIndicator && <PhaseIndicator phase={agentPhase} />}
         {showDesignProgress && <DesignProgress designProgress={designProgress} />}
-        {showOverview && <WorkPlanView overview={planOverview} />}
+        {showOverview && planOverview && <WorkPlanView overview={planOverview} />}
         {showTaskProgress && <TaskProgress tasks={executionTasks} />}
         {showFixProgress && <FixProgressCard steps={fixSteps} content={currentAssistantMessage} isLive />}
         {showFollowUpProgress && (

@@ -24,9 +24,9 @@ kill-ports:
 	done
 
 kill-port-%:
-	@pids=$$(lsof -ti :$* 2>/dev/null || true); \
+	@pids=$$(lsof -nP -iTCP:$* -sTCP:LISTEN -t 2>/dev/null || true); \
 	if [ -n "$$pids" ]; then \
-		echo "Stopping PID(s) $$pids on port $*"; \
+		echo "Stopping listener PID(s) $$pids on port $*"; \
 		kill -9 $$pids 2>/dev/null || true; \
 	fi
 endif
@@ -45,8 +45,8 @@ dev-mocks: kill-port-$(DEV_PORT_MOCKS)
 
 # Install dependencies (also installs Husky git hooks)
 install:
-	pnpm install
 	cd frontend && pnpm install
+	cd mocks/flapi-mock && pnpm install
 	cd backend && uv sync
 
 # Build Docker image
