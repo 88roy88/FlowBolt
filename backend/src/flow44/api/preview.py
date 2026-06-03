@@ -61,7 +61,7 @@ async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Resp
     If the sandbox was evicted (idle), this triggers re-creation and shows
     a "waking up" page that auto-retries after 3 seconds.
     """
-    sandbox = await sandbox_manager.get_or_create_sandbox(project_id)
+    sandbox = await sandbox_manager.wake_sandbox(project_id)
 
     if not sandbox.is_dev_server_running():
         await sandbox_manager.ensure_ready(sandbox)

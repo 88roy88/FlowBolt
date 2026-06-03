@@ -90,13 +90,14 @@ class SandboxManager:
         idle_reaper.touch(project_id)
         return sandbox
 
-    async def get_or_create_sandbox(self, project_id: str) -> PnpmSandbox:
+    async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
+        """Get an active sandbox or re-create it if it was evicted by the idle reaper."""
         try:
-            sandbox = self.get_sandbox(project_id)
+            return self.get_sandbox(project_id)
         except SandboxNotFoundError:
             sandbox = await self.create_sandbox(project_id)
             idle_reaper.touch(project_id)
-        return sandbox
+            return sandbox
 
     @staticmethod
     async def ensure_ready(sandbox: PnpmSandbox) -> None:
@@ -117,7 +118,7 @@ class SandboxManager:
         """Reconcile workspace state: kill stale processes and delete orphan directories.
 
         Sandbox objects and ports are NOT pre-allocated — they are created lazily
-        via get_or_create_sandbox() when a user first connects.
+        via wake_sandbox() when a user first connects.
         """
         port_start, port_end = settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END
         self._kill_orphan_processes(port_start, port_end)
