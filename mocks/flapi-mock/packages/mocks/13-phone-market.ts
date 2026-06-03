@@ -1,7 +1,7 @@
 import { MockPackage, buildMetadata } from '../package-base.js';
 
 const data = {
-  market_share_cube: [
+  "Market Share Cube": [
     { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', units_sold: 52000, revenue_m: 51.9, market_share_pct: 35.2, yoy_growth: 4.1 },
     { brand: 'Samsung', category: 'Flagship', quarter: 'Q1-2025', units_sold: 38000, revenue_m: 39.5, market_share_pct: 25.7, yoy_growth: 8.3 },
     { brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', units_sold: 12000, revenue_m: 11.9, market_share_pct: 8.1,  yoy_growth: 22.5 },
@@ -13,7 +13,7 @@ const data = {
     { brand: 'Apple',   category: 'Flagship', quarter: 'Q4-2024', units_sold: 68000, revenue_m: 67.9, market_share_pct: 42.1, yoy_growth: 5.5 },
     { brand: 'Samsung', category: 'Flagship', quarter: 'Q4-2024', units_sold: 30000, revenue_m: 31.2, market_share_pct: 18.6, yoy_growth: 3.2 },
   ],
-  sales_trends_cube: [
+  "Sales Trends Cube": [
     { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', month: '2025-01', units: 15000, avg_price: 998,  returns: 120, return_rate: 0.8 },
     { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', month: '2025-02', units: 18000, avg_price: 995,  returns: 95,  return_rate: 0.5 },
     { brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', month: '2025-03', units: 19000, avg_price: 990,  returns: 110, return_rate: 0.6 },
@@ -24,7 +24,7 @@ const data = {
     { brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', month: '2025-02', units: 4000,  avg_price: 920,  returns: 25,  return_rate: 0.6 },
     { brand: 'Google',  category: 'Flagship', quarter: 'Q1-2025', month: '2025-03', units: 4500,  avg_price: 899,  returns: 28,  return_rate: 0.6 },
   ],
-  reviews_sentiment_cube: [
+  "Reviews Sentiment Cube": [
     { brand: 'Apple',   category: 'Flagship', model_name: 'iPhone 16 Pro',    device_id: 'PH01', quarter: 'Q1-2025', avg_rating: 4.6, reviews_total: 12500, positive_pct: 82, negative_pct: 8,  top_praise: 'Camera quality',  top_complaint: 'Price too high' },
     { brand: 'Apple',   category: 'Standard', model_name: 'iPhone 16',        device_id: 'PH02', quarter: 'Q1-2025', avg_rating: 4.4, reviews_total: 9800,  positive_pct: 78, negative_pct: 10, top_praise: 'Performance',     top_complaint: 'No ProMotion' },
     { brand: 'Samsung', category: 'Flagship', model_name: 'Galaxy S25 Ultra', device_id: 'PH03', quarter: 'Q1-2025', avg_rating: 4.5, reviews_total: 8200,  positive_pct: 80, negative_pct: 9,  top_praise: 'S Pen + AI',      top_complaint: 'Heavy weight' },
@@ -34,7 +34,7 @@ const data = {
     { brand: 'Xiaomi',  category: 'Flagship', model_name: 'Xiaomi 14 Ultra',  device_id: 'PH10', quarter: 'Q1-2025', avg_rating: 4.3, reviews_total: 2800,  positive_pct: 75, negative_pct: 12, top_praise: 'Leica camera',    top_complaint: 'MIUI ads' },
     { brand: 'Apple',   category: 'Budget',   model_name: 'iPhone SE 4',      device_id: 'PH08', quarter: 'Q1-2025', avg_rating: 4.2, reviews_total: 5600,  positive_pct: 74, negative_pct: 13, top_praise: 'Value for money', top_complaint: 'No always-on display' },
   ],
-  carrier_data_cube: [
+  "Carrier Data Cube": [
     { carrier: 'Cellcom',    brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', activations: 18000, avg_monthly_arpu: 89, churn_rate: 1.2, bundle_adoption: 45 },
     { carrier: 'Partner',    brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', activations: 15000, avg_monthly_arpu: 95, churn_rate: 0.9, bundle_adoption: 52 },
     { carrier: 'Hot Mobile', brand: 'Apple',   category: 'Flagship', quarter: 'Q1-2025', activations: 12000, avg_monthly_arpu: 85, churn_rate: 1.5, bundle_adoption: 38 },

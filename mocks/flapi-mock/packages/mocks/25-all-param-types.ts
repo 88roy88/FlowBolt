@@ -1,7 +1,7 @@
 import { MockPackage, quickParamsQuery, buildMetadata } from '../package-base.js';
 
 const sampleData = {
-  echo: [
+  Echo: [
     {
       label: 'sample text',
       date_range: '2025-01-01',
@@ -132,6 +132,6 @@ export default new MockPackage({
     const count = extractInt(quickParams.count);
     const ratio = extractDouble(quickParams.ratio);
 
-    return { echo: [{ label, date_range, recorded_at, area, is_active, count, ratio }] };
+    return { Echo: [{ label, date_range, recorded_at, area, is_active, count, ratio }] };
   },
 });

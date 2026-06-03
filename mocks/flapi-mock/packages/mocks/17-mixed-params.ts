@@ -1,7 +1,7 @@
 import { MockPackage, quickParamsQuery, buildMetadata } from '../package-base.js';
 
 const data = {
-  reports_cube: [
+  "Reports Cube": [
     { id: 1, type: 'Sales', quarter: 'Q1', year: 2025, region: 'North', department: 'Retail', priority: 'High' },
     { id: 2, type: 'Marketing', quarter: 'Q2', year: 2025, region: 'South', department: 'Digital', priority: 'Medium' },
     { id: 3, type: 'Finance', quarter: 'Q1', year: 2024, region: 'East', department: 'Analytics', priority: 'Low' },
@@ -56,7 +56,7 @@ export default new MockPackage({
     },
   ]),
   getResults(quickParams) {
-    let results = [...data.reports_cube];
+    let results = [...data["Reports Cube"]];
 
     // Required (no default): type
     if (quickParams?.type) {
@@ -88,6 +88,6 @@ export default new MockPackage({
       results = results.filter((row) => departments.includes(row.department));
     }
 
-    return { reports_cube: results };
+    return { "Reports Cube": results };
   },
 });

@@ -1,7 +1,7 @@
 import { MockPackage, quickParamsQuery, buildMetadata } from '../package-base.js';
 
 const data = {
-  products_cube: [
+  "Products Cube": [
     { id: 1, name: 'Widget A', category: 'Electronics', price: 299 },
     { id: 2, name: 'Widget B', category: 'Home', price: 149 },
     { id: 3, name: 'Widget C', category: 'Electronics', price: 499 },
@@ -31,7 +31,7 @@ export default new MockPackage({
     },
   ]),
   getResults(quickParams) {
-    let results = [...data.products_cube];
+    let results = [...data["Products Cube"]];
 
     if (quickParams?.category) {
       const categories = Array.isArray(quickParams.category) ? quickParams.category : [quickParams.category];
@@ -43,6 +43,6 @@ export default new MockPackage({
       results = results.filter((row) => row.price >= minPrice);
     }
 
-    return { products_cube: results };
+    return { "Products Cube": results };
   },
 });

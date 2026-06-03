@@ -1,7 +1,7 @@
 import { MockPackage, buildMetadata } from '../package-base.js';
 
 const data = {
-  reports: [
+  Reports: [
     { id: 'RPT-001', title: 'Weekly Threat Assessment', classification: 'SECRET', date: '2025-03-10', summary: 'Rising activity in sector 7; three new entities linked to campaign Alpha.', source: 'OSINT' },
     { id: 'RPT-002', title: 'Entity Network Mapping', classification: 'CONFIDENTIAL', date: '2025-03-12', summary: 'Mapping of 12 entities and 8 events; cross-ref with financial indicators.', source: 'HUMINT' },
     { id: 'RPT-003', title: 'Indicator Bulletin', classification: 'RESTRICTED', date: '2025-03-14', summary: 'New IOCs associated with infrastructure; recommend blocking at perimeter.', source: 'SIGINT' },
@@ -9,7 +9,7 @@ const data = {
     { id: 'RPT-005', title: 'Infrastructure Deep Dive', classification: 'SECRET', date: '2025-03-11', summary: 'Technical analysis of Server Farm 7 and related C2 infrastructure.', source: 'SIGINT' },
     { id: 'RPT-006', title: 'Person-of-Interest Update', classification: 'RESTRICTED', date: '2025-03-13', summary: 'Movement and communications pattern for primary subject.', source: 'HUMINT' },
   ],
-  entities: [
+  Entities: [
     { name: 'Alpha Corp', type: 'Organization', country: 'N/A', role: 'Suspected front', links: 4 },
     { name: 'John D.', type: 'Person', country: 'XX', role: 'Key contact', links: 2 },
     { name: 'Server Farm 7', type: 'Infrastructure', country: 'YY', role: 'Hosting', links: 12 },
@@ -19,7 +19,7 @@ const data = {
     { name: 'Relay Node A', type: 'Infrastructure', country: 'YY', role: 'Proxy', links: 7 },
     { name: 'Operation Beta', type: 'Campaign', country: 'N/A', role: 'Dormant', links: 2 },
   ],
-  events: [
+  Events: [
     { date: '2025-03-01', location: 'Region A', type: 'Meeting', description: 'Stakeholder coordination' },
     { date: '2025-03-05', location: 'Online', type: 'Transfer', description: 'Funds moved to shell entity' },
     { date: '2025-03-09', location: 'Region B', type: 'Deployment', description: 'New infrastructure detected' },
@@ -29,7 +29,7 @@ const data = {
     { date: '2025-03-10', location: 'Region C', type: 'Deployment', description: 'Mirror site activation' },
     { date: '2025-03-14', location: 'N/A', type: 'Alert', description: 'IOC hit on perimeter' },
   ],
-  indicators: [
+  Indicators: [
     { ioc: '192.0.2.100', type: 'IPv4', confidence: 0.92 },
     { ioc: 'malware-sample.exe', type: 'FileHash', confidence: 0.88 },
     { ioc: 'phishing-domain.tld', type: 'Domain', confidence: 0.95 },

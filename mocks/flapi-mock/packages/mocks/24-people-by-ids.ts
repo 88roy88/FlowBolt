@@ -3,7 +3,7 @@ import { people } from './_people.js';
 
 // 1-indexed into the shared roster so ids line up with what a user can see in
 // `_people.ts`. Exercises the multi-value (`singleValue: false`) path.
-const sampleData = { people: [people[0]] };
+const sampleData = { People: [people[0]] };
 
 export default new MockPackage({
   metadata: buildMetadata(24, 'Get People by IDs', sampleData, {
@@ -39,6 +39,6 @@ export default new MockPackage({
         }
       );
     });
-    return { people: results };
+    return { People: results };
   },
 });

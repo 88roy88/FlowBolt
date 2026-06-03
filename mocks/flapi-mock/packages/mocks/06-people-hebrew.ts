@@ -1,7 +1,7 @@
 import { MockPackage, buildMetadata } from '../package-base.js';
 
 const data = {
-  people: [
+  People: [
     { id: 'p1', m_id:1, hebrew_name: 'אלכס חן', department: 'הנדסה', rank: 'סגן' },
     { id: 'p2', m_id:2, hebrew_name: 'סם ריברה', department: 'מודיעין', rank: 'סרן' },
     { id: 'p3', m_id:3, hebrew_name: 'ג\'ורדן לי', department: 'לוגיסטיקה', rank: 'רב-סרן' },

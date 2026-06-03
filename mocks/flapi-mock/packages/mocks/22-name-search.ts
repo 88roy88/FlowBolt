@@ -1,7 +1,7 @@
 import { MockPackage, quickParamsQuery, buildMetadata } from '../package-base.js';
 import { people } from './_people.js';
 
-const data = { names: people.map((p) => ({ name: p.name })) };
+const data = { Names: people.map((p) => ({ name: p.name })) };
 
 export default new MockPackage({
   metadata: buildMetadata(22, 'Search Names by Prefix', data, {
@@ -23,7 +23,7 @@ export default new MockPackage({
     const prefix = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
     if (!prefix) return data;
     return {
-      names: data.names.filter((row) => row.name.toLowerCase().startsWith(prefix)),
+      Names: data.Names.filter((row) => row.name.toLowerCase().startsWith(prefix)),
     };
   },
 });

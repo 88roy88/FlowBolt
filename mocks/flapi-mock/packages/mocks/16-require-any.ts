@@ -1,7 +1,7 @@
 import { MockPackage, quickParamsQuery, buildMetadata } from '../package-base.js';
 
 const data = {
-  filters_cube: [
+  "Filters Cube": [
     { id: 1, region: 'North', department: 'Sales', status: 'Active', metric: 850 },
     { id: 2, region: 'South', department: 'Marketing', status: 'Active', metric: 620 },
     { id: 3, region: 'East', department: 'Sales', status: 'Inactive', metric: 740 },
@@ -35,14 +35,14 @@ export default new MockPackage({
     const departmentFilter = quickParams?.department;
 
     if (!regionFilter && !departmentFilter) {
-      return { filters_cube: [] };
+      return { "Filters Cube": [] };
     }
 
     const regions = regionFilter ? (Array.isArray(regionFilter) ? regionFilter : [regionFilter]) : null;
     const departments = departmentFilter ? (Array.isArray(departmentFilter) ? departmentFilter : [departmentFilter]) : null;
 
     return {
-      filters_cube: data.filters_cube.filter((row) => {
+      "Filters Cube": data["Filters Cube"].filter((row) => {
         const matchesRegion = !regions || regions.includes(row.region);
         const matchesDept = !departments || departments.includes(row.department);
         return matchesRegion && matchesDept;

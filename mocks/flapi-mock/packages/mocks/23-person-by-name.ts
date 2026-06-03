@@ -2,7 +2,7 @@ import { MockPackage, quickParamsQuery, buildMetadata } from '../package-base.js
 import { people, peopleByName } from './_people.js';
 
 // Shape the sample output as a single-row cube so buildMetadata emits a usable schema.
-const sampleData = { person: [people[0]] };
+const sampleData = { Person: [people[0]] };
 
 export default new MockPackage({
   metadata: buildMetadata(23, 'Get Person by Name', sampleData, {
@@ -24,7 +24,7 @@ export default new MockPackage({
     const match = key ? peopleByName.get(key) : undefined;
     if (!match) {
       return {
-        person: [
+        Person: [
           {
             name: `not found: ${typeof raw === 'string' ? raw : ''}`,
             title: '',
@@ -38,6 +38,6 @@ export default new MockPackage({
         ],
       };
     }
-    return { person: [match] };
+    return { Person: [match] };
   },
 });

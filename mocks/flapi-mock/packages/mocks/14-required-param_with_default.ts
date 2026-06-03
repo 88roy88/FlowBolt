@@ -1,7 +1,7 @@
 import { MockPackage, quickParamsQuery, buildMetadata } from '../package-base.js';
 
 const data = {
-  required_cube: [
+  "Required Cube": [
     { id: 1, status: 'Active', count: 42 },
     { id: 2, status: 'Pending', count: 18 },
     { id: 3, status: 'Completed', count: 95 },
@@ -27,12 +27,12 @@ export default new MockPackage({
     const statusFilter = quickParams?.status;
 
     if (!statusFilter) {
-      return { required_cube: [] };
+      return { "Required Cube": [] };
     }
 
     const statuses = Array.isArray(statusFilter) ? statusFilter : [statusFilter];
     return {
-      required_cube: data.required_cube.filter((row) => statuses.includes(row.status)),
+      "Required Cube": data["Required Cube"].filter((row) => statuses.includes(row.status)),
     };
   },
 });
