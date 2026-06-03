@@ -17,6 +17,7 @@ from flow44.api import (
     errors,
     export,
     files,
+    iaagent,
     models,
     preview,
     projects,
@@ -108,6 +109,7 @@ auth_routes.include_router(export.router)
 auth_routes.include_router(publish.router)
 auth_routes.include_router(data_source_api.router)
 auth_routes.include_router(chat.http_router)
+auth_routes.include_router(iaagent.router)
 app.include_router(auth_routes)
 
 # Public HTTP routes

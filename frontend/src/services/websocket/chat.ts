@@ -1,5 +1,6 @@
 import type { WSMessage } from '../../types';
 import type { ChatSocket } from './types';
+import { handleChatConnectionLost } from '../../stores/agentAlivePoll';
 import { createReconnectingSocket, getWsBase } from './reconnecting';
 
 const chatSockets = new Map<string, ChatSocket>();
@@ -25,7 +26,7 @@ export function getChatSocket(projectId: string): ChatSocket {
         handlers.forEach((h) => h(msg));
       } catch {}
     },
-    undefined,
+    handleChatConnectionLost,
     () => {
       if (typeof window !== 'undefined') {
         import('../../stores/errors').then(({ useErrorStore }) => {
