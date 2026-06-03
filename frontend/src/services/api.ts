@@ -1,4 +1,4 @@
-import { authSession, credentialsStore } from '../auth';
+import { authSession } from '../auth';
 import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
 
 const BASE = '/api';
@@ -164,28 +164,16 @@ export async function fetchDefaultModel(): Promise<string> {
 }
 
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
-  const headers: Record<string, string> = {};
-  const auth = await authSession.ensureFreshToken();
-  if (auth) headers.Authorization = auth;
-  const res = await fetch(`${BASE}/data-source/search/${encodeURIComponent(queryOrId)}`, { headers });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${text}`);
-  }
-  if (!text) return [] as DataSourceSearchRecord[];
-  return JSON.parse(text) as DataSourceSearchRecord[];
+  // Backend strips the Bearer prefix before forwarding to FLAPI, so the shared helper is safe here.
+  return request<DataSourceSearchRecord[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
 }
 
 export function downloadZip(projectId: string): void {
-  const token = credentialsStore.getValidToken();
-  const url = `${BASE}/export/${projectId}/zip${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-  window.open(url, '_blank');
+  window.open(`${BASE}/export/${projectId}/zip`, '_blank');
 }
 
 export function downloadSingleHtml(projectId: string): void {
-  const token = credentialsStore.getValidToken();
-  const url = `${BASE}/export/${projectId}/html${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-  window.open(url, '_blank');
+  window.open(`${BASE}/export/${projectId}/html`, '_blank');
 }
 
 export async function publishToS3(projectId: string, slug?: string): Promise<{ url: string; handle: string; published_at: string }> {

@@ -1,8 +1,8 @@
 export type AuthCredentials = {
   auth_token: string;
-  userId?: string;
+  userId: string;
   userName?: string;
-  exp?: number;
+  exp: number;
   [key: string]: unknown;
 };
 
@@ -28,17 +28,17 @@ export function extractCredentials(data: Record<string, unknown>): AuthCredentia
   const token = data.auth_token;
   if (typeof token !== 'string' || !token.trim()) return null;
 
-  const creds: AuthCredentials = { auth_token: token.trim() };
-
   const userId = findClaimBySuffix(data, '/UniqueID');
-  if (userId) creds.userId = userId;
+  if (!userId) return null;
+
+  if (typeof data.exp !== 'number' || !Number.isFinite(data.exp)) return null;
+
+  const creds: AuthCredentials = { auth_token: token.trim(), userId, exp: data.exp };
 
   const givenName = findClaimBySuffix(data, '/givenname');
   const surname = findClaimBySuffix(data, '/surname');
   const fullName = [givenName, surname].filter(Boolean).join(' ');
   if (fullName) creds.userName = fullName;
-
-  if (typeof data.exp === 'number' && Number.isFinite(data.exp)) creds.exp = data.exp;
 
   return creds;
 }

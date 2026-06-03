@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 
-from flow44.api.deps import ProjectDep, SandboxDep, WsSandboxDep
+from flow44.api.deps import ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ async def proxy_to_sandbox(  # noqa: E501
 
 @router.websocket("/{project_id}/proxy/")
 @router.websocket("/{project_id}/proxy")
-async def proxy_ws(websocket: WebSocket, project_id: str, sandbox: WsSandboxDep) -> None:  # noqa: C901
+async def proxy_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandboxDep) -> None:  # noqa: C901
     """Proxy WebSocket connections for Vite HMR."""
     await websocket.accept()
 
@@ -104,7 +104,7 @@ async def proxy_ws(websocket: WebSocket, project_id: str, sandbox: WsSandboxDep)
 
     import websockets  # noqa: PLC0415
 
-    proxy_prefix = f"/api/preview/{project_id}/proxy"
+    proxy_prefix = f"/api/preview/{project.id}/proxy"
     query = websocket.scope.get("query_string", b"").decode()
     target_url = f"ws://127.0.0.1:{sandbox.port}{proxy_prefix}"
     if query:
@@ -130,7 +130,7 @@ async def proxy_ws(websocket: WebSocket, project_id: str, sandbox: WsSandboxDep)
 
             await asyncio.gather(client_to_upstream(), upstream_to_client())
     except Exception:
-        logger.debug("HMR WebSocket proxy failed for session %s", project_id)
+        logger.debug("HMR WebSocket proxy failed for session %s", project.id)
     finally:
         try:
             await websocket.close()

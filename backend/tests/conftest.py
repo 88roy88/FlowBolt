@@ -10,7 +10,9 @@ load_dotenv(Path(__file__).parent / "test.env")
 
 import flow44.config  # noqa: E402
 import flow44.db.database  # noqa: E402
+from flow44.api.deps import get_user_id  # noqa: E402
 from flow44.db.database import get_engine, init_db, reset  # noqa: E402
+from flow44.main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -34,6 +36,14 @@ def auth_test_user():
 @pytest.fixture
 def tmp_dir(tmp_path: Path) -> Path:
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def authenticated_user():
+    # HTTP tests act as a signed-in user; auth tests call the deps directly and bypass this.
+    app.dependency_overrides[get_user_id] = lambda: "test-user"
+    yield
+    app.dependency_overrides.pop(get_user_id, None)
 
 
 @pytest.fixture(scope="session")
