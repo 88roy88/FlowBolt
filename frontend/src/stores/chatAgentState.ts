@@ -1,0 +1,88 @@
+import type { AgentPhase, AgentPhaseConstMap } from '../types';
+import type { ChatState } from './chat';
+
+/** Every `AgentPhase` as an identity key/value pair; mismatched values fail type-check. */
+export const AGENT_PHASE = {
+  idle: 'idle',
+  fetching_data_sources: 'fetching_data_sources',
+  designing: 'designing',
+  planning: 'planning',
+  awaiting_approval: 'awaiting_approval',
+  executing: 'executing',
+  fixing: 'fixing',
+  exploring: 'exploring',
+  complete: 'complete',
+} as const satisfies AgentPhaseConstMap;
+
+export type AgentPhaseMap = typeof AGENT_PHASE;
+
+export const TERMINAL_EVENT_TYPES = [
+  'action_complete',
+  'error',
+  'plan_rejected',
+  'plan_overview',
+] as const;
+
+export const ACTIVE_AGENT_PHASES: AgentPhase[] = [
+  AGENT_PHASE.fetching_data_sources,
+  AGENT_PHASE.designing,
+  AGENT_PHASE.planning,
+  AGENT_PHASE.executing,
+  AGENT_PHASE.fixing,
+  AGENT_PHASE.exploring,
+];
+
+export const TRANSIENT_RESET: Partial<ChatState> = {
+  isStreaming: false,
+  agentAlive: false,
+  agentPhase: AGENT_PHASE.idle,
+  currentAssistantMessage: '',
+  actions: [],
+  followUpSteps: [],
+  followUpDiffs: [],
+  fixSteps: [],
+  executionTasks: [],
+  designProgress: { architecture: null, ux: null },
+};
+
+export type AgentActivityState = Pick<ChatState, 'isStreaming' | 'agentPhase'>;
+export type AwaitingPlanState = Pick<ChatState, 'agentPhase' | 'planOverview'>;
+
+export function isHistoryRunComplete(events: Array<{ type?: string }>): boolean {
+  if (events.length === 0) return true;
+  const lastType = events[events.length - 1].type;
+  if (!lastType) return true;
+  return (TERMINAL_EVENT_TYPES as readonly string[]).includes(lastType);
+}
+
+export function isAwaitingPlanApproval(state: AwaitingPlanState): boolean {
+  return (
+    state.agentPhase === AGENT_PHASE.awaiting_approval &&
+    state.planOverview != null
+  );
+}
+
+export function isAgentWorking(state: AgentActivityState): boolean {
+  return state.isStreaming || ACTIVE_AGENT_PHASES.includes(state.agentPhase);
+}
+
+export function isKnownAgentPhase(phase: string | null): phase is AgentPhase {
+  return phase !== null && (Object.values(AGENT_PHASE) as string[]).includes(phase);
+}
+
+export type AgentAliveState = AgentActivityState & Pick<ChatState, 'error' | 'agentAlive'>;
+
+/**
+ * True while the backend agent is running.
+ * Uses poll (`agentAlive`) when known; falls back to local WS activity until the first poll.
+ */
+export function isAgentAlive(state: AgentAliveState): boolean {
+  if (state.error) return false;
+  if (state.agentAlive === true) return true;
+  if (state.agentAlive === false) return false;
+  return isAgentWorking(state);
+}
+
+export function getTransientReset(): Partial<ChatState> {
+  return { ...TRANSIENT_RESET };
+}
