@@ -77,14 +77,21 @@ def decode_token(token: str) -> TokenPayload | None:
         return None
 
 
-def get_user_id(token: TokenDep) -> str:
-    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
+def validate_token(token: TokenDep) -> TokenPayload:
+    """Require a valid signed token; no user_id claim needed."""
     if not token:
         raise HTTPException(status_code=401, detail="Authorization required")
 
     payload = decode_token(token)
     if payload is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return payload
+
+
+def get_user_id(token: TokenDep) -> str:
+    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
+    payload = validate_token(token)
     if not payload.unique_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
 
@@ -102,6 +109,14 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 
 
 ProjectDep = Annotated[Project, Depends(get_project)]
+
+
+async def validate_ws_token(token: TokenDep) -> TokenPayload:
+    """WS variant of validate_token: rejects the handshake instead of HTTP 401."""
+    try:
+        return validate_token(token)
+    except HTTPException:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
 
 
 async def get_ws_user_id(

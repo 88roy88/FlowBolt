@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 http_router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 # WebSocket router — auth via Depends() on each endpoint
-router = APIRouter()
+ws_router = APIRouter()
 
 
 async def _is_new_project(project_id: str) -> bool:
@@ -54,7 +54,7 @@ async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
     return [{**evt.payload, "_ts": evt.created_at} for evt in events]
 
 
-@router.websocket("/ws/chat/{project_id}")
+@ws_router.websocket("/ws/chat/{project_id}")
 async def chat_ws(  # noqa: C901, PLR0915
     websocket: WebSocket,
     project: WsProjectDep,

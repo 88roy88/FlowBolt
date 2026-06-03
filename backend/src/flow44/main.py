@@ -24,7 +24,7 @@ from flow44.api import (
     server_log,
     terminal,
 )
-from flow44.api.deps import get_user_id
+from flow44.api.deps import validate_token, validate_ws_token
 from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
@@ -99,24 +99,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# All HTTP REST routes share a single auth choke-point
-api_router = APIRouter(dependencies=[Depends(get_user_id)])
-api_router.include_router(projects.router)
-api_router.include_router(files.router)
-api_router.include_router(preview.router)
-api_router.include_router(export.router)
-api_router.include_router(publish.router)
-api_router.include_router(data_source_api.router)
-api_router.include_router(chat.http_router)
-app.include_router(api_router)
+# Authenticated HTTP routes
+auth_routes = APIRouter(dependencies=[Depends(validate_token)])
+auth_routes.include_router(projects.router)
+auth_routes.include_router(files.router)
+auth_routes.include_router(preview.router)
+auth_routes.include_router(export.router)
+auth_routes.include_router(publish.router)
+auth_routes.include_router(data_source_api.router)
+auth_routes.include_router(chat.http_router)
+app.include_router(auth_routes)
 
-# Public HTTP REST routes — no auth required
-public_router = APIRouter()
-public_router.include_router(models.router)
-app.include_router(public_router)
+# Public HTTP routes
+public_routes = APIRouter()
+public_routes.include_router(models.router)
+app.include_router(public_routes)
 
-# WS routers — handle their own auth
-app.include_router(chat.router)
-app.include_router(terminal.router)
-app.include_router(server_log.router)
-app.include_router(errors.router)
+# Authenticated WS routes
+ws_auth_routes = APIRouter(dependencies=[Depends(validate_ws_token)])
+ws_auth_routes.include_router(chat.ws_router)
+ws_auth_routes.include_router(terminal.router)
+ws_auth_routes.include_router(server_log.router)
+ws_auth_routes.include_router(errors.router)
+app.include_router(ws_auth_routes)
