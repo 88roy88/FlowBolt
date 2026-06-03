@@ -145,7 +145,13 @@
       "designing": "Designing",
       "planning": "Planning",
       "building": "Building",
-      "thinking": "Thinking"
+      "thinking": "Thinking",
+      "designingApplication": "Designing the application...",
+      "buildingWorkPlan": "Building work plan...",
+      "reviewPlanBelow": "Review the plan below",
+      "fixing": "Fixing error...",
+      "exploring": "Exploring codebase...",
+      "done": "Done!"
     },
     "plan": {
       "whatYouWillGet": "What you'll get",
