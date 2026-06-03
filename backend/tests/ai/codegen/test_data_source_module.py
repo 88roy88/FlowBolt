@@ -138,10 +138,47 @@ class TestMixedParams:
             params_info=params,
             queries=_queries("mixed"),
         )
-        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string; // Type\n  priority?: string | string[]; // Priority\n  createdAfter?: { From: Date; To: Date }; // Created after" in result
+        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };" in result
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) {\n    body['tasks']['priority'] = priority;\n  }" in result
         assert "if (createdAfter !== undefined) {\n    body['tasks']['created_after'] = createdAfter;\n  }" in result
+
+
+class TestDisplayNameComment:
+    def test_comment_only_on_non_redundant_display_name(self) -> None:
+        # "name" / "Name" → redundant → no comment
+        # "dept_id" / "Department" → different → comment emitted
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="name",
+                    display_name="Name",
+                    type="string",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="employees",
+                ),
+                ParamDefinition(
+                    name="dept_id",
+                    display_name="Department",
+                    type="string",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="employees",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="Employee",
+            params_info=params,
+            queries=_queries("employee"),
+        )
+        assert "name: string;\n  deptId: string; // Department" in result
+        assert "name: string; // Name" not in result
 
 
 class TestArrayParam:
@@ -469,7 +506,7 @@ class TestRequireAnyGroup:
         # Both require_any params are treated as required positional for TS typing
         # (runtime OR-validation is the caller's concern; the prompt tells the LLM
         # at least one must be provided).
-        assert "  email,\n  phone,\n}: {\n  email: string; // Email\n  phone: string; // Phone" in result
+        assert "  email,\n  phone,\n}: {\n  email: string;\n  phone: string;" in result
 
 
 class TestDatetimeFieldConversion:
