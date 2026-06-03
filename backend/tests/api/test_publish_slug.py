@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
+from flow44.api.deps import validate_token
 from flow44.config import settings
 from flow44.main import app
 
@@ -215,6 +216,35 @@ class TestShareBySlug:
             response = client.get("/shared/nonexistent")
             assert response.status_code == 404
             assert "No published app found" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_share_route_is_public(self):
+        """The share route must serve without a token — it backs public links.
+
+        The autouse ``authenticated_user`` fixture globally overrides
+        ``validate_token``; drop it here so a missing/invalid token is not masked.
+        """
+        mock_proj = _mock_project(published_url="my-app", published_at="2026-04-18T21:00:00Z")
+        mock_proj.id = "proj-123"
+        saved = app.dependency_overrides.pop(validate_token, None)
+        try:
+            with patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj):
+                with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"), \
+                     patch("httpx.AsyncClient.get") as mock_get:
+                    mock_resp = AsyncMock()
+                    mock_resp.status_code = 200
+                    mock_resp.text = "<html>Shared App</html>"
+                    mock_resp.headers = {}
+                    mock_resp.raise_for_status = lambda: None
+                    mock_get.return_value = mock_resp
+
+                    response = client.get("/shared/my-app")
+
+                    assert response.status_code == 200
+                    assert response.text == "<html>Shared App</html>"
+        finally:
+            if saved is not None:
+                app.dependency_overrides[validate_token] = saved
 
     @pytest.mark.asyncio
     async def test_share_s3_failure_returns_502(self):
