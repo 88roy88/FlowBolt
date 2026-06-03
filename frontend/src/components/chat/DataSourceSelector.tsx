@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { searchDataSources } from '../../services/api';
 import type { DataSourceSearchRecord } from '../../types';
 import { X, Search } from 'lucide-react';
@@ -36,8 +37,10 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
     if (isOpen && inputRef.current) inputRef.current.focus();
   }, [isOpen]);
 
+  const debouncedQuery = useDebouncedValue(query, 300);
+
   useEffect(() => {
-    if (!query.trim()) {
+    if (!debouncedQuery.trim()) {
       setResults([]);
       setShowDropdown(false);
       setIsLoading(false);
@@ -45,12 +48,12 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
     }
 
     let ignore = false;
+    setIsLoading(true);
+    setShowDropdown(true);
 
-    const timer = setTimeout(async () => {
-      setIsLoading(true);
-      setShowDropdown(true);
+    (async () => {
       try {
-        const sources = await searchDataSources(query);
+        const sources = await searchDataSources(debouncedQuery);
         if (!ignore) setResults(sources.slice(0, 10));
       } catch (err) {
         console.error('Failed to search data sources:', err);
@@ -58,13 +61,12 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
       } finally {
         if (!ignore) setIsLoading(false);
       }
-    }, 300);
+    })();
 
     return () => {
       ignore = true;
-      clearTimeout(timer);
     };
-  }, [query]);
+  }, [debouncedQuery]);
 
   if (!isOpen) return null;
 

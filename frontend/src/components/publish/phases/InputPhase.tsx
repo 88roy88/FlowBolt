@@ -6,26 +6,24 @@ import { SlugInput } from '../components/SlugInput';
 import { SlugPreview } from '../components/SlugPreview';
 import { PublishButton } from '../components/PublishButton';
 import { BTN_SECONDARY } from '../styles';
-import { usePublishStore, SlugStatus } from '../../../stores/publish';
+import { usePublishStore } from '../../../stores/publish';
+import { useSlugAvailability, SlugStatus } from '../../../hooks/useSlugAvailability';
 
 interface InputPhaseProps {
-  mode: 'create' | 'edit';
+  isPublishing: boolean;
   onPublish: (useSlug: boolean) => void;
-  onCancelEditing: () => void;
 }
 
-export function InputPhase({
-  mode,
-  onPublish,
-  onCancelEditing,
-}: InputPhaseProps) {
+export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
+  const mode = usePublishStore(s => s.mode);
+  const projectId = usePublishStore(s => s.projectId);
   const slug = usePublishStore(s => s.slug);
-  const slugStatus = usePublishStore(s => s.status);
-  const isPublishing = usePublishStore(s => s.isPublishing);
   const initialSlug = usePublishStore(s => s.initialSlug);
   const onSlugChange = usePublishStore(s => s.setSlug);
-  const canPublish = usePublishStore(s => s.canPublish());
+  const onCancelEditing = usePublishStore(s => s.resetSlug);
   const isChanged = usePublishStore(s => s.isChanged());
+  const { status: slugStatus, canPublish } = useSlugAvailability();
+
   const { t } = useTranslation();
   const [isEditingSlug, setIsEditingSlug] = useState(mode === 'create');
   
@@ -56,7 +54,6 @@ export function InputPhase({
 
   return (
     <div className="flex flex-col space-y-4">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full flex items-center justify-center bg-primary/10 shrink-0">
           <Globe className="w-5 h-5 text-primary" />
@@ -76,7 +73,7 @@ export function InputPhase({
         <>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">{t('publish.currentUrl')}</label>
-            <SlugPreview slugValue={initialSlug || usePublishStore.getState().projectId!} />
+            <SlugPreview slugValue={initialSlug || projectId || ''} />
           </div>
 
           <p className="text-xs text-amber-500/90">{t('publish.overwriteWarning')}</p>
