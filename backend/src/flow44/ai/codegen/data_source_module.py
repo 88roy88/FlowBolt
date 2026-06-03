@@ -86,7 +86,9 @@ def _ts_type(p: ParamDefinition) -> str:
             base = "WKT"
         case _ as unreachable:
             assert_never(unreachable)
-    return f"{base} | {base}[]" if not p.is_single_value else base
+    if not p.is_single_value and p.type != "datetime":
+        return f"{base} | {base}[]"
+    return base
 
 
 def _unique_idents(params: list[ParamDefinition]) -> dict[int, str]:
