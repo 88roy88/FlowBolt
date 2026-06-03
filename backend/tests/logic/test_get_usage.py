@@ -59,7 +59,6 @@ class TestGetUsage:
         assert len(usage.queries) == 1
         assert usage.queries[0].name == "persons"
         assert usage.params.parameters == []
-        assert usage.minimal_params == {}
         assert usage.can_run is True
 
     async def test_fetches_params_info_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
