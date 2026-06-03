@@ -17,7 +17,7 @@ export function SlugInput({ value, onChange, placeholder, disabled }: SlugInputP
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e)}
+        onChange={onChange}
         placeholder={placeholder}
         disabled={disabled}
         className="flex-1 px-3 py-2 text-sm bg-transparent outline-none placeholder:text-muted-foreground/50"
