@@ -96,11 +96,17 @@ export const SearchResultSchema = Type.Object({
 
 export type SearchResult = Static<typeof SearchResultSchema>;
 
-// Quick Param types
-export const QuickParamValueSchema = Type.Object({
-  Name: Type.String(),
-  Value: Type.String(),
-});
+// Usually an array of { Name, Value } option items, but can be 
+// any valid Inflow parameter type (see QuickParamValue).
+export const QuickParamValueSchema = Type.Union([
+  Type.Array(
+    Type.Object({
+      Name: Type.Union([Type.String(), Type.Null()]),
+      Value: Type.Union([Type.String(), Type.Number(), Type.Null()]),
+    }),
+  ),
+  Type.Unknown(),
+]);
 
 export const QuickParamDefinitionSchema = Type.Object({
   Name: Type.String(),
