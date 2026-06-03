@@ -102,7 +102,7 @@ async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
     if project_id not in sandbox_manager._sandboxes:
         raise HTTPException(status_code=404, detail="No active sandbox for this project")
 
-    await sandbox_manager.destroy_sandbox(project_id, delete_workspace=False)
+    await sandbox_manager.suspend_sandbox(project_id)
     idle_reaper.remove(project_id)
     return {"status": "reaped", "project_id": project_id}
 
@@ -113,6 +113,6 @@ async def delete_existing_project(project_id: str) -> None:
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    await sandbox_manager.destroy_sandbox(project.id, delete_workspace=True)
+    await sandbox_manager.destroy_sandbox(project.id)
     idle_reaper.remove(project.id)
     await delete_project(project_id)

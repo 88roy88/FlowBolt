@@ -43,33 +43,33 @@ class TestSandboxManagerLifecycle:
             s2 = await mgr.wake_sandbox("proj1")
         assert s1 is s2
 
-    async def test_destroy_removes_sandbox(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_suspend_removes_sandbox(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
             await mgr.create_sandbox("proj1")
-            await mgr.destroy_sandbox("proj1", delete_workspace=False)
+            await mgr.suspend_sandbox("proj1")
         with pytest.raises(SandboxNotFoundError):
             mgr.get_sandbox("proj1")
 
-    async def test_port_freed_after_destroy(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_port_freed_after_suspend(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
             sandbox = await mgr.create_sandbox("proj1")
             port = sandbox.port
             assert port not in mgr._available_ports
-            await mgr.destroy_sandbox("proj1", delete_workspace=False)
+            await mgr.suspend_sandbox("proj1")
         assert port in mgr._available_ports
 
-    async def test_destroy_nonexistent_no_error(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_suspend_nonexistent_no_error(self, manager) -> None:  # type: ignore[type-arg]
         mgr, *_ = manager
-        await mgr.destroy_sandbox("ghost", delete_workspace=False)  # must not raise
+        await mgr.suspend_sandbox("ghost")  # must not raise
 
-    async def test_destroy_all(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_suspend_all(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
             await mgr.create_sandbox("p1")
             await mgr.create_sandbox("p2")
-            await mgr.destroy_all(delete_workspaces=False)
+            await mgr.suspend_all()
         with pytest.raises(SandboxNotFoundError):
             mgr.get_sandbox("p1")
         with pytest.raises(SandboxNotFoundError):

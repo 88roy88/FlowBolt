@@ -58,7 +58,13 @@ class SandboxManager:
     def _create_sandbox_instance(self, info: SandboxInfo) -> PnpmSandbox:
         return self._get_sandbox_class()(info)
 
-    async def create_sandbox(self, project_id: str) -> PnpmSandbox:
+    async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
+        """Get an active sandbox, or re-activate it if it was suspended."""
+        sandbox = self._sandboxes.get(project_id)
+        if sandbox is not None:
+            idle_reaper.touch(project_id)
+            return sandbox
+
         async with self._lock:
             port = self._take_available_port()
 
@@ -69,19 +75,32 @@ class SandboxManager:
         await sandbox.start()
 
         self._sandboxes[project_id] = sandbox
+        idle_reaper.touch(project_id)
         return sandbox
 
-    async def destroy_sandbox(self, project_id: str, *, delete_workspace: bool = True) -> None:
+    async def create_sandbox(self, project_id: str) -> PnpmSandbox:
+        """Create a brand-new sandbox for a newly created project."""
+        return await self.wake_sandbox(project_id)
+
+    async def suspend_sandbox(self, project_id: str) -> None:
+        """Suspend a sandbox: kill processes and free port, but keep workspace on disk."""
         async with self._lock:
             sandbox = self._sandboxes.pop(project_id, None)
 
         if sandbox is None:
             return
 
-        await sandbox.destroy(delete_workspace=delete_workspace)
+        await sandbox.destroy(delete_workspace=False)
 
         async with self._lock:
             self._available_ports.add(sandbox.port)
+
+    async def destroy_sandbox(self, project_id: str) -> None:
+        """Permanently destroy a sandbox and delete its workspace from disk."""
+        await self.suspend_sandbox(project_id)
+        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+        if os.path.isdir(workspace_dir):
+            shutil.rmtree(workspace_dir, ignore_errors=True)
 
     def get_sandbox(self, project_id: str) -> PnpmSandbox:
         sandbox = self._sandboxes.get(project_id)
@@ -89,15 +108,6 @@ class SandboxManager:
             raise SandboxNotFoundError(f"No sandbox found for project_id {project_id}")
         idle_reaper.touch(project_id)
         return sandbox
-
-    async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
-        """Get an active sandbox or re-create it if it was evicted by the idle reaper."""
-        try:
-            return self.get_sandbox(project_id)
-        except SandboxNotFoundError:
-            sandbox = await self.create_sandbox(project_id)
-            idle_reaper.touch(project_id)
-            return sandbox
 
     @staticmethod
     async def ensure_dev_server(sandbox: PnpmSandbox) -> None:
@@ -143,10 +153,11 @@ class SandboxManager:
                 logger.info("Removing orphan workspace %s", name)
                 shutil.rmtree(workspace_dir, ignore_errors=True)
 
-    async def destroy_all(self, *, delete_workspaces: bool = False) -> None:
+    async def suspend_all(self) -> None:
+        """Suspend all active sandboxes (used during shutdown)."""
         project_ids = list(self._sandboxes.keys())
         for sid in project_ids:
-            await self.destroy_sandbox(sid, delete_workspace=delete_workspaces)
+            await self.suspend_sandbox(sid)
 
 
 sandbox_manager = SandboxManager()

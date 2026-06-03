@@ -66,7 +66,7 @@ class IdleReaper:
                     project_id,
                     idle_seconds,
                 )
-                await sandbox_manager.destroy_sandbox(project_id, delete_workspace=False)
+                await sandbox_manager.suspend_sandbox(project_id)
                 self._last_activity.pop(project_id, None)
 
 

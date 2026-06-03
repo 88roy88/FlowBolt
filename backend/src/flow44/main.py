@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
     await idle_reaper.stop()
-    await sandbox_manager.destroy_all()
+    await sandbox_manager.suspend_all()
     logger.info("Shutdown complete.")
 
 
