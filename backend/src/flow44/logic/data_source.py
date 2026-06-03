@@ -201,7 +201,7 @@ def _default_for(param: ParamDefinition) -> ParamValue | None:
     return parsed if param.is_single_value else [parsed]
 
 
-def _minimal_params_for(params_info: DataSourceParamsInfo) -> QuickParams | None:
+def _minimal_params_for(params_info: DataSourceParamsInfo) -> QuickParams | None:  # noqa: C901
     if not params_info.parameters:
         return QuickParams(root={})
 
