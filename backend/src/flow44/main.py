@@ -29,7 +29,7 @@ from flow44.db.database import init_db
 from flow44.db.project import list_projects
 from flow44.integrations.s3 import setup_bucket
 from flow44.sandbox.idle_reaper import idle_reaper
-from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+from flow44.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -89,9 +89,6 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok", "version": "0.1.0"}
 
 
-@app.exception_handler(SandboxNotFoundError)
-async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 # CORS — allow all origins in development

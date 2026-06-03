@@ -16,10 +16,6 @@ class SandboxError(Exception):
     pass
 
 
-class SandboxNotFoundError(SandboxError):
-    pass
-
-
 class SandboxManager:
     def __init__(self) -> None:
         self._sandboxes: dict[str, PnpmSandbox] = {}
@@ -58,29 +54,36 @@ class SandboxManager:
     def _create_sandbox_instance(self, info: SandboxInfo) -> PnpmSandbox:
         return self._get_sandbox_class()(info)
 
-    async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
+    async def get_sandbox(self, project_id: str) -> PnpmSandbox:
         """Get an active sandbox, or re-activate it if it was suspended."""
         sandbox = self._sandboxes.get(project_id)
-        if sandbox is not None:
-            idle_reaper.touch(project_id)
-            return sandbox
+        if sandbox is None:
+            async with self._lock:
+                port = self._take_available_port()
 
-        async with self._lock:
-            port = self._take_available_port()
+            workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+            info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
 
-        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
-        info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
+            sandbox = self._create_sandbox_instance(info)
+            await sandbox.start()
 
-        sandbox = self._create_sandbox_instance(info)
-        await sandbox.start()
+            self._sandboxes[project_id] = sandbox
 
-        self._sandboxes[project_id] = sandbox
         idle_reaper.touch(project_id)
         return sandbox
 
+    async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
+        """Wake a suspended sandbox: get it and start the dev server."""
+        sandbox = await self.get_sandbox(project_id)
+        await self.start_dev_server(sandbox)
+        return sandbox
+
     async def create_sandbox(self, project_id: str) -> PnpmSandbox:
-        """Create a brand-new sandbox for a newly created project."""
-        return await self.wake_sandbox(project_id)
+        """Create a brand-new sandbox: get, scaffold, and start the dev server."""
+        sandbox = await self.get_sandbox(project_id)
+        await sandbox.scaffold(settings.TEMPLATE_DIR)
+        await self.start_dev_server(sandbox)
+        return sandbox
 
     async def suspend_sandbox(self, project_id: str) -> None:
         """Suspend a sandbox: kill processes and free port, but keep workspace on disk."""
@@ -102,12 +105,6 @@ class SandboxManager:
         if os.path.isdir(workspace_dir):
             shutil.rmtree(workspace_dir, ignore_errors=True)
 
-    def get_sandbox(self, project_id: str) -> PnpmSandbox:
-        sandbox = self._sandboxes.get(project_id)
-        if sandbox is None:
-            raise SandboxNotFoundError(f"No sandbox found for project_id {project_id}")
-        idle_reaper.touch(project_id)
-        return sandbox
 
     @staticmethod
     async def start_dev_server(sandbox: PnpmSandbox) -> None:

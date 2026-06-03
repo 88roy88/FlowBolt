@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from flow44.sandbox.base import SandboxInfo
-from flow44.sandbox.manager import SandboxManager, SandboxNotFoundError
+from flow44.sandbox.manager import SandboxManager
 
 from .conftest import DummySandbox
 
@@ -25,16 +25,19 @@ def manager(tmp_path):  # type: ignore[type-arg]
 
 @pytest.mark.asyncio
 class TestSandboxManagerLifecycle:
-    async def test_get_unknown_raises(self, manager) -> None:  # type: ignore[type-arg]
-        mgr, *_ = manager
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("nonexistent")
+    async def test_get_creates_if_missing(self, manager) -> None:  # type: ignore[type-arg]
+        mgr, workspace_base, mock_s = manager
+        with patch("flow44.sandbox.manager.settings", mock_s):
+            sandbox = await mgr.get_sandbox("proj1")
+        assert "proj1" in mgr._sandboxes
+        assert mgr._sandboxes["proj1"] is sandbox
 
     async def test_create_and_get(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
             sandbox = await mgr.create_sandbox("proj1")
-        assert mgr.get_sandbox("proj1") is sandbox
+            got = await mgr.get_sandbox("proj1")
+        assert got is sandbox
 
     async def test_wake_sandbox_idempotent(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
@@ -48,8 +51,7 @@ class TestSandboxManagerLifecycle:
         with patch("flow44.sandbox.manager.settings", mock_s):
             await mgr.create_sandbox("proj1")
             await mgr.suspend_sandbox("proj1")
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("proj1")
+        assert "proj1" not in mgr._sandboxes
 
     async def test_port_freed_after_suspend(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
@@ -70,10 +72,8 @@ class TestSandboxManagerLifecycle:
             await mgr.create_sandbox("p1")
             await mgr.create_sandbox("p2")
             await mgr.suspend_all()
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("p1")
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("p2")
+        assert "p1" not in mgr._sandboxes
+        assert "p2" not in mgr._sandboxes
 
     async def test_workspace_dir_is_under_base(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager

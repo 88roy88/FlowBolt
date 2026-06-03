@@ -54,7 +54,6 @@ async def get_preview_port(project_id: str, sandbox: Annotated[PnpmSandbox, Sand
 )
 async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Response:
     sandbox = await sandbox_manager.wake_sandbox(project_id)
-    await sandbox_manager.start_dev_server(sandbox)
 
     proxy_prefix = f"/api/preview/{project_id}/proxy"
     target_url = f"http://127.0.0.1:{sandbox.port}{proxy_prefix}/{path}"

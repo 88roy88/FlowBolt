@@ -9,7 +9,6 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from flow44.config import settings
 from flow44.db.project import (
     create_project,
     delete_project,
@@ -55,22 +54,16 @@ async def debug_list_sandboxes() -> dict[str, Any]:
 async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
     project = await create_project(body.name)
 
-    sandbox = await sandbox_manager.create_sandbox(project.id)
-
-    async def _scaffold_and_start() -> None:
+    async def _create() -> None:
         from flow44.db.events import emit_event  # noqa: PLC0415
 
         try:
-            logger.info("[projects] Scaffolding project for session %s", project.id)
-            await sandbox.scaffold(settings.TEMPLATE_DIR)
-            logger.info("[projects] Starting dev server for session %s", project.id)
-            await sandbox.start_dev_server()
+            await sandbox_manager.create_sandbox(project.id)
         except Exception:
-            logger.exception("[projects] Scaffolding failed for session %s", project.id)
+            logger.exception("[projects] Sandbox creation failed for project %s", project.id)
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
-    # TODO: shouldnt we use the fastapi background-task for this?
-    asyncio.create_task(_scaffold_and_start())
+    asyncio.create_task(_create())
     return project.model_dump()
 
 
