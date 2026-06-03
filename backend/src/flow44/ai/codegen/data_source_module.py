@@ -172,9 +172,13 @@ def _build_date_conversions(queries: list[DataSourceQuerySchema]) -> list[str]:
         if not datetime_fields:
             continue
         lines.append(f"  for (const row of envelope.data[{_js_string(query.display_name)}]) {{\n")
+        lines.append("    try {\n")
         for field in datetime_fields:
             k = _js_string(field.name)
-            lines.append(f"    if (row[{k}] != null) row[{k}] = new Date(row[{k}] as unknown as string);\n")
+            lines.append(f"      if (row[{k}] != null) row[{k}] = new Date(row[{k}] as unknown as string);\n")
+        lines.append("    } catch (e) {\n")
+        lines.append("      console.warn('Failed to convert date fields', e);\n")
+        lines.append("    }\n")
         lines.append("  }\n")
     return lines
 
