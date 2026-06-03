@@ -68,7 +68,7 @@ def _generate_from_schema(queries: list[DataSourceQuerySchema], base_name: str) 
         body = "\n".join(field_lines) if field_lines else "  [key: string]: unknown;"
         prefix = "" if _redundant_display_name(query.name, query.display_name) else f"// {query.display_name}\n"
         interfaces.append(f"{prefix}export interface {type_name} {{\n{body}\n}}\n")
-        results_fields.append(f"  {_quote_key(query.name)}: {type_name}[];")
+        results_fields.append(f"  {_quote_key(query.display_name)}: {type_name}[];")
     results_body = "\n".join(results_fields)
     interfaces.append(f"export interface {base_name}Results {{\n{results_body}\n}}\n")
     return "\n".join(interfaces)

@@ -509,6 +509,33 @@ class TestRequireAnyGroup:
         assert "  email,\n  phone,\n}: {\n  email: string;\n  phone: string;" in result
 
 
+class TestResultsKeyUsesDisplayName:
+    def test_results_key_and_date_conversion_use_display_name(self) -> None:
+        # query.name="rows" differs from display_name="Order Rows"
+        # Results interface key and date conversion must use display_name, not name
+        queries = [
+            DataSourceQuerySchema(
+                name="rows",
+                display_name="Order Rows",
+                description="",
+                fields=[
+                    DataSourceFieldSchema(name="id", display_name="ID", type="int"),
+                    DataSourceFieldSchema(name="created_at", display_name="Created at", type="datetime"),
+                ],
+            )
+        ]
+        result = generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="Sales",
+            params_info=_empty_params(),
+            queries=queries,
+        )
+        assert '"Order Rows": SalesRows[]' in result
+        assert "for (const row of envelope.data['Order Rows'])" in result
+        assert "rows: SalesRows[]" not in result
+        assert "envelope.data['rows']" not in result
+
+
 class TestDatetimeFieldConversion:
     def test_datetime_fields_converted_to_date_in_body(self) -> None:
         queries = [
@@ -534,7 +561,7 @@ class TestDatetimeFieldConversion:
         assert "created_at: Date;" in result
         assert "updated_at: Date;" in result
         # Conversion loops emitted after envelope cast
-        assert "for (const row of envelope.data['events'])" in result
+        assert "for (const row of envelope.data['Events'])" in result
         assert "row['created_at'] = new Date(row['created_at'] as unknown as string);" in result
         assert "row['updated_at'] = new Date(row['updated_at'] as unknown as string);" in result
         # Non-datetime fields don't get a conversion line

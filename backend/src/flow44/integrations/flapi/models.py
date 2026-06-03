@@ -26,8 +26,10 @@ FieldType = Literal[
     "decimal",
     "dynamic",
 ]
-type CubeId = str
 # OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
+
+type CubeId = str
+type QueryDisplayName = str
 
 
 class PascalCaseBaseModel(BaseModel):
@@ -111,7 +113,7 @@ class QuickParams(RootModel[dict[CubeId, dict[str, QuickParamValue]]]):
 
 
 class DataSourceRunResult(BaseModel):
-    results: dict[str, Any]
+    results: dict[QueryDisplayName, Any]
 
 
 # -- Quick params info: GET /package/v1/quick/{id} -----------------------

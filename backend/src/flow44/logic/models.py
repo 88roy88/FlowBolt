@@ -1,5 +1,6 @@
 from typing import Any, Literal, assert_never
 
+from flow44.integrations.flapi.models import QueryDisplayName
 from pydantic import BaseModel, Field, RootModel, computed_field
 
 # Domain-side vocabulary. The FLAPI adapter translates into these;
@@ -74,7 +75,7 @@ class DataSourceParams(RootModel[dict[str, ParamValue]]):
 
 
 class DataSourceResult(BaseModel):
-    data: dict[str, Any]
+    data: dict[QueryDisplayName, Any]
 
 
 class DataSourceFieldSchema(BaseModel):
@@ -99,4 +100,4 @@ class DataSourceUsage(BaseModel):
     queries: list[DataSourceQuerySchema]
     params: DataSourceParamsInfo
     can_run: bool = False
-    sample: dict[str, Any] | None = None
+    sample: dict[QueryDisplayName, Any] | None = None
