@@ -19,10 +19,10 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {}  # Empty dict since no params needed
+        assert minimal_params is not None
+        assert minimal_params.root == {}
 
     async def test_all_optional_params_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with only optional params can run."""
@@ -37,6 +37,7 @@ class TestCanRunWithoutParams:
                         is_required=False,
                         is_single_value=False,
                         options=[ParamOption(name="Electronics", value="Electronics")],
+                        cube_id="products",
                     ),
                 ],
                 require_any=False,
@@ -44,10 +45,10 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {}  # Empty dict since all params are optional
+        assert minimal_params is not None
+        assert minimal_params.root == {}
 
     async def test_required_param_with_default_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with required param that has default value can run."""
@@ -65,6 +66,7 @@ class TestCanRunWithoutParams:
                             ParamOption(name="Active", value="Active"),
                             ParamOption(name="Inactive", value="Inactive"),
                         ],
+                        cube_id="people",
                     ),
                 ],
                 require_any=False,
@@ -72,10 +74,10 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {"status": "Active"}  # Uses first option as default
+        assert minimal_params is not None
+        assert minimal_params.root == {"people": {"status": "Active"}}
 
     async def test_required_param_without_options_cannot_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with required param but no default values cannot run."""
@@ -90,6 +92,7 @@ class TestCanRunWithoutParams:
                         is_required=True,
                         is_single_value=True,
                         options=[],  # No options = no default
+                        cube_id="users",
                     ),
                 ],
                 require_any=False,
@@ -97,9 +100,9 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is False
-        assert params is None
+        assert minimal_params is None
 
     async def test_mixed_params_with_defaults_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with mix of optional and required (with defaults) can run."""
@@ -114,6 +117,7 @@ class TestCanRunWithoutParams:
                         is_required=True,
                         is_single_value=True,
                         options=[ParamOption(name="Active", value="Active")],
+                        cube_id="tasks",
                     ),
                     ParamDefinition(
                         name="category",
@@ -122,6 +126,7 @@ class TestCanRunWithoutParams:
                         is_required=False,
                         is_single_value=False,
                         options=[ParamOption(name="All", value="All")],
+                        cube_id="tasks",
                     ),
                 ],
                 require_any=False,
@@ -129,10 +134,10 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {"status": "Active"}  # Only required param included
+        assert minimal_params is not None
+        assert minimal_params.root == {"tasks": {"status": "Active"}}
 
     async def test_integer_param_converted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Integer type params are converted to int."""
@@ -147,6 +152,7 @@ class TestCanRunWithoutParams:
                         is_required=True,
                         is_single_value=True,
                         options=[ParamOption(name="100", value="100")],
+                        cube_id="orders",
                     ),
                 ],
                 require_any=False,
@@ -154,11 +160,11 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {"limit": 100}
-        assert isinstance(params.root["limit"], int)
+        assert minimal_params is not None
+        assert minimal_params.root == {"orders": {"limit": 100}}
+        assert isinstance(minimal_params.root["orders"]["limit"], int)
 
     async def test_boolean_param_converted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Boolean type params are converted to bool."""
@@ -173,6 +179,7 @@ class TestCanRunWithoutParams:
                         is_required=True,
                         is_single_value=True,
                         options=[ParamOption(name="Yes", value="true")],
+                        cube_id="items",
                     ),
                 ],
                 require_any=False,
@@ -180,11 +187,11 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {"active": True}
-        assert isinstance(params.root["active"], bool)
+        assert minimal_params is not None
+        assert minimal_params.root == {"items": {"active": True}}
+        assert isinstance(minimal_params.root["items"]["active"], bool)
 
     async def test_invalid_integer_cannot_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """If integer param value cannot be parsed, cannot run."""
@@ -199,6 +206,7 @@ class TestCanRunWithoutParams:
                         is_required=True,
                         is_single_value=True,
                         options=[ParamOption(name="Invalid", value="not-a-number")],
+                        cube_id="stats",
                     ),
                 ],
                 require_any=False,
@@ -206,9 +214,9 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is False
-        assert params is None
+        assert minimal_params is None
 
     async def test_require_any_with_defaults_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with RequireAny where at least one has default can run."""
@@ -224,6 +232,7 @@ class TestCanRunWithoutParams:
                         is_single_value=True,
                         is_require_any=True,
                         options=[ParamOption(name="A", value="A")],
+                        cube_id="filters",
                     ),
                     ParamDefinition(
                         name="filter2",
@@ -232,7 +241,8 @@ class TestCanRunWithoutParams:
                         is_required=False,
                         is_single_value=False,
                         is_require_any=True,
-                        options=[],  # No default
+                        options=[],
+                        cube_id="filters",
                     ),
                 ],
                 require_any=True,
@@ -240,10 +250,10 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {"filter1": "A"}  # Uses the one with default
+        assert minimal_params is not None
+        assert minimal_params.root == {"filters": {"filter1": "A"}}
 
     async def test_multi_value_required_param_emits_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """is_single_value=False on a required param yields a one-element list default."""
@@ -261,6 +271,7 @@ class TestCanRunWithoutParams:
                             ParamOption(name="1", value="1"),
                             ParamOption(name="2", value="2"),
                         ],
+                        cube_id="people",
                     ),
                 ],
                 require_any=False,
@@ -268,10 +279,10 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {"personIds": [1]}
+        assert minimal_params is not None
+        assert minimal_params.root == {"people": {"personIds": [1]}}
 
     async def test_multi_value_require_any_emits_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Multi-value require_any group default is also wrapped in a list."""
@@ -287,6 +298,7 @@ class TestCanRunWithoutParams:
                         is_single_value=False,
                         is_require_any=True,
                         options=[ParamOption(name="North", value="North")],
+                        cube_id="regions",
                     ),
                 ],
                 require_any=True,
@@ -294,10 +306,10 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is True
-        assert params is not None
-        assert params.root == {"region": ["North"]}
+        assert minimal_params is not None
+        assert minimal_params.root == {"regions": {"region": ["North"]}}
 
     async def test_require_any_without_defaults_cannot_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with RequireAny where none have defaults cannot run."""
@@ -313,6 +325,7 @@ class TestCanRunWithoutParams:
                         is_single_value=False,
                         is_require_any=True,
                         options=[],
+                        cube_id="filters",
                     ),
                     ParamDefinition(
                         name="filter2",
@@ -322,6 +335,7 @@ class TestCanRunWithoutParams:
                         is_single_value=False,
                         is_require_any=True,
                         options=[],
+                        cube_id="filters",
                     ),
                 ],
                 require_any=True,
@@ -329,6 +343,6 @@ class TestCanRunWithoutParams:
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
 
-        can_run, params = await ds_logic.can_run_without_params("123")
+        can_run, minimal_params = await ds_logic.can_run_without_params("123")
         assert can_run is False
-        assert params is None
+        assert minimal_params is None
