@@ -36,11 +36,11 @@ class TestSandboxManagerLifecycle:
             sandbox = await mgr.create_sandbox("proj1")
         assert mgr.get_sandbox("proj1") is sandbox
 
-    async def test_get_or_create_idempotent(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_wake_sandbox_idempotent(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            s1 = await mgr.get_or_create_sandbox("proj1")
-            s2 = await mgr.get_or_create_sandbox("proj1")
+            s1 = await mgr.wake_sandbox("proj1")
+            s2 = await mgr.wake_sandbox("proj1")
         assert s1 is s2
 
     async def test_destroy_removes_sandbox(self, manager) -> None:  # type: ignore[type-arg]

@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Annotated
 
@@ -7,6 +8,8 @@ from fastapi import Depends, Header, HTTPException, WebSocket
 from flow44.config import settings
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+
+logger = logging.getLogger(__name__)
 
 
 def get_sandbox(project_id: str) -> PnpmSandbox:
@@ -19,8 +22,12 @@ def get_sandbox(project_id: str) -> PnpmSandbox:
 async def get_ws_sandbox(websocket: WebSocket, project_id: str) -> PnpmSandbox | None:
     try:
         return await sandbox_manager.wake_sandbox(project_id)
-    except Exception:
+    except SandboxNotFoundError:
         await websocket.close(code=1008, reason="No sandbox")
+        return None
+    except Exception:
+        logger.exception("Failed to wake sandbox for project %s", project_id)
+        await websocket.close(code=1011, reason="Sandbox error")
         return None
 
 

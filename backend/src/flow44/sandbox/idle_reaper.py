@@ -39,14 +39,13 @@ class IdleReaper:
             self._task = None
 
     async def _reap_loop(self) -> None:
-        from flow44.db.session import project_registry  # noqa: PLC0415
         from flow44.sandbox.manager import sandbox_manager  # noqa: PLC0415
 
         while not self._stop.is_set():
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=self._check_interval)
                 break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
             now = time.monotonic()
@@ -61,13 +60,13 @@ class IdleReaper:
                     self._last_activity.pop(project_id, None)
                     continue
 
+                idle_seconds = now - self._last_activity.get(project_id, now)
                 logger.info(
                     "[idle-reaper] Evicting idle sandbox for project %s (idle %.0fs)",
                     project_id,
-                    now - self._last_activity[project_id],
+                    idle_seconds,
                 )
                 await sandbox_manager.destroy_sandbox(project_id, delete_workspace=False)
-                project_registry.remove(project_id)
                 self._last_activity.pop(project_id, None)
 
 

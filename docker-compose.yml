@@ -15,6 +15,26 @@ x-minio-shared: &minio-shared
   S3_BUCKET_NAME: &s3-bucket flow44
 
 services:
+  migrate:
+    build:
+      context: ./backend
+    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *db-shared
+      AIB_DB_USER: *db-user
+      AIB_DB_PASSWORD: *db-pass
+      AIB_DB_NAME: *db-name
+      AIB_DB_HOST: *db-host
+      AIB_DB_PORT: *db-port
+      AIB_DB_SCHEME: *db-scheme
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     build:
       context: ./backend
@@ -27,7 +47,7 @@ services:
       - seccomp:unconfined
     cgroup: host
     volumes:
-      - workspaces:/var/lib/ai-builder/workspaces
+      - workspaces:/var/lib/flow-44/workspaces
       - db-data:/app/data
     env_file:
       - ./backend/.env
@@ -39,8 +59,7 @@ services:
       AIB_DB_HOST: *db-host
       AIB_DB_PORT: *db-port
       AIB_DB_SCHEME: *db-scheme
-      AIB_WORKSPACE_BASE_DIR: /var/lib/ai-builder/workspaces
-      AIB_SANDBOX_MODE: local
+      AIB_WORKSPACE_BASE_DIR: /var/lib/flow-44/workspaces
       AIB_FLAPI_BASE_URL: http://flapi-mock:6001
       S3_ENDPOINT_URL: *s3-url
       S3_BUCKET_NAME: *s3-bucket
@@ -55,8 +74,12 @@ services:
         aliases:
           - base-backend.base
     depends_on:
-      - postgres
-      - minio
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
     restart: unless-stopped
 
   flapi-mock:
@@ -79,7 +102,7 @@ services:
     build: ./frontend
     user: root
     ports:
-      - "9888:80"
+      - "9999:80"
     volumes:
       - ./frontend/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:

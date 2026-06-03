@@ -66,7 +66,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
 
     try:
         sandbox = await sandbox_manager.wake_sandbox(project_id)
-        await sandbox_manager.ensure_ready(sandbox)
+        await sandbox_manager.ensure_dev_server(sandbox)
     except Exception:
         logger.exception("[chat] Failed to prepare sandbox for session %s", project_id)
         await websocket.send_json({"type": "error", "message": "Failed to prepare project sandbox"})

@@ -100,16 +100,9 @@ class SandboxManager:
             return sandbox
 
     @staticmethod
-    async def ensure_ready(sandbox: PnpmSandbox) -> None:
-        if not await sandbox.is_scaffolded():
-            await sandbox.scaffold(settings.TEMPLATE_DIR)
-        elif not os.path.isdir(os.path.join(sandbox.workspace_dir, "node_modules")):
-            sandbox.configure_npmrc()
-            async for line in sandbox.exec("pnpm install 2>&1"):
-                logger.info("[ensure_ready] %s", line.rstrip())
-
+    async def ensure_dev_server(sandbox: PnpmSandbox) -> None:
+        """Start the dev server if it's not already running. Assumes scaffolding is complete."""
         sandbox.configure_npmrc()
-
         if not sandbox.is_dev_server_running():
             logger.info("Starting sandbox dev server for %s", sandbox.project_id)
             await sandbox.start_dev_server()
@@ -120,6 +113,9 @@ class SandboxManager:
         Sandbox objects and ports are NOT pre-allocated — they are created lazily
         via wake_sandbox() when a user first connects.
         """
+        os.makedirs(settings.WORKSPACE_BASE_DIR, exist_ok=True)
+        os.makedirs(settings.PNPM_STORE_DIR, exist_ok=True)
+
         port_start, port_end = settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END
         self._kill_orphan_processes(port_start, port_end)
         self._delete_orphan_workspaces(live_project_ids)

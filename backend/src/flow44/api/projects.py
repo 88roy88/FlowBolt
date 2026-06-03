@@ -18,7 +18,6 @@ from flow44.db.project import (
     rename_project,
     update_project_model,
 )
-from flow44.db.session import project_registry
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
@@ -57,7 +56,6 @@ async def create_new_project(body: CreateProjectRequest) -> dict[str, Any]:
     project = await create_project(body.name)
 
     sandbox = await sandbox_manager.create_sandbox(project.id)
-    project_registry.register(project.id, sandbox.info)
 
     async def _scaffold_and_start() -> None:
         from flow44.db.events import emit_event  # noqa: PLC0415
@@ -105,7 +103,6 @@ async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail="No active sandbox for this project")
 
     await sandbox_manager.destroy_sandbox(project_id, delete_workspace=False)
-    project_registry.remove(project_id)
     idle_reaper.remove(project_id)
     return {"status": "reaped", "project_id": project_id}
 
@@ -117,6 +114,5 @@ async def delete_existing_project(project_id: str) -> None:
         raise HTTPException(status_code=404, detail="Project not found")
 
     await sandbox_manager.destroy_sandbox(project.id, delete_workspace=True)
-    project_registry.remove(project.id)
     idle_reaper.remove(project.id)
     await delete_project(project_id)

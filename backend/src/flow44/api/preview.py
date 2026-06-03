@@ -7,6 +7,7 @@ passthrough — no response rewriting required.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Annotated
 
@@ -21,6 +22,20 @@ from flow44.sandbox.manager import sandbox_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/preview", tags=["preview"])
+
+_PREPARING_HTML = """\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Preparing...</title></head>
+<body style="font-family:system-ui;color:#666;display:flex;align-items:center;\
+justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px;\
+background:#fafafa">
+<div style="font-size:1.2rem">Preparing project environment...</div>
+<div style="font-size:0.85rem;color:#999">Installing dependencies. This may take up to a minute.</div>
+<script>setTimeout(()=>location.reload(),5000)</script>
+</body>
+</html>
+"""
 
 _WAKING_UP_HTML = """\
 <!DOCTYPE html>
@@ -53,23 +68,15 @@ async def get_preview_port(project_id: str, sandbox: Annotated[PnpmSandbox, Sand
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
 async def proxy_to_sandbox(project_id: str, path: str, request: Request) -> Response:
-    """Reverse proxy requests to the sandbox's dev server.
-
-    Vite serves content under its ``base`` path, so the proxy forwards the
-    full prefixed path to the upstream server.
-
-    If the sandbox was evicted (idle), this triggers re-creation and shows
-    a "waking up" page that auto-retries after 3 seconds.
-    """
     sandbox = await sandbox_manager.wake_sandbox(project_id)
 
     if not sandbox.is_dev_server_running():
-        await sandbox_manager.ensure_ready(sandbox)
+        asyncio.create_task(sandbox_manager.ensure_dev_server(sandbox))
         return Response(
-            content=_WAKING_UP_HTML,
+            content=_PREPARING_HTML,
             status_code=503,
             media_type="text/html",
-            headers={"Cache-Control": "no-store", "Retry-After": "3"},
+            headers={"Cache-Control": "no-store", "Retry-After": "5"},
         )
 
     proxy_prefix = f"/api/preview/{project_id}/proxy"
