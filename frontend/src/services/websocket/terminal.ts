@@ -1,4 +1,5 @@
 import type { TerminalSocket } from './types';
+import { credentialsStore } from '../../auth';
 import { getWsBase } from './reconnecting';
 
 export function createTerminalSocket(projectId: string): TerminalSocket {
@@ -18,6 +19,7 @@ export function createTerminalSocket(projectId: string): TerminalSocket {
 
   function connect() {
     if (closed) return;
+    credentialsStore.ensureCookie();
     const ws = new WebSocket(`${getWsBase()}/ws/terminal/${projectId}`);
     ws.binaryType = 'arraybuffer';
     socket = ws;

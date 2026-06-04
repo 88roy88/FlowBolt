@@ -1,3 +1,5 @@
+import { credentialsStore } from '../../auth';
+
 export function getWsBase(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}`;
@@ -25,6 +27,7 @@ export function createReconnectingSocket(
 
   function connect() {
     if (closed) return;
+    credentialsStore.ensureCookie();
     socket = new WebSocket(url);
 
     socket.addEventListener('open', () => {

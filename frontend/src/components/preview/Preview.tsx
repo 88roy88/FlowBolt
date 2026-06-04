@@ -6,6 +6,7 @@ import { useConsoleStore } from '../../stores/console';
 import { RefreshCw, ExternalLink, Globe, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { publishToS3 } from '../../services/api';
+import { credentialsStore } from '../../auth';
 import { PublishModal } from '../ui/PublishModal';
 
 export function Preview() {
@@ -28,6 +29,7 @@ export function Preview() {
       return;
     }
     setLoading(true);
+    credentialsStore.ensureCookie();
     const url = `/api/preview/${projectId}/proxy/`;
     setPreviewUrl(url);
     setLoading(false);
@@ -89,7 +91,7 @@ export function Preview() {
           {t('preview.refresh')}
         </Button>
         {previewUrl && (
-          <Button variant="outline" size="sm" onClick={() => window.open(previewUrl, '_blank')} title={t('preview.openInNewTab')}>
+          <Button variant="outline" size="sm" onClick={() => { credentialsStore.ensureCookie(); window.open(previewUrl, '_blank'); }} title={t('preview.openInNewTab')}>
             <ExternalLink size={14} className="text-primary/70" />
             {t('preview.open')}
           </Button>
@@ -104,7 +106,7 @@ export function Preview() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`/api/export/${projectId}/published`, '_blank')}
+              onClick={() => { credentialsStore.ensureCookie(); window.open(`/api/export/${projectId}/published`, '_blank'); }}
               title={t('preview.viewPublishedApp')}
             >
               <ExternalLink size={14} className="text-primary/70" />
