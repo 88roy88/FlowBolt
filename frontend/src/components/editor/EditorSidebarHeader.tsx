@@ -70,7 +70,7 @@ export function EditorSidebarHeader({
             `}
             title={t('editor.files')}
           >
-            <Files size={12} />
+            <Files size={12} className={leftTab === 'files' ? 'text-primary' : ''} />
             <span>{t('editor.files')}</span>
           </button>
 
@@ -88,7 +88,7 @@ export function EditorSidebarHeader({
             `}
             title={`${t('editor.searchShortcutTitle')} (⇧⌘F)`}
           >
-            <Search size={12} />
+            <Search size={12} className={leftTab === 'search' ? 'text-primary' : ''} />
             <span>{t('editor.searchTab')}</span>
             {searchResultCount > 0 && (
               <span
@@ -114,7 +114,7 @@ export function EditorSidebarHeader({
           className={`
             flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all
             ${projectId
-              ? 'text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer'
+              ? 'text-muted-foreground hover:text-primary hover:bg-muted cursor-pointer'
               : 'opacity-30 cursor-not-allowed text-muted-foreground'
             }
           `}

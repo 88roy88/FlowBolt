@@ -4,13 +4,13 @@ import { SunMedium, MoonStar } from 'lucide-react';
 type Theme = 'light' | 'dark';
 
 function getInitialTheme(): Theme {
-  if (typeof document === 'undefined') return 'dark';
+  if (typeof document === 'undefined') return 'light';
   const attr = document.documentElement.dataset.theme;
   if (attr === 'light' || attr === 'dark') return attr;
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-    return 'light';
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
   }
-  return 'dark';
+  return 'light';
 }
 
 export function ThemeToggle() {
@@ -37,7 +37,7 @@ export function ThemeToggle() {
         borderRadius: 999,
         border: '1px solid var(--border)',
         background: 'var(--surface)',
-        color: 'var(--text-dim)',
+        color: 'var(--color-primary)',
         cursor: 'pointer',
         marginRight: 8,
       }}

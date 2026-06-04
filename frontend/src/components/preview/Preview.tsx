@@ -76,12 +76,12 @@ export function Preview() {
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-border shrink-0">
         <Button variant="outline" size="sm" onClick={handleRefresh} title={t('preview.refreshPreview')}>
-          <RefreshCw size={14} />
+          <RefreshCw size={14} className="text-primary/70" />
           {t('preview.refresh')}
         </Button>
         {previewUrl && (
           <Button variant="outline" size="sm" onClick={() => window.open(previewUrl, '_blank')} title={t('preview.openInNewTab')}>
-            <ExternalLink size={14} />
+            <ExternalLink size={14} className="text-primary/70" />
             {t('preview.open')}
           </Button>
         )}
@@ -98,7 +98,7 @@ export function Preview() {
               onClick={() => window.open(liveUrl, '_blank')}
               title={t('preview.viewPublishedApp')}
             >
-              <ExternalLink size={14} />
+              <ExternalLink size={14} className="text-primary/70" />
               {t('preview.viewLive')}
             </Button>
           ) : null}

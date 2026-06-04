@@ -100,15 +100,15 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --background: #f5f5f7;
+  --background: #f0fafb;
   --foreground: #111827;
   --surface: #ffffff;
-  --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
+  --muted: #e2f5f7;
+  --muted-foreground: #3a6870;
 
-  --primary: #2563eb;
+  --primary: #0090A3;
   --primary-foreground: #ffffff;
-  --accent: #2563eb;
+  --accent: #0090A3;
   --accent-foreground: #ffffff;
 
   --destructive: #dc2626;
@@ -118,25 +118,25 @@
   --warning: #ca8a04;
   --warning-foreground: #ffffff;
 
-  --border: #d1d5db;
-  --input: #d1d5db;
-  --ring: #2563eb;
+  --border: #b8dde2;
+  --input: #b8dde2;
+  --ring: #0090A3;
 
   --card: #ffffff;
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
 
-  --user-bubble: #e5f0ff;
-  --assistant-bubble: #f3f4f6;
+  --user-bubble: #E2FDFF;
+  --assistant-bubble: #e8f7f9;
 
   --text-on-accent: #ffffff;
-  --accent-bg: rgba(37, 99, 235, 0.1);
-  --accent-border: rgba(37, 99, 235, 0.25);
-  --accent-bg-strong: rgba(37, 99, 235, 0.15);
+  --accent-bg: rgba(0, 144, 163, 0.1);
+  --accent-border: rgba(0, 144, 163, 0.25);
+  --accent-bg-strong: rgba(0, 144, 163, 0.15);
   --danger-bg: rgba(220, 38, 38, 0.1);
   --success-bg: rgba(22, 163, 74, 0.1);
-  --running-bg: rgba(37, 99, 235, 0.06);
+  --running-bg: rgba(0, 144, 163, 0.06);
   --diff-add: #16a34a;
   --diff-add-bg: rgba(22, 163, 74, 0.1);
   --diff-remove: #dc2626;
@@ -164,7 +164,7 @@
   --text: var(--foreground);
   --text-dim: var(--muted-foreground);
   --danger: var(--destructive);
-  --accent-hover: #1d4ed8;
+  --accent-hover: #007a8c;
 }
 
 /* Register our tokens with Tailwind v4 */
