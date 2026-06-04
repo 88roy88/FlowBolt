@@ -55,10 +55,11 @@ class DatabaseSettings(Flow44BaseSettings):
 class AIModelSettings(Flow44BaseSettings):
     AI_MODEL: str = "qwen/qwen3-coder-30b-a3b-instruct"
     # Base URL for OpenAI-compatible endpoints (vLLM, Ollama, OpenRouter, etc.)
-    AI_BASE_URL: str| None = "http://flow-44-models.com/openai/v1"
-    AI_API_KEY: str| None = "default"
+    AI_BASE_URL: str | None = "http://flow-44-models.com/openai/v1"
+    AI_API_KEY: str | None = "default"
 
-    # if ai_model starts with bedrock/ set base_url and api_key to None (using pydantic v2's model_validator to allow dynamic defaults based on other fields)
+    # if ai_model starts with bedrock/ set base_url and api_key to None
+    # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)
     @model_validator(mode="before")
     def _set_bedrock_defaults(cls, values: dict[str, Any]) -> dict[str, Any]:
         ai_model = values.get("AI_MODEL", "")
@@ -66,6 +67,7 @@ class AIModelSettings(Flow44BaseSettings):
             values["AI_BASE_URL"] = None
             values["AI_API_KEY"] = None
         return values
+
 
 class SearchIndexSettings(Flow44BaseSettings):
     SEARCH_INDEX_MAX_FILE_SIZE_MB: int = 1  # Max size per file to index (MB)
