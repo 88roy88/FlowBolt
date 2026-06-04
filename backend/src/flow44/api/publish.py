@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import re
-from typing import Literal
+from enum import StrEnum
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -25,24 +25,30 @@ class PublishRequest(BaseModel):
     slug: str | None = None
 
 
-async def _slug_status(slug: str, project_id: str) -> Literal["available", "invalid", "taken"]:
+class SlugStatus(StrEnum):
+    available = "available"
+    invalid = "invalid"
+    taken = "taken"
+
+
+async def _slug_status(slug: str, project_id: str) -> SlugStatus:
     """Single source of truth for whether a slug may be used by this project."""
     if not _SLUG_RE.match(slug):
-        return "invalid"
+        return SlugStatus.invalid
     if await is_handle_taken(slug, exclude_project_id=project_id):
-        return "taken"
-    return "available"
+        return SlugStatus.taken
+    return SlugStatus.available
 
 
 @router.get("/slug/check")
 async def check_slug(project_id: str, slug: str = Query(...)) -> dict[str, bool]:
     """Return whether a slug is available for this project."""
-    return {"available": await _slug_status(slug, project_id) == "available"}
+    return {"available": await _slug_status(slug, project_id) == SlugStatus.available}
 
 
 async def _validate_slug(slug: str, project_id: str) -> None:
     status = await _slug_status(slug, project_id)
-    if status == "invalid":
+    if status == SlugStatus.invalid:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -50,7 +56,7 @@ async def _validate_slug(slug: str, project_id: str) -> None:
                 " (must start and end with a letter or digit)."
             ),
         )
-    if status == "taken":
+    if status == SlugStatus.taken:
         raise HTTPException(status_code=409, detail=f"The slug '{slug}' is already taken.")
 
 
