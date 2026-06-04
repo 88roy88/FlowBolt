@@ -1,0 +1,2 @@
+export const BTN_SECONDARY = 'px-4 py-2.5 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2';
+export const BTN_PRIMARY = 'flex-1 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors text-sm font-medium flex justify-center items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed';

@@ -50,9 +50,19 @@ def setup_bucket(bucket_name: str) -> None:
     )
 
 
+def _get_s3_key(project_id: str) -> str:
+    return f"published/{project_id}.html"
+
+
+def get_published_url(project_id: str) -> str:
+    """Return the internal S3 URL for a published project."""
+    key = _get_s3_key(project_id)
+    return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"
+
+
 def deploy_single_html(html_content: str, project_id: str) -> str:
     s3 = connect_to_s3()
-    key = f"published/{project_id}.html"
+    key = _get_s3_key(project_id)
     s3.put_object(
         Bucket=settings.S3_BUCKET_NAME,
         Key=key,
@@ -61,4 +71,4 @@ def deploy_single_html(html_content: str, project_id: str) -> str:
         ACL="public-read",
         StorageClass=settings.S3_STORAGE_CLASS,
     )
-    return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"
+    return get_published_url(project_id)
