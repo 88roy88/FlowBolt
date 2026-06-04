@@ -83,6 +83,7 @@ async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishReque
     # Deploy the single HTML to S3 securely without blocking the event loop
     try:
         loop = asyncio.get_running_loop()
+        # TODO - REFACTOR TO AIOBOTO3: boto3 doesn't support async so we have to run in a thread pool.
         await loop.run_in_executor(None, deploy_single_html, html_content, project.id)
     except Exception as exc:
         logger.exception("S3 deployment failed for project %s", project.id)
