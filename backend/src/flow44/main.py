@@ -7,9 +7,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import litellm
-from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from flow44.api import (
     chat,
@@ -31,7 +30,8 @@ from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import setup_bucket
-from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+from flow44.sandbox.idle_reaper import idle_reaper
+from flow44.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -59,6 +59,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await sandbox_manager.reconcile_workspaces(live_project_ids)
     logger.info("Sandbox restoration complete.")
 
+    idle_reaper.start()
+    logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
+
     if settings.S3_BUCKET_NAME:
         logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
         try:
@@ -69,8 +72,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("S3 bucket setup issue (may already exist or be misconfigured): %s", exc)
 
     yield
-    logger.info("Shutting down — destroying all sandboxes...")
-    await sandbox_manager.destroy_all()
+    logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
+    await idle_reaper.stop()
+    await sandbox_manager.suspend_all()
     logger.info("Shutdown complete.")
 
 
@@ -85,11 +89,6 @@ app = FastAPI(
 async def health_check() -> dict[str, str]:
     """Health check endpoint for Docker/K8s."""
     return {"status": "ok", "version": "0.1.0"}
-
-
-@app.exception_handler(SandboxNotFoundError)
-async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 # CORS — allow all origins in development

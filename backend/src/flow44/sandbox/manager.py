@@ -6,16 +6,13 @@ import socket
 
 from flow44.config import settings
 from flow44.sandbox.base import SandboxInfo
+from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.main import PnpmSandbox, PnpmSandboxNamespace, PnpmSandboxUnix, PnpmSandboxWindows
 
 logger = logging.getLogger(__name__)
 
 
 class SandboxError(Exception):
-    pass
-
-
-class SandboxNotFoundError(SandboxError):
     pass
 
 
@@ -57,67 +54,76 @@ class SandboxManager:
     def _create_sandbox_instance(self, info: SandboxInfo) -> PnpmSandbox:
         return self._get_sandbox_class()(info)
 
-    async def create_sandbox(self, project_id: str) -> PnpmSandbox:
-        async with self._lock:
-            port = self._take_available_port()
+    async def get_sandbox(self, project_id: str) -> PnpmSandbox:
+        """Get an active sandbox, or re-activate it if it was suspended."""
+        sandbox = self._sandboxes.get(project_id)
+        if sandbox is None:
+            async with self._lock:
+                port = self._take_available_port()
 
-        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
-        info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
+            workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+            info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
 
-        sandbox = self._create_sandbox_instance(info)
-        await sandbox.start()
+            sandbox = self._create_sandbox_instance(info)
+            await sandbox.start()
 
-        self._sandboxes[project_id] = sandbox
+            self._sandboxes[project_id] = sandbox
+
+        idle_reaper.touch(project_id)
         return sandbox
 
-    async def destroy_sandbox(self, project_id: str, *, delete_workspace: bool = True) -> None:
+    async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
+        """Wake a suspended sandbox: get it and start the dev server (non-blocking)."""
+        sandbox = await self.get_sandbox(project_id)
+        await self.start_dev_server(sandbox)
+        return sandbox
+
+    async def create_sandbox(self, project_id: str) -> PnpmSandbox:
+        """Create a brand-new sandbox: get, scaffold, and start the dev server."""
+        sandbox = await self.get_sandbox(project_id)
+        await sandbox.scaffold(settings.TEMPLATE_DIR)
+        await self.start_dev_server(sandbox)
+        return sandbox
+
+    async def suspend_sandbox(self, project_id: str) -> None:
+        """Suspend a sandbox: kill processes and free port, but keep workspace on disk."""
         async with self._lock:
             sandbox = self._sandboxes.pop(project_id, None)
 
         if sandbox is None:
             return
 
-        await sandbox.destroy(delete_workspace=delete_workspace)
+        await sandbox.destroy(delete_workspace=False)
 
         async with self._lock:
             self._available_ports.add(sandbox.port)
 
-    def get_sandbox(self, project_id: str) -> PnpmSandbox:
-        sandbox = self._sandboxes.get(project_id)
-        if sandbox is None:
-            raise SandboxNotFoundError(f"No sandbox found for project_id {project_id}")
-        return sandbox
-
-    async def get_or_create_sandbox(self, project_id: str) -> PnpmSandbox:
-        try:
-            sandbox = self.get_sandbox(project_id)
-        except SandboxNotFoundError:
-            sandbox = await self.create_sandbox(project_id)
-        return sandbox
+    async def destroy_sandbox(self, project_id: str) -> None:
+        """Permanently destroy a sandbox and delete its workspace from disk."""
+        await self.suspend_sandbox(project_id)
+        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+        if os.path.isdir(workspace_dir):  # noqa: ASYNC240
+            shutil.rmtree(workspace_dir, ignore_errors=True)
 
     @staticmethod
-    async def ensure_ready(sandbox: PnpmSandbox) -> None:
-        if not await sandbox.is_scaffolded():
-            await sandbox.scaffold(settings.TEMPLATE_DIR)
-
-        sandbox.configure_npmrc()
-
+    async def start_dev_server(sandbox: PnpmSandbox) -> None:
+        """Start the dev server if it's not already running."""
         if not sandbox.is_dev_server_running():
             logger.info("Starting sandbox dev server for %s", sandbox.project_id)
             await sandbox.start_dev_server()
 
     async def reconcile_workspaces(self, live_project_ids: set[str]) -> None:
-        """Reconcile workspace state: restore live sandboxes, kill stale processes, delete orphans.
+        """Reconcile workspace state: kill stale processes and delete orphan directories.
 
-        - Kills orphan dev server processes
-        - Deletes workspace directories not in live_project_ids
-        - Restores sandboxes for workspaces that survived restart
-        - Restarts dev servers for scaffolded sandboxes
+        Sandbox objects and ports are NOT pre-allocated — they are created lazily
+        via wake_sandbox() when a user first connects.
         """
+        os.makedirs(settings.WORKSPACE_BASE_DIR, exist_ok=True)
+        os.makedirs(settings.PNPM_STORE_DIR, exist_ok=True)
+
         port_start, port_end = settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END
         self._kill_orphan_processes(port_start, port_end)
-        await self._restore_workspaces(live_project_ids)
-        await self._restart_dev_servers()
+        self._delete_orphan_workspaces(live_project_ids)
 
     def _kill_orphan_processes(self, port_start: int, port_end: int) -> None:
         """Kill any processes occupying the sandbox port range from a previous run."""
@@ -126,56 +132,33 @@ class SandboxManager:
             logger.info("Killing orphan process pid %d (port %d)", pid, port)
             sandbox_cls.kill_pid(pid)
 
-    async def _restore_workspaces(self, live_project_ids: set[str]) -> None:
-        """Scan workspace base dir, delete orphans, restore live sandboxes."""
+    def _delete_orphan_workspaces(self, live_project_ids: set[str]) -> None:
+        """Delete workspace directories for projects no longer in the database."""
         base = settings.WORKSPACE_BASE_DIR
-        if not os.path.isdir(base):  # noqa: ASYNC240
+        if not os.path.isdir(base):
             return
 
         for name in os.listdir(base):
             if name.startswith("."):
                 continue
             workspace_dir = os.path.join(base, name)
-            if not os.path.isdir(workspace_dir):  # noqa: ASYNC240
+            if not os.path.isdir(workspace_dir):
                 continue
-            if name in self._sandboxes:
-                continue
-
             if name not in live_project_ids:
                 logger.info("Removing orphan workspace %s", name)
                 shutil.rmtree(workspace_dir, ignore_errors=True)
-                continue
 
-            await self._restore_one(name, workspace_dir)
+    def has_active_sandbox(self, project_id: str) -> bool:
+        return project_id in self._sandboxes
 
-    async def _restore_one(self, project_id: str, workspace_dir: str) -> None:
-        """Restore a single sandbox from an existing workspace directory."""
-        async with self._lock:
-            if not self._available_ports:
-                logger.warning("No ports left to restore sandbox %s", project_id)
-                return
-            try:
-                port = self._take_available_port()
-            except RuntimeError:
-                logger.warning("No free ports to restore sandbox %s", project_id)
-                return
+    def active_project_ids(self) -> list[str]:
+        return list(self._sandboxes.keys())
 
-        info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
-        sandbox = self._create_sandbox_instance(info)
-        self._sandboxes[project_id] = sandbox
-        logger.info("Restored sandbox for session %s (port %d)", project_id, port)
-
-    async def _restart_dev_servers(self) -> None:
-        """Re-stamp vite configs and restart dev servers for all scaffolded sandboxes."""
-        for sandbox in self._sandboxes.values():
-            if await sandbox.is_scaffolded():
-                sandbox._stamp_vite_config(settings.TEMPLATE_DIR)  # Re-stamp after restart
-                asyncio.create_task(sandbox.start_dev_server())
-
-    async def destroy_all(self, *, delete_workspaces: bool = False) -> None:
+    async def suspend_all(self) -> None:
+        """Suspend all active sandboxes (used during shutdown)."""
         project_ids = list(self._sandboxes.keys())
         for sid in project_ids:
-            await self.destroy_sandbox(sid, delete_workspace=delete_workspaces)
+            await self.suspend_sandbox(sid)
 
 
 sandbox_manager = SandboxManager()

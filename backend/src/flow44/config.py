@@ -27,6 +27,8 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_DISABLE_CGROUPS: bool = False
     PNPM_STORE_DIR: str = "/var/lib/flow-44/workspaces/.pnpm-store"
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
+    SANDBOX_IDLE_TTL_SECONDS: int = 5 * 60  # 5 minutes
+    SANDBOX_IDLE_CHECK_INTERVAL_SECONDS: int = 60
     # Public base URL of this backend, used in HTML exports so API calls work standalone.
     EXPORT_API_BASE_URL: str = "http://localhost:8000"
     # SSO config injected into generated apps' vite.config.ts at scaffold time

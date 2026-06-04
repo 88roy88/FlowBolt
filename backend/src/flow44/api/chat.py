@@ -18,7 +18,7 @@ from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.integrations.flapi_api import data_source_client
-from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
@@ -73,13 +73,7 @@ async def chat_ws(  # noqa: C901, PLR0915
     logger.info("[chat] WebSocket accepted for session %s", project.id)
 
     try:
-        sandbox = sandbox_manager.get_sandbox(project.id)
-        await sandbox_manager.ensure_ready(sandbox)
-    except SandboxNotFoundError:
-        logger.error("[chat] Sandbox not found for session %s", project.id)
-        await websocket.send_json({"type": "error", "message": "Project sandbox not found"})
-        await websocket.close()
-        return
+        sandbox = await sandbox_manager.wake_sandbox(project.id)
     except Exception:
         logger.exception("[chat] Failed to prepare sandbox for session %s", project.id)
         await websocket.send_json({"type": "error", "message": "Failed to prepare project sandbox"})
