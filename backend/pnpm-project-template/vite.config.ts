@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_AUTH_PROVIDER_URL': JSON.stringify('{{AUTH_PROVIDER_URL}}'),
       'import.meta.env.VITE_AUTH_STORAGE_KEY': JSON.stringify('{{AUTH_STORAGE_KEY}}'),
       'import.meta.env.VITE_AUTH_USE_IFRAME': JSON.stringify('{{AUTH_USE_IFRAME}}'),
+      'import.meta.env.VITE_AUTH_POST_MESSAGE_TARGET': JSON.stringify('{{AUTH_POST_MESSAGE_TARGET}}'),
     },
   }
 })

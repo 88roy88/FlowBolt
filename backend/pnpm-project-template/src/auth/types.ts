@@ -1,8 +1,8 @@
 export type AuthCredentials = {
   auth_token: string;
-  userId?: string;
+  userId: string;
   userName?: string;
-  expiresAt?: string;
+  exp: number;
   [key: string]: unknown;
 };
 
@@ -13,21 +13,32 @@ export function isCredentialsMessage(data: unknown): data is Record<string, unkn
   return typeof tag === 'string' && tag.toLowerCase() === 'delivercredentials';
 }
 
+// Real provider sends claims as URL-keyed entries (e.g. ".../UniqueID", ".../givenname").
+// Suffix-match mirrors the backend's _find_unique_id pattern.
+function findClaimBySuffix(data: Record<string, unknown>, suffix: string): string | undefined {
+  for (const [key, val] of Object.entries(data)) {
+    if (key.endsWith(suffix) && typeof val === 'string' && val.trim()) {
+      return val.trim();
+    }
+  }
+  return undefined;
+}
+
 export function extractCredentials(data: Record<string, unknown>): AuthCredentials | null {
   const token = data.auth_token;
   if (typeof token !== 'string' || !token.trim()) return null;
 
-  const creds: AuthCredentials = { auth_token: token.trim() };
-  if (typeof data.userId === 'string') creds.userId = data.userId;
-  if (typeof data.userName === 'string') creds.userName = data.userName;
+  const userId = findClaimBySuffix(data, '/UniqueID');
+  if (!userId) return null;
 
-  for (const key of ['expiresAt', 'expiration', 'tokenExpiry']) {
-    const val = data[key];
-    if (typeof val === 'string' && val.trim()) {
-      creds.expiresAt = val.trim();
-      break;
-    }
-  }
+  if (typeof data.exp !== 'number' || !Number.isFinite(data.exp)) return null;
+
+  const creds: AuthCredentials = { auth_token: token.trim(), userId, exp: data.exp };
+
+  const givenName = findClaimBySuffix(data, '/givenname');
+  const surname = findClaimBySuffix(data, '/surname');
+  const fullName = [givenName, surname].filter(Boolean).join(' ');
+  if (fullName) creds.userName = fullName;
 
   return creds;
 }

@@ -11,6 +11,7 @@ function envInt(v: string | undefined, defaultValue: number): number {
 
 export type AuthConfig = {
   storageKey: string;
+  cookieName: string;
   providerUrl: string;
   postMessageTarget: string;
   pollIntervalMs: number;
@@ -33,6 +34,7 @@ function readConfig(): AuthConfig {
 
   return {
     storageKey: (import.meta.env.VITE_AUTH_STORAGE_KEY as string | undefined)?.trim() || 'Auth',
+    cookieName: (import.meta.env.VITE_AUTH_COOKIE_NAME as string | undefined)?.trim() || 'flow44_token',
     providerUrl,
     postMessageTarget: explicitOrigin || derivedOrigin || '*',
     pollIntervalMs: envInt(import.meta.env.VITE_AUTH_POLL_INTERVAL_MS as string | undefined, 500),

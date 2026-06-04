@@ -33,6 +33,7 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_AUTH_PROVIDER_URL: str = "http://localhost:6001/sso"
     SANDBOX_AUTH_STORAGE_KEY: str = "Auth"
     SANDBOX_AUTH_USE_IFRAME: bool = True
+    SANDBOX_AUTH_POST_MESSAGE_TARGET: str = "*"
 
 
 class DatabaseSettings(Flow44BaseSettings):
@@ -62,12 +63,12 @@ class SearchIndexSettings(Flow44BaseSettings):
 
 
 class AuthSettings(Flow44BaseSettings):
-    # JWT public key or secret for token validation (optional - if not set, only checks structure/expiry)
-    AUTH_JWT_SECRET: str | None = None
+    # JWT public key / HMAC secret for verifying token signatures (required)
+    AUTH_JWT_PUBLIC_KEY: str
     # JWT algorithm (default: HS256 for HMAC, use RS256 for RSA)
-    AUTH_JWT_ALGORITHM: str = "HS256"
-    # Require JWT format (vs allowing opaque tokens)
-    AUTH_REQUIRE_JWT: bool = False
+    AUTH_JWT_ALGORITHM: str = "RS256"
+    # Name of the cookie carrying the auth token (must match the frontend's VITE_AUTH_COOKIE_NAME)
+    AUTH_COOKIE_NAME: str = "flow44_token"
 
 
 class FlapiSettings(Flow44BaseSettings):

@@ -36,7 +36,7 @@ export function AuthGate({ children, loader }: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  // Watch for token being cleared (e.g. by refreshAfter401 in iframe mode)
+  // Watch for token being cleared (e.g. by refreshCredentials in iframe mode)
   useEffect(() => {
     if (state !== 'ready') return;
     function onCleared() {

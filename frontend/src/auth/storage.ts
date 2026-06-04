@@ -1,6 +1,20 @@
 import { authConfig } from './config';
 import type { AuthCredentials } from './types';
 
+const COOKIE_BASE = 'Path=/; SameSite=Strict';
+
+function setAuthCookie(credentials: AuthCredentials): void {
+  if (typeof document === 'undefined') return;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  const expires = new Date(credentials.exp * 1000).toUTCString();
+  document.cookie = `${authConfig.cookieName}=${credentials.auth_token}; ${COOKIE_BASE}${secure}; Expires=${expires}`;
+}
+
+function clearAuthCookie(): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${authConfig.cookieName}=; ${COOKIE_BASE}; Max-Age=0`;
+}
+
 function parseStoredCredentials(raw: string): AuthCredentials | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -10,17 +24,6 @@ function parseStoredCredentials(raw: string): AuthCredentials | null {
   } catch {
     return null;
   }
-}
-
-function parseExpiryTimestamp(creds: AuthCredentials): number | null {
-  for (const key of ['expiresAt', 'expiration', 'tokenExpiry']) {
-    const val = (creds as Record<string, unknown>)[key];
-    if (typeof val === 'string' && val.trim()) {
-      const ms = Date.parse(val.trim());
-      return Number.isFinite(ms) ? ms : null;
-    }
-  }
-  return null;
 }
 
 export const credentialsStore = {
@@ -41,6 +44,7 @@ export const credentialsStore = {
   save(credentials: AuthCredentials): void {
     try {
       window.localStorage.setItem(authConfig.storageKey, JSON.stringify(credentials));
+      setAuthCookie(credentials);
     } catch {
       throw new Error('Failed to persist auth credentials');
     }
@@ -49,6 +53,7 @@ export const credentialsStore = {
   clear(): void {
     try {
       window.localStorage.removeItem(authConfig.storageKey);
+      clearAuthCookie();
       window.dispatchEvent(new Event('auth:credentials-cleared'));
     } catch {
       /* ignore */
@@ -62,8 +67,7 @@ export const credentialsStore = {
       const token = creds?.auth_token?.trim();
       if (!token) return undefined;
 
-      const expiry = creds ? parseExpiryTimestamp(creds) : null;
-      if (expiry !== null && Date.now() >= expiry) return undefined;
+      if (creds && creds.exp * 1000 <= Date.now()) return undefined;
 
       return token;
     } catch {
