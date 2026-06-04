@@ -18,7 +18,7 @@ export function Preview() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const isPublished = !!currentProject?.published_at;
+  const isPublished = !!currentProject?.published_url;
   const liveUrl = currentProject?.published_url
     ? `/shared/${currentProject.published_url}`
     : null;

@@ -90,17 +90,17 @@ async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishReque
 
     handle = slug or project.id
     try:
-        published_at = await update_project_published_url(project.id, handle)
+        updated = await update_project_published_url(project.id, handle)
     except IntegrityError as exc:
         logger.warning("Handle collision for project %s with handle %s: %s", project.id, handle, exc)
         raise HTTPException(
             status_code=409, detail=f"The handle '{handle}' was just claimed by another project."
         ) from exc
 
-    if published_at is None:
+    if not updated:
         raise HTTPException(status_code=404, detail="Project not found.")
 
     public_path = f"/shared/{handle}"
     logger.info("Published project %s (handle: %s, public: %s)", project.id, handle, public_path)
 
-    return {"url": public_path, "handle": handle, "published_at": published_at}
+    return {"url": public_path, "handle": handle}

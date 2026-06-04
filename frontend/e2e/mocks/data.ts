@@ -10,7 +10,6 @@ export const MOCK_PROJECT = {
   created_at: new Date().toISOString(),
   model: 'mock/test-model',
   published_url: '',
-  published_at: null as string | null,
 };
 
 /** A second mock project used to simulate a taken slug in publish tests. */
@@ -20,7 +19,6 @@ export const MOCK_PROJECT_WITH_SLUG = {
   created_at: new Date().toISOString(),
   model: 'mock/test-model',
   published_url: 'taken-slug',
-  published_at: new Date().toISOString(),
 };
 
 /** Matches backend `FileEntry` shape (`is_directory`, leading `/` on paths). */

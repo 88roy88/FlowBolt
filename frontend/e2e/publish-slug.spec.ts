@@ -71,7 +71,6 @@ test.describe('Publish modal — edit mode', () => {
   const publishedProject = {
     ...MOCK_PROJECT,
     published_url: 'my-existing-app',
-    published_at: new Date().toISOString(),
   };
   test.use({
     mockOptions: {

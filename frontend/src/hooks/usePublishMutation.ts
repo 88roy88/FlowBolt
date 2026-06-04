@@ -3,7 +3,7 @@ import { publishToS3 } from '../services/api';
 import { usePublishStore } from '../stores/publish';
 import { useSessionStore } from '../stores/session';
 
-type PublishResult = { url: string; handle: string; published_at: string };
+type PublishResult = { url: string; handle: string };
 
 export function usePublishMutation(
   projectId: string | null,
@@ -15,7 +15,7 @@ export function usePublishMutation(
     },
     onSuccess(data) {
       if (!projectId) return;
-      useSessionStore.getState().setProjectPublishedUrl(projectId, data.handle, data.published_at);
+      useSessionStore.getState().setProjectPublishedUrl(projectId, data.handle);
     },
   });
 }

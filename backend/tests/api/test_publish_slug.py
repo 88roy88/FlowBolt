@@ -81,7 +81,7 @@ class TestPublish:
             p_deploy,
             p_bucket,
             patch("flow44.api.publish.is_handle_taken", return_value=False),
-            patch("flow44.api.publish.update_project_published_url", return_value="2026-04-19T12:00:00Z") as mock_update,
+            patch("flow44.api.publish.update_project_published_url", return_value=True) as mock_update,
         ):
             response = client.post(
                 "/api/export/proj-1/publish",
@@ -100,7 +100,7 @@ class TestPublish:
             p_build,
             p_deploy,
             p_bucket,
-            patch("flow44.api.publish.update_project_published_url", return_value="2026-04-19T12:00:00Z") as mock_update,
+            patch("flow44.api.publish.update_project_published_url", return_value=True) as mock_update,
         ):
             response = client.post(
                 "/api/export/proj-1/publish",
@@ -137,7 +137,7 @@ class TestPublish:
             p_deploy,
             p_bucket,
             patch("flow44.api.publish.is_handle_taken", return_value=False),
-            patch("flow44.api.publish.update_project_published_url", return_value="2026-04-19T12:00:00Z"),
+            patch("flow44.api.publish.update_project_published_url", return_value=True),
         ):
             response = client.post(
                 "/api/export/proj-1/publish",

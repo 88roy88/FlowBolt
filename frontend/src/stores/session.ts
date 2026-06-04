@@ -15,7 +15,7 @@ interface SessionState {
   deleteProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
   updateProjectSummary: (projectId: string, summary: string) => void;
-  setProjectPublishedUrl: (projectId: string, handle: string, publishedAt: string) => void;
+  setProjectPublishedUrl: (projectId: string, handle: string) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -94,11 +94,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
   },
 
-  setProjectPublishedUrl(projectId: string, handle: string, publishedAt: string) {
+  setProjectPublishedUrl(projectId: string, handle: string) {
     set((state) => {
       const patch = {
         published_url: handle,
-        published_at: publishedAt,
       };
       const projects = state.projects.map((p) =>
         p.id === projectId ? { ...p, ...patch } : p

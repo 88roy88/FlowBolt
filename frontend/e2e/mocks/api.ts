@@ -403,11 +403,10 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     const proj = projects.find((p) => p.id === projectId);
     if (proj) {
       proj.published_url = handle;
-      proj.published_at = new Date().toISOString();
     }
 
     const publicPath = `/shared/${handle}`;
-    return route.fulfill({ json: { url: publicPath, handle, published_at: proj?.published_at ?? new Date().toISOString() } });
+    return route.fulfill({ json: { url: publicPath, handle } });
   });
 
   // --- Data source search ---
