@@ -25,7 +25,7 @@ export function MobileLayout() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-surface shrink-0">
         <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-md hover:bg-muted/50">
-          <Menu size={20} className="text-muted-foreground" />
+          <Menu size={20} className="text-primary/70" />
         </button>
         <FlowBrand size="sm" />
         <div className="w-9" /> {/* Spacer to center the logo */}
@@ -35,13 +35,22 @@ export function MobileLayout() {
 
       {/* Content */}
       {isEmptyState ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
-          <FlowBrand size="lg" />
-          <p className="text-sm text-muted-foreground text-center leading-relaxed">
-            Describe what you want to build and the AI will generate it for you.
-          </p>
-          <div className="w-full">
-            <PromptInput />
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6 relative overflow-hidden">
+          {/* Background glow */}
+          <div className="absolute top-1/3 start-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent),transparent_70%)] pointer-events-none" />
+          <div className="relative z-10 flex flex-col items-center gap-5 w-full">
+            <div className="relative">
+              <div className="absolute inset-0 blur-2xl bg-[color-mix(in_srgb,var(--primary)_20%,transparent)] scale-[2] pointer-events-none" />
+              <div className="relative drop-shadow-[0_0_16px_color-mix(in_srgb,var(--primary)_30%,transparent)]">
+                <FlowBrand size="lg" />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground text-center leading-relaxed">
+              Describe what you want to build and the AI will generate it for you.
+            </p>
+            <div className="w-full rounded-2xl border border-primary/20 shadow-[0_2px_20px_color-mix(in_srgb,var(--primary)_6%,transparent)] [&>div]:border-t-0 [&>div]:rounded-2xl">
+              <PromptInput />
+            </div>
           </div>
         </div>
       ) : (
