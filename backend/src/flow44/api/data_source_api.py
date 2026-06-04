@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Body, HTTPException
 
-from flow44.api.deps import AuthDep
+from flow44.api.deps import TokenDep as AuthDep
 from flow44.integrations.flapi.models import CubeId, QuickParams, QuickParamValue
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import (

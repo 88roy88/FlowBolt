@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.api.deps import get_ws_sandbox
+from flow44.api.deps import WsProjectDep, WsSandboxDep
 from flow44.sandbox.pty import BasePTY
 
 logger = logging.getLogger(__name__)
@@ -14,18 +14,14 @@ router = APIRouter()
 
 
 @router.websocket("/ws/terminal/{project_id}")
-async def terminal_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901
-    sandbox = await get_ws_sandbox(websocket, project_id)
-    if sandbox is None:
-        return
-
+async def terminal_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandboxDep) -> None:  # noqa: C901
     await websocket.accept()
 
     pty: BasePTY | None = None
     try:
         pty = sandbox.get_or_create_pty()
     except Exception:
-        logger.exception("Failed to create PTY for session %s", project_id)
+        logger.exception("Failed to create PTY for session %s", project.id)
         await websocket.close(code=1011, reason="Failed to create terminal")
         return
 
@@ -35,7 +31,7 @@ async def terminal_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C
         try:
             await websocket.send_bytes(scrollback)
         except Exception:
-            logger.debug("Failed to send scrollback for session %s", project_id)
+            logger.debug("Failed to send scrollback for session %s", project.id)
 
     stop_event = asyncio.Event()
 
@@ -58,9 +54,9 @@ async def terminal_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C
             data = await websocket.receive_bytes()
             pty.write(data)
     except WebSocketDisconnect:
-        logger.info("Terminal WebSocket disconnected for session %s", project_id)
+        logger.info("Terminal WebSocket disconnected for session %s", project.id)
     except Exception:
-        logger.exception("Error in terminal WebSocket for session %s", project_id)
+        logger.exception("Error in terminal WebSocket for session %s", project.id)
     finally:
         # Detach only — do NOT kill the PTY. It stays alive for reconnection.
         stop_event.set()

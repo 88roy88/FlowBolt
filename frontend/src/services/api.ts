@@ -1,7 +1,27 @@
+import { authSession } from '../auth';
 import type { FileEntry, Project, AIModel, DataSourceSearchResult } from '../types';
-import { readDataSourceAuthorization } from './dataSourceAuth';
 
 const BASE = '/api';
+
+// Fetch with a Bearer token; on a 401, re-acquire credentials and retry once.
+async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry = true): Promise<Response> {
+  const token = await authSession.ensureFreshToken();
+  const headers = new Headers(options.headers);
+  if (token) {
+    headers.set('Authorization', token.startsWith('Bearer ') ? token : `Bearer ${token}`);
+  }
+
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401 && allowRetry) {
+    await authSession.refreshCredentials();
+    if (!authSession.hasValidSession()) {
+      throw new Error('API error 401: authentication required');
+    }
+    return fetchWithAuth(path, options, false);
+  }
+  return res;
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
@@ -10,10 +30,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (options?.body && !isFormDataBody) {
     headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch(`${BASE}${path}`, {
-    headers,
-    ...options,
-  });
+
+  const res = await fetchWithAuth(path, { ...options, headers });
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${text}`);
@@ -61,13 +79,13 @@ export async function deleteFileEntry(projectId: string, path: string): Promise<
 }
 
 export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
-  const res = await fetch(`${BASE}/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
+  const res = await fetchWithAuth(`/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type || 'application/octet-stream' },
     body: file,
   });
-  const text = await res.text();
   if (!res.ok) {
+    const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
 }
@@ -123,6 +141,10 @@ export async function updateProjectModel(projectId: string, model: string): Prom
   });
 }
 
+export async function reapProject(projectId: string): Promise<void> {
+  await request(`/projects/${projectId}/debug/reap`, { method: 'POST' });
+}
+
 export async function fetchPreviewPort(projectId: string): Promise<number> {
   const data = await request<{ port: number }>(`/preview/${projectId}/port`);
   return data.port;
@@ -155,16 +177,8 @@ export async function fetchDefaultModel(): Promise<string> {
 }
 
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchResult[]> {
-  const headers: Record<string, string> = {};
-  const auth = readDataSourceAuthorization();
-  if (auth) headers.Authorization = auth;
-  const res = await fetch(`${BASE}/data-source/search/${encodeURIComponent(queryOrId)}`, { headers });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${text}`);
-  }
-  if (!text) return [] as DataSourceSearchResult[];
-  return JSON.parse(text) as DataSourceSearchResult[];
+  // Backend strips the Bearer prefix before forwarding to FLAPI, so the shared helper is safe here.
+  return request<DataSourceSearchResult[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
 }
 
 export function downloadZip(projectId: string): void {

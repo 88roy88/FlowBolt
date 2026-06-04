@@ -13,6 +13,7 @@ class Project(SQLModel, table=True):
     __tablename__ = "projects"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    user_id: str = Field(index=True)
     name: str
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
@@ -24,8 +25,8 @@ class Project(SQLModel, table=True):
     published_url: str = Field(default="")
 
 
-async def create_project(name: str) -> Project:
-    project = Project(name=name)
+async def create_project(name: str, user_id: str) -> Project:
+    project = Project(name=name, user_id=user_id)
     async with database.async_session() as session:
         session.add(project)
         await session.commit()
@@ -38,9 +39,20 @@ async def get_project(project_id: str) -> Project | None:
         return await session.get(Project, project_id)
 
 
-async def list_projects() -> list[Project]:
+async def list_user_projects(user_id: str) -> list[Project]:
     async with database.async_session() as session:
-        result = await session.execute(select(Project).order_by(Project.created_at.desc()))  # type: ignore[attr-defined]
+        query = (
+            select(Project).where(Project.user_id == user_id).order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+        )
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+
+async def list_all_projects() -> list[Project]:
+    """System-level: returns every project across all users. Never call from a request handler."""
+    async with database.async_session() as session:
+        query = select(Project).order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+        result = await session.execute(query)
         return list(result.scalars().all())
 
 

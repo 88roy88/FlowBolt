@@ -1,7 +1,7 @@
 import { authConfig } from '../auth/config';
 
 // List of users who see "FlowBase" instead of "Flow44"
-const SPECIAL_USERS = ['666royz', "dev-user"];
+const SPECIAL_USERS = ['666royz', '619roym', '611noat', "dev-user"];
 
 function getUserIdFromJwt(token: string): string | undefined {
   try {

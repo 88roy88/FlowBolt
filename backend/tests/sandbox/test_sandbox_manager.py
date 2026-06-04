@@ -4,8 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
+from flow44.config import settings
 from flow44.sandbox.base import SandboxInfo
-from flow44.sandbox.manager import SandboxManager, SandboxNotFoundError
+from flow44.sandbox.manager import SandboxManager
 
 from .conftest import DummySandbox
 
@@ -25,60 +26,60 @@ def manager(tmp_path):  # type: ignore[type-arg]
 
 @pytest.mark.asyncio
 class TestSandboxManagerLifecycle:
-    async def test_get_unknown_raises(self, manager) -> None:  # type: ignore[type-arg]
-        mgr, *_ = manager
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("nonexistent")
-
-    async def test_create_and_get(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_get_creates_if_missing(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            sandbox = await mgr.create_sandbox("proj1")
-        assert mgr.get_sandbox("proj1") is sandbox
+            sandbox = await mgr.get_sandbox("proj1")
+        assert "proj1" in mgr._sandboxes
+        assert mgr._sandboxes["proj1"] is sandbox
 
-    async def test_get_or_create_idempotent(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_get_idempotent(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            s1 = await mgr.get_or_create_sandbox("proj1")
-            s2 = await mgr.get_or_create_sandbox("proj1")
+            s1 = await mgr.get_sandbox("proj1")
+            s2 = await mgr.get_sandbox("proj1")
         assert s1 is s2
 
-    async def test_destroy_removes_sandbox(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_wake_sandbox_idempotent(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            await mgr.create_sandbox("proj1")
-            await mgr.destroy_sandbox("proj1", delete_workspace=False)
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("proj1")
+            s1 = await mgr.wake_sandbox("proj1")
+            s2 = await mgr.wake_sandbox("proj1")
+        assert s1 is s2
 
-    async def test_port_freed_after_destroy(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_suspend_removes_sandbox(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            sandbox = await mgr.create_sandbox("proj1")
+            await mgr.get_sandbox("proj1")
+            await mgr.suspend_sandbox("proj1")
+        assert "proj1" not in mgr._sandboxes
+
+    async def test_port_freed_after_suspend(self, manager) -> None:  # type: ignore[type-arg]
+        mgr, workspace_base, mock_s = manager
+        with patch("flow44.sandbox.manager.settings", mock_s):
+            sandbox = await mgr.get_sandbox("proj1")
             port = sandbox.port
             assert port not in mgr._available_ports
-            await mgr.destroy_sandbox("proj1", delete_workspace=False)
+            await mgr.suspend_sandbox("proj1")
         assert port in mgr._available_ports
 
-    async def test_destroy_nonexistent_no_error(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_suspend_nonexistent_no_error(self, manager) -> None:  # type: ignore[type-arg]
         mgr, *_ = manager
-        await mgr.destroy_sandbox("ghost", delete_workspace=False)  # must not raise
+        await mgr.suspend_sandbox("ghost")  # must not raise
 
-    async def test_destroy_all(self, manager) -> None:  # type: ignore[type-arg]
+    async def test_suspend_all(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            await mgr.create_sandbox("p1")
-            await mgr.create_sandbox("p2")
-            await mgr.destroy_all(delete_workspaces=False)
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("p1")
-        with pytest.raises(SandboxNotFoundError):
-            mgr.get_sandbox("p2")
+            await mgr.get_sandbox("p1")
+            await mgr.get_sandbox("p2")
+            await mgr.suspend_all()
+        assert "p1" not in mgr._sandboxes
+        assert "p2" not in mgr._sandboxes
 
     async def test_workspace_dir_is_under_base(self, manager) -> None:  # type: ignore[type-arg]
         mgr, workspace_base, mock_s = manager
         with patch("flow44.sandbox.manager.settings", mock_s):
-            sandbox = await mgr.create_sandbox("myproject")
+            sandbox = await mgr.get_sandbox("myproject")
         assert sandbox.workspace_dir.startswith(workspace_base)
         assert "myproject" in sandbox.workspace_dir
 
@@ -116,3 +117,22 @@ class TestStampViteConfig:
         result = (workspace_dir / "vite.config.ts").read_text()
         assert "plugins: []" in result
         assert "proj42" in result
+
+    def test_replaces_auth_post_message_target(self, tmp_path) -> None:  # type: ignore[type-arg]
+        template_dir = tmp_path / "template"
+        template_dir.mkdir()
+        (template_dir / "vite.config.ts").write_text(
+            "'import.meta.env.VITE_AUTH_POST_MESSAGE_TARGET': JSON.stringify('{{AUTH_POST_MESSAGE_TARGET}}'),"
+        )
+
+        workspace_dir = tmp_path / "workspace"
+        workspace_dir.mkdir()
+        (workspace_dir / "vite.config.ts").write_text("")
+
+        sandbox = DummySandbox(SandboxInfo(project_id="proj", workspace_dir=str(workspace_dir), port=0))
+        with patch.object(settings, "SANDBOX_AUTH_POST_MESSAGE_TARGET", "https://auth.example.com"):
+            sandbox._stamp_vite_config(str(template_dir))
+
+        result = (workspace_dir / "vite.config.ts").read_text()
+        assert "https://auth.example.com" in result
+        assert "{{AUTH_POST_MESSAGE_TARGET}}" not in result

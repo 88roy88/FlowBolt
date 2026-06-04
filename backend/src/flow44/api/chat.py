@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from flow44.ai.agent_runtime import mark_agent_finished, mark_agent_started
 from flow44.ai.agents.execute.agent import ExecuteAgent
@@ -13,16 +13,20 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
+from flow44.api.deps import ProjectDep, TokenDep, WsProjectDep
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
-from flow44.db.project import get_project
 from flow44.logic import data_source as ds_logic
-from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+# HTTP routes — included in main's protected api_router
+http_router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+# WebSocket router — auth via Depends() on each endpoint
+ws_router = APIRouter()
 
 
 async def _is_new_project(project_id: str) -> bool:
@@ -47,48 +51,36 @@ def _start_agent(project_id: str, coro: Any) -> None:
     asyncio.create_task(_run_agent_safe(project_id, coro))
 
 
-@router.get("/api/chat/{project_id}/history")
-async def chat_history(project_id: str) -> list[dict[str, Any]]:
-    project = await get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Unknown project")
-    messages = await get_messages(project_id)
+@http_router.get("/{project_id}/history")
+async def chat_history(project: ProjectDep) -> list[dict[str, Any]]:
+    messages = await get_messages(project.id)
     return [m.model_dump() for m in messages]
 
 
-@router.get("/api/chat/{project_id}/events")
-async def chat_events(project_id: str) -> list[dict[str, Any]]:
-    events = await get_events(project_id)
+@http_router.get("/{project_id}/events")
+async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
+    events = await get_events(project.id)
     return [{**evt.payload, "_ts": evt.created_at} for evt in events]
 
 
-@router.websocket("/ws/chat/{project_id}")
-async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901, PLR0915
+@ws_router.websocket("/ws/chat/{project_id}")
+async def chat_ws(  # noqa: C901, PLR0915
+    websocket: WebSocket,
+    project: WsProjectDep,
+    data_source_authorization: TokenDep = None,
+) -> None:
     await websocket.accept()
-    logger.info("[chat] WebSocket accepted for session %s", project_id)
-
-    project = await get_project(project_id)
-    if project is None:
-        await websocket.send_json({"type": "error", "message": "Unknown project"})
-        await websocket.close()
-        return
+    logger.info("[chat] WebSocket accepted for session %s", project.id)
 
     try:
-        sandbox = sandbox_manager.get_sandbox(project_id)
-        await sandbox_manager.ensure_ready(sandbox)
-    except SandboxNotFoundError:
-        logger.error("[chat] Sandbox not found for session %s", project_id)
-        await websocket.send_json({"type": "error", "message": "Project sandbox not found"})
-        await websocket.close()
-        return
+        sandbox = await sandbox_manager.wake_sandbox(project.id)
     except Exception:
-        logger.exception("[chat] Failed to prepare sandbox for session %s", project_id)
+        logger.exception("[chat] Failed to prepare sandbox for session %s", project.id)
         await websocket.send_json({"type": "error", "message": "Failed to prepare project sandbox"})
         await websocket.close()
         return
 
-    # Subscribe to live events (replay is handled by GET /api/chat/{project_id}/events)
-    queue = subscribe(project_id)
+    queue = subscribe(project.id)
 
     async def _forward_events() -> None:
         try:
@@ -96,19 +88,15 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 event = await queue.get()
                 await websocket.send_json(event)
         except Exception:
-            logger.debug("Event forwarding stopped for session %s", project_id)
+            logger.debug("Event forwarding stopped for session %s", project.id)
 
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
-        data_source_authorization: str | None = None
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
             msg_type = data.get("type")
 
-            if msg_type == "auth":
-                raw_auth = data.get("dataSourceAuthorization")
-                data_source_authorization = raw_auth.strip() or None if isinstance(raw_auth, str) else None
-            elif msg_type == "message":
+            if msg_type == "message":
                 user_content: str = data["content"]
                 selected_model: str | None = data.get("model")
                 ds_ids: list[int] = data.get("dataSourceIds") or []
@@ -129,20 +117,20 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                     user_event["data_sources"] = [
                         {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                     ]
-                await emit_event(project_id, user_event, notify=False)
+                await emit_event(project.id, user_event, notify=False)
 
-                is_new = await _is_new_project(project_id)
+                is_new = await _is_new_project(project.id)
 
                 if is_new:
                     # Use PlanAgent for design and planning
                     plan_agent = PlanAgent(
-                        project_id=project_id,
+                        project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model,
                         data_source_authorization=data_source_authorization,
                     )
                     _start_agent(
-                        project_id,
+                        project.id,
                         plan_agent.run(
                             user_content,
                             data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
@@ -150,11 +138,11 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                     )
                 else:
                     followup_agent = FollowUpAgent(
-                        project_id=project_id,
+                        project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model,
                     )
-                    _start_agent(project_id, followup_agent.run(user_content))
+                    _start_agent(project.id, followup_agent.run(user_content))
 
             elif msg_type == "plan_response":
                 action = data.get("action")
@@ -162,7 +150,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 selected_model = data.get("model")
 
                 # Load pending plan from DB
-                state_json = await get_pending_plan(project_id)
+                state_json = await get_pending_plan(project.id)
                 if state_json is None:
                     await websocket.send_json({"type": "error", "message": "No pending plan found"})
                     continue
@@ -171,23 +159,23 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
 
                 if action == "accept":
                     # Execute the plan with ExecuteAgent
-                    await delete_pending_plan(project_id)
+                    await delete_pending_plan(project.id)
                     execute_agent = ExecuteAgent(
-                        project_id=project_id,
+                        project_id=project.id,
                         sandbox=sandbox,
                         state=state,
                         model=selected_model or state.model,
                     )
-                    _start_agent(project_id, execute_agent.run())
+                    _start_agent(project.id, execute_agent.run())
 
                 elif action == "modify" and feedback:
                     # Rebuild plan with feedback using PlanAgent
                     plan_agent = PlanAgent(
-                        project_id=project_id,
+                        project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model or state.model,
                     )
-                    _start_agent(project_id, plan_agent.rebuild_with_feedback(state, feedback))
+                    _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
 
             elif msg_type == "fix_error":
                 error_message = data.get("error_message", "")
@@ -204,7 +192,7 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
 
                 # Emit user_message event (for frontend history reconstruction)
                 await emit_event(
-                    project_id,
+                    project.id,
                     {
                         "type": "user_message",
                         "content": "",
@@ -219,12 +207,12 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
                 )
 
                 fix_agent = FixErrorAgent(
-                    project_id=project_id,
+                    project_id=project.id,
                     sandbox=sandbox,
                     model=selected_model,
                 )
                 _start_agent(
-                    project_id,
+                    project.id,
                     fix_agent.run(
                         error_message=error_message,
                         error_file=error_file,
@@ -238,9 +226,9 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
     try:
         await _receive_actions()
     except WebSocketDisconnect:
-        logger.info("[chat] WebSocket disconnected for session %s", project_id)
+        logger.info("[chat] WebSocket disconnected for session %s", project.id)
     except Exception:
-        logger.exception("[chat] Unhandled error in chat WebSocket for session %s", project_id)
+        logger.exception("[chat] Unhandled error in chat WebSocket for session %s", project.id)
         try:
             await websocket.send_json({"type": "error", "message": "Internal server error"})
         except Exception:  # noqa: S110 — WS may already be closed
@@ -251,4 +239,4 @@ async def chat_ws(websocket: WebSocket, project_id: str) -> None:  # noqa: C901,
             await forward_task
         except asyncio.CancelledError:
             pass
-        unsubscribe(project_id, queue)
+        unsubscribe(project.id, queue)

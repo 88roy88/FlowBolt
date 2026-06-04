@@ -3,9 +3,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import litellm
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from flow44.api import (
     chat,
@@ -21,11 +20,13 @@ from flow44.api import (
     server_log,
     terminal,
 )
+from flow44.api.deps import validate_token, validate_ws_token
 from flow44.config import settings
 from flow44.db.database import init_db
-from flow44.db.project import list_projects
+from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import setup_bucket
-from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+from flow44.sandbox.idle_reaper import idle_reaper
+from flow44.sandbox.manager import sandbox_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -47,11 +48,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Restoring existing sandbox workspaces...")
 
-    live_projects = await list_projects()
+    live_projects = await list_all_projects()
 
     live_project_ids = {p.id for p in live_projects}
     await sandbox_manager.reconcile_workspaces(live_project_ids)
     logger.info("Sandbox restoration complete.")
+
+    idle_reaper.start()
+    logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
 
     if settings.S3_BUCKET_NAME:
         logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
@@ -63,8 +67,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("S3 bucket setup issue (may already exist or be misconfigured): %s", exc)
 
     yield
-    logger.info("Shutting down — destroying all sandboxes...")
-    await sandbox_manager.destroy_all()
+    logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
+    await idle_reaper.stop()
+    await sandbox_manager.suspend_all()
     logger.info("Shutdown complete.")
 
 
@@ -82,11 +87,6 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok", "version": "0.1.0"}
 
 
-@app.exception_handler(SandboxNotFoundError)
-async def sandbox_not_found_handler(request: Request, exc: SandboxNotFoundError) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
 # CORS — allow all origins in development
 # TODO: limit CORS
 app.add_middleware(
@@ -97,18 +97,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# REST routers
-app.include_router(projects.router)
-app.include_router(files.router)
-app.include_router(preview.router)
-app.include_router(models.router)
-app.include_router(export.router)
-app.include_router(publish.router)
-app.include_router(data_source_api.router)
-app.include_router(iaagent.router)
+# Authenticated HTTP routes
+auth_routes = APIRouter(dependencies=[Depends(validate_token)])
+auth_routes.include_router(projects.router)
+auth_routes.include_router(files.router)
+auth_routes.include_router(preview.router)
+auth_routes.include_router(export.router)
+auth_routes.include_router(publish.router)
+auth_routes.include_router(data_source_api.router)
+auth_routes.include_router(chat.http_router)
+auth_routes.include_router(iaagent.router)
+app.include_router(auth_routes)
 
-# WebSocket routers
-app.include_router(chat.router)
-app.include_router(terminal.router)
-app.include_router(server_log.router)
-app.include_router(errors.router)
+# Public HTTP routes
+public_routes = APIRouter()
+public_routes.include_router(models.router)
+public_routes.include_router(publish.public_router)
+app.include_router(public_routes)
+
+# Authenticated WS routes
+ws_auth_routes = APIRouter(dependencies=[Depends(validate_ws_token)])
+ws_auth_routes.include_router(chat.ws_router)
+ws_auth_routes.include_router(terminal.router)
+ws_auth_routes.include_router(server_log.router)
+ws_auth_routes.include_router(errors.router)
+app.include_router(ws_auth_routes)
