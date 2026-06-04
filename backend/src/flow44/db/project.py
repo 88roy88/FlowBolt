@@ -156,7 +156,7 @@ async def update_project_published_url(project_id: str, handle: str) -> None:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if not project:
-            raise Exception("project not found")
+            raise Exception("project not found")  # noqa: TRY002
         now = datetime.now(UTC).isoformat()
         project.published_url = handle
         project.published_at = now
