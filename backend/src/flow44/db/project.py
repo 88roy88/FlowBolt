@@ -155,7 +155,8 @@ async def update_project_published_url(project_id: str, handle: str) -> None:
     """Set the project's handle. Caller must ensure the project exists."""
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
-        assert project is not None, f"Project {project_id} not found"
+        if not project:
+            return
         now = datetime.now(UTC).isoformat()
         project.published_url = handle
         project.published_at = now
