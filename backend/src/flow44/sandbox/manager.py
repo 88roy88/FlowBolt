@@ -78,22 +78,6 @@ class SandboxManager:
         await self.start_dev_server(sandbox)
         return sandbox
 
-    async def wake_and_wait(self, project_id: str, *, timeout: float = 30.0) -> PnpmSandbox:  # noqa: ASYNC109
-        """Wake a sandbox and wait until the dev server is accepting connections."""
-        sandbox = await self.wake_sandbox(project_id)
-        deadline = asyncio.get_event_loop().time() + timeout
-        while asyncio.get_event_loop().time() < deadline:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                sock.connect(("127.0.0.1", sandbox.port))
-                sock.close()
-                return sandbox
-            except OSError:
-                sock.close()
-                await asyncio.sleep(0.2)
-        logger.warning("Dev server for %s did not become ready within %.0fs", project_id, timeout)
-        return sandbox
-
     async def create_sandbox(self, project_id: str) -> PnpmSandbox:
         """Create a brand-new sandbox: get, scaffold, and start the dev server."""
         sandbox = await self.get_sandbox(project_id)
@@ -124,7 +108,6 @@ class SandboxManager:
     @staticmethod
     async def start_dev_server(sandbox: PnpmSandbox) -> None:
         """Start the dev server if it's not already running."""
-        sandbox.configure_npmrc()
         if not sandbox.is_dev_server_running():
             logger.info("Starting sandbox dev server for %s", sandbox.project_id)
             await sandbox.start_dev_server()
@@ -164,6 +147,12 @@ class SandboxManager:
             if name not in live_project_ids:
                 logger.info("Removing orphan workspace %s", name)
                 shutil.rmtree(workspace_dir, ignore_errors=True)
+
+    def has_active_sandbox(self, project_id: str) -> bool:
+        return project_id in self._sandboxes
+
+    def active_project_ids(self) -> list[str]:
+        return list(self._sandboxes.keys())
 
     async def suspend_all(self) -> None:
         """Suspend all active sandboxes (used during shutdown)."""

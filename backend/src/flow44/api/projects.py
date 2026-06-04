@@ -85,7 +85,7 @@ async def delete_existing_project(project: ProjectDep) -> None:
 @router.post("/{project_id}/debug/reap", status_code=200)
 async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
     """DEBUG: Force-evict a sandbox as if the idle reaper triggered."""
-    if project_id not in sandbox_manager._sandboxes:
+    if not sandbox_manager.has_active_sandbox(project_id):
         raise HTTPException(status_code=404, detail="No active sandbox for this project")
 
     await sandbox_manager.suspend_sandbox(project_id)
@@ -96,5 +96,5 @@ async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
 @router.get("/debug/sandboxes", status_code=200)
 async def debug_list_sandboxes() -> dict[str, Any]:
     """DEBUG: Show active sandbox count and which projects have live sandboxes."""
-    active = list(sandbox_manager._sandboxes.keys())
+    active = sandbox_manager.active_project_ids()
     return {"count": len(active), "project_ids": active}

@@ -11,33 +11,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/preview", tags=["preview"])
 
-_WAKING_UP_HTML = """\
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Waking up...</title></head>
-<body style="font-family:system-ui;color:#666;display:flex;align-items:center;\
-justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px;\
-background:#fafafa">
-<div style="font-size:1.2rem">Waking up project...</div>
-<div style="font-size:0.85rem;color:#999">This usually takes a few seconds.</div>
-<script>setTimeout(()=>location.reload(),3000)</script>
-</body>
-</html>
-"""
+_proxy_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
 
-_PREPARING_HTML = """\
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Preparing...</title></head>
-<body style="font-family:system-ui;color:#666;display:flex;align-items:center;\
-justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px;\
-background:#fafafa">
-<div style="font-size:1.2rem">Preparing project environment...</div>
-<div style="font-size:0.85rem;color:#999">Installing dependencies. This may take up to a minute.</div>
-<script>setTimeout(()=>location.reload(),5000)</script>
-</body>
-</html>
-"""
+
+def _loading_page(title: str, message: str, detail: str, reload_ms: int) -> str:
+    return (
+        f'<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>{title}</title></head>\n'
+        f'<body style="font-family:system-ui;color:#666;display:flex;align-items:center;'
+        f"justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px;"
+        f'background:#fafafa">\n'
+        f'<div style="font-size:1.2rem">{message}</div>\n'
+        f'<div style="font-size:0.85rem;color:#999">{detail}</div>\n'
+        f"<script>setTimeout(()=>location.reload(),{reload_ms})</script>\n"
+        f"</body>\n</html>\n"
+    )
 
 
 @router.get("/{project_id}/port")
@@ -64,7 +51,12 @@ async def proxy_to_sandbox(
 
     if not sandbox.is_dev_server_running():
         return Response(
-            content=_PREPARING_HTML,
+            content=_loading_page(
+                "Preparing...",
+                "Preparing project environment...",
+                "Installing dependencies. This may take up to a minute.",
+                5000,
+            ),
             status_code=503,
             media_type="text/html",
             headers={"Cache-Control": "no-store", "Retry-After": "5"},
@@ -82,16 +74,20 @@ async def proxy_to_sandbox(
     body = await request.body()
 
     try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            resp = await client.request(
-                method=request.method,
-                url=target_url,
-                headers=headers,
-                content=body if body else None,
-            )
+        resp = await _proxy_client.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            content=body if body else None,
+        )
     except httpx.ConnectError:
         return Response(
-            content=_WAKING_UP_HTML,
+            content=_loading_page(
+                "Waking up...",
+                "Waking up project...",
+                "This usually takes a few seconds.",
+                3000,
+            ),
             status_code=503,
             media_type="text/html",
             headers={"Cache-Control": "no-store", "Retry-After": "3"},

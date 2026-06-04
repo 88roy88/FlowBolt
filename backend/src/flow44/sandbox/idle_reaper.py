@@ -56,7 +56,7 @@ class IdleReaper:
                     to_evict.append(project_id)
 
             for project_id in to_evict:
-                if project_id not in sandbox_manager._sandboxes:
+                if not sandbox_manager.has_active_sandbox(project_id):
                     self._last_activity.pop(project_id, None)
                     continue
 
