@@ -141,6 +141,10 @@ export async function updateProjectModel(projectId: string, model: string): Prom
   });
 }
 
+export async function reapProject(projectId: string): Promise<void> {
+  await request(`/projects/${projectId}/debug/reap`, { method: 'POST' });
+}
+
 export async function fetchPreviewPort(projectId: string): Promise<number> {
   const data = await request<{ port: number }>(`/preview/${projectId}/port`);
   return data.port;

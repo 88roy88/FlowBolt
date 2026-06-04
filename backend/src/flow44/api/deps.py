@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 from typing import Annotated
 
@@ -11,7 +9,7 @@ from flow44.config import settings
 from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
 from flow44.sandbox.main import PnpmSandbox
-from flow44.sandbox.manager import SandboxNotFoundError, sandbox_manager
+from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
@@ -144,9 +142,9 @@ WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 async def get_sandbox(project: ProjectDep) -> PnpmSandbox:
     try:
-        return sandbox_manager.get_sandbox(project.id)
-    except SandboxNotFoundError:
-        raise HTTPException(status_code=404, detail=f"No sandbox found for project {project.id}") from None
+        return await sandbox_manager.get_sandbox(project.id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"No sandbox found for project {project.id}") from exc
 
 
 SandboxDep = Annotated[PnpmSandbox, Depends(get_sandbox)]
@@ -154,8 +152,9 @@ SandboxDep = Annotated[PnpmSandbox, Depends(get_sandbox)]
 
 async def get_ws_sandbox(project: WsProjectDep) -> PnpmSandbox:
     try:
-        return sandbox_manager.get_sandbox(project.id)
-    except SandboxNotFoundError:
+        return await sandbox_manager.get_sandbox(project.id)
+    except Exception:
+        logger.exception("Failed to get sandbox for project %s", project.id)
         raise WebSocketException(code=4404, reason="Sandbox not found") from None
 
 
