@@ -42,7 +42,7 @@ function initializeTheme() {
     if (stored === 'light' || stored === 'dark') {
       theme = stored;
     } else {
-      theme = window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      theme = window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     document.documentElement.dataset.theme = theme;
   } catch {}
@@ -185,78 +185,56 @@ export default function App() {
 
   if (showNewProject && projects.length === 0) {
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        gap: '16px',
-      }}>
-        <FlowBrand size="lg" />
-        {!backendAvailable ? (
-          <>
-            <div style={{
-              padding: '16px 24px',
-              background: 'var(--surface)',
-              border: '2px solid var(--danger)',
-              borderRadius: '8px',
-              maxWidth: '500px',
-              textAlign: 'center',
-            }}>
-              <p style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' }}>
-                {t('app.backendUnavailable')}
-              </p>
-              <p style={{ color: 'var(--text-dim)', fontSize: '14px' }}>
-                {t('app.cannotConnect')}
-              </p>
+      <div className="flex flex-col items-center justify-center h-full gap-6 px-8 relative overflow-hidden">
+        {/* Background glow */}
+        <div className="absolute top-[25%] start-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_8%,transparent),transparent_70%)] pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-md">
+          {/* Logo with glow */}
+          <div className="relative">
+            <div className="absolute inset-0 blur-3xl bg-[color-mix(in_srgb,var(--primary)_25%,transparent)] scale-[2] pointer-events-none" />
+            <div className="relative drop-shadow-[0_0_20px_color-mix(in_srgb,var(--primary)_30%,transparent)]">
+              <FlowBrand size="lg" />
             </div>
-            <button
-              onClick={() => window.location.reload()}
-              style={{
-                padding: '8px 16px',
-                background: 'var(--accent)',
-                color: 'var(--bg)',
-                borderRadius: '6px',
-                fontWeight: 600,
-              }}
-            >
-              {t('app.retryConnection')}
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={{ color: 'var(--text-dim)' }}>{t('app.createFirstProject')}</p>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder={t('common.projectName')}
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-                style={{
-                  padding: '8px 12px',
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '6px',
-                  width: '250px',
-                }}
-              />
+          </div>
+
+          {!backendAvailable ? (
+            <>
+              <div className="w-full px-5 py-4 bg-surface rounded-xl border-2 border-destructive/50 text-center shadow-[0_0_20px_color-mix(in_srgb,var(--destructive)_10%,transparent)]">
+                <p className="text-destructive font-semibold mb-1.5">{t('app.backendUnavailable')}</p>
+                <p className="text-sm text-muted-foreground">{t('app.cannotConnect')}</p>
+              </div>
               <button
-                onClick={handleCreate}
-                style={{
-                  padding: '8px 16px',
-                  background: 'var(--accent)',
-                  color: 'var(--bg)',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                }}
+                onClick={() => window.location.reload()}
+                className="px-5 py-2 bg-primary text-text-on-accent rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity shadow-[0_0_16px_color-mix(in_srgb,var(--primary)_30%,transparent)]"
               >
-                {t('common.create')}
+                {t('app.retryConnection')}
               </button>
-            </div>
-          </>
-        )}
+            </>
+          ) : (
+            <>
+              <p className="text-base text-muted-foreground text-center leading-relaxed">
+                {t('app.createFirstProject')}
+              </p>
+              <div className="w-full flex gap-2">
+                <input
+                  type="text"
+                  placeholder={t('common.projectName')}
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+                  className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:border-primary/60 focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_8%,transparent)] transition-all"
+                />
+                <button
+                  onClick={handleCreate}
+                  className="px-4 py-2 bg-primary text-text-on-accent rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity shadow-[0_0_16px_color-mix(in_srgb,var(--primary)_25%,transparent)]"
+                >
+                  {t('common.create')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     );
   }
