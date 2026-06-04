@@ -151,16 +151,13 @@ async def is_handle_taken(handle: str, exclude_project_id: str) -> bool:
         return result.scalar_one_or_none() is not None
 
 
-async def update_project_published_url(project_id: str, handle: str) -> bool:
-    """Set the project's handle; return True on success, or False if it doesn't exist."""
+async def update_project_published_url(project_id: str, handle: str) -> None:
+    """Set the project's handle. Caller must ensure the project exists."""
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
-        if not project:
-            return False
         now = datetime.now(UTC).isoformat()
         project.published_url = handle
         project.published_at = now
         project.updated_at = now
         session.add(project)
         await session.commit()
-        return True
