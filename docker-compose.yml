@@ -38,8 +38,6 @@ services:
   backend:
     build:
       context: ./backend
-    expose:
-      - "8000"
     cap_add:
       - SYS_ADMIN
     security_opt:
@@ -48,7 +46,6 @@ services:
     cgroup: host
     volumes:
       - workspaces:/var/lib/flow-44/workspaces
-      - db-data:/app/data
     env_file:
       - ./backend/.env
     environment:
@@ -99,7 +96,12 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_AUTH_PROVIDER_URL: http://localhost:6001/sso
+        VITE_AUTH_STORAGE_KEY: Auth
+        VITE_AUTH_USE_IFRAME: "true"
     user: root
     ports:
       - "9999:80"
@@ -115,8 +117,6 @@ services:
     image: postgres:16-alpine
     container_name: flow44-postgres
     environment: *db-shared
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -129,9 +129,6 @@ services:
 
   minio:
     image: minio/minio:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     environment: *minio-shared
     command: server /data --console-address ":9001"
     volumes:
@@ -145,6 +142,5 @@ networks:
 
 volumes:
   workspaces:
-  db-data:
   postgres_data:
   minio-data:

@@ -14,7 +14,6 @@ from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
 from flow44.main import app
-from flow44.sandbox.manager import SandboxNotFoundError
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -104,7 +103,7 @@ def test_sandbox_not_found_after_auth_sends_error():
          patch("flow44.api.deps.get_user_id", return_value="user-a"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 
-        mock_mgr.get_sandbox.side_effect = SandboxNotFoundError("proj-123")
+        mock_mgr.wake_sandbox = AsyncMock(side_effect=Exception("proj-123"))
 
         try:
             with _websocket_connect("/ws/chat/proj-123", "valid-token") as ws:
@@ -114,4 +113,4 @@ def test_sandbox_not_found_after_auth_sends_error():
         except WebSocketDisconnect:
             pass
 
-        mock_mgr.get_sandbox.assert_called_once()
+        mock_mgr.wake_sandbox.assert_called_once()

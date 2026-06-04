@@ -140,8 +140,6 @@ async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-
-
 async def get_sandbox(project: ProjectDep) -> PnpmSandbox:
     try:
         return await sandbox_manager.get_sandbox(project.id)

@@ -55,7 +55,11 @@ async def get_preview_port(project: ProjectDep, sandbox: SandboxDep) -> dict[str
     "/{project_id}/proxy/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
 )
-async def proxy_to_sandbox(project: ProjectDep, path: str, request: Request,) -> Response:
+async def proxy_to_sandbox(
+    project: ProjectDep,
+    path: str,
+    request: Request,
+) -> Response:
     sandbox = await sandbox_manager.wake_sandbox(project.id)
 
     if not sandbox.is_dev_server_running():
