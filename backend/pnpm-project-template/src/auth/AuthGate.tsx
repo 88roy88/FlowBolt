@@ -30,7 +30,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Watch for token being cleared (e.g. by refreshAfter401 in iframe mode)
+  // Watch for token being cleared (e.g. by refreshCredentials in iframe mode)
   useEffect(() => {
     if (state !== 'ready') return;
     function onCleared() {

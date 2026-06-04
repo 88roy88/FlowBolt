@@ -45,6 +45,7 @@ export interface Project {
   id: string;
   name: string;
   created_at: string;
+  user_id?: string;
   summary?: string;
   selected_model?: string;
   published_url?: string;
@@ -71,7 +72,6 @@ export interface DataSourceSearchRecord {
 // Agent types
 export type AgentPhase =
   | 'idle'
-  | 'classifying'
   | 'fetching_data_sources'
   | 'designing'
   | 'planning'
@@ -80,6 +80,8 @@ export type AgentPhase =
   | 'fixing'
   | 'exploring'
   | 'complete';
+
+export type AgentPhaseConstMap = { readonly [K in AgentPhase]: K };
 
 // User-facing plan overview (shown during approval)
 export interface PlanFeature {
@@ -129,7 +131,6 @@ export interface FollowUpStep {
 }
 
 export type WSMessage =
-  | { type: 'auth'; dataSourceAuthorization?: string }
   | { type: 'message'; content: string; model?: string; dataSourceIds?: number[] }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
