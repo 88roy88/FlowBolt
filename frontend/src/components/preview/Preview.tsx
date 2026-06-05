@@ -6,6 +6,7 @@ import { useConsoleStore } from '../../stores/console';
 import { usePublishStore } from '../../stores/publish';
 import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
+import { credentialsStore } from '../../auth';
 
 export function Preview() {
   const { t } = useTranslation();
@@ -29,6 +30,7 @@ export function Preview() {
       return;
     }
     setLoading(true);
+    credentialsStore.ensureCookie();
     const url = `/api/preview/${projectId}/proxy/`;
     setPreviewUrl(url);
     setLoading(false);
@@ -80,7 +82,7 @@ export function Preview() {
           {t('preview.refresh')}
         </Button>
         {previewUrl && (
-          <Button variant="outline" size="sm" onClick={() => window.open(previewUrl, '_blank')} title={t('preview.openInNewTab')}>
+          <Button variant="outline" size="sm" onClick={() => { credentialsStore.ensureCookie(); window.open(previewUrl, '_blank'); }} title={t('preview.openInNewTab')}>
             <ExternalLink size={14} className="text-primary/70" />
             {t('preview.open')}
           </Button>
@@ -95,7 +97,7 @@ export function Preview() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(liveUrl, '_blank')}
+              onClick={() => { credentialsStore.ensureCookie(); window.open(liveUrl, '_blank'); }}
               title={t('preview.viewPublishedApp')}
             >
               <ExternalLink size={14} className="text-primary/70" />

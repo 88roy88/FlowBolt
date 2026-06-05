@@ -1,4 +1,4 @@
-import { authSession } from '../auth';
+import { authSession, credentialsStore } from '../auth';
 import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
 
 const BASE = '/api';
@@ -182,10 +182,12 @@ export async function searchDataSources(queryOrId: string): Promise<DataSourceSe
 }
 
 export function downloadZip(projectId: string): void {
+  credentialsStore.ensureCookie();
   window.open(`${BASE}/export/${projectId}/zip`, '_blank');
 }
 
 export function downloadSingleHtml(projectId: string): void {
+  credentialsStore.ensureCookie();
   window.open(`${BASE}/export/${projectId}/html`, '_blank');
 }
 

@@ -1,18 +1,17 @@
+import Cookies from 'js-cookie';
 import { authConfig } from './config';
 import type { AuthCredentials } from './types';
 
-const COOKIE_BASE = 'Path=/; SameSite=Strict';
-
 function setAuthCookie(credentials: AuthCredentials): void {
-  if (typeof document === 'undefined') return;
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  const expires = new Date(credentials.exp * 1000).toUTCString();
-  document.cookie = `${authConfig.cookieName}=${credentials.auth_token}; ${COOKIE_BASE}${secure}; Expires=${expires}`;
+  Cookies.set(authConfig.cookieName, credentials.auth_token, {
+    expires: new Date(credentials.exp * 1000),
+    secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
+    sameSite: 'strict',
+  });
 }
 
 function clearAuthCookie(): void {
-  if (typeof document === 'undefined') return;
-  document.cookie = `${authConfig.cookieName}=; ${COOKIE_BASE}; Max-Age=0`;
+  Cookies.remove(authConfig.cookieName);
 }
 
 function parseStoredCredentials(raw: string): AuthCredentials | null {
@@ -58,6 +57,12 @@ export const credentialsStore = {
     } catch {
       /* ignore */
     }
+  },
+
+  ensureCookie(): void {
+    if (Cookies.get(authConfig.cookieName)) return;
+    const [creds, validToken] = [this.read(), this.getValidToken()];
+    if (creds && validToken) setAuthCookie(creds)
   },
 
   getValidToken(): string | undefined {

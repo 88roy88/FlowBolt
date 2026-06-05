@@ -1,4 +1,5 @@
 import type { ReadOnlySocket } from './types';
+import { credentialsStore } from '../../auth';
 import { getWsBase } from './reconnecting';
 
 export function createServerLogSocket(projectId: string): ReadOnlySocket {
@@ -9,6 +10,7 @@ export function createServerLogSocket(projectId: string): ReadOnlySocket {
 
   function connect() {
     if (closed) return;
+    credentialsStore.ensureCookie();
     socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
     socket.binaryType = 'arraybuffer';
 
