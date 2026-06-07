@@ -82,7 +82,9 @@ class TestRequiredParam:
         )
         assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in result
         assert "body['people']['person_id'] = personId;" in result
-        assert "fetchWithAuth('/api/data-source/7/run', body);" in result
+        assert "fetchWithAuth('/api/data-source/7/run', {" in result
+        assert "method: 'POST'" in result
+        assert "body: JSON.stringify(body)" in result
 
     def test_schema_only_response_type_when_no_sample(self) -> None:
         result = generate_data_source_module(

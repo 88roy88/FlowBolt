@@ -164,7 +164,13 @@ def _build_body(
                 f"    body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {ident};\n"
                 f"  }}\n"
             )
-        lines.append(f"  const res = await fetchWithAuth('{path}', body);\n")
+        lines.append(
+            f"  const res = await fetchWithAuth('{path}', {{\n"
+            f"    method: 'POST',\n"
+            f"    headers: {{ 'Content-Type': 'application/json' }},\n"
+            f"    body: JSON.stringify(body),\n"
+            f"  }});\n"
+        )
 
     lines.append(f"  const envelope = (await res.json()) as {{ data: {results_type} }};\n")
     if queries:
