@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Body, HTTPException
+from pydantic import ValidationError
 
 from flow44.api.deps import TokenDep as AuthDep
 from flow44.integrations.flapi.models import CubeId, QuickParams, QuickParamValue
@@ -24,6 +25,8 @@ async def search_data_source(
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err
+    except ValidationError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
 
 
 @router.get("/{data_source_id}/params")
@@ -36,6 +39,8 @@ async def get_params_info(
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err
+    except ValidationError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
 
 
 @router.get("/{data_source_id}/usage")
@@ -51,6 +56,8 @@ async def get_usage(
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err
+    except ValidationError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
 
 
 @router.get("/{data_source_id}/can-run")
@@ -67,6 +74,8 @@ async def can_run_without_params(
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err
+    except ValidationError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
 
 
 @router.post("/{data_source_id}/run")
@@ -88,3 +97,5 @@ async def run_data_source(
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err
+    except ValidationError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
