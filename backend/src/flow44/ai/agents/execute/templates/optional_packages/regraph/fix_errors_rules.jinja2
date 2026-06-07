@@ -1,0 +1,5 @@
+ReGraph rules:
+- `regraph` is installed — fix ReGraph usage in app source files only. Do not edit package manager files or add alternate graph libraries.
+- Import ReGraph APIs from `regraph`, for example `Chart` and, only if needed, `TimeBar`.
+- If the chart is blank, first verify the parent container has explicit width and height and that link `id1`/`id2` values reference existing node ids.
+- Keep `items` as an object keyed by ids, not an array. Fix generated array-based graph data by converting it into a keyed item object before passing it to `<Chart />`.

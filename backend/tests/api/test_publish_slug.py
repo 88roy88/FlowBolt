@@ -68,8 +68,8 @@ class TestPublish:
 
     def _patch_build_and_deploy(self):
         return (
-            patch("flow44.api.publish.build_single_html", return_value="<html>ok</html>"),
-            patch("flow44.api.publish.deploy_single_html", return_value=MOCK_S3_URL),
+            patch("flow44.api.publish.build_dist", return_value="dist"),
+            patch("flow44.api.publish.deploy_published_dist", return_value=MOCK_S3_URL),
             patch.object(settings, "S3_BUCKET_NAME", "test-bucket"),
         )
 
@@ -77,7 +77,7 @@ class TestPublish:
     async def test_publish_with_slug(self):
         p_build, p_deploy, p_bucket = self._patch_build_and_deploy()
         with (
-            p_build,
+            p_build as mock_build,
             p_deploy,
             p_bucket,
             patch("flow44.api.publish.is_handle_taken", return_value=False),
@@ -92,6 +92,7 @@ class TestPublish:
             assert data["url"] == "/shared/my-cool-app"
             assert data["handle"] == "my-cool-app"
             mock_update.assert_awaited_once_with("proj-1", "my-cool-app")
+            mock_build.assert_awaited_once_with("proj-1", public_base="/shared/my-cool-app/")
 
     @pytest.mark.asyncio
     async def test_publish_without_slug(self):

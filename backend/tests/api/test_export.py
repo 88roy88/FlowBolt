@@ -179,3 +179,45 @@ async def test_proxy_published_app_not_found():
         response = client.get(f"/shared/{project_id}")
         assert response.status_code == 404
         assert response.json()["detail"] == f"No published app found for handle '{project_id}'."
+
+
+@pytest.mark.asyncio
+async def test_proxy_published_asset():
+    project = AsyncMock(id="published-proj", published_at="2026-04-18T21:00:00Z")
+    with patch("flow44.api.shared.get_project_by_handle", return_value=project), patch(
+        "httpx.AsyncClient.get"
+    ) as mock_get:
+        response_from_s3 = AsyncMock()
+        response_from_s3.content = b"console.log('ok')"
+        response_from_s3.headers = {"content-type": "application/javascript"}
+        response_from_s3.raise_for_status = lambda: None
+        mock_get.return_value = response_from_s3
+
+        response = client.get("/shared/my-app/assets/main.js")
+
+    assert response.status_code == 200
+    assert response.content == b"console.log('ok')"
+
+
+@pytest.mark.asyncio
+async def test_proxy_published_spa_route_falls_back_to_index():
+    project = AsyncMock(id="published-proj", published_at="2026-04-18T21:00:00Z")
+    index_response = AsyncMock()
+    index_response.text = "<html>app</html>"
+    index_response.headers = {}
+    index_response.raise_for_status = lambda: None
+
+    async def get_object(url: str, **_: object):
+        if url.endswith("/reports/daily"):
+            raise FileNotFoundError("missing route object")
+        if url.endswith("/index.html"):
+            return index_response
+        raise AssertionError(url)
+
+    with patch("flow44.api.shared.get_project_by_handle", return_value=project), patch(
+        "httpx.AsyncClient.get", side_effect=get_object
+    ):
+        response = client.get("/shared/my-app/reports/daily")
+
+    assert response.status_code == 200
+    assert response.text == "<html>app</html>"

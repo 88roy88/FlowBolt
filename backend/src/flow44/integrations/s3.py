@@ -1,6 +1,8 @@
 import functools
 import json
 import logging
+import mimetypes
+import os
 from typing import Any
 
 import boto3
@@ -55,8 +57,13 @@ def _get_s3_key(project_id: str) -> str:
 
 
 def get_published_url(project_id: str) -> str:
-    """Return the internal S3 URL for a published project."""
+    """Return the legacy single-HTML URL for a published project."""
     key = _get_s3_key(project_id)
+    return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"
+
+
+def get_published_asset_url(project_id: str, relative_path: str) -> str:
+    key = f"published/{project_id}/{relative_path.lstrip('/')}"
     return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"
 
 
@@ -72,3 +79,22 @@ def deploy_single_html(html_content: str, project_id: str) -> str:
         StorageClass=settings.S3_STORAGE_CLASS,
     )
     return get_published_url(project_id)
+
+
+def deploy_published_dist(dist_dir: str, project_id: str) -> str:
+    """Upload a Vite dist directory under published/{project_id}/."""
+    s3 = connect_to_s3()
+    for root, _, files in os.walk(dist_dir):
+        for filename in files:
+            absolute_path = os.path.join(root, filename)
+            relative_path = os.path.relpath(absolute_path, dist_dir).replace(os.sep, "/")
+            with open(absolute_path, "rb") as handle:
+                s3.put_object(
+                    Bucket=settings.S3_BUCKET_NAME,
+                    Key=f"published/{project_id}/{relative_path}",
+                    Body=handle.read(),
+                    ContentType=mimetypes.guess_type(filename)[0] or "application/octet-stream",
+                    ACL="public-read",
+                    StorageClass=settings.S3_STORAGE_CLASS,
+                )
+    return get_published_asset_url(project_id, "index.html")

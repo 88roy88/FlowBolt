@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -6,6 +7,7 @@ from abc import ABC
 from pydantic import BaseModel
 
 from flow44.config import settings
+from flow44.paths import preview_base_path, sandbox_path_env
 from flow44.sandbox.base import BaseSandbox
 
 logger = logging.getLogger(__name__)
@@ -37,10 +39,27 @@ class PnpmMixin(BaseSandbox, ABC):
         shutil.copytree(template_dir, self.workspace_dir, dirs_exist_ok=True)
 
         self._stamp_vite_config(template_dir)
+        self._configure_preview_paths()
         self.configure_npmrc()
 
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
+
+    def _npm_package_installed(self, package_name: str) -> bool:
+        pkg_path = os.path.join(self.workspace_dir, "package.json")
+        if not os.path.isfile(pkg_path):
+            return False
+        with open(pkg_path, encoding="utf-8") as handle:
+            pkg = json.load(handle)
+        return package_name in pkg.get("dependencies", {})
+
+    async def enable_optional_packages(self, package_names: list[str]) -> None:
+        """Install optional packages after they have passed the backend whitelist."""
+        for package_name in package_names:
+            if self._npm_package_installed(package_name):
+                continue
+            async for line in self.exec(f"pnpm add {package_name} 2>&1"):
+                logger.info("[optional-package:%s] %s", package_name, line.rstrip())
 
     def _stamp_vite_config(self, template_dir: str) -> None:
         template_path = os.path.join(template_dir, "vite.config.ts")
@@ -114,12 +133,28 @@ class PnpmMixin(BaseSandbox, ABC):
     async def start_dev_server(self) -> None:
         await self.stop_background_process("dev-server")
 
+        self._configure_preview_paths()
         env = os.environ.copy()
+        env.update(
+            sandbox_path_env(
+                public_base=preview_base_path(self.project_id),
+                api_base_url=settings.EXPORT_API_BASE_URL,
+            )
+        )
         env["FORCE_COLOR"] = "1"
 
         cmd = f"pnpm dev --port {self.port} --strictPort --host 0.0.0.0"
         await self._spawn_background("dev-server", cmd, env)
         logger.info("Dev server started for %s on port %d", self.project_id, self.port)
+
+    def _configure_preview_paths(self) -> None:
+        env_path = os.path.join(self.workspace_dir, ".env.local")
+        env_vars = sandbox_path_env(
+            public_base=preview_base_path(self.project_id),
+            api_base_url=settings.EXPORT_API_BASE_URL,
+        )
+        with open(env_path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(f"{key}={value}" for key, value in env_vars.items()) + "\n")
 
     async def stop_dev_server(self) -> None:
         await self.stop_background_process("dev-server")

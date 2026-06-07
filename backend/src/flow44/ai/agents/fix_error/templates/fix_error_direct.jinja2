@@ -42,4 +42,12 @@ Rules:
 3. Do NOT refactor unrelated code
 4. Output complete file contents, not patches
 5. Do NOT include shell actions
+{% if package_fix_rules %}
+
+Package-specific repair rules:
+{% for rule_block in package_fix_rules %}
+{{ rule_block }}
+{% endfor %}
+{% else %}
 6. **CRITICAL**: Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS). Do NOT import other npm packages.
+{% endif %}

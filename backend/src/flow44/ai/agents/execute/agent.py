@@ -5,15 +5,23 @@ import uuid
 
 from langfuse import Langfuse
 from langfuse.decorators import langfuse_context, observe
+from pydantic import ValidationError
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
+from flow44.ai.agents.execute.optional_packages import (
+    OptionalPackageDecision,
+    package_capabilities,
+    package_install_names,
+    selected_package_names,
+)
 from flow44.ai.agents.execute.prompts import (
     SUMMARY_PROMPT,
     render_codegen,
     render_fix_errors,
     render_merge,
+    render_package_decision,
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
@@ -178,7 +186,11 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
+        prompt = render_fix_errors(
+            errors=state.all_errors,
+            files=state.build_state.completed_files,
+            selected_packages=state.build_state.work_plan.selected_packages if state.build_state.work_plan else None,
+        )
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
@@ -236,11 +248,16 @@ class ExecuteAgent(BaseAgent):
 
     async def _build_technical_plan(self, state: ExecutionState) -> WorkPlan:
         """Build technical task plan from user overview."""
+        selected_packages = await self._decide_optional_packages(state)
         merge_data: dict[str, object] = {
             "user_request": state.build_state.user_content,
             "architecture": state.build_state.architecture.model_dump(),
             "ux_design": state.build_state.ux_design.model_dump(),
             "user_preferences": [d.model_dump() for d in state.build_state.user_overview.decisions],
+            "optional_package_decision": {
+                "selected_packages": selected_packages,
+                "selected_capabilities": package_capabilities(selected_packages),
+            },
         }
         if state.build_state.data_source_contexts:
             merge_data["data_source_integrations"] = [
@@ -264,7 +281,10 @@ class ExecuteAgent(BaseAgent):
 
         raw = await complete_chat(
             [Message.user(json.dumps(merge_data, indent=2))],
-            render_merge(has_data_sources=bool(state.build_state.data_source_contexts)),
+            render_merge(
+                has_data_sources=bool(state.build_state.data_source_contexts),
+                selected_packages=selected_packages,
+            ),
             model=state.model,
             metadata=state.llm_metadata_fn("build_technical_plan"),
         )
@@ -281,13 +301,39 @@ class ExecuteAgent(BaseAgent):
             for t in plan_data.get("tasks", [])
         ]
 
+        if selected_packages:
+            await state.sandbox_ref.enable_optional_packages(package_install_names(selected_packages))
+
         return WorkPlan(
             id=f"plan-{uuid.uuid4().hex[:8]}",
             summary=plan_data.get("summary", ""),
             architecture=state.build_state.architecture,
             ux_design=state.build_state.ux_design,
             tasks=tasks,
+            selected_packages=selected_packages,
         )
+
+    async def _decide_optional_packages(self, state: ExecutionState) -> list[str]:
+        decision_input = json.dumps(
+            {
+                "user_request": state.build_state.user_content,
+                "architecture": state.build_state.architecture.model_dump(),
+                "ux_design": state.build_state.ux_design.model_dump(),
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+        raw = await complete_chat(
+            [Message.user(decision_input)],
+            render_package_decision(),
+            model=state.model,
+            metadata=state.llm_metadata_fn("decide_optional_packages"),
+        )
+        try:
+            return selected_package_names(OptionalPackageDecision.model_validate(parse_json_response(raw)))
+        except ValidationError:
+            logger.warning("[execute] Invalid optional package decision; continuing without optional packages")
+            return []
 
     async def _execute_task(self, task: Task, state: ExecutionState) -> None:
         """Execute a single task with Langfuse span."""
@@ -319,6 +365,7 @@ class ExecuteAgent(BaseAgent):
                 other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
+                selected_packages=state.build_state.work_plan.selected_packages,
             )
 
             generated: list[tuple[str, str]] = []

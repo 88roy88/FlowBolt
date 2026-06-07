@@ -1,0 +1,9 @@
+## ReGraph Contract
+
+`regraph` is available for interactive connected-data visualization.
+
+- Import visualization components from `regraph`, usually `Chart` for network graphs and `TimeBar` only when the UI needs time-based filtering or event timelines.
+- Follow the minimal platform contract in `src/platform/regraph/README.md`.
+- `Chart` renders items from an object keyed by stable item ids. Nodes are item entries without `id1`/`id2`; links are item entries with `id1` and `id2` referencing node ids.
+- ReGraph fills its parent element, so every chart or time bar must be inside a parent with explicit, stable width and height.
+- Keep ReGraph state in React state or memoized values in the owning component; update `items`, `selection`, and options declaratively.

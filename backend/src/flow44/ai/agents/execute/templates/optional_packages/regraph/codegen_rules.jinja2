@@ -1,0 +1,7 @@
+- `regraph` is installed for connected-data visualization. Import only the ReGraph APIs you use, for example `import { Chart } from 'regraph';`.
+- Follow `src/platform/regraph/README.md`. Do not edit files under `src/platform/`.
+- Use ReGraph only for relationship/network data. Do not use it for regular bar/line/pie charts, static diagrams, flowcharts, or layout-only UI.
+- Build the chart `items` as a deterministic object keyed by item id. Link entries must reference existing node ids with `id1` and `id2`.
+- Give each ReGraph container explicit dimensions with Tailwind classes or CSS, such as `h-[520px] w-full`, `min-h-[420px]`, or a responsive viewport-based height. Do not render `<Chart />` in an auto-height wrapper.
+- Prefer ReGraph's built-in interactions, selection, styling, and options over custom canvas/SVG graph rendering. Keep surrounding controls in React.
+- Do not add CDN scripts, downloaded `.tgz` files, font packages, map packages, or extra graph libraries.
