@@ -19,6 +19,7 @@ from flow44.sandbox.main import PnpmSandbox
 logger = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 15
+MAX_READ_LINES = 1000
 
 
 @dataclass
@@ -82,18 +83,26 @@ class FollowUpAgent(BaseAgent):
             return "\n".join(results)
 
         @tool
-        async def read_file(path: str) -> str:
-            """Read the full content of a file with line numbers. Always read a file before editing it."""
+        async def read_file(path: str, offset: int = 0, limit: int = MAX_READ_LINES) -> str:
+            """Read file content with line numbers. Always read a file before editing it.
+
+            Args:
+                path: File path to read.
+                offset: Starting line number (0-based). Defaults to 0 (beginning of file).
+                limit: Max number of lines to return. Defaults to 1000, max 1000.
+            """
             try:
                 content = await sandbox.read_file(path)
             except (FileNotFoundError, PermissionError) as e:
                 return f"Error: {e}"
             lines = content.splitlines()
-            if len(lines) > 500:
-                numbered = [f"{i + 1:4d} | {line}" for i, line in enumerate(lines[:500])]
-                numbered.append(f"\n... (truncated at 500 lines, file has {len(lines)} total)")
-                return "\n".join(numbered)
-            return "\n".join(f"{i + 1:4d} | {line}" for i, line in enumerate(lines))
+            total = len(lines)
+            limit = min(limit, MAX_READ_LINES)
+            chunk = lines[offset : offset + limit]
+            numbered = [f"{i + offset + 1:4d} | {line}" for i, line in enumerate(chunk)]
+            if offset + limit < total:
+                numbered.append(f"\n... (showing lines {offset + 1}-{offset + len(chunk)}, file has {total} total)")
+            return "\n".join(numbered)
 
         @tool
         async def write_file(path: str, content: str) -> str:
