@@ -49,8 +49,8 @@ def generate_data_source_module(
     types_block = generate_ts_interfaces(sanitized_name, queries=queries).rstrip()
 
     function_name = _function_name(sanitized_name)
-    required = [p for p in params_info.parameters if p.is_required or p.is_require_any]
-    optional = [p for p in params_info.parameters if not (p.is_required or p.is_require_any)]
+    required = [p for p in params_info.parameters if p.is_required]
+    optional = [p for p in params_info.parameters if not p.is_required]
 
     signature = _build_signature(function_name, required, optional, results_type)
     body = _build_body(data_source_id, required, optional, results_type, queries)
