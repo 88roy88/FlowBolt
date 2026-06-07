@@ -91,7 +91,7 @@ class TestGenerateTsInterfacesSchemaOnly:
 
     def test_no_queries_falls_back_to_unknown(self) -> None:
         result = generate_ts_interfaces("X")
-        assert "export type XResponse = unknown;" in result
+        assert "export type XResults = unknown;" in result
 
     def test_empty_base_name_gets_default(self) -> None:
         result = generate_ts_interfaces("")

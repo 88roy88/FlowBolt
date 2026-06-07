@@ -39,6 +39,11 @@ class TestGetUsage:
             "get_metadata",
             AsyncMock(return_value=_metadata(queries=[])),
         )
+        monkeypatch.setattr(
+            ds_logic,
+            "get_params_info",
+            AsyncMock(return_value=DataSourceParamsInfo(parameters=[], require_any=False)),
+        )
 
         with pytest.raises(ds_logic.FlapiUpstreamError, match="no queries"):
             await ds_logic.get_usage("1")
