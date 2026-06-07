@@ -32,9 +32,9 @@ The following data sources have **pre-generated** async API functions that you s
 **Data Characteristics:** {{ ctx.data_characteristics }}
 
 Pre-generated module: `import { dataSource{{ ctx.sanitized_name }} } from '../dataSources/{{ ctx.sanitized_name }}';`
-The module also exports the response type `{{ ctx.sanitized_name }}Response`.
+The module also exports the response type `{{ ctx.sanitized_name }}Results`.
 
-This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Response>`. You are responsible for calling it (from `useEffect`, an event handler, or a loader) and for holding the result in `useState`.
+This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Results>`. You are responsible for calling it (from `useEffect`, an event handler, or a loader) and for holding the result in `useState`.
 
 **Response schema (queries/cubes):**
 {% for q in ctx.queries %}
