@@ -103,8 +103,7 @@ class FlapiClient:
         query: dict[str, str] = {}
         if all_queries is not None:
             query["allQueries"] = "true" if all_queries else "false"
-        if execute_continued_process is not None:
-            query["executeContinuedProcess"] = "true" if execute_continued_process else "false"
+        query["executeContinuedProcess"] = "true" if execute_continued_process else "false"
         safe = quote(str(data_source_id), safe="")
         body = quick_params.model_dump() if quick_params else {}
         raw: dict[str, Any] = await self._request(
