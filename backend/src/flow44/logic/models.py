@@ -39,9 +39,12 @@ class ParamDefinition(BaseModel):
     def default_values(self) -> ParamScalar | list[ParamScalar] | None:
         if not self.options:
             return None
-        if self.is_single_value:
-            return parse_param_value(self.options[0].value, self.type)
-        return [parse_param_value(opt.value, self.type) for opt in self.options]
+        try:
+            if self.is_single_value:
+                return parse_param_value(self.options[0].value, self.type)
+            return [parse_param_value(opt.value, self.type) for opt in self.options]
+        except ValueError:
+            return None
 
 
 def parse_param_value(value: str, param_type: ParamType) -> ParamScalar:
