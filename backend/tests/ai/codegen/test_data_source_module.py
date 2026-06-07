@@ -505,6 +505,57 @@ class TestRequireAnyGroup:
         )
         assert "  email,\n  phone,\n}: {\n  email?: string;\n  phone?: string;" in result
 
+    def test_require_any_jsdoc_comment_lists_param_names(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="email",
+                    display_name="Email",
+                    type="string",
+                    is_required=False,
+                    is_require_any=True,
+                    is_single_value=True,
+                ),
+                ParamDefinition(
+                    name="phone",
+                    display_name="Phone",
+                    type="string",
+                    is_required=False,
+                    is_require_any=True,
+                    is_single_value=True,
+                ),
+            ],
+            require_any=True,
+        )
+        result = generate_data_source_module(
+            data_source_id="9",
+            sanitized_name="Contact",
+            params_info=params,
+            queries=_queries("contact"),
+        )
+        assert "/** At least one of the following must be provided: email, phone. */" in result
+
+    def test_no_jsdoc_comment_when_no_require_any(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="user_id",
+                    display_name="User ID",
+                    type="int",
+                    is_required=True,
+                    is_single_value=True,
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="User",
+            params_info=params,
+            queries=_queries("user"),
+        )
+        assert "/** At least one" not in result
+
 
 class TestResultsKeyUsesDisplayName:
     def test_results_key_and_date_conversion_use_display_name(self) -> None:

@@ -51,8 +51,9 @@ def generate_data_source_module(
     function_name = _function_name(sanitized_name)
     required = [p for p in params_info.parameters if p.is_required]
     optional = [p for p in params_info.parameters if not p.is_required]
+    require_any = [p for p in optional if p.is_require_any]
 
-    signature = _build_signature(function_name, required, optional, results_type)
+    signature = _build_signature(function_name, required, optional, require_any, results_type)
     body = _build_body(data_source_id, required, optional, results_type, queries)
 
     used_types = {p.type for p in params_info.parameters}
@@ -110,6 +111,7 @@ def _build_signature(
     function_name: str,
     required: list[ParamDefinition],
     optional: list[ParamDefinition],
+    require_any: list[ParamDefinition],
     response_type: str,
 ) -> str:
     all_params = required + optional
@@ -127,7 +129,11 @@ def _build_signature(
         fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};{comment}")
     type_body = "".join(fields)
 
-    return f"export async function {function_name}({{{param_names}\n}}: {{{type_body}\n}}): Promise<{response_type}>"
+    sig = f"export async function {function_name}({{{param_names}\n}}: {{{type_body}\n}}): Promise<{response_type}>"
+    if require_any:
+        names = ", ".join(p.name for p in require_any)
+        return f"/** At least one of the following must be provided: {names}. */\n{sig}"
+    return sig
 
 
 def _build_body(
