@@ -17,7 +17,7 @@ from flow44.api.deps import ProjectDep, TokenDep, WsProjectDep
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
-from flow44.integrations.flapi_api import data_source_client
+from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                 if ds_ids:
                     ds_names: list[str] = []
                     for ds_id in ds_ids:
-                        name = await data_source_client.get_display_name(
+                        name = await ds_logic.get_display_name(
                             ds_id,
                             authorization=data_source_authorization,
                         )

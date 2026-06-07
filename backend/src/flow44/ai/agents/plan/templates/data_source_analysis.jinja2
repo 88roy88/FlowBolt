@@ -5,10 +5,35 @@ Analyze this API data source in the context of the user's request.
 User wants to build: {{ user_content }}
 
 Data source: {{ data_source_name }}
-Sample API Response:
+
+**Response schema (queries/cubes):**
+{% for q in queries %}
+- `{{ q.name }}` — {{ q.description }}
+  {% for f in q.fields %}
+  - `{{ f.name }}` ({{ f.type }}){% if f.description %} — {{ f.description }}{% endif %}
+  {% endfor %}
+{% endfor %}
+
+**Parameters:**
+{% if params %}
+{% for p in params %}
+- `{{ p.name }}` ({{ p.type }}{% if not p.is_single_value %}[]{% endif %}){% if p.is_required %} — required{% elif p.is_require_any %} — required (one of the require-any group){% else %} — optional{% endif %}{% if p.display_name %}, displayed as "{{ p.display_name }}"{% endif %}{% if p.options %}. Options: {% for opt in p.options %}`{{ opt.value }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+{% endfor %}
+{% if require_any %}
+  (At least one of the `require-any` params must be provided.)
+{% endif %}
+{% else %}
+None.
+{% endif %}
+
+{% if sample_data_json %}
+**Sample API Response:**
 ```json
 {{ sample_data_json }}
 ```
+{% else %}
+**No sample available** — the data source requires user input before it can be run. Reason about its shape from the Response schema above.
+{% endif %}
 
 Respond with ONLY a JSON object:
-{"data_schema": "Brief human-readable description of the data shape and key fields", "relevant_fields": "Newline-separated list of relevant fields, each formatted as: field_name — why it matters. Use \\n between entries.", "data_characteristics": "Nature of the data: is it a list, paginated, real-time, static, etc.", "integration_notes": "Any special considerations for displaying or transforming this data"}
+{"data_schema": "Brief human-readable description of the data shape and key fields", "relevant_fields": "Newline-separated list of relevant fields, each formatted as: field_name — why it matters. Use \\n between entries.", "data_characteristics": "Nature of the data: is it a list, paginated, real-time, static, etc.", "integration_notes": "Any special considerations for displaying or transforming this data", "param_ux_hints": "Per-param UX guidance (how to acquire each value: user form input, route/query param, derived from another data source, or hard-coded). Use \\n between entries. Empty string if the data source has no parameters."}

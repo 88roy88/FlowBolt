@@ -253,6 +253,9 @@ class ExecuteAgent(BaseAgent):
                         "relevant_fields",
                         "data_characteristics",
                         "integration_notes",
+                        "param_ux_hints",
+                        "params_info",
+                        "can_run_without_input",
                     )
                     if k in ctx
                 }

@@ -3,9 +3,6 @@ import { authConfig } from '../auth/config';
 // List of users who see "FlowBase" instead of "Flow44"
 const SPECIAL_USERS = ['666royz', '619roym', '611noat', "dev-user"];
 
-/**
- * Check if the current user should see the "Base" easter egg
- */
 export function isSpecialUser(): boolean {
   try {
     const stored = window.localStorage?.getItem(authConfig.storageKey);

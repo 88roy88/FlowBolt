@@ -28,28 +28,55 @@ Rules:
 - **CRITICAL**: ONLY use the pre-installed packages (react, react-dom, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss). Do NOT suggest adding other packages or dependencies. All functionality must be implemented using built-in browser APIs and these pre-configured packages only.
 {% if data_source_contexts %}
 
-The user's request includes the following data sources. Pre-built hooks and TypeScript types
-have ALREADY been generated for each one. Your architecture MUST use these existing files.
-Do NOT design new hooks or types for data sources — they are ready to import.
+The user's request includes the following data sources. Pre-built async API functions
+and TypeScript types have ALREADY been generated for each one. Your architecture MUST
+use these existing files. Do NOT design new fetch logic or types for data sources —
+they are ready to import.
 
 {% for ctx in data_source_contexts %}
 ### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }})
 Relevant Fields: {{ ctx.relevant_fields }}
 Data Characteristics: {{ ctx.data_characteristics }}
 
-**Pre-generated files (already exist — do NOT include in file_structure):**
-{% for path in ctx.generated_files.keys() %}
-- `{{ path }}`
+**Pre-generated file (already exists — do NOT include in file_structure):**
+- `src/dataSources/{{ ctx.sanitized_name }}.ts`
+
+Usage: `import { dataSource{{ ctx.sanitized_name }} } from './dataSources/{{ ctx.sanitized_name }}';`
+This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Response>`. It does NOT manage React state — you are responsible for calling it from `useEffect`, an event handler, or a loader, and for holding the result in your own `useState`.
+
+**Response schema (queries/cubes):**
+{% for q in ctx.queries %}
+- `{{ q.name }}` — {{ q.description }}
+  {% for f in q.fields %}
+  - `{{ f.name }}` ({{ f.type }}){% if f.description %} — {{ f.description }}{% endif %}
+  {% endfor %}
 {% endfor %}
 
-Usage: `import { useDataSource{{ ctx.sanitized_name }} } from './hooks/useDataSource{{ ctx.sanitized_name }}';`
-The hook returns `{ data, isLoading, error, refetch }`.
+**Parameters:**
+{% if ctx.params_info.parameters %}
+{% for p in ctx.params_info.parameters %}
+- `{{ p.name }}` ({{ p.type }}{% if not p.is_single_value %}[]{% endif %}){% if p.is_required %} — required{% elif p.is_require_any %} — required (one of the require-any group){% else %} — optional{% endif %}{% if p.display_name %}, displayed as "{{ p.display_name }}"{% endif %}{% if p.options %}. Options: {% for opt in p.options %}`{{ opt.value }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+{% endfor %}
+{% if ctx.params_info.require_any %}
+  (At least one of the `require-any` params must be provided.)
+{% endif %}
 
-Sample data structure:
+The generated function signature takes required params as typed positional arguments (camelCase) followed by an optional `options` object containing the optional params. If the data source requires user input, design a form/selector that collects the required values and call the function on submit.
+
+Control mapping: `Date`→date picker, `Integer`→number input, `Boolean`→toggle, `String` with options→select, `String` without options→text input. Arrays (`is_single_value=false`) → multi-select.
+{% else %}
+None — this data source takes no parameters; call the function with no arguments.
+{% endif %}
+
+{% if ctx.sample_data_json %}
+**Sample response:**
 ```json
 {{ ctx.sample_data_json }}
 ```
+{% else %}
+**No sample available** — the data source requires user input before it can be run. Reason about its shape from the Response schema above.
+{% endif %}
 {% endfor %}
 
-IMPORTANT: `src/auth/` is a pre-existing module — do NOT include it in file_structure. Do NOT include the data source hooks or types files in file_structure either — they already exist.
+IMPORTANT: `src/auth/`, `src/api/`, and `src/config.ts` are pre-existing modules — do NOT include them in file_structure. Do NOT include the data source modules in file_structure either — they already exist at `src/dataSources/{Name}.ts`.
 {% endif %}

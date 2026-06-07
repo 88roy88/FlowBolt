@@ -67,3 +67,4 @@ class DataSourceAnalysis(BaseModel):
     relevant_fields: str = ""
     data_characteristics: str = ""
     integration_notes: str = ""
+    param_ux_hints: str = ""

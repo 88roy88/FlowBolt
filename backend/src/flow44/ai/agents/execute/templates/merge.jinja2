@@ -44,17 +44,19 @@ Rules:
 
 ## Data Source Integration — Pre-Generated Files
 
-TypeScript types and custom hooks for all data sources have ALREADY been generated and written
-to the project. Do NOT create tasks for:
-- Data source TypeScript interfaces/types (already in `src/types/`)
-- Data source fetch hooks (already in `src/hooks/`)
+A typed async API function and TypeScript response type for each data source has ALREADY been
+generated and written to the project at `src/dataSources/{Sanitized}.ts`. Do NOT create tasks for:
+- Data source modules (already in `src/dataSources/`)
+- The shared HTTP transport at `src/api/client.ts`
 - The `src/auth/` module (pre-configured in the project template)
 
 Instead, create tasks for:
-1. Components that DISPLAY and INTERACT with the data (import the pre-built hooks)
+1. Components that DISPLAY and INTERACT with the data (call the pre-built function, hold the result in local state, and render loading/error states themselves)
 2. App integration that wires the data source components into the layout
 
-The hooks are already importable. Example usage in components:
-`import { useDataSourceMyApi } from '../hooks/useDataSourceMyApi';`
-`const { data, isLoading, error, refetch } = useDataSourceMyApi();`
+Example usage in a component:
+`import { dataSourceMyApi } from '../dataSources/MyApi';`
+`useEffect(() => { dataSourceMyApi().then(setData).catch(setError); }, []);`
+
+If a data source requires user input (see the analysis's param hints), create a form task that collects the required values and only calls the function on submit.
 {% endif %}

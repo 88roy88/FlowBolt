@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { FileEntry, Project, AIModel, DataSourceSearchRecord } from '../types';
+import type { FileEntry, Project, AIModel, DataSourceSearchResult } from '../types';
 
 const BASE = '/api';
 
@@ -176,9 +176,9 @@ export async function fetchDefaultModel(): Promise<string> {
   return data.model;
 }
 
-export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchRecord[]> {
+export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchResult[]> {
   // Backend strips the Bearer prefix before forwarding to FLAPI, so the shared helper is safe here.
-  return request<DataSourceSearchRecord[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
+  return request<DataSourceSearchResult[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
 }
 
 export function downloadZip(projectId: string): void {
