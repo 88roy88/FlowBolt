@@ -103,7 +103,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
         for p in param_list:
             options = [
                 ParamOption(name=n, value=str(v))
-                for item in (p.value if isinstance(p.value, list) else [])
+                for item in (p.value if isinstance(p.value, list) else [p.value] if p.value is not None else [])
                 if isinstance(n := getattr(item, "Name", None), str) and (v := getattr(item, "Value", None)) is not None
             ]
             parameters.append(
