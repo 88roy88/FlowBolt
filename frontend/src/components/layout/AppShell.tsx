@@ -11,6 +11,7 @@ import { MobileLayout } from './MobileLayout';
 import { Terminal } from '../terminal/Terminal';
 import { ServerLog } from '../terminal/ServerLog';
 import { Console } from '../terminal/Console';
+import { PublishModal } from '../publish/PublishModal';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
 import { PromptInput } from '../chat/PromptInput';
 import { useChatStore } from '../../stores/chat';
@@ -315,6 +316,8 @@ export function AppShell() {
           onClose={() => setShowSettings(false)}
         />
       )}
+
+      <PublishModal />
     </div>
   );
 }

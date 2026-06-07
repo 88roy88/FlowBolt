@@ -18,6 +18,7 @@ from flow44.api import (
     projects,
     publish,
     server_log,
+    shared,
     terminal,
 )
 from flow44.api.deps import validate_token, validate_ws_token
@@ -112,7 +113,7 @@ app.include_router(auth_routes)
 # Public HTTP routes
 public_routes = APIRouter()
 public_routes.include_router(models.router)
-public_routes.include_router(publish.public_router)
+public_routes.include_router(shared.router)
 app.include_router(public_routes)
 
 # Authenticated WS routes

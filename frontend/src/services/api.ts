@@ -1,4 +1,4 @@
-import { authSession } from '../auth';
+import { authSession, credentialsStore } from '../auth';
 import type { FileEntry, Project, AIModel, DataSourceSearchResult } from '../types';
 
 const BASE = '/api';
@@ -182,17 +182,31 @@ export async function searchDataSources(queryOrId: string): Promise<DataSourceSe
 }
 
 export function downloadZip(projectId: string): void {
+  credentialsStore.ensureCookie();
   window.open(`${BASE}/export/${projectId}/zip`, '_blank');
 }
 
 export function downloadSingleHtml(projectId: string): void {
+  credentialsStore.ensureCookie();
   window.open(`${BASE}/export/${projectId}/html`, '_blank');
 }
 
-export async function publishToS3(projectId: string): Promise<{ url: string }> {
-  return request<{ url: string }>(`/export/${projectId}/publish`, {
+export async function publishToS3(projectId: string, slug?: string): Promise<{ url: string; handle: string }> {
+  return request<{ url: string; handle: string }>(`/export/${projectId}/publish`, {
     method: 'POST',
+    body: JSON.stringify({ slug: slug ?? null }),
   });
+}
+
+export async function checkSlugAvailability(
+  projectId: string,
+  slug: string,
+  options?: RequestInit
+): Promise<{ available: boolean }> {
+  return request<{ available: boolean }>(
+    `/export/${projectId}/slug/check?slug=${encodeURIComponent(slug)}`,
+    options
+  );
 }
 
 export async function checkBackendHealth(): Promise<boolean> {

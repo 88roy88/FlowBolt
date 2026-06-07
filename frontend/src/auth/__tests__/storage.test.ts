@@ -62,18 +62,18 @@ describe('credentialsStore.save', () => {
     expect(JSON.parse(raw!).auth_token).toBe('tok-123');
   });
 
-  it('writes a cookie carrying the token with an Expires derived from exp', () => {
+  it('writes a cookie carrying the token with an expiry derived from exp', () => {
     credentialsStore.save(creds());
     const cookie = cookieWrites.at(-1)!;
     expect(cookie).toContain(`${authConfig.cookieName}=tok-123`);
-    expect(cookie).toContain('Expires=');
-    expect(cookie).not.toContain('Secure'); // http: in this fake
+    expect(cookie).toContain('expires=');
+    expect(cookie).not.toContain('secure'); // http: in this fake
   });
 
-  it('marks the cookie Secure on https', () => {
+  it('marks the cookie secure on https', () => {
     installDom('https:');
     credentialsStore.save(creds());
-    expect(cookieWrites.at(-1)!).toContain('Secure');
+    expect(cookieWrites.at(-1)!).toContain('secure');
   });
 });
 
@@ -123,6 +123,37 @@ describe('credentialsStore.getValidToken', () => {
   });
 });
 
+describe('credentialsStore.ensureCookie', () => {
+  beforeEach(() => installDom());
+
+  it('re-writes the cookie when a valid credential is in localStorage but no cookie was written', () => {
+    window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds()));
+    expect(cookieWrites).toHaveLength(0);
+
+    credentialsStore.ensureCookie();
+
+    expect(cookieWrites.at(-1)!).toContain(`${authConfig.cookieName}=tok-123`);
+  });
+
+  it('is a no-op when the stored credential is expired', () => {
+    window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds({ exp: past })));
+    credentialsStore.ensureCookie();
+    expect(cookieWrites).toHaveLength(0);
+  });
+
+  it('is a no-op when nothing is stored', () => {
+    credentialsStore.ensureCookie();
+    expect(cookieWrites).toHaveLength(0);
+  });
+
+  it('does not re-write the cookie when one is already present', () => {
+    credentialsStore.save(creds());
+    const writesBefore = cookieWrites.length;
+    credentialsStore.ensureCookie();
+    expect(cookieWrites).toHaveLength(writesBefore);
+  });
+});
+
 describe('credentialsStore.clear', () => {
   beforeEach(() => installDom());
 
@@ -132,7 +163,8 @@ describe('credentialsStore.clear', () => {
     credentialsStore.clear();
 
     expect(window.localStorage.getItem(authConfig.storageKey)).toBeNull();
-    expect(cookieWrites.at(-1)!).toContain('Max-Age=0');
+    expect(cookieWrites.at(-1)!.startsWith(`${authConfig.cookieName}=;`)).toBe(true);
+    expect(cookieWrites.at(-1)!).toContain('expires=');
     expect(win.dispatchEvent).toHaveBeenCalledOnce();
     const event = win.dispatchEvent.mock.calls[0][0] as Event;
     expect(event.type).toBe('auth:credentials-cleared');

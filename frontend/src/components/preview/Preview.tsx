@@ -3,24 +3,26 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useConsoleStore } from '../../stores/console';
-import { RefreshCw, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import { usePublishStore } from '../../stores/publish';
+import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
-import { publishToS3 } from '../../services/api';
-import { PublishModal } from '../ui/PublishModal';
+import { credentialsStore } from '../../auth';
 
 export function Preview() {
   const { t } = useTranslation();
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const saveVersion = useFilesStore((s) => s.saveVersion);
+  
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishModalState, setPublishModalState] = useState<{ open: boolean; url?: string; error?: string }>({ open: false });
 
   const isPublished = !!currentProject?.published_url;
+  const liveUrl = currentProject?.published_url
+    ? `/shared/${currentProject.published_url}`
+    : null;
 
   useEffect(() => {
     if (!projectId) {
@@ -28,11 +30,14 @@ export function Preview() {
       return;
     }
     setLoading(true);
+    credentialsStore.ensureCookie();
     const url = `/api/preview/${projectId}/proxy/`;
     setPreviewUrl(url);
     setLoading(false);
     console.debug('[Preview] refresh — reason: project changed', { projectId, refreshKey });
   }, [projectId, refreshKey]);
+
+  const clearConsole = useConsoleStore((s) => s.clear);
 
   // Auto-refresh preview when files are saved (by user or AI).
   // Debounce to avoid rapid refreshes during bulk writes.
@@ -46,31 +51,19 @@ export function Preview() {
       setRefreshKey((k) => k + 1);
     }, 2000);
     return () => clearTimeout(timer);
-  }, [saveVersion]);
+  }, [saveVersion, clearConsole]);
 
-  const clearConsole = useConsoleStore((s) => s.clear);
   const handleRefresh = () => {
     console.debug('[Preview] refresh — reason: manual');
     clearConsole();
     setRefreshKey((k) => k + 1);
   };
 
-  const handlePublish = useCallback(async () => {
-    if (!projectId || isPublishing) return;
-    setIsPublishing(true);
-    try {
-      const result = await publishToS3(projectId);
-      const current = useSessionStore.getState().currentProject;
-      if (current) {
-        useSessionStore.getState().setProjectPublishedUrl(current.id, result.url);
-      }
-      setPublishModalState({ open: true, url: result.url });
-    } catch (err) {
-      setPublishModalState({ open: true, error: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setIsPublishing(false);
+  const handlePublish = useCallback(() => {
+    if (projectId) {
+      usePublishStore.getState().open(projectId, currentProject?.published_url);
     }
-  }, [projectId, isPublishing]);
+  }, [projectId, currentProject]);
 
   if (!projectId) {
     return (
@@ -89,7 +82,7 @@ export function Preview() {
           {t('preview.refresh')}
         </Button>
         {previewUrl && (
-          <Button variant="outline" size="sm" onClick={() => window.open(previewUrl, '_blank')} title={t('preview.openInNewTab')}>
+          <Button variant="outline" size="sm" onClick={() => { credentialsStore.ensureCookie(); window.open(previewUrl, '_blank'); }} title={t('preview.openInNewTab')}>
             <ExternalLink size={14} className="text-primary/70" />
             {t('preview.open')}
           </Button>
@@ -100,11 +93,11 @@ export function Preview() {
 
         {/* Publish Actions */}
         <div className="flex items-center gap-1.5">
-          {isPublished && projectId ? (
+          {isPublished && liveUrl ? (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`/api/export/${projectId}/published`, '_blank')}
+              onClick={() => { credentialsStore.ensureCookie(); window.open(liveUrl, '_blank'); }}
               title={t('preview.viewPublishedApp')}
             >
               <ExternalLink size={14} className="text-primary/70" />
@@ -114,15 +107,11 @@ export function Preview() {
           <Button
             variant="default"
             size="sm"
-            disabled={!projectId || isPublishing}
+            disabled={!projectId}
             onClick={handlePublish}
             title={isPublished ? t('preview.republish') : t('preview.publish')}
           >
-            {isPublishing ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Globe size={14} />
-            )}
+            <Globe size={14} />
             {isPublished ? t('preview.republish') : t('preview.publish')}
           </Button>
         </div>
@@ -145,13 +134,6 @@ export function Preview() {
           {loading ? t('preview.loading') : t('preview.noPreviewAvailable')}
         </div>
       )}
-
-      <PublishModal
-        open={publishModalState.open}
-        onOpenChange={(open) => setPublishModalState(s => ({ ...s, open }))}
-        url={publishModalState.url}
-        errorMessage={publishModalState.error}
-      />
     </div>
   );
 }
