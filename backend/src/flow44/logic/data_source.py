@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from pydantic import ValidationError
@@ -248,7 +249,11 @@ async def get_usage(
     *,
     authorization: str | None = None,
 ) -> DataSourceUsage:
-    metadata = await data_source_client.get_metadata(data_source_id, authorization=authorization)
+    metadata, params_info = await asyncio.gather(
+        data_source_client.get_metadata(data_source_id, authorization=authorization),
+        get_params_info(data_source_id, authorization=authorization),
+    )
+
     if not metadata.queries:
         # Planner relies on at least one query for its schema-only TS fallback.
         raise FlapiUpstreamError(
@@ -276,8 +281,6 @@ async def get_usage(
         )
         for query in metadata.queries
     ]
-
-    params_info = await get_params_info(data_source_id, authorization=authorization)
     minimal = _minimal_params_for(params_info)
     can_run = minimal is not None
 
