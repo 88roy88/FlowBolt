@@ -111,7 +111,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
                     name=p.name,
                     display_name=p.display_name,
                     description=p.description,
-                    type=_FLAPI_PARAM_TYPE[p.type_],
+                    type=_FLAPI_PARAM_TYPE.get(p.type_, "string"),
                     is_required=p.is_required,
                     is_single_value=p.is_single_value,
                     is_require_any=p.is_require_any,
