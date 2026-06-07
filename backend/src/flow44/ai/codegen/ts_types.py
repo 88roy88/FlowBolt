@@ -44,7 +44,7 @@ def generate_ts_interfaces(
         base_name = "DataSource"
 
     if not queries:
-        return f"export type {base_name}Response = unknown;\n"
+        return f"export type {base_name}Results = unknown;\n"
 
     return _generate_from_schema(queries, base_name)
 
