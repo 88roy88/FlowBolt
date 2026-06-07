@@ -475,7 +475,7 @@ class TestAllParamTypes:
 
 
 class TestRequireAnyGroup:
-    def test_require_any_params_are_positional_required(self) -> None:
+    def test_require_any_params_are_optional_in_signature(self) -> None:
         params = DataSourceParamsInfo(
             parameters=[
                 ParamDefinition(
@@ -503,10 +503,7 @@ class TestRequireAnyGroup:
             params_info=params,
             queries=_queries("contact"),
         )
-        # Both require_any params are treated as required positional for TS typing
-        # (runtime OR-validation is the caller's concern; the prompt tells the LLM
-        # at least one must be provided).
-        assert "  email,\n  phone,\n}: {\n  email: string;\n  phone: string;" in result
+        assert "  email,\n  phone,\n}: {\n  email?: string;\n  phone?: string;" in result
 
 
 class TestResultsKeyUsesDisplayName:
