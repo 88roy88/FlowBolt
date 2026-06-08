@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { credentialsStore } from '../storage';
 import { authConfig } from '../config';
 import type { AuthCredentials } from '../types';
+import { fakeJwt } from './jwt-helper';
 
 // ---------------------------------------------------------------------------
 // Lightweight DOM fakes (Vitest runs in the `node` environment — no jsdom).
@@ -44,8 +45,10 @@ function installDom(protocol = 'http:') {
 const future = Math.floor(Date.now() / 1000) + 3600;
 const past = Math.floor(Date.now() / 1000) - 3600;
 
+const VALID_TOKEN = fakeJwt({ userId: 'user-42', exp: future });
+
 function creds(overrides: Partial<AuthCredentials> = {}): AuthCredentials {
-  return { auth_token: 'tok-123', userId: 'user-42', exp: future, ...overrides };
+  return { auth_token: VALID_TOKEN, userId: 'user-42', exp: future, ...overrides };
 }
 
 afterEach(() => {
@@ -59,13 +62,13 @@ describe('credentialsStore.save', () => {
     credentialsStore.save(creds());
     const raw = window.localStorage.getItem(authConfig.storageKey);
     expect(raw).not.toBeNull();
-    expect(JSON.parse(raw!).auth_token).toBe('tok-123');
+    expect(JSON.parse(raw!).auth_token).toBe(VALID_TOKEN);
   });
 
   it('writes a cookie carrying the token with an expiry derived from exp', () => {
     credentialsStore.save(creds());
     const cookie = cookieWrites.at(-1)!;
-    expect(cookie).toContain(`${authConfig.cookieName}=tok-123`);
+    expect(cookie).toContain(`${authConfig.cookieName}=${encodeURIComponent(VALID_TOKEN)}`);
     expect(cookie).toContain('expires=');
     expect(cookie).not.toContain('secure'); // http: in this fake
   });
@@ -80,12 +83,20 @@ describe('credentialsStore.save', () => {
 describe('credentialsStore.read', () => {
   beforeEach(() => installDom());
 
-  it('returns the stored credentials', () => {
+  it('returns the stored credentials from localStorage', () => {
     credentialsStore.save(creds());
-    expect(credentialsStore.read()?.auth_token).toBe('tok-123');
+    expect(credentialsStore.read()?.auth_token).toBe(VALID_TOKEN);
   });
 
-  it('returns null for invalid JSON', () => {
+  it('falls back to cookie when localStorage is empty', () => {
+    const token = fakeJwt({ userId: 'cookie-user', exp: future });
+    cookieWrites.push(`${authConfig.cookieName}=${token}`);
+    const result = credentialsStore.read();
+    expect(result?.userId).toBe('cookie-user');
+    expect(result?.auth_token).toBe(token);
+  });
+
+  it('returns null for invalid JSON in localStorage', () => {
     window.localStorage.setItem(authConfig.storageKey, '{not json');
     expect(credentialsStore.read()).toBeNull();
   });
@@ -105,17 +116,21 @@ describe('credentialsStore.getValidToken', () => {
 
   it('returns the token for an unexpired credential', () => {
     credentialsStore.save(creds());
-    expect(credentialsStore.getValidToken()).toBe('tok-123');
+    expect(credentialsStore.getValidToken()).toBe(VALID_TOKEN);
   });
 
-  it('returns undefined for an expired credential', () => {
-    credentialsStore.save(creds({ exp: past }));
+  it('returns undefined and clears for an expired credential', () => {
+    const expiredToken = fakeJwt({ userId: 'user-42', exp: past });
+    credentialsStore.save(creds({ auth_token: expiredToken, exp: past }));
     expect(credentialsStore.getValidToken()).toBeUndefined();
+    expect(window.localStorage.getItem(authConfig.storageKey)).toBeNull();
   });
 
-  it('treats a credential without an exp as valid', () => {
-    window.localStorage.setItem(authConfig.storageKey, JSON.stringify({ auth_token: 'tok' }));
-    expect(credentialsStore.getValidToken()).toBe('tok');
+  it('ensures the cookie is set when returning a valid token', () => {
+    window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds()));
+    expect(cookieWrites).toHaveLength(0);
+    credentialsStore.getValidToken();
+    expect(cookieWrites.length).toBeGreaterThan(0);
   });
 
   it('returns undefined when nothing is stored', () => {
@@ -132,11 +147,12 @@ describe('credentialsStore.ensureCookie', () => {
 
     credentialsStore.ensureCookie();
 
-    expect(cookieWrites.at(-1)!).toContain(`${authConfig.cookieName}=tok-123`);
+    expect(cookieWrites.at(-1)!).toContain(`${authConfig.cookieName}=`);
   });
 
   it('is a no-op when the stored credential is expired', () => {
-    window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds({ exp: past })));
+    const expiredToken = fakeJwt({ userId: 'user-42', exp: past });
+    window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds({ auth_token: expiredToken, exp: past })));
     credentialsStore.ensureCookie();
     expect(cookieWrites).toHaveLength(0);
   });

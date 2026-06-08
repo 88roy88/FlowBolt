@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PopupAuthenticator, PopupBlockedError } from '../popup';
 import type { AuthConfig } from '../config';
-
-const UNIQUE_ID = 'https://issuer.example/claims/UniqueID';
+import { fakeJwt } from './jwt-helper';
 
 const config: AuthConfig = {
   storageKey: 'Auth',
@@ -31,9 +30,11 @@ function installWindow() {
   });
 }
 
+const VALID_TOKEN = fakeJwt({ userId: 'u', exp: 1700000000 });
+
 const validMessage = (popup: unknown) => ({
   source: popup,
-  data: { message: 'delivercredentials', auth_token: 'tok', [UNIQUE_ID]: 'u', exp: 1 },
+  data: { message: 'delivercredentials', auth_token: VALID_TOKEN },
 });
 
 beforeEach(() => {
@@ -75,7 +76,7 @@ describe('PopupAuthenticator.acquireCredentials', () => {
     const promise = new PopupAuthenticator(config).acquireCredentials();
     messageListener!(validMessage(popup));
 
-    await expect(promise).resolves.toEqual({ auth_token: 'tok', userId: 'u', exp: 1 });
+    await expect(promise).resolves.toEqual({ auth_token: VALID_TOKEN, userId: 'u', exp: 1700000000 });
     expect(popup.close).toHaveBeenCalled();
   });
 
@@ -98,7 +99,7 @@ describe('PopupAuthenticator.acquireCredentials', () => {
     // Still pending — deliver from the real popup to settle it.
     messageListener!(validMessage(popup));
 
-    await expect(promise).resolves.toMatchObject({ auth_token: 'tok' });
+    await expect(promise).resolves.toMatchObject({ auth_token: VALID_TOKEN });
   });
 
   it('rejects when the user closes the popup', async () => {

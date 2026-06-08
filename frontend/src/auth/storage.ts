@@ -1,6 +1,7 @@
 import Cookies from 'js-cookie';
 import { authConfig } from './config';
 import type { AuthCredentials } from './types';
+import { credentialsFromToken } from './types';
 
 function setAuthCookie(credentials: AuthCredentials): void {
   Cookies.set(authConfig.cookieName, credentials.auth_token, {
@@ -25,6 +26,10 @@ function parseStoredCredentials(raw: string): AuthCredentials | null {
   }
 }
 
+function isExpired(creds: AuthCredentials): boolean {
+  return creds.exp * 1000 <= Date.now();
+}
+
 export const credentialsStore = {
   read(): AuthCredentials | null {
     if (typeof window === 'undefined') return null;
@@ -34,6 +39,16 @@ export const credentialsStore = {
         const parsed = parseStoredCredentials(raw);
         if (parsed?.auth_token) return parsed;
       }
+
+      const cookieToken = Cookies.get(authConfig.cookieName);
+      if (cookieToken) {
+        const creds = credentialsFromToken(cookieToken);
+        if (creds && !isExpired(creds)) {
+          window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds));
+          return creds;
+        }
+      }
+
       return null;
     } catch {
       return null;
@@ -61,8 +76,8 @@ export const credentialsStore = {
 
   ensureCookie(): void {
     if (Cookies.get(authConfig.cookieName)) return;
-    const [creds, validToken] = [this.read(), this.getValidToken()];
-    if (creds && validToken) setAuthCookie(creds)
+    const creds = this.read();
+    if (creds && !isExpired(creds)) setAuthCookie(creds);
   },
 
   getValidToken(): string | undefined {
@@ -72,8 +87,12 @@ export const credentialsStore = {
       const token = creds?.auth_token?.trim();
       if (!token) return undefined;
 
-      if (creds && creds.exp * 1000 <= Date.now()) return undefined;
+      if (creds && isExpired(creds)) {
+        this.clear();
+        return undefined;
+      }
 
+      this.ensureCookie();
       return token;
     } catch {
       return undefined;

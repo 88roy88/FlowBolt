@@ -12,4 +12,5 @@ export { credentialsStore } from './storage';
 export { authConfig, isProviderConfigured } from './config';
 export { IframeModal } from './IframeModal';
 export type { AuthCredentials } from './types';
+export { credentialsFromToken } from './types';
 export type { SessionBootstrapResult } from './session';
