@@ -1,3 +1,5 @@
+import { decodeJwt } from 'jose';
+
 export type AuthCredentials = {
   auth_token: string;
   userId: string;
@@ -24,21 +26,41 @@ function findClaimBySuffix(data: Record<string, unknown>, suffix: string): strin
   return undefined;
 }
 
-export function extractCredentials(data: Record<string, unknown>): AuthCredentials | null {
-  const token = data.auth_token;
-  if (typeof token !== 'string' || !token.trim()) return null;
-
-  const userId = findClaimBySuffix(data, '/UniqueID');
+function credentialsFromPayload(token: string, payload: Record<string, unknown>): AuthCredentials | null {
+  const userId = findClaimBySuffix(payload, '/UniqueID');
   if (!userId) return null;
 
-  if (typeof data.exp !== 'number' || !Number.isFinite(data.exp)) return null;
+  if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp)) return null;
 
-  const creds: AuthCredentials = { auth_token: token.trim(), userId, exp: data.exp };
+  const creds: AuthCredentials = { auth_token: token, userId, exp: payload.exp };
 
-  const givenName = findClaimBySuffix(data, '/givenname');
-  const surname = findClaimBySuffix(data, '/surname');
+  const givenName = findClaimBySuffix(payload, '/givenname');
+  const surname = findClaimBySuffix(payload, '/surname');
   const fullName = [givenName, surname].filter(Boolean).join(' ');
   if (fullName) creds.userName = fullName;
 
   return creds;
+}
+
+export function extractCredentials(data: Record<string, unknown>): AuthCredentials | null {
+  const token = data.auth_token;
+  if (typeof token !== 'string' || !token.trim()) return null;
+
+  try {
+    // TODO: Add full JWT signature verification (jwtVerify with JWKS) once endpoint is available
+    const payload = decodeJwt(token.trim()) as Record<string, unknown>;
+    return credentialsFromPayload(token.trim(), payload);
+  } catch {
+    return null;
+  }
+}
+
+export function credentialsFromToken(token: string): AuthCredentials | null {
+  try {
+    // TODO: Add full JWT signature verification once JWKS endpoint is available
+    const payload = decodeJwt(token) as Record<string, unknown>;
+    return credentialsFromPayload(token, payload);
+  } catch {
+    return null;
+  }
 }

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { listenForIframeCredentials } from '../iframeAuth';
 import type { AuthConfig } from '../config';
-
-const UNIQUE_ID = 'https://issuer.example/claims/UniqueID';
+import { fakeJwt } from './jwt-helper';
 
 const config: AuthConfig = {
   storageKey: 'Auth',
@@ -33,7 +32,8 @@ function makeIframe() {
   } as unknown as HTMLIFrameElement;
 }
 
-const validData = { message: 'delivercredentials', auth_token: 'tok', [UNIQUE_ID]: 'u', exp: 1 };
+const VALID_TOKEN = fakeJwt({ userId: 'u', exp: 1700000000 });
+const validData = { message: 'delivercredentials', auth_token: VALID_TOKEN };
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -50,7 +50,7 @@ describe('listenForIframeCredentials', () => {
     const iframe = makeIframe();
     const promise = listenForIframeCredentials(iframe, config);
     messageListener!({ source: iframe.contentWindow, data: validData });
-    await expect(promise).resolves.toEqual({ auth_token: 'tok', userId: 'u', exp: 1 });
+    await expect(promise).resolves.toEqual({ auth_token: VALID_TOKEN, userId: 'u', exp: 1700000000 });
   });
 
   it('ignores messages from a foreign source', async () => {
@@ -58,7 +58,7 @@ describe('listenForIframeCredentials', () => {
     const promise = listenForIframeCredentials(iframe, config);
     messageListener!({ source: { other: true }, data: validData });
     messageListener!({ source: iframe.contentWindow, data: validData });
-    await expect(promise).resolves.toMatchObject({ auth_token: 'tok' });
+    await expect(promise).resolves.toMatchObject({ auth_token: VALID_TOKEN });
   });
 
   it('rejects when the message has no usable credentials', async () => {

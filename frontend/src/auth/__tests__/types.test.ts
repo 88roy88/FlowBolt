@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { extractCredentials, isCredentialsMessage } from '../types';
-
-const CLAIM_PREFIX = 'https://issuer.example/v1/claims/';
-const UNIQUE_ID = CLAIM_PREFIX + 'UniqueID';
-const GIVEN_NAME = CLAIM_PREFIX + 'givenname';
-const SURNAME = CLAIM_PREFIX + 'surname';
+import { extractCredentials, isCredentialsMessage, credentialsFromToken } from '../types';
+import { fakeJwt } from './jwt-helper';
 
 describe('isCredentialsMessage', () => {
   it('matches on a message tag (case-insensitive)', () => {
@@ -25,59 +21,65 @@ describe('isCredentialsMessage', () => {
 });
 
 describe('extractCredentials', () => {
-  it('lifts auth_token, URL-suffixed userId, and exp', () => {
-    const creds = extractCredentials({
-      auth_token: 'tok-123',
-      [UNIQUE_ID]: 'user-42',
-      exp: 1700000000,
-    });
-    expect(creds).toEqual({ auth_token: 'tok-123', userId: 'user-42', exp: 1700000000 });
+  it('decodes claims from the JWT payload', () => {
+    const token = fakeJwt({ userId: 'user-42', exp: 1700000000 });
+    const creds = extractCredentials({ auth_token: token });
+    expect(creds).toMatchObject({ auth_token: token, userId: 'user-42', exp: 1700000000 });
   });
 
-  it('composes userName from given name + surname', () => {
-    const creds = extractCredentials({
-      auth_token: 'tok',
-      [UNIQUE_ID]: 'u',
-      [GIVEN_NAME]: 'Ada',
-      [SURNAME]: 'Lovelace',
-      exp: 1,
-    });
+  it('composes userName from given name + surname in the JWT', () => {
+    const token = fakeJwt({ userId: 'u', givenName: 'Ada', surname: 'Lovelace' });
+    const creds = extractCredentials({ auth_token: token });
     expect(creds?.userName).toBe('Ada Lovelace');
   });
 
   it('uses a single name part when only one is present', () => {
-    const creds = extractCredentials({
-      auth_token: 'tok',
-      [UNIQUE_ID]: 'u',
-      [GIVEN_NAME]: 'Ada',
-      exp: 1,
-    });
+    const token = fakeJwt({ userId: 'u', givenName: 'Ada' });
+    const creds = extractCredentials({ auth_token: token });
     expect(creds?.userName).toBe('Ada');
   });
 
-  it('trims the token and claim values', () => {
+  it('ignores claims passed in the postMessage data (reads from JWT only)', () => {
+    const token = fakeJwt({ userId: 'jwt-user', exp: 1700000000 });
     const creds = extractCredentials({
-      auth_token: '  tok  ',
-      [UNIQUE_ID]: '  user-42  ',
-      exp: 1,
+      auth_token: token,
+      'https://issuer.example/v1/claims/UniqueID': 'postmessage-user',
+      exp: 9999999999,
     });
-    expect(creds?.auth_token).toBe('tok');
-    expect(creds?.userId).toBe('user-42');
+    expect(creds?.userId).toBe('jwt-user');
+    expect(creds?.exp).toBe(1700000000);
+  });
+
+  it('trims the token', () => {
+    const token = fakeJwt({ userId: 'user-42' });
+    const creds = extractCredentials({ auth_token: `  ${token}  ` });
+    expect(creds?.auth_token).toBe(token);
   });
 
   it('rejects a missing or blank auth_token', () => {
-    expect(extractCredentials({ [UNIQUE_ID]: 'u', exp: 1 })).toBeNull();
-    expect(extractCredentials({ auth_token: '   ', [UNIQUE_ID]: 'u', exp: 1 })).toBeNull();
-    expect(extractCredentials({ auth_token: 42, [UNIQUE_ID]: 'u', exp: 1 })).toBeNull();
+    expect(extractCredentials({})).toBeNull();
+    expect(extractCredentials({ auth_token: '   ' })).toBeNull();
+    expect(extractCredentials({ auth_token: 42 })).toBeNull();
   });
 
-  it('rejects a missing userId claim', () => {
-    expect(extractCredentials({ auth_token: 'tok', exp: 1 })).toBeNull();
+  it('rejects an invalid (non-JWT) token', () => {
+    expect(extractCredentials({ auth_token: 'not-a-jwt' })).toBeNull();
   });
 
-  it('rejects a missing or non-finite exp', () => {
-    expect(extractCredentials({ auth_token: 'tok', [UNIQUE_ID]: 'u' })).toBeNull();
-    expect(extractCredentials({ auth_token: 'tok', [UNIQUE_ID]: 'u', exp: 'soon' })).toBeNull();
-    expect(extractCredentials({ auth_token: 'tok', [UNIQUE_ID]: 'u', exp: Infinity })).toBeNull();
+  it('rejects a JWT without a UniqueID claim', () => {
+    const token = fakeJwt({ userId: '' });
+    expect(extractCredentials({ auth_token: token })).toBeNull();
+  });
+});
+
+describe('credentialsFromToken', () => {
+  it('decodes credentials from a valid JWT string', () => {
+    const token = fakeJwt({ userId: 'u1', exp: 1700000000 });
+    const creds = credentialsFromToken(token);
+    expect(creds).toMatchObject({ auth_token: token, userId: 'u1', exp: 1700000000 });
+  });
+
+  it('returns null for an invalid token', () => {
+    expect(credentialsFromToken('garbage')).toBeNull();
   });
 });

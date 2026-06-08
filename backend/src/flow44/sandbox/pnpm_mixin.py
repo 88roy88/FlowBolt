@@ -18,21 +18,19 @@ class BuildCommandResult(BaseModel):
 
 
 class PnpmMixin(BaseSandbox, ABC):
-    # TODO: change to configure_npmrc
     def configure_npmrc(self) -> None:
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
-        existing_content = ""
-        if os.path.exists(npmrc):
-            with open(npmrc, encoding="utf-8") as f:
-                existing_content = f.read()
+        store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
 
-        # Ensure store-dir is set so pnpm uses the correct volume path
-        if "store-dir" not in existing_content:
-            store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
-            with open(npmrc, "a", encoding="utf-8") as f:
-                if existing_content and not existing_content.endswith("\n"):
-                    f.write("\n")
-                f.write(f"store-dir={store_path}\n")
+        content = (
+            f"registry={settings.NPM_REGISTRY}\n"
+            f"strict-ssl={str(settings.NPM_STRICT_SSL).lower()}\n"
+            f"audit={str(settings.NPM_AUDIT).lower()}\n"
+            f"store-dir={store_path}\n"
+        )
+
+        with open(npmrc, "w", encoding="utf-8") as f:
+            f.write(content)
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)

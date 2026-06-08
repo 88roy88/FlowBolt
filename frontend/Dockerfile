@@ -3,6 +3,8 @@ ARG NGINX_IMAGE=nginx:alpine
 
 FROM ${FRONTEND_BASE_IMAGE} AS build
 
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ARG NPM_STRICT_SSL=true
 RUN npm set registry ${NPM_REGISTRY}
 RUN npm config set strict-ssl ${NPM_STRICT_SSL}
 

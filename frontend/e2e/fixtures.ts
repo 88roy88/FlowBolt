@@ -5,6 +5,7 @@
  * In real mode (BACKEND_URL set): no mocks, tests hit the real backend.
  */
 import { test as base } from '@playwright/test';
+import { UnsecuredJWT } from 'jose';
 import { setupMockAPI, type MockAPIOptions } from './mocks/api';
 import { setupMockWS, sendChatEvents } from './mocks/ws';
 
@@ -13,8 +14,12 @@ declare const process: { env: Record<string, string | undefined> };
 
 const isMock = !process.env.BACKEND_URL;
 
-/** Opaque token used to represent a valid authenticated user in E2E tests. */
-export const E2E_AUTH_TOKEN = 'e2e-test-token';
+/** Valid JWT token used to represent an authenticated user in E2E tests. */
+export const E2E_AUTH_TOKEN = new UnsecuredJWT({
+  'https://issuer.example/v1/claims/UniqueID': 'e2e-user',
+})
+  .setExpirationTime('24h')
+  .encode();
 
 /** localStorage key that the auth module uses (matches VITE_AUTH_STORAGE_KEY). */
 export const AUTH_STORAGE_KEY = 'Auth';
@@ -46,10 +51,12 @@ export const test = base.extend<{
               if (k.startsWith('project-has-messages:')) localStorage.removeItem(k);
             }
             if (!skipAuth) {
-              // Seed auth token so tests skip the sign-in screen
-              localStorage.setItem(storageKey, JSON.stringify({ auth_token: token }));
+              localStorage.setItem(storageKey, JSON.stringify({
+                auth_token: token,
+                userId: 'e2e-user',
+                exp: Math.floor(Date.now() / 1000) + 86400,
+              }));
             } else {
-              // Ensure no stale token from a prior test run leaks in
               localStorage.removeItem(storageKey);
             }
           } catch {
@@ -64,7 +71,11 @@ export const test = base.extend<{
         ({ skipAuth, storageKey, token }: { skipAuth: boolean; storageKey: string; token: string }) => {
           try {
             if (!skipAuth) {
-              localStorage.setItem(storageKey, JSON.stringify({ auth_token: token }));
+              localStorage.setItem(storageKey, JSON.stringify({
+                auth_token: token,
+                userId: 'e2e-user',
+                exp: Math.floor(Date.now() / 1000) + 86400,
+              }));
             } else {
               localStorage.removeItem(storageKey);
             }

@@ -226,7 +226,7 @@
           return;
         }
 
-        const credentials = { type: 'deliverCredentials', auth_token: token, ...claims };
+        const credentials = { type: 'deliverCredentials', auth_token: token };
 
         const target = window.opener || (window.parent !== window ? window.parent : null);
         if (!target) {
