@@ -23,7 +23,7 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.viewer: {Permission.read},
     Role.editor: {Permission.read, Permission.write},
     Role.publisher: {Permission.read, Permission.publish},
-    Role.maintainer: {Permission.read, Permission.write, Permission.publish},
+    Role.maintainer: {Permission.read, Permission.write, Permission.publish, Permission.manage_members},
 }
 
 _OWNER_PERMISSIONS: set[Permission] = {

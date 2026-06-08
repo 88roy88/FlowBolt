@@ -60,7 +60,7 @@ export const PUBLISH_ROLES: ReadonlySet<ProjectRole> = new Set([
   ProjectRoles.owner, ProjectRoles.publisher, ProjectRoles.maintainer, ProjectRoles.admin,
 ]);
 export const MANAGE_ROLES: ReadonlySet<ProjectRole> = new Set([
-  ProjectRoles.owner, ProjectRoles.admin,
+  ProjectRoles.owner, ProjectRoles.maintainer, ProjectRoles.admin,
 ]);
 
 export interface Project {
