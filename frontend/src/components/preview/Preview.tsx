@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useConsoleStore } from '../../stores/console';
 import { usePublishStore } from '../../stores/publish';
+import { PUBLISH_ROLES } from '../../types';
 import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
@@ -104,16 +105,18 @@ export function Preview() {
               {t('preview.viewLive')}
             </Button>
           ) : null}
-          <Button
-            variant="default"
-            size="sm"
-            disabled={!projectId}
-            onClick={handlePublish}
-            title={isPublished ? t('preview.republish') : t('preview.publish')}
-          >
-            <Globe size={14} />
-            {isPublished ? t('preview.republish') : t('preview.publish')}
-          </Button>
+          {(!currentProject?.role || PUBLISH_ROLES.has(currentProject.role)) && (
+            <Button
+              variant="default"
+              size="sm"
+              disabled={!projectId}
+              onClick={handlePublish}
+              title={isPublished ? t('preview.republish') : t('preview.publish')}
+            >
+              <Globe size={14} />
+              {isPublished ? t('preview.republish') : t('preview.publish')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -123,7 +126,7 @@ export function Preview() {
           ref={iframeRef}
           key={refreshKey}
           src={previewUrl}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
           className="flex-1 w-full border-none"
           style={{ background: 'var(--preview-bg)' }}
           title={t('preview.title')}

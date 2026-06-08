@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
+import { WRITE_ROLES } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
@@ -227,13 +228,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ...RESET_STATE,
       });
 
-      const socket = getChatSocket(projectId);
-      const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
-      attachHandler(projectId, socket, handler);
+      const currentProject = useSessionStore.getState().currentProject;
+      const canWrite = !currentProject?.role || WRITE_ROLES.has(currentProject.role);
+
+      let handler: ((msg: WSMessage) => void) | null = null;
+
+      if (canWrite) {
+        const socket = getChatSocket(projectId);
+        handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler!));
+        attachHandler(projectId, socket, handler);
+      }
 
       const events = await fetchAgentEvents(projectId);
-      for (const evt of events) {
-        handler(evt as WSMessage);
+      if (handler) {
+        for (const evt of events) {
+          handler(evt as WSMessage);
+        }
+      } else {
+        // Read-only: replay events through a temporary handler without WS
+        const tempHandler = createSendMessageHandler(set, get, () => {});
+        for (const evt of events) {
+          tempHandler(evt as WSMessage);
+        }
       }
 
       finalizeHistoryReplayState(set, get, events);

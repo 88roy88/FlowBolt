@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from flow44.api.deps import SandboxDep
+from flow44.api.deps import Permission, SandboxDep, require_permission
 from flow44.sandbox.search_mixin import SearchToolError
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
@@ -70,7 +70,11 @@ async def get_file_content(sandbox: SandboxDep, path: str = Query(...)) -> dict[
 
 
 @router.put("/file/content")
-async def put_file_content(sandbox: SandboxDep, body: WriteFileRequest) -> dict[str, str]:
+async def put_file_content(
+    sandbox: SandboxDep,
+    body: WriteFileRequest,
+    _perms: set[Permission] = require_permission(Permission.write),
+) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
         return {"status": "ok", "path": body.path}
@@ -81,7 +85,11 @@ async def put_file_content(sandbox: SandboxDep, body: WriteFileRequest) -> dict[
 
 
 @router.post("/file")
-async def post_create_file(sandbox: SandboxDep, body: CreateFileRequest) -> dict[str, str]:
+async def post_create_file(
+    sandbox: SandboxDep,
+    body: CreateFileRequest,
+    _perms: set[Permission] = require_permission(Permission.write),
+) -> dict[str, str]:
     try:
         await sandbox.create_file(body.path, body.content)
         return {"status": "ok", "path": body.path}
@@ -92,7 +100,11 @@ async def post_create_file(sandbox: SandboxDep, body: CreateFileRequest) -> dict
 
 
 @router.patch("/file")
-async def patch_rename_file(sandbox: SandboxDep, body: RenamePathRequest) -> dict[str, str]:
+async def patch_rename_file(
+    sandbox: SandboxDep,
+    body: RenamePathRequest,
+    _perms: set[Permission] = require_permission(Permission.write),
+) -> dict[str, str]:
     try:
         await sandbox.rename_file(body.old_path, body.new_path)
         return {"status": "ok", "old_path": body.old_path, "new_path": body.new_path}
@@ -105,7 +117,11 @@ async def patch_rename_file(sandbox: SandboxDep, body: RenamePathRequest) -> dic
 
 
 @router.delete("/file")
-async def delete_entry(sandbox: SandboxDep, path: str = Query(...)) -> dict[str, str]:
+async def delete_entry(
+    sandbox: SandboxDep,
+    path: str = Query(...),
+    _perms: set[Permission] = require_permission(Permission.write),
+) -> dict[str, str]:
     try:
         await sandbox.delete_file(path)
         return {"status": "ok", "path": path}
@@ -122,6 +138,7 @@ async def post_upload_entry(
     sandbox: SandboxDep,
     path: str = Query(...),
     body: bytes = Body(...),
+    _perms: set[Permission] = require_permission(Permission.write),
 ) -> dict[str, str]:
     try:
         await sandbox.write_binary_file(path, body)

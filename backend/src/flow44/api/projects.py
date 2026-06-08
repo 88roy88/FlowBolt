@@ -9,14 +9,18 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from flow44.api.deps import ProjectDep, UserDep
+from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, _is_admin, require_permission
+from flow44.auth.permissions import get_admin_permissions, has_permission
+from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import (
     create_project,
     delete_project,
+    list_all_projects,
     rename_project,
     update_project_model,
 )
 from flow44.db.project import list_user_projects as db_list_user_projects
+from flow44.db.project_member import list_shared_projects
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
@@ -37,14 +41,42 @@ class UpdateProjectModelRequest(BaseModel):
     model: str
 
 
+@router.get("/me")
+async def get_current_user(user_id: UserDep) -> dict[str, Any]:
+    return {
+        "user_id": user_id,
+        "is_admin": _is_admin(user_id),
+        "is_platform_user": _is_admin(user_id) or await db_is_platform_user(user_id),
+    }
+
+
 @router.get("")
 async def list_user_projects(user_id: UserDep) -> list[dict[str, Any]]:
-    projects = await db_list_user_projects(user_id)
-    return [p.model_dump() for p in projects]
+    user_perms = get_admin_permissions() if _is_admin(user_id) else set()
+    can_read_all = has_permission(user_perms, Permission.read)
+
+    if can_read_all:
+        all_projects = await list_all_projects()
+        result: list[dict[str, Any]] = []
+        for p in all_projects:
+            role = "owner" if p.user_id == user_id else "admin"
+            result.append(p.model_dump() | {"role": role})
+        return result
+
+    owned = await db_list_user_projects(user_id)
+    shared = await list_shared_projects(user_id)
+
+    result = []
+    for p in owned:
+        result.append(p.model_dump() | {"role": "owner"})
+    for p, role in shared:
+        result.append(p.model_dump() | {"role": role})
+
+    return result
 
 
 @router.post("", status_code=201)
-async def create_new_project(body: CreateProjectRequest, user_id: UserDep) -> dict[str, Any]:
+async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> dict[str, Any]:
     project = await create_project(body.name, user_id)
 
     async def _create() -> None:
@@ -61,7 +93,11 @@ async def create_new_project(body: CreateProjectRequest, user_id: UserDep) -> di
 
 
 @router.patch("/{project_id}/name", status_code=200)
-async def rename_existing_project(project: ProjectDep, body: RenameProjectRequest) -> dict[str, bool]:
+async def rename_existing_project(
+    project: ProjectDep,
+    body: RenameProjectRequest,
+    _perms: set[Permission] = require_permission(Permission.write),
+) -> dict[str, bool]:
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name cannot be empty")
 
@@ -70,13 +106,20 @@ async def rename_existing_project(project: ProjectDep, body: RenameProjectReques
 
 
 @router.patch("/{project_id}/model", status_code=200)
-async def update_project_selected_model(project: ProjectDep, body: UpdateProjectModelRequest) -> dict[str, bool]:
+async def update_project_selected_model(
+    project: ProjectDep,
+    body: UpdateProjectModelRequest,
+    _perms: set[Permission] = require_permission(Permission.write),
+) -> dict[str, bool]:
     await update_project_model(project.id, body.model)
     return {"success": True}
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_existing_project(project: ProjectDep) -> None:
+async def delete_existing_project(
+    project: ProjectDep,
+    _perms: set[Permission] = require_permission(Permission.delete),
+) -> None:
     await sandbox_manager.destroy_sandbox(project.id)
     idle_reaper.remove(project.id)
     await delete_project(project.id)
@@ -86,7 +129,7 @@ async def delete_existing_project(project: ProjectDep) -> None:
 async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
     """DEBUG: Force-evict a sandbox as if the idle reaper triggered."""
     if not sandbox_manager.has_active_sandbox(project_id):
-        raise HTTPException(status_code=404, detail="No active sandbox for this project")
+        return {"status": "already_sleeping", "project_id": project_id}
 
     await sandbox_manager.suspend_sandbox(project_id)
     idle_reaper.remove(project_id)

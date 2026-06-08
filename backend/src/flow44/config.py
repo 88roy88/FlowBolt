@@ -85,6 +85,8 @@ class AuthSettings(Flow44BaseSettings):
     AUTH_JWT_ALGORITHM: str = "RS256"
     # Name of the cookie carrying the auth token (must match the frontend's VITE_AUTH_COOKIE_NAME)
     AUTH_COOKIE_NAME: str = "flow44_token"
+    # User IDs with system-admin privileges (can access all projects, invite platform users)
+    SYSTEM_ADMIN_IDS: list[str] = []
 
 
 class FlapiSettings(Flow44BaseSettings):
