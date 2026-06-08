@@ -77,7 +77,7 @@ export function BottomDrawer() {
           <div style={{ height: bottomHeight }}>
             <Resizer direction="vertical" onDrag={handleBottomResize} />
             <div style={{ height: bottomHeight - 1 }} className="overflow-hidden">
-              {bottomTab === 'terminal' ? <Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
+              {bottomTab === 'terminal' && canWrite ? <Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
             </div>
           </div>
         </>

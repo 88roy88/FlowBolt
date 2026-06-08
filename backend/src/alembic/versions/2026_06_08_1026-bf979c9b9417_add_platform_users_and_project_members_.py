@@ -44,15 +44,28 @@ def upgrade() -> None:
     # ### end Alembic commands ###
 
     # Backfill: grant platform access to all existing project owners
-    op.execute(
-        """
-        INSERT INTO platform_users (user_id, invited_by, created_at)
-        SELECT DISTINCT user_id, 'system', NOW()::text
-        FROM projects
-        WHERE user_id IS NOT NULL AND user_id != ''
-        ON CONFLICT (user_id) DO NOTHING
-        """
-    )
+    bind = op.get_bind()
+    dialect = bind.dialect.name if bind else "postgresql"
+
+    if dialect == "sqlite":
+        op.execute(
+            """
+            INSERT OR IGNORE INTO platform_users (user_id, invited_by, created_at)
+            SELECT DISTINCT user_id, 'system', datetime('now')
+            FROM projects
+            WHERE user_id IS NOT NULL AND user_id != ''
+            """
+        )
+    else:
+        op.execute(
+            """
+            INSERT INTO platform_users (user_id, invited_by, created_at)
+            SELECT DISTINCT user_id, 'system', NOW()::text
+            FROM projects
+            WHERE user_id IS NOT NULL AND user_id != ''
+            ON CONFLICT (user_id) DO NOTHING
+            """
+        )
 
 
 def downgrade() -> None:

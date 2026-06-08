@@ -69,7 +69,8 @@ async function pollOnce(projectId: string, pollId: number): Promise<void> {
 
   if (useChatStore.getState().agentAlivePollId !== pollId) return;
 
-  if (useChatStore.getState().agentAlive) {
+  const { agentAlive } = useChatStore.getState();
+  if (agentAlive !== false) {
     setTimeout(() => {
       void pollOnce(projectId, pollId);
     }, POLL_MS);

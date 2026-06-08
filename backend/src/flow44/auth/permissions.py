@@ -50,15 +50,15 @@ _ALL_VARIANTS: dict[Permission, Permission] = {
 
 
 def get_role_permissions(role: Role) -> set[Permission]:
-    return ROLE_PERMISSIONS[role]
+    return set(ROLE_PERMISSIONS[role])
 
 
 def get_owner_permissions() -> set[Permission]:
-    return _OWNER_PERMISSIONS
+    return set(_OWNER_PERMISSIONS)
 
 
 def get_admin_permissions() -> set[Permission]:
-    return _ADMIN_PERMISSIONS
+    return set(_ADMIN_PERMISSIONS)
 
 
 def has_permission(user_permissions: set[Permission], required: Permission) -> bool:

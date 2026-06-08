@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
-from flow44.api.deps import Permission, ProjectDep, require_permission
+from flow44.api.deps import Permission, ProjectDep, UserDep, require_permission
 from flow44.auth.permissions import Role
 from flow44.db.project_member import (
     add_member,
@@ -45,17 +46,21 @@ async def list_members(
 async def add_project_member(
     project: ProjectDep,
     body: AddMemberRequest,
+    user_id: UserDep,
     _perms: set[Permission] = require_permission(Permission.manage_members),
 ) -> MemberResponse:
     if body.user_id == project.user_id:
         raise HTTPException(status_code=400, detail="Cannot add the project owner as a member")
 
-    member = await add_member(
-        project_id=project.id,
-        user_id=body.user_id,
-        role=body.role,
-        invited_by=project.user_id,
-    )
+    try:
+        member = await add_member(
+            project_id=project.id,
+            user_id=body.user_id,
+            role=body.role,
+            invited_by=user_id,
+        )
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="User is already a member of this project") from exc
     return MemberResponse(
         user_id=member.user_id, role=member.role, created_at=member.created_at, invited_by=member.invited_by
     )

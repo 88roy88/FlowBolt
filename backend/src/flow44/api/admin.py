@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import UserDep, is_admin
 from flow44.db.platform_user import (
@@ -40,7 +41,10 @@ async def list_users(user_id: AdminDep) -> list[PlatformUserResponse]:
 
 @router.post("/users", status_code=201)
 async def invite_user(user_id: AdminDep, body: InviteUserRequest) -> PlatformUserResponse:
-    user = await add_platform_user(user_id=body.user_id, invited_by=user_id)
+    try:
+        user = await add_platform_user(user_id=body.user_id, invited_by=user_id)
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="User already has platform access") from exc
     return PlatformUserResponse(user_id=user.user_id, invited_by=user.invited_by, created_at=user.created_at)
 
 
