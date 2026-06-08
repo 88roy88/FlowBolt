@@ -7,7 +7,8 @@ function getAppSuffix(): string {
     const raw = localStorage.getItem(authConfig.storageKey);
     if (!raw) return '44';
     const userId = JSON.parse(raw)?.userId;
-    return typeof userId === 'string' && SPECIAL_USERS.includes(userId) ? 'Base' : '44';
+    const isSpecial = typeof userId === 'string' && !!SPECIAL_USERS.find(id => id.startsWith(userId));
+    return isSpecial ? 'Base' : '44';
   } catch {
     return '44';
   }
