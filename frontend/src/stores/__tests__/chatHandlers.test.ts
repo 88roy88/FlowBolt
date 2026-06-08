@@ -25,7 +25,9 @@ vi.mock('../files', () => ({
       updateFileContent: vi.fn(),
       loadFileTree: vi.fn(),
       refreshOpenFiles: vi.fn(),
+      saveVersion: 0,
     }),
+    setState: vi.fn(),
   },
 }));
 

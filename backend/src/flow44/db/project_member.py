@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import UniqueConstraint
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, SQLModel, col, select
 
 from flow44.auth.permissions import Role
 from flow44.db import database
@@ -85,18 +85,18 @@ async def list_project_members(project_id: str) -> list[ProjectMember]:
         result = await session.execute(
             select(ProjectMember)
             .where(ProjectMember.project_id == project_id)
-            .order_by(ProjectMember.created_at.asc())  # type: ignore[attr-defined]
+            .order_by(col(ProjectMember.created_at).asc())
         )
         return list(result.scalars().all())
 
 
-async def list_shared_projects(user_id: str) -> list[tuple[Project, str]]:
+async def list_shared_projects(user_id: str) -> list[tuple[Project, Role]]:
     """Returns projects shared with the user and their role."""
     async with database.async_session() as session:
         result = await session.execute(
             select(Project, ProjectMember.role)
-            .join(ProjectMember, ProjectMember.project_id == Project.id)
-            .where(ProjectMember.user_id == user_id)
-            .order_by(Project.created_at.desc())  # type: ignore[attr-defined]
+            .join(ProjectMember, col(ProjectMember.project_id) == col(Project.id))
+            .where(col(ProjectMember.user_id) == user_id)
+            .order_by(col(Project.created_at).desc())
         )
-        return [(row[0], row[1]) for row in result.all()]
+        return [(row[0], Role(row[1])) for row in result.all()]

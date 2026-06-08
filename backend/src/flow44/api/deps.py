@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
@@ -134,19 +134,15 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_user_permissions(project_id: str, user_id: UserDep) -> set[Permission]:
+async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
     """Resolve the current user's permissions on a project."""
-    project = await db_get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     if project.user_id == user_id:
         return get_owner_permissions()
 
     if is_admin(user_id):
         return get_admin_permissions()
 
-    member = await get_project_member(project_id, user_id)
+    member = await get_project_member(project.id, user_id)
     if member is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -156,7 +152,7 @@ async def get_user_permissions(project_id: str, user_id: UserDep) -> set[Permiss
 PermissionsDep = Annotated[set[Permission], Depends(get_user_permissions)]
 
 
-def require_permission(permission: Permission):  # noqa: ANN201
+def require_permission(permission: Permission) -> Any:
     """Dependency factory: raises 403 if the user lacks the required permission."""
 
     async def _check(user_permissions: PermissionsDep) -> set[Permission]:
@@ -213,18 +209,25 @@ async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-async def get_ws_permissions(project_id: str, user_id: WsUserDep) -> set[Permission]:
+async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
     """WS variant of get_user_permissions."""
-    try:
-        return await get_user_permissions(project_id, user_id)
-    except HTTPException:
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
+    if project.user_id == user_id:
+        return get_owner_permissions()
+
+    if is_admin(user_id):
+        return get_admin_permissions()
+
+    member = await get_project_member(project.id, user_id)
+    if member is None:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+
+    return get_role_permissions(Role(member.role))
 
 
 WsPermissionsDep = Annotated[set[Permission], Depends(get_ws_permissions)]
 
 
-def require_ws_permission(permission: Permission):  # noqa: ANN201
+def require_ws_permission(permission: Permission) -> Any:
     """WS dependency factory: rejects handshake if the user lacks the required permission."""
 
     async def _check(user_permissions: WsPermissionsDep) -> set[Permission]:

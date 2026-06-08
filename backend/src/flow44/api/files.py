@@ -50,7 +50,10 @@ class SearchResponse(BaseModel):
 
 
 @router.get("/tree")
-async def get_file_tree(sandbox: SandboxDep) -> list[dict[str, Any]]:
+async def get_file_tree(
+    sandbox: SandboxDep,
+    _perms: set[Permission] = require_permission(Permission.read),
+) -> list[dict[str, Any]]:
     try:
         tree = await sandbox.list_files()
         return [entry.model_dump() for entry in tree]
@@ -59,7 +62,11 @@ async def get_file_tree(sandbox: SandboxDep) -> list[dict[str, Any]]:
 
 
 @router.get("/file/content")
-async def get_file_content(sandbox: SandboxDep, path: str = Query(...)) -> dict[str, str]:
+async def get_file_content(
+    sandbox: SandboxDep,
+    path: str = Query(...),
+    _perms: set[Permission] = require_permission(Permission.read),
+) -> dict[str, str]:
     try:
         content = await sandbox.read_file(path)
         return {"path": path, "content": content}
@@ -155,6 +162,7 @@ async def get_grep(
     pattern: str = Query(...),
     path: str = Query(default="/"),
     file_pattern: str | None = Query(default=None),
+    _perms: set[Permission] = require_permission(Permission.read),
 ) -> dict[str, Any]:
     try:
         matches = await sandbox.grep(pattern, path, file_pattern)
@@ -166,7 +174,11 @@ async def get_grep(
 
 
 @router.post("/search")
-async def post_search(sandbox: SandboxDep, body: SearchRequest) -> SearchResponse:
+async def post_search(
+    sandbox: SandboxDep,
+    body: SearchRequest,
+    _perms: set[Permission] = require_permission(Permission.read),
+) -> SearchResponse:
     """Search using ripgrep with column positions for frontend integration."""
     try:
         # Use grep with column tracking

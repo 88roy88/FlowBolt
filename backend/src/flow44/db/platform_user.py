@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
 
@@ -40,7 +40,5 @@ async def is_platform_user(user_id: str) -> bool:
 
 async def list_platform_users() -> list[PlatformUser]:
     async with database.async_session() as session:
-        result = await session.execute(
-            select(PlatformUser).order_by(PlatformUser.created_at.desc())  # type: ignore[attr-defined]
-        )
+        result = await session.execute(select(PlatformUser).order_by(col(PlatformUser.created_at).desc()))
         return list(result.scalars().all())
