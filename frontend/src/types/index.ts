@@ -62,6 +62,9 @@ export const PUBLISH_ROLES: ReadonlySet<ProjectRole> = new Set([
 export const MANAGE_ROLES: ReadonlySet<ProjectRole> = new Set([
   ProjectRoles.owner, ProjectRoles.maintainer, ProjectRoles.admin,
 ]);
+export const DELETE_ROLES: ReadonlySet<ProjectRole> = new Set([
+  ProjectRoles.owner, ProjectRoles.admin,
+]);
 
 export interface Project {
   id: string;

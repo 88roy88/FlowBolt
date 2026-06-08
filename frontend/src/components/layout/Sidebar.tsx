@@ -5,7 +5,7 @@ import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
 import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
-import { MANAGE_ROLES, type ProjectSummary } from '../../types';
+import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { ShareModal } from '../sharing/ShareModal';
 import { AdminPanel } from '../admin/AdminPanel';
@@ -249,11 +249,9 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                 ) : (
                   <span className="flex-1 text-[13px] truncate">
                     {project.name}
-                    {project.role && !MANAGE_ROLES.has(project.role) && (
-                      <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
-                        {project.role}
-                      </span>
-                    )}
+                    <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                      {project.role}
+                    </span>
                   </span>
                 )}
                 <Button
@@ -319,7 +317,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                       Sleep
                     </button>
                   )}
-                  {(!project.role || MANAGE_ROLES.has(project.role)) && (
+                  {(!project.role || DELETE_ROLES.has(project.role)) && (
                     <button
                       onClick={() => handleDelete(project.id)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
