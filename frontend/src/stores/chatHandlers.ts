@@ -54,7 +54,9 @@ function generateId(): string {
 
 function refreshFileTreeAfterAgentWrite() {
   if (_skipMessages) return;
-  void useFilesStore.getState().loadFileTree();
+  const store = useFilesStore.getState();
+  void store.loadFileTree();
+  useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
 }
 
 function handleFileUpdate(msg: { path: string; content: string }, set: SetState) {
@@ -174,7 +176,7 @@ export function createFixErrorHandler(
           notifyBuildComplete(useSessionStore.getState().currentProject?.name);
         }
         cleanup();
-        useFilesStore.getState().loadFileTree();
+        refreshFileTreeAfterAgentWrite();
         useFilesStore.getState().refreshOpenFiles();
         break;
       }
@@ -490,6 +492,6 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     notifyBuildComplete(useSessionStore.getState().currentProject?.name);
   }
   cleanup();
-  useFilesStore.getState().loadFileTree();
+  refreshFileTreeAfterAgentWrite();
   useFilesStore.getState().refreshOpenFiles();
 }
