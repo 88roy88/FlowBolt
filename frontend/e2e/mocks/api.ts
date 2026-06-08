@@ -134,11 +134,6 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   const fileContents = { ...MOCK_FILE_CONTENTS };
   let projectsGetCount = 0;
 
-  // --- User status ---
-  await page.route('**/api/projects/me', async (route) => {
-    return route.fulfill({ json: { user_id: 'test-user', is_admin: true, is_platform_user: true } });
-  });
-
   // --- Projects ---
   await page.route('**/api/projects', async (route) => {
     if (route.request().method() === 'POST') {
@@ -162,8 +157,13 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   await page.route('**/api/projects/*', async (route) => {
     const url = route.request().url();
 
-    // Skip sub-routes like /name, /model
-    if (url.includes('/name') || url.includes('/model')) {
+    // User status endpoint
+    if (url.endsWith('/me')) {
+      return route.fulfill({ json: { user_id: 'test-user', is_admin: true, is_platform_user: true } });
+    }
+
+    // Skip sub-routes like /name, /model, /members
+    if (url.includes('/name') || url.includes('/model') || url.includes('/members')) {
       return route.fulfill({ status: 200, json: {} });
     }
 
@@ -412,6 +412,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
 
     const publicPath = `/shared/${handle}`;
     return route.fulfill({ json: { url: publicPath, handle } });
+  });
+
+  // --- Agent alive ---
+  await page.route('**/api/iaagent/*/alive', async (route) => {
+    return route.fulfill({ json: { alive: false, phase: null } });
   });
 
   // --- Data source search ---

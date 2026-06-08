@@ -68,7 +68,7 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
         <div className="mt-2.5 border-t border-border pt-2.5">
           <div className="text-xs font-medium text-muted-foreground mb-2">Files changed</div>
           <div className="flex flex-col gap-1.5">
-            {diffs.map((d) => <DiffBlock key={d.path} fileDiff={d} />)}
+            {diffs.map((d, i) => <DiffBlock key={`${d.path}-${i}`} fileDiff={d} />)}
           </div>
         </div>
       )}
