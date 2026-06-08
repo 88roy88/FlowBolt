@@ -5,39 +5,19 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   promote:
-    name: Create release PR (develop → main)
+    name: Fast-forward main to develop
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: main
 
-      - name: Create PR from develop to main
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fast-forward main to develop
         run: |
-          EXISTING=$(gh pr list --base main --head develop --json number --jq '.[0].number')
-          if [ -n "$EXISTING" ]; then
-            echo "PR #$EXISTING already exists: $(gh pr view $EXISTING --json url --jq .url)"
-            exit 0
-          fi
-
-          gh pr create \
-            --base main \
-            --head develop \
-            --title "Release: promote develop → main" \
-            --body "$(cat <<'EOF'
-          ## Production Release
-
-          This PR promotes the current `develop` branch to `main` (production).
-
-          Triggered manually via workflow dispatch.
-
-          ---
-          Review the changes, ensure CI passes, then approve and merge.
-          EOF
-          )"
+          git fetch origin develop
+          git merge --ff-only origin/develop
+          git push origin main
