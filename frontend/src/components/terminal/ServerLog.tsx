@@ -3,7 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useSessionStore } from '../../stores/session';
-import { createServerLogSocket } from '../../services/websocket';
+import { getServerLogSocket } from '../../services/websocket/serverLog';
 import { getTerminalTheme } from '../../utils/terminalTheme';
 import '@xterm/xterm/css/xterm.css';
 
@@ -32,11 +32,12 @@ export function ServerLog() {
     term.open(containerRef.current);
     fitAddon.fit();
 
-    const socket = createServerLogSocket(projectId);
+    const socket = getServerLogSocket(projectId);
 
-    socket.onData((data) => {
+    const handler = (data: string) => {
       term.write(data);
-    });
+    };
+    socket.onData(handler);
 
     const resizeObserver = new ResizeObserver(() => {
       try {
@@ -59,7 +60,6 @@ export function ServerLog() {
     return () => {
       resizeObserver.disconnect();
       mutationObserver.disconnect();
-      socket.close();
       term.dispose();
     };
   }, [projectId]);

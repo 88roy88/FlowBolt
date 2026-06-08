@@ -2,7 +2,12 @@ import type { TerminalSocket } from './types';
 import { credentialsStore } from '../../auth';
 import { getWsBase } from './reconnecting';
 
-export function createTerminalSocket(projectId: string): TerminalSocket {
+const terminalSockets = new Map<string, TerminalSocket>();
+
+export function getTerminalSocket(projectId: string): TerminalSocket {
+  const existing = terminalSockets.get(projectId);
+  if (existing) return existing;
+
   const handlers: Array<(data: string) => void> = [];
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -11,6 +16,7 @@ export function createTerminalSocket(projectId: string): TerminalSocket {
   let closed = false;
   let retryDelay = 1000;
   const pendingQueue: ArrayBuffer[] = [];
+
   function flushQueue() {
     while (pendingQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
       socket.send(pendingQueue.shift()!);
@@ -53,7 +59,7 @@ export function createTerminalSocket(projectId: string): TerminalSocket {
 
   connect();
 
-  return {
+  const instance: TerminalSocket = {
     send(data: string) {
       const buf = encoder.encode(data);
       if (socket?.readyState === WebSocket.OPEN) {
@@ -69,6 +75,19 @@ export function createTerminalSocket(projectId: string): TerminalSocket {
       closed = true;
       socket?.close();
       socket = null;
+      terminalSockets.delete(projectId);
     },
   };
+
+  terminalSockets.set(projectId, instance);
+  return instance;
+}
+
+export function closeTerminalSocket(projectId: string): void {
+  const existing = terminalSockets.get(projectId);
+  if (existing) existing.close();
+}
+
+export function createTerminalSocket(projectId: string): TerminalSocket {
+  return getTerminalSocket(projectId);
 }
