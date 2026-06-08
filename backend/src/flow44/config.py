@@ -27,6 +27,9 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_PID_LIMIT: int = 256
     SANDBOX_DISABLE_CGROUPS: bool = False
     PNPM_STORE_DIR: str = "/var/lib/flow-44/workspaces/.pnpm-store"
+    NPM_REGISTRY: str = "https://registry.npmjs.org/"
+    NPM_STRICT_SSL: bool = True
+    NPM_AUDIT: bool = True
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
     SANDBOX_IDLE_TTL_SECONDS: int = 5 * 60  # 5 minutes
     SANDBOX_IDLE_CHECK_INTERVAL_SECONDS: int = 60
