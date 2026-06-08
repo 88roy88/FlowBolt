@@ -10,7 +10,8 @@ load_dotenv(Path(__file__).parent / "test.env")
 
 import flow44.config  # noqa: E402
 import flow44.db.database  # noqa: E402
-from flow44.api.deps import TokenPayload, get_user_id, validate_token, validate_ws_token  # noqa: E402
+from flow44.api.deps import TokenPayload, get_user_id, get_user_permissions, validate_token, validate_ws_token  # noqa: E402
+from flow44.auth.permissions import get_owner_permissions  # noqa: E402
 from flow44.db.database import get_engine, init_db, reset  # noqa: E402
 from flow44.main import app  # noqa: E402
 
@@ -22,15 +23,18 @@ def tmp_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def authenticated_user():
-    # HTTP/WS tests act as a signed-in user; auth tests call the deps directly and bypass this.
+    # HTTP/WS tests act as a signed-in user with full permissions;
+    # auth/permission tests call the deps directly and bypass this.
     payload = TokenPayload(exp=9_999_999_999, unique_id="test-user")
     app.dependency_overrides[get_user_id] = lambda: "test-user"
     app.dependency_overrides[validate_token] = lambda: payload
     app.dependency_overrides[validate_ws_token] = lambda: payload
+    app.dependency_overrides[get_user_permissions] = lambda: get_owner_permissions()
     yield
     app.dependency_overrides.pop(get_user_id, None)
     app.dependency_overrides.pop(validate_token, None)
     app.dependency_overrides.pop(validate_ws_token, None)
+    app.dependency_overrides.pop(get_user_permissions, None)
 
 
 @pytest.fixture(scope="session")

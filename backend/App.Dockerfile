@@ -15,6 +15,9 @@ WORKDIR /app
 # Copy all project files
 COPY --chown=appuser:appuser . .
 
+RUN mkdir -p /var/lib/flow-44 && \
+    chmod -R a+w /var/lib/flow-44
+
 # Generate uv.toml from build args (overwriting any existing one from the context)
 RUN echo "native-tls = ${UV_NATIVE_TLS}" > uv.toml && \
     echo "allow-insecure-host = [\"${UV_INSECURE_HOST1}\", \"${UV_INSECURE_HOST2}\"]" >> uv.toml && \

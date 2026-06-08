@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { FileEntry, Project, AIModel, DataSourceSearchResult } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, UserStatus } from '../types';
 
 const BASE = '/api';
 
@@ -216,4 +216,51 @@ export async function checkBackendHealth(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// --- User status & platform ---
+
+export async function fetchMe(): Promise<UserStatus> {
+  return request<UserStatus>('/projects/me');
+}
+
+// --- Project members ---
+
+export async function fetchProjectMembers(projectId: string): Promise<ProjectMember[]> {
+  return request<ProjectMember[]>(`/projects/${projectId}/members`);
+}
+
+export async function addProjectMember(projectId: string, userId: string, role: AssignableRole): Promise<ProjectMember> {
+  return request<ProjectMember>(`/projects/${projectId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, role }),
+  });
+}
+
+export async function updateProjectMemberRole(projectId: string, userId: string, role: AssignableRole): Promise<ProjectMember> {
+  return request<ProjectMember>(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
+  await request(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+// --- Admin: platform user management ---
+
+export async function fetchPlatformUsers(): Promise<{ user_id: string; invited_by: string; created_at: string }[]> {
+  return request('/admin/users');
+}
+
+export async function invitePlatformUser(userId: string): Promise<{ user_id: string; invited_by: string; created_at: string }> {
+  return request('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId }),
+  });
+}
+
+export async function revokePlatformUser(userId: string): Promise<void> {
+  await request(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }

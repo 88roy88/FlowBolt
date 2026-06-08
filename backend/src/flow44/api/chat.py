@@ -13,7 +13,7 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.deps import ProjectDep, TokenDep, WsProjectDep
+from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, require_ws_permission
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -68,6 +68,7 @@ async def chat_ws(  # noqa: C901, PLR0915
     websocket: WebSocket,
     project: WsProjectDep,
     data_source_authorization: TokenDep = None,
+    _perms: set[Permission] = require_ws_permission(Permission.write),
 ) -> None:
     await websocket.accept()
     logger.info("[chat] WebSocket accepted for session %s", project.id)

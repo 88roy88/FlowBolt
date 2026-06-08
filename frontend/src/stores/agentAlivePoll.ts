@@ -1,4 +1,5 @@
 import { fetchAgentAlive } from '../services/api';
+import { WRITE_ROLES } from '../types';
 import {
   ACTIVE_AGENT_PHASES,
   getTransientReset,
@@ -7,6 +8,7 @@ import {
   isKnownAgentPhase,
 } from './chatAgentState';
 import { useChatStore } from './chat';
+import { useSessionStore } from './session';
 
 const POLL_MS = 10000;
 
@@ -65,7 +67,10 @@ async function pollOnce(projectId: string, pollId: number): Promise<void> {
     console.error('Failed to fetch agent alive status:', err);
   }
 
-  if (useChatStore.getState().agentAlivePollId === pollId) {
+  if (useChatStore.getState().agentAlivePollId !== pollId) return;
+
+  const { agentAlive } = useChatStore.getState();
+  if (agentAlive !== false) {
     setTimeout(() => {
       void pollOnce(projectId, pollId);
     }, POLL_MS);
@@ -73,6 +78,10 @@ async function pollOnce(projectId: string, pollId: number): Promise<void> {
 }
 
 export function startAgentAlivePolling(projectId: string): void {
+  const currentProject = useSessionStore.getState().currentProject;
+  const canWrite = !currentProject?.role || WRITE_ROLES.has(currentProject.role);
+  if (!canWrite) return;
+
   const pollId = useChatStore.getState().agentAlivePollId + 1;
   useChatStore.setState({ agentAlive: null, agentAlivePollId: pollId });
   void pollOnce(projectId, pollId);

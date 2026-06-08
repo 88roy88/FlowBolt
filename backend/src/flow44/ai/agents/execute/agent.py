@@ -26,7 +26,7 @@ from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
-MAX_FIX_ATTEMPTS = 2
+MAX_FIX_ATTEMPTS = 10
 
 
 class ExecuteAgent(BaseAgent):
