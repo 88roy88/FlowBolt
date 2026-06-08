@@ -1,6 +1,6 @@
 import { authConfig } from './auth/config';
 
-const SPECIAL_USERS = ['666royz', 'dev-user'];
+const SPECIAL_USERS = ['666royz', '619roym', '611noat', "dev-user"];
 
 function getAppSuffix(): string {
   try {
