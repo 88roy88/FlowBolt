@@ -11,7 +11,7 @@ export function isSpecialUser(): boolean {
     const creds = JSON.parse(stored);
     const userId = creds?.userId;
 
-    return typeof userId === 'string' && SPECIAL_USERS.includes(userId);
+    return typeof userId === 'string' && !!SPECIAL_USERS.find(id => id.startsWith(userId));
   } catch {
     return false;
   }
