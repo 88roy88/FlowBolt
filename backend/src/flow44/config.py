@@ -26,7 +26,7 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256
     SANDBOX_DISABLE_CGROUPS: bool = False
-    PNPM_STORE_DIR: str = "/var/lib/flow-44/workspaces/.pnpm-store"
+    PNPM_STORE_DIR: str = "/var/lib/flow-44/.pnpm-store"
     NPM_REGISTRY: str = "https://registry.npmjs.org/"
     NPM_STRICT_SSL: bool = True
     NPM_AUDIT: bool = True
