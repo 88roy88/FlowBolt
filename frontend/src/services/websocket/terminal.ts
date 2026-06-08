@@ -70,6 +70,10 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
     },
     onData(handler: (data: string) => void) {
       handlers.push(handler);
+      return () => {
+        const idx = handlers.indexOf(handler);
+        if (idx !== -1) handlers.splice(idx, 1);
+      };
     },
     close() {
       closed = true;

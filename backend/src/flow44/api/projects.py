@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, _is_admin, require_permission
+from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, is_admin, require_permission
 from flow44.auth.permissions import get_admin_permissions, has_permission
 from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import (
@@ -43,16 +43,17 @@ class UpdateProjectModelRequest(BaseModel):
 
 @router.get("/me")
 async def get_current_user(user_id: UserDep) -> dict[str, Any]:
+    admin = is_admin(user_id)
     return {
         "user_id": user_id,
-        "is_admin": _is_admin(user_id),
-        "is_platform_user": _is_admin(user_id) or await db_is_platform_user(user_id),
+        "is_admin": admin,
+        "is_platform_user": admin or await db_is_platform_user(user_id),
     }
 
 
 @router.get("")
 async def list_user_projects(user_id: UserDep) -> list[dict[str, Any]]:
-    user_perms = get_admin_permissions() if _is_admin(user_id) else set()
+    user_perms = get_admin_permissions() if is_admin(user_id) else set()
     can_read_all = has_permission(user_perms, Permission.read)
 
     if can_read_all:

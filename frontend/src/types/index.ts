@@ -41,36 +41,12 @@ export interface FileEntry {
   children?: FileEntry[];
 }
 
-export const ProjectRoles = {
-  owner: 'owner',
-  viewer: 'viewer',
-  editor: 'editor',
-  publisher: 'publisher',
-  maintainer: 'maintainer',
-  admin: 'admin',
-} as const;
-
-export type ProjectRole = (typeof ProjectRoles)[keyof typeof ProjectRoles];
+export type ProjectRole = 'owner' | 'viewer' | 'editor' | 'publisher' | 'maintainer' | 'admin';
 export type AssignableRole = 'viewer' | 'editor' | 'publisher' | 'maintainer';
 
-export const WRITE_ROLES: ReadonlySet<ProjectRole> = new Set([
-  ProjectRoles.owner,
-  ProjectRoles.editor,
-  ProjectRoles.maintainer,
-  ProjectRoles.admin,
-]);
-
-export const PUBLISH_ROLES: ReadonlySet<ProjectRole> = new Set([
-  ProjectRoles.owner,
-  ProjectRoles.publisher,
-  ProjectRoles.maintainer,
-  ProjectRoles.admin,
-]);
-
-export const MANAGE_ROLES: ReadonlySet<ProjectRole> = new Set([
-  ProjectRoles.owner,
-  ProjectRoles.admin,
-]);
+export const WRITE_ROLES: ReadonlySet<ProjectRole> = new Set(['owner', 'editor', 'maintainer', 'admin']);
+export const PUBLISH_ROLES: ReadonlySet<ProjectRole> = new Set(['owner', 'publisher', 'maintainer', 'admin']);
+export const MANAGE_ROLES: ReadonlySet<ProjectRole> = new Set(['owner', 'admin']);
 
 export interface Project {
   id: string;

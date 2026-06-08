@@ -109,7 +109,7 @@ def get_user_id(token: TokenDep) -> str:
 UserDep = Annotated[str, Depends(get_user_id)]
 
 
-def _is_admin(user_id: str) -> bool:
+def is_admin(user_id: str) -> bool:
     return user_id in settings.SYSTEM_ADMIN_IDS
 
 
@@ -121,7 +121,7 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
     if project.user_id == user_id:
         return project
 
-    if _is_admin(user_id):
+    if is_admin(user_id):
         return project
 
     member = await get_project_member(project_id, user_id)
@@ -143,7 +143,7 @@ async def get_user_permissions(project_id: str, user_id: UserDep) -> set[Permiss
     if project.user_id == user_id:
         return get_owner_permissions()
 
-    if _is_admin(user_id):
+    if is_admin(user_id):
         return get_admin_permissions()
 
     member = await get_project_member(project_id, user_id)
@@ -169,7 +169,7 @@ def require_permission(permission: Permission):  # noqa: ANN201
 
 async def require_platform_user(user_id: UserDep) -> str:
     """Gate: only platform users and admins can create projects."""
-    if _is_admin(user_id):
+    if is_admin(user_id):
         return user_id
     if await db_is_platform_user(user_id):
         return user_id

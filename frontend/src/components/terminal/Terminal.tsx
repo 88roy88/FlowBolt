@@ -43,7 +43,7 @@ export function Terminal() {
     const handler = (data: string) => {
       term.write(data);
     };
-    socket.onData(handler);
+    const unsubscribe = socket.onData(handler);
 
     const resizeObserver = new ResizeObserver(() => {
       try {
@@ -66,6 +66,7 @@ export function Terminal() {
     });
 
     return () => {
+      unsubscribe();
       resizeObserver.disconnect();
       mutationObserver.disconnect();
       term.dispose();

@@ -9,11 +9,11 @@ export interface ChatSocket {
 
 export interface TerminalSocket {
   send(data: string): void;
-  onData(handler: (data: string) => void): void;
+  onData(handler: (data: string) => void): () => void;
   close(): void;
 }
 
 export interface ReadOnlySocket {
-  onData(handler: (data: string) => void): void;
+  onData(handler: (data: string) => void): () => void;
   close(): void;
 }
