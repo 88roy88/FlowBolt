@@ -134,6 +134,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   const fileContents = { ...MOCK_FILE_CONTENTS };
   let projectsGetCount = 0;
 
+  // --- User status ---
+  await page.route('**/api/projects/me', async (route) => {
+    return route.fulfill({ json: { user_id: 'test-user', is_admin: true, is_platform_user: true } });
+  });
+
   // --- Projects ---
   await page.route('**/api/projects', async (route) => {
     if (route.request().method() === 'POST') {
