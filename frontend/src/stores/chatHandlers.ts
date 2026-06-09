@@ -86,7 +86,7 @@ function handleText(msg: { content: string }, set: SetState) {
 }
 
 function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
-  set({ ...getTransientReset(), error: msg.message });
+  set({ ...getTransientReset(), agentAlive: false, error: msg.message });
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
   }
@@ -172,10 +172,11 @@ export function createFixErrorHandler(
           set((s) => ({
             messages: [...s.messages, fixMessage],
             ...getTransientReset(),
+            agentAlive: false,
             buildCompleted: true,
           }));
         } else {
-          set({ ...getTransientReset(), buildCompleted: true });
+          set({ ...getTransientReset(), agentAlive: false, buildCompleted: true });
         }
         if (!_skipMessages) {
           notifyBuildComplete(useSessionStore.getState().currentProject?.name);
@@ -487,6 +488,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
   set((s) => ({
     messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
     ...getTransientReset(),
+    agentAlive: false,
     planOverview: null,
     projectSummary: null,
     buildCompleted: true,
