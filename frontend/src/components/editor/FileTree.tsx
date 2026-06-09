@@ -9,10 +9,10 @@ import { joinPath, parentDirectory, ROOT_DROP_PATH } from './fileTreePaths';
 
 interface FileTreeProps {
   readOnly: boolean;
-  readOnlyMessage: string;
+  readOnlyMessage?: string;
 }
 
-export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
+export function FileTree({ readOnly }: FileTreeProps) {
   const { t, i18n } = useTranslation();
   const isRtl = i18n.dir(i18n.resolvedLanguage) === 'rtl';
   const fileTree = useFilesStore((s) => s.fileTree);
