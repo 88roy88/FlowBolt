@@ -7,7 +7,7 @@ loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useChatStore } from '../../stores/chat';
-import { isAgentWorking } from '../../stores/chatAgentState';
+import { isAgentAlive } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { WRITE_ROLES } from '../../types';
 import { Resizer } from '../layout/Resizer';
@@ -46,7 +46,7 @@ export function EditorPanel() {
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
-  const aiFlowActive = useChatStore(isAgentWorking);
+  const aiFlowActive = useChatStore(isAgentAlive);
   const noWritePermission = currentProject?.role ? !WRITE_ROLES.has(currentProject.role) : false;
   const readOnlyUntilInitialBuildComplete = !buildCompleted;
   const editorReadOnly = noWritePermission || readOnlyUntilInitialBuildComplete || aiFlowActive;
