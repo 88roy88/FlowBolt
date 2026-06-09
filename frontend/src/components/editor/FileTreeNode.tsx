@@ -154,34 +154,32 @@ export function FileTreeNode({
     >
       {getFileIcon(entry.name)}
       <span className="truncate flex-1 min-w-0">{entry.name}</span>
-      <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <button
-          type="button"
-          className="rounded p-0.5 hover:bg-muted"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (readOnly) return;
-            onRename(entry);
-          }}
-          title={t('editor.renameFile')}
-          disabled={readOnly}
-        >
-          <Pencil size={12} />
-        </button>
-        <button
-          type="button"
-          className="rounded p-0.5 hover:bg-muted text-destructive"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (readOnly) return;
-            onDelete(entry);
-          }}
-          title={t('editor.deleteFile')}
-          disabled={readOnly}
-        >
-          <Trash2 size={12} />
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            type="button"
+            className="rounded p-0.5 hover:bg-muted"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRename(entry);
+            }}
+            title={t('editor.renameFile')}
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            type="button"
+            className="rounded p-0.5 hover:bg-muted text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(entry);
+            }}
+            title={t('editor.deleteFile')}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
