@@ -49,20 +49,22 @@ def test_deploy_single_html():
         project_id = "proj-123"
 
         # Ensure settings are controlled
-        with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
-            with patch.object(settings, "S3_ENDPOINT_URL", "http://s3.local"):
-                url = deploy_single_html(html_content, project_id)
+        with (
+            patch.object(settings, "S3_BUCKET_NAME", "my-bucket"),
+            patch.object(settings, "S3_ENDPOINT_URL", "http://s3.local"),
+        ):
+            url = deploy_single_html(html_content, project_id)
 
-                expected_key = f"published/{project_id}.html"
-                mock_client.put_object.assert_called_once_with(
-                    Bucket="my-bucket",
-                    Key=expected_key,
-                    Body=html_content.encode("utf-8"),
-                    ContentType="text/html",
-                    ACL="public-read",
-                    StorageClass=settings.S3_STORAGE_CLASS,
-                )
-                assert url == f"http://s3.local/my-bucket/{expected_key}"
+            expected_key = f"published/{project_id}.html"
+            mock_client.put_object.assert_called_once_with(
+                Bucket="my-bucket",
+                Key=expected_key,
+                Body=html_content.encode("utf-8"),
+                ContentType="text/html",
+                ACL="public-read",
+                StorageClass=settings.S3_STORAGE_CLASS,
+            )
+            assert url == f"http://s3.local/my-bucket/{expected_key}"
 
 
 def test_deploy_shared_dist(tmp_path):

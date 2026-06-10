@@ -1,4 +1,6 @@
-You decide which optional npm packages this generated React app needs.
+You decide which optional packages are useful for this app.
+
+Return JSON only.
 
 ## Allowed Optional Packages
 
@@ -8,8 +10,8 @@ You decide which optional npm packages this generated React app needs.
 Capability:
 - {{ package.capability }}
 
-Use when: {{ package.when_to_use }}
-Avoid when: {{ package.when_not_to_use }}
+Use when: {{ package.use_when }}
+Avoid when: {{ package.avoid_when }}
 {% endfor %}
 
 ## Selection Rules
@@ -18,17 +20,22 @@ Required:
 - Select zero, one, or multiple packages from the allowed list.
 - Select every allowed package that is clearly useful for the requested app.
 - Use more than one package when the app clearly needs multiple package capabilities.
-- If no package is clearly useful, return an empty list.
 - Use the package-specific guidance above.
-- If the request is in another language, infer the intent before deciding.
+- Understand the user intent even if the request is written in another language.
+- If no package is clearly useful, return an empty list.
 
 Forbidden:
 - Do not select packages outside the allowed list.
 - Do not select a package only because it is available.
 - Do not select packages for features that are simple to build without them.
 
-Return JSON only using this shape:
-{"selected_packages":[{"name":"allowed-package-name","capability":"capability-from-allowed-list","reason":"short reason"}]}
+## Output
+
+Return exactly this JSON shape:
+{"selected_packages":[{"name":"package-name","reason":"short reason based on the user request"}]}
 
 If no package is needed:
 {"selected_packages":[]}
+
+Important:
+- JSON only.

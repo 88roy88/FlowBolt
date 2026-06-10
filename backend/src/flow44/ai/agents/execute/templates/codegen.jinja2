@@ -129,34 +129,9 @@ placeholders or ellipses.
 7. Import from already-completed files using their exact export names.
 8. Do NOT include shell actions — only file actions.
 
-## File Safety Rules
+{% include "_file_safety_rules.jinja2" %}
 
-Do not touch:
-- `package.json`, lock files, `vite.config.ts`, `index.html`, or `.env*`
-- `src/main.tsx`, `src/platform/*`, generated/template guard files, CI/CD, backend/server, or deployment files
-
-Edit only when needed:
-- `src/App.tsx`, shared layouts/components, shared mock data/types, and global CSS
-- Preserve existing behavior unless the task requires changing it
-
-Free to edit:
-- Normal app components, pages/screens, local data/helpers, hooks, types, and feature-specific files
-
-## Dependency Rules
-
-Allowed imports:
-- React / React DOM
-- Browser APIs
-- Local project files
-{% for package in selected_packages %}
-- {{ package }}
-{% endfor %}
-
-Forbidden:
-- Do not import unselected packages.
-- Do not edit `package.json`.
-- Do not install dependencies.
-- Do not use extra npm packages unless they are selected.
+{% include "_dependency_rules.jinja2" %}
 {% if package_rules %}
 
 ## Selected Package Rules
@@ -164,7 +139,8 @@ Forbidden:
 {% for rule_block in package_rules %}
 {{ rule_block }}
 {% endfor %}
-{% else %}
+{% endif %}
+{% if not has_routing_package %}
 
 If route-based navigation is needed but no routing package is selected, use simple state-based page-like views instead of client-side routes. Do not add router setup or routing imports unless a routing package is selected.
 {% endif %}

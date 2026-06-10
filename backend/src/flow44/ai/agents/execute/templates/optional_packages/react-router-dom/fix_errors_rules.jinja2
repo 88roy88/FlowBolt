@@ -1,4 +1,5 @@
 Routing rules:
-- `react-router-dom` is installed — fix routing code in `App.tsx` and page components only.
+- Fix routing code in normal app source files only.
 - Keep `<BrowserRouter basename={getRouterBasename()}>` in `App.tsx`; do not use `HashRouter`.
 - In-app navigation must use `Link`, `NavLink`, or `useNavigate`; never `<a href="/...">` for app routes.
+- Do not edit `vite.config.ts`, `index.html`, env files, or `src/platform/*`.

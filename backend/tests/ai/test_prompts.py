@@ -83,10 +83,14 @@ class TestPromptRendering:
         result = render_followup(
             project_summary="A todo app built with React",
             file_tree="src/\n  App.tsx\n  Todo.tsx",
+            selected_packages=["react-router-dom"],
         )
         assert "todo app" in result
         assert "App.tsx" in result
         assert "EXPLORE" in result
+        assert result.count("## Dependency Rules") == 1
+        assert result.count("## File Safety Rules") == 1
+        assert "- react-router-dom" in result
 
     def test_codegen(self) -> None:
         result = render_codegen(
@@ -175,8 +179,39 @@ class TestPromptRendering:
 
         assert "Select zero, one, or multiple packages" in result
         assert "Use more than one package" in result
-        assert '"name":"allowed-package-name"' in result
-        assert '"capability":"capability-from-allowed-list"' in result
+        assert '"name":"package-name"' in result
+        assert '"reason":"short reason based on the user request"' in result
+        assert '"capability"' not in result
+
+    def test_codegen_package_variants_are_strict_and_phase_specific(self) -> None:
+        variants = {
+            "none": [],
+            "router": ["react-router-dom"],
+            "graph": ["regraph"],
+            "both": ["react-router-dom", "regraph"],
+        }
+
+        for name, selected in variants.items():
+            result = render_codegen(
+                task_title=name,
+                task_description=name,
+                task_files=["src/App.tsx"],
+                architecture={},
+                ux_design={},
+                selected_packages=selected,
+            )
+            dependency_rules = result.split("## Dependency Rules", 1)[1].split("## Selected Package Rules", 1)[0]
+
+            assert result.count("## Dependency Rules") == 1
+            assert result.count("## File Safety Rules") == 1
+            assert "`vite.config.ts`" in result
+            assert "`index.html`" in result
+            assert "`src/platform/*`" in result
+            assert ("- react-router-dom" in dependency_rules) == ("react-router-dom" in selected)
+            assert ("- regraph" in dependency_rules) == ("regraph" in selected)
+            assert ("basename={getRouterBasename()}" in result) == ("react-router-dom" in selected)
+            assert ("Use ReGraph for interactive node/edge" in result) == ("regraph" in selected)
+            assert ("state-based page-like views" in result) == ("react-router-dom" not in selected)
 
     def test_fix_prompts_include_file_safety_rules_once(self) -> None:
         execute_fix = render_fix_errors(errors="broken", files={"src/App.tsx": "broken"})
@@ -184,3 +219,6 @@ class TestPromptRendering:
 
         assert execute_fix.count("## File Safety Rules") == 1
         assert direct_fix.count("## File Safety Rules") == 1
+        assert execute_fix.count("## Dependency Rules") == 1
+        assert direct_fix.count("## Dependency Rules") == 1
+        assert "Only use pre-installed packages" not in direct_fix

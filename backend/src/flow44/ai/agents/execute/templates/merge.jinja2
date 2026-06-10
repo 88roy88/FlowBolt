@@ -41,24 +41,17 @@ Rules:
 - Do NOT include tasks for installing dependencies or running the dev server
 - Do NOT plan imports from packages that are not selected in the optional package decision or not installed in the project
 
-## File Safety Rules
-
-Do not touch:
-- `package.json`, lock files, `vite.config.ts`, `index.html`, `.env*`, `src/main.tsx`, or `src/platform/*`
-- Generated/template guard files, CI/CD, backend/server, or deployment files
-
-Edit only when needed:
-- `src/App.tsx`, shared layouts/components, shared mock data/types, and global CSS
-- Preserve existing behavior unless the task requires changing it
-
-Free to edit:
-- Normal app components, pages/screens, local data/helpers, hooks, types, and feature-specific files
+{% include "_file_safety_rules.jinja2" %}
 {% if package_merge_rules %}
 
 Package-specific task planning rules:
 {% for rule_block in package_merge_rules %}
 {{ rule_block }}
 {% endfor %}
+{% endif %}
+{% if not has_routing_package %}
+
+If route-based navigation is needed but no routing package is selected, plan simple state-based page-like views instead of client-side routes. Do not plan router setup or routing imports unless a routing package is selected.
 {% endif %}
 {% if has_data_sources %}
 

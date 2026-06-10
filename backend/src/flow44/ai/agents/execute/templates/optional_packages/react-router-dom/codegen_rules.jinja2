@@ -1,5 +1,15 @@
-- `react-router-dom` is installed for multi-page client routing. Follow `src/platform/react-router-dom/README.md`; the backend does not define routes for you.
-- `App.tsx` must use `BrowserRouter`, `Routes`, and `Route` from `react-router-dom`, plus `getRouterBasename` from `./platform/react-router-dom/routerBasename`.
-- Wrap routes exactly with `<BrowserRouter basename={getRouterBasename()}>`; do not use `HashRouter` and do not move the router to `main.tsx`.
-- In-app navigation must use `<Link to="...">`, `<NavLink>`, or `useNavigate()` with app-relative paths. Never use `<a href="/...">` for app routes.
-- Lazy-load secondary pages with `lazy(() => import('./pages/...'))` inside `<Suspense>`.
+Required:
+- Use `BrowserRouter` with `basename={getRouterBasename()}`.
+- Import `getRouterBasename` from the platform router helper.
+- Use `Routes` and `Route` for route definitions.
+- Use `Link`, `NavLink`, or `useNavigate` for internal navigation.
+
+Forbidden:
+- Do not hardcode router basename.
+- Do not use raw `<a href="/...">` for internal app routes.
+- Do not edit `vite.config.ts`.
+- Do not edit `index.html`.
+- Do not edit env files.
+- Do not edit `src/platform/*`.
+- Do not add or remove Vite `base`.
+- Do not add `<base href>`.

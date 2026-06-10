@@ -23,7 +23,7 @@ Only create the files a package needs. Missing files are ignored.
 1. Add one entry to `OPTIONAL_PACKAGES` in `optional_packages.py`.
 2. Set `name` to the npm package key used by package decisions.
 3. Set `packages` to the npm packages that should be installed.
-4. Set `capability`, `when_to_use`, and `when_not_to_use` for the package decision prompt.
+4. Set `capability`, `use_when`, and `avoid_when` for the package decision prompt.
 5. Add package prompt fragments in `templates/optional_packages/<name>/` only for the prompt scenarios that need package-specific guidance.
 
 Example:
@@ -33,8 +33,8 @@ Example:
     name="react-router-dom",
     capability="client_routing",
     packages=("react-router-dom",),
-    when_to_use="Use for true multi-page client-side apps with route navigation.",
-    when_not_to_use="Do not use for tabs, dashboards, landing pages, or in-page sections.",
+    use_when="Use for true multi-page client-side apps with route navigation.",
+    avoid_when="Do not use for tabs, dashboards, landing pages, or in-page sections.",
 ),
 ```
 

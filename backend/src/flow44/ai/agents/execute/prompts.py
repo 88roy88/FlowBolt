@@ -10,6 +10,8 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from flow44.ai.agents.execute.optional_packages import (
     OPTIONAL_PACKAGES,
     OptionalPackagePrompt,
+    allowed_import_names,
+    has_capability,
     optional_package_prompt_context,
     validate_optional_packages,
 )
@@ -25,10 +27,12 @@ def render(template_name: str, **kwargs: Any) -> str:
 
 
 def render_merge(*, has_data_sources: bool = False, selected_packages: list[str] | None = None) -> str:
+    validated_packages = validate_optional_packages(selected_packages or [])
     return render(
         "merge.jinja2",
         has_data_sources=has_data_sources,
-        package_merge_rules=_render_optional_package_prompts(selected_packages, OptionalPackagePrompt.MERGE_RULES),
+        has_routing_package=has_capability(validated_packages, "client_routing"),
+        package_merge_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.MERGE_RULES),
     )
 
 
@@ -78,6 +82,7 @@ def render_codegen(  # noqa: PLR0913
                     preview += f"\n... ({len(lines) - 50} more lines)"
                 other_exports[path] = preview
 
+    validated_packages = validate_optional_packages(selected_packages or [])
     return render(
         "codegen.jinja2",
         task_title=task_title,
@@ -88,18 +93,22 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
-        selected_packages=validate_optional_packages(selected_packages or []),
-        package_contexts=_render_optional_package_prompts(selected_packages, OptionalPackagePrompt.CODEGEN_CONTEXT),
-        package_rules=_render_optional_package_prompts(selected_packages, OptionalPackagePrompt.CODEGEN_RULES),
+        allowed_imports=allowed_import_names(validated_packages),
+        has_routing_package=has_capability(validated_packages, "client_routing"),
+        package_contexts=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.CODEGEN_CONTEXT),
+        package_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.CODEGEN_RULES),
     )
 
 
 def render_fix_errors(*, errors: str, files: dict[str, str], selected_packages: list[str] | None = None) -> str:
+    validated_packages = validate_optional_packages(selected_packages or [])
     return render(
         "fix_errors.jinja2",
         errors=errors,
         files=files,
-        package_fix_rules=_render_optional_package_prompts(selected_packages, OptionalPackagePrompt.FIX_ERRORS_RULES),
+        allowed_imports=allowed_import_names(validated_packages),
+        has_routing_package=has_capability(validated_packages, "client_routing"),
+        package_fix_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.FIX_ERRORS_RULES),
     )
 
 

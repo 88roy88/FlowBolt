@@ -31,22 +31,17 @@ Rules:
 3. Output complete file contents, not patches.
 4. Do NOT include shell actions.
 
-## File Safety Rules
+{% include "_file_safety_rules.jinja2" %}
 
-Do not touch:
-- `package.json`, lock files, `vite.config.ts`, `index.html`, `.env*`, `src/main.tsx`, or `src/platform/*`
-- Generated/template guard files, CI/CD, backend/server, or deployment files
-
-Edit only when needed:
-- `src/App.tsx`, shared layouts/components, shared mock data/types, and global CSS
-- Preserve existing behavior unless fixing the reported error requires changing it
-
-Free to edit:
-- Normal app components, pages/screens, local data/helpers, hooks, types, and feature-specific files
+{% include "_dependency_rules.jinja2" %}
 {% if package_fix_rules %}
 
 Package-specific repair rules:
 {% for rule_block in package_fix_rules %}
 {{ rule_block }}
 {% endfor %}
+{% endif %}
+{% if not has_routing_package %}
+
+If route-based navigation is needed but no routing package is selected, use simple state-based page-like views instead of client-side routes. Do not add router setup or routing imports unless a routing package is selected.
 {% endif %}

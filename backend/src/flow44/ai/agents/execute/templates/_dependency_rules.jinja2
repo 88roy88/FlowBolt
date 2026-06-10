@@ -1,0 +1,15 @@
+## Dependency Rules
+
+Allowed imports:
+- React / React DOM
+- Browser APIs
+- Local project files
+{% for package in allowed_imports %}
+- {{ package }}
+{% endfor %}
+
+Forbidden:
+- Do not import unselected packages.
+- Do not edit `package.json`.
+- Do not install dependencies.
+- Do not use extra npm packages unless they are selected and listed above.
