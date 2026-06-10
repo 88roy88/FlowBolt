@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any
 
-from langfuse.decorators import langfuse_context, observe
+from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
@@ -61,14 +61,7 @@ class PlanAgent(BaseAgent):
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
-        self._trace_id = langfuse_context.get_current_trace_id()
-
-        langfuse_context.update_current_trace(
-            session_id=self.project_id,
-            user_id=self.project_id,
-            metadata={"model": self.model or "default"},
-            tags=["plan-agent"],
-        )
+        self._setup_trace(["plan-agent"])
 
         # Initialize plan state for Flow
         plan_state = PlanState(
@@ -175,10 +168,11 @@ class PlanAgent(BaseAgent):
 
     # -- Rebuild --
 
+    @observe(name="plan-agent-rebuild")  # type: ignore[untyped-decorator]
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
-        self._trace_id = langfuse_context.get_current_trace_id()
+        self._setup_trace(["plan-agent", "rebuild"])
 
         await self.emit({"type": "phase", "phase": "planning"})
 

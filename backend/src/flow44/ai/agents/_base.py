@@ -13,6 +13,7 @@ class BaseAgent:
         sandbox: PnpmSandbox,
         model: str | None = None,
         trace_id: str | None = None,
+        user_id: str | None = None,
     ) -> None:
         if sandbox.project_id != project_id:
             raise ValueError(f"Sandbox project_id '{sandbox.project_id}' doesn't match agent project_id '{project_id}'")
@@ -21,6 +22,16 @@ class BaseAgent:
         self.sandbox = sandbox
         self.model = model
         self._trace_id = trace_id
+        self._user_id = user_id
+
+    def _setup_trace(self, tags: list[str]) -> None:
+        self._trace_id = langfuse_context.get_current_trace_id()
+        langfuse_context.update_current_trace(
+            session_id=self.project_id,
+            user_id=self._user_id or self.project_id,
+            metadata={"model": self.model or "default"},
+            tags=tags,
+        )
 
     async def emit(self, event: dict[str, Any]) -> None:
         await emit_event(self.project_id, event)
