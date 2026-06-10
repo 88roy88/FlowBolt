@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from langfuse.decorators import langfuse_context, observe
+from langfuse.decorators import observe
 from pydantic import BaseModel
 
 from flow44.ai.agents._base import BaseAgent
@@ -172,9 +172,7 @@ class FollowUpAgent(BaseAgent):
 
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str) -> None:
-        langfuse_context.update_current_observation(tags=["follow-up-agent"])
-        # TODO: add metadata. like SID  # noqa: E501
-        # (also, we need to standardize session id and project id usage across the codebase).
+        self._setup_trace(["follow-up-agent"])
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
