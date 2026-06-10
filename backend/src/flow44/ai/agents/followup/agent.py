@@ -1,4 +1,5 @@
 import asyncio
+import difflib
 import json
 import logging
 import uuid
@@ -111,8 +112,6 @@ class FollowUpAgent(BaseAgent):
         @tool
         async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
-            import difflib  # noqa: PLC0415
-
             try:
                 old_content = await sandbox.read_file(path)
             except FileNotFoundError:
@@ -136,8 +135,6 @@ class FollowUpAgent(BaseAgent):
         @tool
         async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
-            import difflib  # noqa: PLC0415
-
             try:
                 current = await sandbox.read_file(path)
             except FileNotFoundError:
@@ -182,7 +179,7 @@ class FollowUpAgent(BaseAgent):
 
         new_data_source_contexts: list[dict[str, Any]] = []
         if data_source_ids:
-            new_data_source_contexts = await self._fetch_and_generate_data_sources(
+            new_data_source_contexts = await self._fetch_and_generate_new_data_sources(
                 content, data_source_ids
             )
 
@@ -228,7 +225,7 @@ class FollowUpAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
-    async def _fetch_and_generate_data_sources(
+    async def _fetch_and_generate_new_data_sources(
         self, user_content: str, data_source_ids: list[str]
     ) -> list[dict[str, Any]]:
         await self.emit({"type": "phase", "phase": "fetching_data_sources"})
@@ -257,8 +254,28 @@ class FollowUpAgent(BaseAgent):
             module_path = next(iter(files))
             content = files[module_path]
             ctx["module_path"] = module_path
+
+            try:
+                old_content = await self.sandbox.read_file(module_path)
+            except FileNotFoundError:
+                old_content = ""
+
             await self.sandbox.write_file(module_path, content)
+
+            diff_str = "".join(
+                difflib.unified_diff(
+                    old_content.splitlines(keepends=True),
+                    content.splitlines(keepends=True),
+                    fromfile=f"a/{module_path}",
+                    tofile=f"b/{module_path}",
+                    lineterm="",
+                )
+            )
             await self.emit({"type": "file", "path": module_path, "content": content})
+            if diff_str:
+                self._diffs.append(FileDiff(path=module_path, diff=diff_str))
+            if module_path not in self._files_changed:
+                self._files_changed.append(module_path)
 
         return contexts
 
