@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class OptionalPackagePrompt(StrEnum):
@@ -57,9 +57,16 @@ OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
 
 
 class SelectedOptionalPackage(BaseModel):
-    name: str = Field(validation_alias=AliasChoices("name", "package"))
+    name: str
     capability: str = ""
     reason: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy_package_key(cls, data: dict[str, object]) -> dict[str, object]:
+        if "name" not in data and "package" in data:
+            return data | {"name": data["package"]}
+        return data
 
 
 class OptionalPackageDecision(BaseModel):
