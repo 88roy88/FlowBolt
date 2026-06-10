@@ -182,9 +182,7 @@ class FollowUpAgent(BaseAgent):
 
         new_data_source_contexts: list[dict[str, Any]] = []
         if data_source_ids:
-            new_data_source_contexts = await self._fetch_and_generate_new_data_sources(
-                content, data_source_ids
-            )
+            new_data_source_contexts = await self._fetch_and_generate_new_data_sources(content, data_source_ids)
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
