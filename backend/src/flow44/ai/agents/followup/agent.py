@@ -29,6 +29,7 @@ MAX_READ_LINES = 1000
 class FileDiff:
     path: str
     diff: str
+    is_new: bool = False
 
 
 class FollowUpAgent(BaseAgent):
@@ -114,8 +115,10 @@ class FollowUpAgent(BaseAgent):
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
             try:
                 old_content = await sandbox.read_file(path)
+                is_new_file = False
             except FileNotFoundError:
                 old_content = ""
+                is_new_file = True
             await sandbox.write_file(path, content)
 
             # Generate diff
@@ -127,7 +130,7 @@ class FollowUpAgent(BaseAgent):
 
             await self.emit({"type": "file", "path": path, "content": content})
             if diff_str:
-                self._diffs.append(FileDiff(path=path, diff=diff_str))
+                self._diffs.append(FileDiff(path=path, diff=diff_str, is_new=is_new_file))
             if path not in self._files_changed:
                 self._files_changed.append(path)
             return f"OK — wrote {path} ({len(content.splitlines())} lines)"
@@ -217,7 +220,7 @@ class FollowUpAgent(BaseAgent):
             await self.emit(
                 {
                     "type": "followup_diffs",
-                    "diffs": [{"path": d.path, "diff": d.diff} for d in self._diffs],
+                    "diffs": [{"path": d.path, "diff": d.diff, "is_new": d.is_new} for d in self._diffs],
                 }
             )
 
@@ -257,8 +260,10 @@ class FollowUpAgent(BaseAgent):
 
             try:
                 old_content = await self.sandbox.read_file(module_path)
+                is_new_module = False
             except FileNotFoundError:
                 old_content = ""
+                is_new_module = True
 
             await self.sandbox.write_file(module_path, content)
 
@@ -273,7 +278,7 @@ class FollowUpAgent(BaseAgent):
             )
             await self.emit({"type": "file", "path": module_path, "content": content})
             if diff_str:
-                self._diffs.append(FileDiff(path=module_path, diff=diff_str))
+                self._diffs.append(FileDiff(path=module_path, diff=diff_str, is_new=is_new_module))
             if module_path not in self._files_changed:
                 self._files_changed.append(module_path)
 

@@ -152,6 +152,7 @@ export interface FixStep {
 export interface FileDiff {
   path: string;
   diff: string;
+  is_new?: boolean;
 }
 
 export interface FollowUpStep {
