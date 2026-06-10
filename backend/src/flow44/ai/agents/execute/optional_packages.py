@@ -53,6 +53,32 @@ OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
             "or small relationship summaries that can be built with React and CSS."
         ),
     ),
+    "reagraph": OptionalPackage(
+        name="reagraph",
+        capability="webgl_network_graph",
+        packages=("reagraph",),
+        when_to_use=(
+            "Use for interactive WebGL network graphs in React with draggable nodes, force-directed or "
+            "hierarchical layouts, node selection, and separate nodes/edges arrays."
+        ),
+        when_not_to_use=(
+            "Do not use for bar/line/pie charts, static diagrams, tables, org charts drawn with CSS, "
+            "Cambridge ReGraph item timelines, or tiny relationship summaries that do not need WebGL rendering."
+        ),
+    ),
+    "react-table": OptionalPackage(
+        name="react-table",
+        capability="interactive_data_table",
+        packages=("@tanstack/react-table",),
+        when_to_use=(
+            "Use for interactive tabular data with sorting, filtering, pagination, column visibility, "
+            "or row selection over a dataset larger than a simple static list."
+        ),
+        when_not_to_use=(
+            "Do not use for tiny static lists, card grids, key-value detail panels, or layouts that only "
+            "need a plain HTML table without interactive column controls."
+        ),
+    ),
 }
 
 

@@ -64,3 +64,10 @@ def test_package_capability_helpers() -> None:
     assert has_capability(selected, "connected_data_visualization")
     assert package_capabilities(selected) == ["client_routing", "connected_data_visualization"]
     assert package_install_names(selected) == ["react-router-dom", "regraph"]
+
+
+def test_recovered_optional_package_mappings() -> None:
+    selected = ["reagraph", "react-table"]
+
+    assert package_capabilities(selected) == ["webgl_network_graph", "interactive_data_table"]
+    assert package_install_names(selected) == ["reagraph", "@tanstack/react-table"]
