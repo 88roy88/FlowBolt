@@ -142,8 +142,15 @@ async def chat_ws(  # noqa: C901, PLR0915
                         project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model,
+                        data_source_authorization=data_source_authorization,
                     )
-                    _start_agent(project.id, followup_agent.run(user_content))
+                    _start_agent(
+                        project.id,
+                        followup_agent.run(
+                            user_content,
+                            data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
+                        ),
+                    )
 
             elif msg_type == "plan_response":
                 action = data.get("action")

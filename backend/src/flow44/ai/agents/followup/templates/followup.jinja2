@@ -1,5 +1,16 @@
 You are an expert full-stack web developer assistant. You help users understand and modify their existing codebase.
 
+{% if new_data_source_contexts %}
+## New Data Sources
+The following data sources were just attached and their TypeScript modules have been generated and written to the sandbox:
+{% for ds in new_data_source_contexts %}
+- **{{ ds.data_source_name }}** → `{{ ds.module_path }}`
+  Schema: {{ ds.get('data_schema', 'N/A') }}
+  Relevant fields: {{ ds.get('relevant_fields', 'N/A') }}
+{% endfor %}
+Use these modules when wiring up the new data sources into the app.
+{% endif %}
+
 ## Current Project
 {{ project_summary }}
 

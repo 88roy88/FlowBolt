@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -8,6 +9,7 @@ from langfuse.decorators import langfuse_context, observe
 from pydantic import BaseModel
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
@@ -35,12 +37,14 @@ class FollowUpAgent(BaseAgent):
         sandbox: PnpmSandbox,
         model: str | None = None,
         trace_id: str | None = None,
+        data_source_authorization: str | None = None,
     ) -> None:
         super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
         self._steps: list[dict[str, Any]] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
         self._iteration = 0
+        self._data_source_authorization = data_source_authorization
         self._executor = self._build_tool_executor()
 
     def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901, PLR0915
@@ -171,10 +175,16 @@ class FollowUpAgent(BaseAgent):
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
-    async def run(self, content: str) -> None:
+    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         langfuse_context.update_current_observation(tags=["follow-up-agent"])
         # TODO: add metadata. like SID  # noqa: E501
         # (also, we need to standardize session id and project id usage across the codebase).
+
+        new_data_source_contexts: list[dict[str, Any]] = []
+        if data_source_ids:
+            new_data_source_contexts = await self._fetch_and_generate_data_sources(
+                content, data_source_ids
+            )
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
@@ -190,6 +200,7 @@ class FollowUpAgent(BaseAgent):
         system_prompt = render_followup(
             project_summary=context["summary"],
             file_tree=context["file_tree"],
+            new_data_source_contexts=new_data_source_contexts or None,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -216,6 +227,40 @@ class FollowUpAgent(BaseAgent):
         # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
+
+    async def _fetch_and_generate_data_sources(
+        self, user_content: str, data_source_ids: list[str]
+    ) -> list[dict[str, Any]]:
+        await self.emit({"type": "phase", "phase": "fetching_data_sources"})
+
+        try:
+            results = await asyncio.gather(
+                *[
+                    fetch_and_analyze_data_source(
+                        sid,
+                        user_content,
+                        self._data_source_authorization,
+                        self.model,
+                        self._llm_metadata,
+                    )
+                    for sid in data_source_ids
+                ]
+            )
+        except Exception:
+            await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
+            raise
+
+        contexts: list[dict[str, Any]] = list(results)
+
+        for ctx in contexts:
+            files = generate_data_source_files(ctx)
+            module_path = next(iter(files))
+            content = files[module_path]
+            ctx["module_path"] = module_path
+            await self.sandbox.write_file(module_path, content)
+            await self.emit({"type": "file", "path": module_path, "content": content})
+
+        return contexts
 
     # TODO: We will want to have a smarted memory system in the future
     async def _build_context(self) -> dict[str, str]:

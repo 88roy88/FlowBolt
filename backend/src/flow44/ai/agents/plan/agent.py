@@ -1,29 +1,24 @@
 import asyncio
 import json
 import logging
-from typing import Any
 
 from langfuse.decorators import langfuse_context, observe
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
     UX_DESIGN_PROMPT,
     render_architecture,
-    render_data_source_analysis,
     render_user_plan,
 )
-from flow44.ai.codegen.data_source_module import generate_data_source_module
-from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
 from flow44.db.pending_plan import save_pending_plan
-from flow44.logic import data_source as ds_logic
-from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -94,7 +89,16 @@ class PlanAgent(BaseAgent):
 
         try:
             results = await asyncio.gather(
-                *[self._fetch_and_analyze_data_source(sid) for sid in state.build_state.data_source_ids]
+                *[
+                    fetch_and_analyze_data_source(
+                        sid,
+                        self._state.user_content,
+                        self._data_source_authorization,
+                        self.model,
+                        self._llm_metadata,
+                    )
+                    for sid in state.build_state.data_source_ids
+                ]
             )
         except Exception:
             await state.emit_fn(
@@ -107,7 +111,7 @@ class PlanAgent(BaseAgent):
 
         # Generate deterministic hook + type files and write to sandbox
         for ctx in state.build_state.data_source_contexts:
-            generated = self._generate_data_source_files(ctx)
+            generated = generate_data_source_files(ctx)
             ctx["generated_files"] = generated
             for path, content in generated.items():
                 await state.sandbox_ref.write_file(path, content)
@@ -206,74 +210,6 @@ class PlanAgent(BaseAgent):
         await self.emit({"type": "plan_overview", "overview": self._state.user_overview.model_dump()})
 
     # -- Design --
-
-    async def _fetch_and_analyze_data_source(self, data_source_id: str) -> dict[str, Any]:
-        ds_name, usage = await asyncio.gather(
-            ds_logic.get_display_name(data_source_id, authorization=self._data_source_authorization),
-            ds_logic.get_usage(data_source_id, authorization=self._data_source_authorization),
-        )
-        sanitized = sanitize_to_pascal_case(ds_name) or f"DataSource{data_source_id}"
-        analysis = await self._analyze_data_source(ds_name, usage.sample, usage.queries, usage.params)
-        return {
-            "data_source_id": data_source_id,
-            "data_source_name": ds_name,
-            "sanitized_name": sanitized,
-            "queries": [q.model_dump() for q in usage.queries],
-            "params_info": usage.params.model_dump(),
-            "sample_data": usage.sample,
-            "can_run_without_input": usage.can_run,
-            **analysis,
-        }
-
-    @staticmethod
-    def _generate_data_source_files(ctx: dict[str, Any]) -> dict[str, str]:
-        """Generate a single TypeScript module per data source."""
-        sanitized = ctx["sanitized_name"]
-        module_path = f"src/dataSources/{sanitized}.ts"
-        params_info = DataSourceParamsInfo.model_validate(ctx["params_info"])
-        queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.get("queries", [])]
-        content = generate_data_source_module(
-            data_source_id=ctx["data_source_id"],
-            sanitized_name=sanitized,
-            params_info=params_info,
-            queries=queries,
-        )
-        return {module_path: content}
-
-    async def _analyze_data_source(
-        self,
-        ds_name: str,
-        sample_data: Any,
-        queries: list[Any],
-        params_info: Any,
-    ) -> dict[str, Any]:
-        prompt = render_data_source_analysis(
-            user_content=self._state.user_content,
-            data_source_name=ds_name,
-            sample_data=sample_data,
-            queries=[q.model_dump() for q in queries],
-            params_info=params_info.model_dump(),
-        )
-        try:
-            raw = await complete_chat(
-                [Message.user("Analyze this data source.")],
-                prompt,
-                model=self.model,
-                metadata=self._llm_metadata("data_source_analysis"),
-            )
-            return parse_json_response(raw)
-        except Exception:
-            logger.exception("[plan] Data source analysis failed, using degraded result")
-            return {
-                "data_schema": "Unknown — analysis failed",
-                "relevant_fields": "See raw data",
-                "data_characteristics": ("Requires user input" if sample_data is None else "Fetched from API"),
-                "integration_notes": (
-                    f"Data preview: {json.dumps(sample_data, indent=2)[:500]}"
-                    if sample_data is not None
-                    else "No sample available — data source requires parameters."
-                ),
-            }
 
     @observe(name="design-architecture")  # type: ignore[untyped-decorator]
     async def _design_architecture(self) -> ArchitectureDesign:
