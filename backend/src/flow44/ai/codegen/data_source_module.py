@@ -147,7 +147,12 @@ def _build_body(
     path = f"/api/data-source/{data_source_id}/run"
 
     if not required and not optional:
-        lines.append(f"  const res = await fetchWithAuth('{path}');\n")
+        lines.append(
+            f"  const res = await fetchWithAuth('{path}', {{\n"
+            f"    method: 'POST',\n"
+            f"    headers: {{ 'Content-Type': 'application/json' }},\n"
+            f"  }});\n"
+        )
     else:
         all_params = required + optional
         idents = _unique_idents(all_params)
