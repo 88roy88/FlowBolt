@@ -1,0 +1,18 @@
+Required:
+- Use Reagraph for WebGL network graphs, draggable nodes, force-directed layouts, or hierarchical node/link visualizations.
+- Import Reagraph APIs from `reagraph`, usually `GraphCanvas`.
+- Model graph data as separate `nodes` and `edges` arrays with stable string ids.
+- Ensure every edge `source` and `target` references an existing node id.
+- Give the graph container an explicit height and width.
+- Keep demo graph data local and small unless the task explicitly provides a data source.
+
+Forbidden:
+- Do not use Reagraph for ordinary charts, tables, static diagrams, or simple card relationships.
+- Do not replace Reagraph with ReGraph, D3, Cytoscape, vis-network, or other graph packages unless they are separately selected and installed.
+- `reagraph` is installed for WebGL network graphs. Import only the Reagraph APIs you use, for example `import { GraphCanvas } from 'reagraph';`.
+- Follow `src/platform/reagraph/README.md`. Do not edit files under `src/platform/`.
+- Use Reagraph only for relationship/network data. Do not use it for bar/line/pie charts, static diagrams, flowcharts, or layout-only UI.
+- Pass `nodes` as an array of objects with stable `id` and `label` values. Pass `edges` as an array with stable `id`, `source`, and `target` values that reference existing node ids.
+- Give every `GraphCanvas` container explicit dimensions with Tailwind classes or CSS, such as `h-[520px] w-full`, `min-h-[420px]`, or a responsive viewport-based height. Do not render `<GraphCanvas />` in an auto-height wrapper.
+- Prefer Reagraph's built-in layouts, selection, dragging, and theme props over custom canvas/SVG graph rendering. Keep surrounding controls in React.
+- Do not add CDN scripts, downloaded `.tgz` files, or extra graph libraries such as `regraph`, D3 force layouts, or vis.js.

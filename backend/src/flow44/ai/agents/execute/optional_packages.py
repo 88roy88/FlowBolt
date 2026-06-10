@@ -12,8 +12,11 @@ from pydantic import BaseModel, Field, model_validator
 class OptionalPackagePrompt(StrEnum):
     CODEGEN_CONTEXT = "codegen_context"
     CODEGEN_RULES = "codegen_rules"
+    CODEGEN_UNSELECTED_RULES = "codegen_unselected_rules"
     MERGE_RULES = "merge_rules"
+    MERGE_UNSELECTED_RULES = "merge_unselected_rules"
     FIX_ERRORS_RULES = "fix_errors_rules"
+    FIX_ERRORS_UNSELECTED_RULES = "fix_errors_unselected_rules"
 
 
 @dataclass(frozen=True)
@@ -51,28 +54,28 @@ OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
         ),
         strong_intent_groups=(("real screens",), ("deep link",), ("browser back",), ("route url",)),
     ),
-    "regraph": OptionalPackage(
-        name="regraph",
-        capability="connected_data_visualization",
-        packages=("regraph",),
-        use_when=(
-            "Use for interactive relationship, node/edge, network, dependency, or connection maps; assets, "
-            "services, APIs, databases, or owners connected to each other; clickable nodes; highlighted "
-            "connections; selecting a table row to focus a graph node; or relationship exploration. ReGraph "
-            "is paid but available inside the organization, so do not avoid it because it is paid."
-        ),
-        avoid_when=(
-            "Avoid for ordinary charts, static diagrams, simple cards, normal tables, non-interactive "
-            "summaries, or a tiny static org chart that can be plain HTML/CSS."
-        ),
-        strong_intent_groups=(
-            ("visual map", "connected"),
-            ("connection map", "click"),
-            ("connection map", "highlight"),
-            ("click a node",),
-            ("highlight", "graph node"),
-        ),
-    ),
+    # "regraph": OptionalPackage(
+    #     name="regraph",
+    #     capability="connected_data_visualization",
+    #     packages=("regraph",),
+    #     use_when=(
+    #         "Use for interactive relationship, node/edge, network, dependency, or connection maps; assets, "
+    #         "services, APIs, databases, or owners connected to each other; clickable nodes; highlighted "
+    #         "connections; selecting a table row to focus a graph node; or relationship exploration. ReGraph "
+    #         "is paid but available inside the organization, so do not avoid it because it is paid."
+    #     ),
+    #     avoid_when=(
+    #         "Avoid for ordinary charts, static diagrams, simple cards, normal tables, non-interactive "
+    #         "summaries, or a tiny static org chart that can be plain HTML/CSS."
+    #     ),
+    #     strong_intent_groups=(
+    #         ("visual map", "connected"),
+    #         ("connection map", "click"),
+    #         ("connection map", "highlight"),
+    #         ("click a node",),
+    #         ("highlight", "graph node"),
+    #     ),
+    # ),
     "reagraph": OptionalPackage(
         name="reagraph",
         capability="webgl_network_graph",
@@ -98,6 +101,26 @@ OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
         avoid_when=(
             "Do not use for tiny static lists, card grids, key-value detail panels, or layouts that only "
             "need a plain HTML table without interactive column controls."
+        ),
+    ),
+    "leaflet": OptionalPackage(
+        name="leaflet",
+        capability="interactive_geospatial_map",
+        packages=("leaflet", "@types/leaflet"),
+        use_when=(
+            "Use for interactive geographic maps with real-world locations, latitude/longitude coordinates, "
+            "markers, popups, zooming, panning, map tiles, or routes over physical places."
+        ),
+        avoid_when=(
+            "Avoid for conceptual maps, relationship graphs, floor plans, static illustrations, dashboards "
+            "that only need cards/charts, or generic asset maps without geographic coordinates."
+        ),
+        strong_intent_groups=(
+            ("leaflet",),
+            ("latitude", "longitude"),
+            ("geo", "map"),
+            ("map", "marker"),
+            ("map", "tile"),
         ),
     ),
 }

@@ -1,0 +1,12 @@
+Reagraph rules:
+- Fix Reagraph usage in app source files only. Do not edit package manager files or add alternate graph libraries.
+- Import Reagraph APIs from `reagraph`, usually `GraphCanvas`.
+- If the graph is blank, first verify the parent container has explicit width and height and that every edge `source`/`target` references an existing node id.
+- Keep graph data as `nodes` and `edges` arrays with stable string ids. Do not convert Reagraph data to the ReGraph keyed-item object model.
+- Replace accidental ReGraph-specific `items`, `id1`, or `id2` usage with Reagraph `nodes` and `edges` data.
+Reagraph rules:
+- `reagraph` is installed — fix Reagraph usage in app source files only. Do not edit package manager files or add alternate graph libraries.
+- Import Reagraph APIs from `reagraph`, for example `GraphCanvas`.
+- If the graph is blank, first verify the parent container has explicit width and height and that edge `source`/`target` values reference existing node ids.
+- Keep `nodes` and `edges` as arrays of objects with stable ids. Fix generated keyed-object graph data by converting it into node and edge arrays before passing it to `<GraphCanvas />`.
+- Do not switch to `regraph`, D3, vis.js, or custom SVG/canvas rendering when Reagraph is already selected.

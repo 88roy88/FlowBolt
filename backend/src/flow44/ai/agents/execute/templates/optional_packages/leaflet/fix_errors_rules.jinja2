@@ -1,0 +1,6 @@
+Leaflet rules:
+- Fix Leaflet usage in app source files only. Do not edit package manager files or add alternate map libraries.
+- Import Leaflet APIs from `leaflet`; replace accidental `react-leaflet` imports with direct Leaflet usage.
+- If Leaflet styles or marker assets are missing, ensure `leaflet/dist/leaflet.css` is imported from app source.
+- If the map is blank, first verify the map container has explicit height/width and that initialization runs after the container ref exists.
+- Always clean up created map instances with `map.remove()` when the React component unmounts.

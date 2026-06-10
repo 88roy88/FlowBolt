@@ -49,9 +49,12 @@ Package-specific task planning rules:
 {{ rule_block }}
 {% endfor %}
 {% endif %}
-{% if not has_routing_package %}
+{% if package_unselected_merge_rules %}
 
-If route-based navigation is needed but no routing package is selected, plan simple state-based page-like views instead of client-side routes. Do not plan router setup or routing imports unless a routing package is selected.
+Package-specific fallback planning rules:
+{% for rule_block in package_unselected_merge_rules %}
+{{ rule_block }}
+{% endfor %}
 {% endif %}
 {% if has_data_sources %}
 

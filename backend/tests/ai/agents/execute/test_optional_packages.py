@@ -125,11 +125,29 @@ def test_recovered_optional_package_mappings() -> None:
     assert allowed_import_names(selected) == ["reagraph", "@tanstack/react-table"]
 
 
+def test_leaflet_optional_package_installs_runtime_and_types() -> None:
+    selected = ["leaflet"]
+
+    assert package_capabilities(selected) == ["interactive_geospatial_map"]
+    assert package_install_names(selected) == ["leaflet", "@types/leaflet"]
+    assert allowed_import_names(selected) == ["leaflet", "@types/leaflet"]
+
+
 def test_connected_assets_prompt_selects_router_and_regraph() -> None:
     selected = selected_package_names(high_confidence_optional_package_decision(CONNECTED_ASSETS_PROMPT))
 
     assert "react-router-dom" in selected
     assert "regraph" in selected
+
+
+def test_leaflet_prompt_selects_geospatial_map_package() -> None:
+    selected = selected_package_names(
+        high_confidence_optional_package_decision(
+            "Build a Leaflet field map with latitude and longitude markers for bases."
+        )
+    )
+
+    assert "leaflet" in selected
 
 
 def test_selected_packages_recovered_from_actual_dependency_names() -> None:

@@ -1,0 +1,10 @@
+Required:
+- Use Leaflet for interactive geographic maps with markers, popups, zooming, panning, or real latitude/longitude coordinates.
+- Import Leaflet APIs from `leaflet`, usually `import L from 'leaflet'`.
+- Import the stylesheet with `import 'leaflet/dist/leaflet.css'` in the component or another app source file that renders the map.
+- Initialize maps inside a React effect and clean them up on unmount with `map.remove()`.
+- Give every Leaflet map container an explicit height and width.
+
+Forbidden:
+- Do not import `react-leaflet`, Mapbox, Google Maps, OpenLayers, or other map packages unless they are separately selected and installed.
+- Do not use Leaflet for conceptual relationship maps, network graphs, or non-geographic diagrams.

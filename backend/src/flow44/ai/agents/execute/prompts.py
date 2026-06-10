@@ -11,7 +11,6 @@ from flow44.ai.agents.execute.optional_packages import (
     OPTIONAL_PACKAGES,
     OptionalPackagePrompt,
     allowed_import_names,
-    has_capability,
     optional_package_prompt_context,
     validate_optional_packages,
 )
@@ -31,8 +30,10 @@ def render_merge(*, has_data_sources: bool = False, selected_packages: list[str]
     return render(
         "merge.jinja2",
         has_data_sources=has_data_sources,
-        has_routing_package=has_capability(validated_packages, "client_routing"),
         package_merge_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.MERGE_RULES),
+        package_unselected_merge_rules=_render_unselected_optional_package_prompts(
+            validated_packages, OptionalPackagePrompt.MERGE_UNSELECTED_RULES
+        ),
     )
 
 
@@ -94,9 +95,11 @@ def render_codegen(  # noqa: PLR0913
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
         allowed_imports=allowed_import_names(validated_packages),
-        has_routing_package=has_capability(validated_packages, "client_routing"),
         package_contexts=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.CODEGEN_CONTEXT),
         package_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.CODEGEN_RULES),
+        package_unselected_rules=_render_unselected_optional_package_prompts(
+            validated_packages, OptionalPackagePrompt.CODEGEN_UNSELECTED_RULES
+        ),
     )
 
 
@@ -107,8 +110,10 @@ def render_fix_errors(*, errors: str, files: dict[str, str], selected_packages: 
         errors=errors,
         files=files,
         allowed_imports=allowed_import_names(validated_packages),
-        has_routing_package=has_capability(validated_packages, "client_routing"),
         package_fix_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.FIX_ERRORS_RULES),
+        package_unselected_fix_rules=_render_unselected_optional_package_prompts(
+            validated_packages, OptionalPackagePrompt.FIX_ERRORS_UNSELECTED_RULES
+        ),
     )
 
 
@@ -120,6 +125,22 @@ def _render_optional_package_prompts(
     for package_name in validate_optional_packages(selected_packages or []):
         try:
             blocks.append(render(OPTIONAL_PACKAGES[package_name].prompt_template(prompt)).strip())
+        except TemplateNotFound:
+            continue
+    return blocks
+
+
+def _render_unselected_optional_package_prompts(
+    selected_packages: list[str] | None,
+    prompt: OptionalPackagePrompt,
+) -> list[str]:
+    selected = set(validate_optional_packages(selected_packages or []))
+    blocks: list[str] = []
+    for package_name, package in OPTIONAL_PACKAGES.items():
+        if package_name in selected:
+            continue
+        try:
+            blocks.append(render(package.prompt_template(prompt)).strip())
         except TemplateNotFound:
             continue
     return blocks

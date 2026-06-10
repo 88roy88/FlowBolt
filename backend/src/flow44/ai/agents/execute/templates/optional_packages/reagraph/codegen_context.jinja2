@@ -1,0 +1,14 @@
+## Reagraph Contract
+
+Reagraph provides WebGL network graph rendering for node/link datasets. Use it when the app needs an
+interactive force-directed or hierarchical graph over explicit `nodes` and `edges` arrays, especially
+for larger or more dynamic relationship views where plain SVG/CSS would be limiting.
+## Reagraph Contract
+
+`reagraph` is available for interactive WebGL network graphs in React.
+
+- Import `GraphCanvas` from `reagraph` and pass `nodes` and `edges` arrays.
+- Follow the minimal platform contract in `src/platform/reagraph/README.md`.
+- Each node needs a stable string `id` and a display `label`. Each edge needs a stable string `id`, plus `source` and `target` node ids.
+- `GraphCanvas` fills its parent element, so wrap it in a parent with explicit, stable width and height.
+- Keep graph data in React state or memoized values; update `nodes`, `edges`, and interaction props declaratively.
