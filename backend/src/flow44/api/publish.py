@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from flow44.api.deps import ProjectDep
 from flow44.config import settings
 from flow44.db.project import is_handle_taken, update_project_published_url
-from flow44.integrations.s3 import deploy_published_dist
+from flow44.integrations.s3 import deploy_shared_dist
 from flow44.paths import shared_base_path
 from flow44.sandbox.operations import BuildError, build_dist
 
@@ -86,7 +86,7 @@ async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishReque
     try:
         loop = asyncio.get_running_loop()
         # TODO - REFACTOR TO AIOBOTO3: boto3 doesn't support async so we have to run in a thread pool.
-        await loop.run_in_executor(None, deploy_published_dist, dist_dir, project.id)
+        await loop.run_in_executor(None, deploy_shared_dist, dist_dir, project.id)
     except Exception as exc:
         logger.exception("S3 deployment failed for project %s", project.id)
         raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}") from exc

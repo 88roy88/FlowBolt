@@ -1,4 +1,4 @@
-"""Public serving routes: published apps by project ID or custom slug."""
+"""Public serving routes for shared apps by project ID or custom slug."""
 
 import logging
 import mimetypes
@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 
 from flow44.config import settings
 from flow44.db.project import get_project_by_handle
-from flow44.integrations.s3 import get_published_asset_url, get_published_url
+from flow44.integrations.s3 import get_published_url, get_shared_asset_url
 
 logger = logging.getLogger(__name__)
 
@@ -34,21 +34,21 @@ async def _fetch_first(urls: list[str], log_ctx: str) -> httpx.Response:
                 resp.raise_for_status()
                 return resp
             except Exception:
-                logger.debug("Failed published object fetch for %s from %s", log_ctx, source_url, exc_info=True)
-    raise HTTPException(status_code=502, detail="Error fetching published app from S3.")
+                logger.debug("Failed shared object fetch for %s from %s", log_ctx, source_url, exc_info=True)
+    raise HTTPException(status_code=502, detail="Error fetching shared app from S3.")
 
 
 def _is_static_asset(path: str) -> bool:
     return bool(os.path.splitext(path)[1])
 
 
-async def _serve_published_path(handle: str, path: str) -> Response:
+async def _serve_shared_path(handle: str, path: str) -> Response:
     project = await get_project_by_handle(handle)
     if not project or not project.published_at:
-        raise HTTPException(status_code=404, detail=f"No published app found for handle '{handle}'.")
+        raise HTTPException(status_code=404, detail=f"No shared app found for handle '{handle}'.")
 
     requested_path = path.lstrip("/") or "index.html"
-    urls = [get_published_asset_url(project.id, requested_path)]
+    urls = [get_shared_asset_url(project.id, requested_path)]
     if requested_path == "index.html":
         urls.append(get_published_url(project.id))
 
@@ -58,7 +58,7 @@ async def _serve_published_path(handle: str, path: str) -> Response:
         if _is_static_asset(requested_path):
             raise
         resp = await _fetch_first(
-            [get_published_asset_url(project.id, "index.html"), get_published_url(project.id)],
+            [get_shared_asset_url(project.id, "index.html"), get_published_url(project.id)],
             f"handle {handle}, SPA fallback",
         )
 
@@ -70,15 +70,15 @@ async def _serve_published_path(handle: str, path: str) -> Response:
 
 
 @router.get("/{handle}", response_class=HTMLResponse)
-async def serve_published_app(handle: str) -> HTMLResponse:
-    """Serve a published app via its custom slug or project ID handle."""
-    response = await _serve_published_path(handle, "index.html")
+async def serve_shared_app(handle: str) -> HTMLResponse:
+    """Serve a shared app via its custom slug or project ID handle."""
+    response = await _serve_shared_path(handle, "index.html")
     if not isinstance(response, HTMLResponse):
-        raise HTTPException(status_code=502, detail="Published index is not HTML.")
+        raise HTTPException(status_code=502, detail="Shared index is not HTML.")
     return response
 
 
 @router.get("/{handle}/{path:path}")
-async def serve_published_asset_or_route(handle: str, path: str) -> Response:
-    """Serve a published asset, or index.html for a client-side route."""
-    return await _serve_published_path(handle, path)
+async def serve_shared_asset_or_route(handle: str, path: str) -> Response:
+    """Serve a shared asset, or index.html for a client-side route."""
+    return await _serve_shared_path(handle, path)

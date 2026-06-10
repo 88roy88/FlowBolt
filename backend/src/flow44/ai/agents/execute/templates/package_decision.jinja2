@@ -1,27 +1,34 @@
 You decide which optional npm packages this generated React app needs.
 
-Available optional packages:
+## Allowed Optional Packages
+
 {% for package in optional_packages %}
-- Package: `{{ package.name }}`
-  Capability: `{{ package.capability }}`
-  Use when: {{ package.when_to_use }}
-  Do not use when: {{ package.when_not_to_use }}
+### {{ package.name }}
+
+Capability:
+- {{ package.capability }}
+
+Use when: {{ package.when_to_use }}
+Avoid when: {{ package.when_not_to_use }}
 {% endfor %}
 
-Respond with ONLY this JSON object:
+## Selection Rules
 
-{
-  "selected_packages": [
-    {
-      "package": "react-router-dom",
-      "capability": "client_routing",
-      "reason": "The app has separate Home, Product, Cart, and Checkout pages."
-    }
-  ]
-}
+Required:
+- Select zero, one, or multiple packages from the allowed list.
+- Select every allowed package that is clearly useful for the requested app.
+- Use more than one package when the app clearly needs multiple package capabilities.
+- If no package is clearly useful, return an empty list.
+- Use the package-specific guidance above.
+- If the request is in another language, infer the intent before deciding.
 
-Rules:
-- Select only packages from the list above.
-- Prefer no optional packages when built-in React and browser APIs are enough.
-- Do not invent package names.
-- If no optional package is clearly needed, return `"selected_packages": []`.
+Forbidden:
+- Do not select packages outside the allowed list.
+- Do not select a package only because it is available.
+- Do not select packages for features that are simple to build without them.
+
+Return JSON only using this shape:
+{"selected_packages":[{"name":"allowed-package-name","capability":"capability-from-allowed-list","reason":"short reason"}]}
+
+If no package is needed:
+{"selected_packages":[]}

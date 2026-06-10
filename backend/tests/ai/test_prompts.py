@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from flow44.ai.agents.execute.prompts import render_codegen, render_merge, render_summary
+from flow44.ai.agents.execute.prompts import (
+    render_codegen,
+    render_fix_errors,
+    render_merge,
+    render_package_decision,
+    render_summary,
+)
+from flow44.ai.agents.fix_error.prompts import render_fix_error_direct
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
 
@@ -43,6 +50,7 @@ class TestPromptRendering:
         assert "following data sources" in result
         assert "dataSourceSalesData" in result
         assert "Pre-generated file" in result
+        assert "**Parameters:**" in result
 
     def test_architecture_without_data_sources(self) -> None:
         result = render_architecture(data_source_contexts=None)
@@ -51,6 +59,7 @@ class TestPromptRendering:
     def test_merge_without_data_sources(self) -> None:
         result = render_merge(has_data_sources=False)
         assert "Pre-Generated Files" not in result
+        assert result.count("## File Safety Rules") == 1
 
     def test_merge_with_data_sources(self) -> None:
         result = render_merge(has_data_sources=True)
@@ -90,6 +99,28 @@ class TestPromptRendering:
         assert "Create Header" in result
         assert "src/Header.tsx" in result
         assert "flowArtifact" in result
+        assert result.count("## Dependency Rules") == 1
+        assert result.count("## File Safety Rules") == 1
+        assert "state-based page-like views" in result
+        assert "Single-page app only" not in result
+
+    def test_codegen_allows_only_selected_packages(self) -> None:
+        result = render_codegen(
+            task_title="Build routed graph",
+            task_description="Build routed graph",
+            task_files=["src/App.tsx"],
+            architecture={},
+            ux_design={},
+            selected_packages=["react-router-dom", "regraph", "unknown-package"],
+        )
+
+        dependency_rules = result.split("## Dependency Rules", 1)[1].split("## Selected Package Rules", 1)[0]
+        assert result.count("## Dependency Rules") == 1
+        assert result.count("## Selected Package Rules") == 1
+        assert "- react-router-dom" in dependency_rules
+        assert "- regraph" in dependency_rules
+        assert "unknown-package" not in result
+        assert "state-based page-like views" not in result
 
     def test_codegen_with_dependencies(self) -> None:
         result = render_codegen(
@@ -137,3 +168,19 @@ class TestPromptRendering:
         assert "Analytics" in result
         assert "dataSourceAnalytics" in result
         assert "pre-generated" in result.lower()
+        assert "**Parameters:**" in result
+
+    def test_package_decision_allows_multiple_packages(self) -> None:
+        result = render_package_decision()
+
+        assert "Select zero, one, or multiple packages" in result
+        assert "Use more than one package" in result
+        assert '"name":"allowed-package-name"' in result
+        assert '"capability":"capability-from-allowed-list"' in result
+
+    def test_fix_prompts_include_file_safety_rules_once(self) -> None:
+        execute_fix = render_fix_errors(errors="broken", files={"src/App.tsx": "broken"})
+        direct_fix = render_fix_error_direct(error_message="broken", files={"src/App.tsx": "broken"})
+
+        assert execute_fix.count("## File Safety Rules") == 1
+        assert direct_fix.count("## File Safety Rules") == 1

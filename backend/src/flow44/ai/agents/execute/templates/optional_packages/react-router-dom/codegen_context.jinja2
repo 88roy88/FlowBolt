@@ -1,8 +1,5 @@
 ## Router Contract
 
-Preview/publish run under nested URLs. Vite `base` handles assets; React Router must use the same basename:
-
-- In `App.tsx`, wrap routes with `<BrowserRouter basename={getRouterBasename()}>`.
-- Import `getRouterBasename` from `./platform/react-router-dom/routerBasename`.
-- Keep the router in `App.tsx`; do not use `HashRouter` or move routing to `main.tsx`.
-- Use `Link`, `NavLink`, or `useNavigate()` for app routes; never `<a href="/...">`.
+Preview and shared apps run below nested URLs such as `/preview/{project_id}/` and `/shared/{handle}/`.
+Vite's base path handles asset URLs, while React Router needs the matching runtime basename from
+`src/platform/react-router-dom/routerBasename.ts` so routes remain inside that nested URL.

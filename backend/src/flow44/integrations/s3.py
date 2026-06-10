@@ -62,7 +62,8 @@ def get_published_url(project_id: str) -> str:
     return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"
 
 
-def get_published_asset_url(project_id: str, relative_path: str) -> str:
+def get_shared_asset_url(project_id: str, relative_path: str) -> str:
+    # Legacy storage prefix kept for backward compatibility.
     key = f"published/{project_id}/{relative_path.lstrip('/')}"
     return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{key}"
 
@@ -81,8 +82,8 @@ def deploy_single_html(html_content: str, project_id: str) -> str:
     return get_published_url(project_id)
 
 
-def deploy_published_dist(dist_dir: str, project_id: str) -> str:
-    """Upload a Vite dist directory under published/{project_id}/."""
+def deploy_shared_dist(dist_dir: str, project_id: str) -> str:
+    """Upload a Vite dist directory for shared serving."""
     s3 = connect_to_s3()
     for root, _, files in os.walk(dist_dir):
         for filename in files:
@@ -91,10 +92,11 @@ def deploy_published_dist(dist_dir: str, project_id: str) -> str:
             with open(absolute_path, "rb") as handle:
                 s3.put_object(
                     Bucket=settings.S3_BUCKET_NAME,
+                    # Legacy storage prefix kept for backward compatibility.
                     Key=f"published/{project_id}/{relative_path}",
                     Body=handle.read(),
                     ContentType=mimetypes.guess_type(filename)[0] or "application/octet-stream",
                     ACL="public-read",
                     StorageClass=settings.S3_STORAGE_CLASS,
                 )
-    return get_published_asset_url(project_id, "index.html")
+    return get_shared_asset_url(project_id, "index.html")

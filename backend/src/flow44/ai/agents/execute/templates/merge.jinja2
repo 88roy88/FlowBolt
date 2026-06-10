@@ -38,10 +38,21 @@ Rules:
 - Component tasks depend on their type definitions
 - The final App.tsx integration task depends on all component tasks
 - Keep the total number of tasks reasonable (3-10 for most projects)
-- Do NOT create tasks for modifying package.json or installing dependencies
 - Do NOT include tasks for installing dependencies or running the dev server
-- Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
-- Do NOT include `src/main.tsx`, `vite.config.ts`, `index.html`, or files under `src/platform/`
+- Do NOT plan imports from packages that are not selected in the optional package decision or not installed in the project
+
+## File Safety Rules
+
+Do not touch:
+- `package.json`, lock files, `vite.config.ts`, `index.html`, `.env*`, `src/main.tsx`, or `src/platform/*`
+- Generated/template guard files, CI/CD, backend/server, or deployment files
+
+Edit only when needed:
+- `src/App.tsx`, shared layouts/components, shared mock data/types, and global CSS
+- Preserve existing behavior unless the task requires changing it
+
+Free to edit:
+- Normal app components, pages/screens, local data/helpers, hooks, types, and feature-specific files
 {% if package_merge_rules %}
 
 Package-specific task planning rules:

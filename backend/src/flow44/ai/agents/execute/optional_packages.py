@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class OptionalPackagePrompt(StrEnum):
@@ -57,7 +57,7 @@ OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
 
 
 class SelectedOptionalPackage(BaseModel):
-    package: str
+    name: str = Field(validation_alias=AliasChoices("name", "package"))
     capability: str = ""
     reason: str = ""
 
@@ -80,7 +80,7 @@ def optional_package_prompt_context() -> list[dict[str, str]]:
 
 def selected_package_names(decision: OptionalPackageDecision) -> list[str]:
     """Extract package names from model output and keep only whitelisted packages."""
-    return validate_optional_packages([item.package for item in decision.selected_packages])
+    return validate_optional_packages([item.name for item in decision.selected_packages])
 
 
 def validate_optional_packages(package_names: list[str]) -> list[str]:

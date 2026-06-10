@@ -118,21 +118,53 @@ placeholders or ellipses.
 {% endfor %}
 {% endif %}
 
-Rules:
+## General Rules
+
 1. All file paths are relative to the project root (e.g. src/App.tsx).
 2. Use TypeScript, React 18+, and Tailwind CSS v3.
 3. Tailwind CSS is pre-configured - use utility classes extensively for styling.
 4. Write clean, production-quality code with modern, polished UI/UX.
-5. Only output the files listed above — do not create extra files. Do NOT overwrite `src/auth`, `src/api`, `src/dataSources`, `src/config.ts`, or `src/main.tsx`.
-6. Do NOT edit files under `src/platform/`.
+5. Only output the files listed above — do not create extra files.
+6. Keep changes small and focused.
 7. Import from already-completed files using their exact export names.
 8. Do NOT include shell actions — only file actions.
+
+## File Safety Rules
+
+Do not touch:
+- `package.json`, lock files, `vite.config.ts`, `index.html`, or `.env*`
+- `src/main.tsx`, `src/platform/*`, generated/template guard files, CI/CD, backend/server, or deployment files
+
+Edit only when needed:
+- `src/App.tsx`, shared layouts/components, shared mock data/types, and global CSS
+- Preserve existing behavior unless the task requires changing it
+
+Free to edit:
+- Normal app components, pages/screens, local data/helpers, hooks, types, and feature-specific files
+
+## Dependency Rules
+
+Allowed imports:
+- React / React DOM
+- Browser APIs
+- Local project files
+{% for package in selected_packages %}
+- {{ package }}
+{% endfor %}
+
+Forbidden:
+- Do not import unselected packages.
+- Do not edit `package.json`.
+- Do not install dependencies.
+- Do not use extra npm packages unless they are selected.
 {% if package_rules %}
-9. The selected optional npm packages are already installed. Follow these package-specific rules and do not import other optional packages:
+
+## Selected Package Rules
+
 {% for rule_block in package_rules %}
 {{ rule_block }}
 {% endfor %}
 {% else %}
-9. **CRITICAL**: Only React, TypeScript, Tailwind CSS, and browser APIs are available. Do not import optional npm packages.
-10. Single-page app only — do not create `src/pages/` or navigation/routing.
+
+If route-based navigation is needed but no routing package is selected, use simple state-based page-like views instead of client-side routes. Do not add router setup or routing imports unless a routing package is selected.
 {% endif %}

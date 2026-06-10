@@ -131,7 +131,7 @@ async def test_export_html_error():
 
 
 @pytest.mark.asyncio
-async def test_proxy_published_app_basic():
+async def test_proxy_shared_app_basic():
     project_id = "published-proj"
     mock_project = AsyncMock()
     mock_project.id = project_id
@@ -157,7 +157,7 @@ async def test_proxy_published_app_basic():
 
 
 @pytest.mark.asyncio
-async def test_proxy_published_app_fetch_error():
+async def test_proxy_shared_app_fetch_error():
     project_id = "fetch-err"
     mock_project = AsyncMock()
     mock_project.id = project_id
@@ -169,20 +169,20 @@ async def test_proxy_published_app_fetch_error():
             with patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")):
                 response = client.get(f"/shared/{project_id}")
                 assert response.status_code == 502
-                assert response.json()["detail"] == "Error fetching published app from S3."
+                assert response.json()["detail"] == "Error fetching shared app from S3."
 
 
 @pytest.mark.asyncio
-async def test_proxy_published_app_not_found():
+async def test_proxy_shared_app_not_found():
     project_id = "non-existent"
     with patch("flow44.api.shared.get_project_by_handle", return_value=None):
         response = client.get(f"/shared/{project_id}")
         assert response.status_code == 404
-        assert response.json()["detail"] == f"No published app found for handle '{project_id}'."
+        assert response.json()["detail"] == f"No shared app found for handle '{project_id}'."
 
 
 @pytest.mark.asyncio
-async def test_proxy_published_asset():
+async def test_proxy_shared_asset():
     project = AsyncMock(id="published-proj", published_at="2026-04-18T21:00:00Z")
     with patch("flow44.api.shared.get_project_by_handle", return_value=project), patch(
         "httpx.AsyncClient.get"
@@ -200,7 +200,7 @@ async def test_proxy_published_asset():
 
 
 @pytest.mark.asyncio
-async def test_proxy_published_spa_route_falls_back_to_index():
+async def test_proxy_shared_spa_route_falls_back_to_index():
     project = AsyncMock(id="published-proj", published_at="2026-04-18T21:00:00Z")
     index_response = AsyncMock()
     index_response.text = "<html>app</html>"

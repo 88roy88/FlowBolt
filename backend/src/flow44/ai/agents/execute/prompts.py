@@ -88,6 +88,7 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
+        selected_packages=validate_optional_packages(selected_packages or []),
         package_contexts=_render_optional_package_prompts(selected_packages, OptionalPackagePrompt.CODEGEN_CONTEXT),
         package_rules=_render_optional_package_prompts(selected_packages, OptionalPackagePrompt.CODEGEN_RULES),
     )

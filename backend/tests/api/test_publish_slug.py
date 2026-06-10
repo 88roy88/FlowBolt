@@ -69,7 +69,7 @@ class TestPublish:
     def _patch_build_and_deploy(self):
         return (
             patch("flow44.api.publish.build_dist", return_value="dist"),
-            patch("flow44.api.publish.deploy_published_dist", return_value=MOCK_S3_URL),
+            patch("flow44.api.publish.deploy_shared_dist", return_value=MOCK_S3_URL),
             patch.object(settings, "S3_BUCKET_NAME", "test-bucket"),
         )
 
@@ -216,7 +216,7 @@ class TestShareBySlug:
         with patch("flow44.api.shared.get_project_by_handle", return_value=None):
             response = client.get("/shared/nonexistent")
             assert response.status_code == 404
-            assert "No published app found" in response.json()["detail"]
+            assert "No shared app found" in response.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_share_route_is_public(self):
@@ -256,4 +256,4 @@ class TestShareBySlug:
                  patch("httpx.AsyncClient.get", side_effect=Exception("S3 down")):
                 response = client.get("/shared/my-app")
                 assert response.status_code == 502
-                assert "Error fetching published app" in response.json()["detail"]
+                assert "Error fetching shared app" in response.json()["detail"]
