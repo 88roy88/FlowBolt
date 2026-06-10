@@ -6,7 +6,8 @@ from typing import Any
 
 import pytest
 
-from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.agents import analyze_data_source as ads_module
+from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import (
     DataSourceFieldSchema,
@@ -51,21 +52,22 @@ class TestFetchAndAnalyze:
                 sample={"results": {"rows": [{"id": 1}]}},
             )
 
-        async def _analyze(*_a: object, **_kw: object) -> dict[str, str]:
-            return {
-                "data_schema": "schema",
-                "relevant_fields": "id",
-                "data_characteristics": "static",
-                "integration_notes": "none",
-            }
+        analysis = {
+            "data_schema": "schema",
+            "relevant_fields": "id",
+            "data_characteristics": "static",
+            "integration_notes": "none",
+        }
+
+        async def _complete_chat(*_a: object, **_kw: object) -> str:
+            return ""
 
         monkeypatch.setattr(ds_logic, "get_display_name", _name)
         monkeypatch.setattr(ds_logic, "get_usage", _usage_fn)
-        monkeypatch.setattr(PlanAgent, "_analyze_data_source", _analyze)
+        monkeypatch.setattr(ads_module, "complete_chat", _complete_chat)
+        monkeypatch.setattr(ads_module, "parse_json_response", lambda _: analysis)
 
-        agent = PlanAgent.__new__(PlanAgent)
-        agent._data_source_authorization = None  # type: ignore[attr-defined]
-        ctx = await agent._fetch_and_analyze_data_source("42")
+        ctx = await fetch_and_analyze_data_source("42", "", None, None, lambda _: {})
 
         assert ctx["data_source_id"] == "42"
         assert ctx["data_source_name"] == "Weather"
@@ -94,22 +96,23 @@ class TestFetchAndAnalyze:
                 sample=None,
             )
 
-        async def _analyze(*_a: object, **_kw: object) -> dict[str, str]:
-            return {
-                "data_schema": "person",
-                "relevant_fields": "id",
-                "data_characteristics": "requires input",
-                "integration_notes": "form",
-                "param_ux_hints": "person_id — user input",
-            }
+        analysis = {
+            "data_schema": "person",
+            "relevant_fields": "id",
+            "data_characteristics": "requires input",
+            "integration_notes": "form",
+            "param_ux_hints": "person_id — user input",
+        }
+
+        async def _complete_chat(*_a: object, **_kw: object) -> str:
+            return ""
 
         monkeypatch.setattr(ds_logic, "get_display_name", _name)
         monkeypatch.setattr(ds_logic, "get_usage", _usage_fn)
-        monkeypatch.setattr(PlanAgent, "_analyze_data_source", _analyze)
+        monkeypatch.setattr(ads_module, "complete_chat", _complete_chat)
+        monkeypatch.setattr(ads_module, "parse_json_response", lambda _: analysis)
 
-        agent = PlanAgent.__new__(PlanAgent)
-        agent._data_source_authorization = None  # type: ignore[attr-defined]
-        ctx = await agent._fetch_and_analyze_data_source("7")
+        ctx = await fetch_and_analyze_data_source("7", "", None, None, lambda _: {})
 
         assert ctx["can_run_without_input"] is False
         assert ctx["sample_data"] is None
@@ -132,7 +135,7 @@ class TestGenerateDataSourceFiles:
             ],
             "sample_data": {"results": {"rows": [{"id": 1}]}},
         }
-        files = PlanAgent._generate_data_source_files(ctx)
+        files = generate_data_source_files(ctx)
         assert set(files.keys()) == {"src/dataSources/Sales.ts"}
         content = files["src/dataSources/Sales.ts"]
         assert "export async function dataSourceSales()" in content
@@ -167,7 +170,7 @@ class TestGenerateDataSourceFiles:
             ],
             "sample_data": None,
         }
-        files = PlanAgent._generate_data_source_files(ctx)
+        files = generate_data_source_files(ctx)
         content = files["src/dataSources/Person.ts"]
         assert "}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in content
         assert "export interface PersonPerson" in content
