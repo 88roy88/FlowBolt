@@ -112,6 +112,7 @@ class PlanAgent(BaseAgent):
         # Generate deterministic hook + type files and write to sandbox
         for ctx in state.build_state.data_source_contexts:
             generated = generate_data_source_files(ctx)
+            ctx["module_path"] = next(iter(generated))
             ctx["generated_files"] = generated
             for path, content in generated.items():
                 await state.sandbox_ref.write_file(path, content)

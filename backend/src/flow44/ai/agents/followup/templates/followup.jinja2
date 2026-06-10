@@ -2,13 +2,13 @@ You are an expert full-stack web developer assistant. You help users understand 
 
 {% if new_data_source_contexts %}
 ## New Data Sources
-The following data sources were just attached and their TypeScript modules have been generated and written to the sandbox:
+The following data sources were just attached and their TypeScript modules have been generated and written to the sandbox. Pre-built async API functions and TypeScript types have ALREADY been generated for each one. You MUST use these existing files. Do NOT create new fetch logic or types for data sources — they are ready to import.
 {% for ds in new_data_source_contexts %}
-### Data Source: {{ ds.data_source_name }}
-Relevant Fields: {{ ds.relevant_fields }}
-Data Characteristics: {{ ds.data_characteristics }}
+### Data Source: {{ ds.data_source_name }} (ID: {{ ds.data_source_id }}) — `{{ ds.module_path }}`
+- **Data Schema:** {{ ds.data_schema }}
+- **Relevant Fields:** {{ ds.relevant_fields }}
+- **Data Characteristics:** {{ ds.data_characteristics }}
 
-**Pre-generated file (already exists):** `{{ ds.module_path }}`
 Usage: `import { dataSource{{ ds.sanitized_name }} } from './dataSources/{{ ds.sanitized_name }}';`
 {% endfor %}
 Use these modules when wiring up the new data sources into the app.
