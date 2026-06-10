@@ -41,8 +41,11 @@ class TestNoParams:
         assert "import { fetchWithAuth } from '../api/client';" in result
         assert "export async function dataSourceSales(): Promise<SalesResults>" in result
         assert "/api/data-source/42/run" in result
-        # No body built; fetchWithAuth called with just the path.
-        assert "fetchWithAuth('/api/data-source/42/run')" in result
+        # No request body, but method/headers options are still passed.
+        assert "fetchWithAuth('/api/data-source/42/run', {" in result
+        assert "method: 'POST'" in result
+        assert "headers: { 'Content-Type': 'application/json' }" in result
+        assert "body: JSON.stringify" not in result
         assert "const body:" not in result
 
 
