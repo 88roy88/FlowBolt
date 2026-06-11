@@ -6,6 +6,48 @@ You are an expert full-stack web developer assistant. You help users understand 
 ## File Tree
 {{ file_tree }}
 
+{% if data_source_contexts %}
+## Data Sources
+
+This project uses the following external data sources. Pre-built TypeScript modules
+exist at `src/dataSources/` — use `import { dataSource<Name> } from './dataSources/<Name>';`
+to call them.
+
+{% for ctx in data_source_contexts %}
+### {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }})
+{% if ctx.sanitized_name is defined and ctx.sanitized_name %}
+Module: `src/dataSources/{{ ctx.sanitized_name }}.ts`
+{% endif %}
+
+**Response schema:**
+{% for q in ctx.queries %}
+- `{{ q.name }}`{% if q.display_name %} ({{ q.display_name }}){% endif %}{% if q.description %} — {{ q.description }}{% endif %}
+
+{% for f in q.fields %}
+  - `{{ f.name }}` ({{ f.type }}){% if f.description %} — {{ f.description }}{% endif %}
+
+{% endfor %}
+{% endfor %}
+
+**Parameters:**
+{% if ctx.params_info and ctx.params_info.parameters %}
+{% for p in ctx.params_info.parameters %}
+- `{{ p.name }}` ({{ p.type }}{% if not p.is_single_value %}[]{% endif %}){% if p.is_required %} — required{% elif p.is_require_any %} — required (one of group){% else %} — optional{% endif %}
+
+{% endfor %}
+{% else %}
+None — call with no arguments.
+{% endif %}
+
+{% if ctx.sample_data_json %}
+**Sample response (truncated):**
+```json
+{{ ctx.sample_data_json }}
+```
+{% endif %}
+
+{% endfor %}
+{% endif %}
 ## How to Work
 
 Follow the EXPLORE → REASON → ACT pattern:

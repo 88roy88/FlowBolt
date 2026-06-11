@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -32,6 +33,7 @@ __all__ = [
     "DataSourceResult",
     "DataSourceUsage",
     "FlapiUpstreamError",
+    "build_data_source_context",
     "can_run_without_params",
     "fetch_data_source",
     "get_display_name",
@@ -242,6 +244,34 @@ async def can_run_without_params(
     params_info = await get_params_info(data_source_id, authorization=authorization)
     minimal = _minimal_params_for(params_info)
     return minimal is not None, minimal
+
+
+async def build_data_source_context(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> dict[str, Any]:
+    """Build a datasource context dict with schema, params, and sample data.
+
+    Used by both the plan agent (which layers LLM analysis on top) and the
+    followup agent (which uses it directly for prompt context).
+    """
+    from flow44.ai.codegen.ts_types import sanitize_to_pascal_case  # noqa: PLC0415
+
+    name, usage = await asyncio.gather(
+        get_display_name(data_source_id, authorization=authorization),
+        get_usage(data_source_id, authorization=authorization),
+    )
+    sanitized = sanitize_to_pascal_case(name) or f"DataSource{data_source_id}"
+    return {
+        "data_source_id": str(data_source_id),
+        "data_source_name": name,
+        "sanitized_name": sanitized,
+        "queries": [q.model_dump() for q in usage.queries],
+        "params_info": usage.params.model_dump(),
+        "sample_data": usage.sample,
+        "can_run_without_input": usage.can_run,
+    }
 
 
 async def get_usage(

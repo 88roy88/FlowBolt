@@ -25,6 +25,7 @@ class FixErrorState(BaseModel):
     discovered_files: dict[str, str] = Field(default_factory=dict)
     generated_files: list[tuple[str, str]] = Field(default_factory=list)
     full_response: str = ""
+    explanation: str = ""
     validation_errors: str = ""
     retry_count: int = 0
 

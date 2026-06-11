@@ -15,7 +15,6 @@ from flow44.ai.agents.plan.prompts import (
     render_user_plan,
 )
 from flow44.ai.codegen.data_source_module import generate_data_source_module
-from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
@@ -208,22 +207,16 @@ class PlanAgent(BaseAgent):
     # -- Design --
 
     async def _fetch_and_analyze_data_source(self, data_source_id: str) -> dict[str, Any]:
-        ds_name, usage = await asyncio.gather(
-            ds_logic.get_display_name(data_source_id, authorization=self._data_source_authorization),
-            ds_logic.get_usage(data_source_id, authorization=self._data_source_authorization),
+        context = await ds_logic.build_data_source_context(
+            data_source_id, authorization=self._data_source_authorization
         )
-        sanitized = sanitize_to_pascal_case(ds_name) or f"DataSource{data_source_id}"
-        analysis = await self._analyze_data_source(ds_name, usage.sample, usage.queries, usage.params)
-        return {
-            "data_source_id": data_source_id,
-            "data_source_name": ds_name,
-            "sanitized_name": sanitized,
-            "queries": [q.model_dump() for q in usage.queries],
-            "params_info": usage.params.model_dump(),
-            "sample_data": usage.sample,
-            "can_run_without_input": usage.can_run,
-            **analysis,
-        }
+        # LLM analysis needs typed objects — reconstruct from the context dict
+        params_info = DataSourceParamsInfo.model_validate(context["params_info"])
+        queries = [DataSourceQuerySchema.model_validate(q) for q in context.get("queries", [])]
+        analysis = await self._analyze_data_source(
+            context["data_source_name"], context["sample_data"], queries, params_info  # type: ignore[arg-type]
+        )
+        return {**context, **analysis}
 
     @staticmethod
     def _generate_data_source_files(ctx: dict[str, Any]) -> dict[str, str]:

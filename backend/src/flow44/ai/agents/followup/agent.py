@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -7,13 +8,14 @@ from typing import Any
 from langfuse.decorators import langfuse_context, observe
 from pydantic import BaseModel
 
-from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.db.chat import get_messages
-from flow44.db.project import get_project
+from flow44.db.project import get_project, get_project_data_sources, update_project_data_sources
+from flow44.logic import data_source as ds_logic
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -28,15 +30,19 @@ class FileDiff:
     diff: str
 
 
-class FollowUpAgent(BaseAgent):
+class FollowUpAgent(ChatAgent):
     def __init__(
         self,
         project_id: str,
         sandbox: PnpmSandbox,
         model: str | None = None,
         trace_id: str | None = None,
+        data_source_authorization: str | None = None,
+        data_source_ids: list[str] | None = None,
     ) -> None:
         super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        self._data_source_authorization = data_source_authorization
+        self._data_source_ids = data_source_ids or []
         self._steps: list[dict[str, Any]] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
@@ -179,7 +185,6 @@ class FollowUpAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
 
-        # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
         history = await get_messages(self.project_id)
         messages = [
             Message(role=m.role, content=m.content)  # type: ignore[arg-type]
@@ -190,6 +195,7 @@ class FollowUpAgent(BaseAgent):
         system_prompt = render_followup(
             project_summary=context["summary"],
             file_tree=context["file_tree"],
+            data_source_contexts=context.get("data_source_contexts") or None,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -205,6 +211,8 @@ class FollowUpAgent(BaseAgent):
         if answer:
             await self.emit({"type": "text", "content": answer})
 
+        await self._save_response(answer or "", self._steps, self._files_changed)
+
         if self._diffs:
             await self.emit(
                 {
@@ -217,8 +225,7 @@ class FollowUpAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
-    # TODO: We will want to have a smarted memory system in the future
-    async def _build_context(self) -> dict[str, str]:
+    async def _build_context(self) -> dict[str, Any]:
         project = await get_project(self.project_id)
         summary = ""
         if project and project.summary:
@@ -238,7 +245,34 @@ class FollowUpAgent(BaseAgent):
         except Exception:
             file_tree = "(unable to list files)"
 
-        return {"summary": summary, "file_tree": file_tree}
+        data_source_contexts = await self._load_data_source_contexts()
+
+        return {"summary": summary, "file_tree": file_tree, "data_source_contexts": data_source_contexts}
+
+    async def _load_data_source_contexts(self) -> list[dict[str, Any]]:
+        """Load datasource contexts from DB, fetching any new ones not yet stored."""
+        stored_contexts = await get_project_data_sources(self.project_id)
+        stored_ids = {str(ctx.get("data_source_id")) for ctx in stored_contexts}
+
+        new_ids = [dsid for dsid in self._data_source_ids if dsid not in stored_ids]
+
+        new_contexts: list[dict[str, Any]] = []
+        if new_ids:
+            tasks = [
+                ds_logic.build_data_source_context(dsid, authorization=self._data_source_authorization)
+                for dsid in new_ids
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in results:
+                if isinstance(result, BaseException):
+                    logger.warning("[followup] Failed to fetch data source: %s", result)
+                else:
+                    new_contexts.append(result)  # type: ignore[arg-type]
+
+            if new_contexts:
+                await update_project_data_sources(self.project_id, stored_contexts + new_contexts)
+
+        return stored_contexts + new_contexts
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
         """Emit ReAct step events and track state for followup agent."""
