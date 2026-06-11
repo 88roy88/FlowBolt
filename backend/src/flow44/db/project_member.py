@@ -99,6 +99,6 @@ async def list_shared_projects(user_id: str) -> list[tuple[Project, Role]]:
             .join(ProjectMember, col(ProjectMember.project_id) == col(Project.id))
             .where(col(ProjectMember.user_id) == user_id)
             .order_by(col(Project.created_at).desc())
-            .options(defer(Project.data_sources))
+            .options(defer(Project.data_sources))  # type: ignore[arg-type]
         )
         return [(row[0], Role(row[1])) for row in result.all()]

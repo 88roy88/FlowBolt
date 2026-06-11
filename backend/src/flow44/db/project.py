@@ -47,7 +47,7 @@ async def list_user_projects(user_id: str) -> list[Project]:
             select(Project)
             .where(Project.user_id == user_id)
             .order_by(col(Project.created_at).desc())
-            .options(defer(Project.data_sources))
+            .options(defer(Project.data_sources))  # type: ignore[arg-type]
         )
         result = await session.execute(query)
         return list(result.scalars().all())
@@ -56,11 +56,7 @@ async def list_user_projects(user_id: str) -> list[Project]:
 async def list_all_projects() -> list[Project]:
     """System-level: returns every project across all users. Never call from a request handler."""
     async with database.async_session() as session:
-        query = (
-            select(Project)
-            .order_by(col(Project.created_at).desc())
-            .options(defer(Project.data_sources))
-        )
+        query = select(Project).order_by(col(Project.created_at).desc()).options(defer(Project.data_sources))  # type: ignore[arg-type]
         result = await session.execute(query)
         return list(result.scalars().all())
 
