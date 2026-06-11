@@ -21,7 +21,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.get_bind().execute(sa.text("""
+    op.get_bind().execute(
+        sa.text("""
         UPDATE projects
         SET data_sources = (
             SELECT json_agg(elem::jsonb - 'sample_data' - 'generated_files')
@@ -29,7 +30,8 @@ def upgrade() -> None:
         )
         WHERE data_sources IS NOT NULL
           AND data_sources::text NOT IN ('null', '[]')
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:
