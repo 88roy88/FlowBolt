@@ -267,7 +267,7 @@ class FollowUpAgent(ChatAgent):
                 if isinstance(result, BaseException):
                     logger.warning("[followup] Failed to fetch data source: %s", result)
                 else:
-                    new_contexts.append(result)  # type: ignore[arg-type]
+                    new_contexts.append(result)
 
             if new_contexts:
                 await update_project_data_sources(self.project_id, stored_contexts + new_contexts)

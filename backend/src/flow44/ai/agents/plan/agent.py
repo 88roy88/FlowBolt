@@ -214,7 +214,7 @@ class PlanAgent(BaseAgent):
         params_info = DataSourceParamsInfo.model_validate(context["params_info"])
         queries = [DataSourceQuerySchema.model_validate(q) for q in context.get("queries", [])]
         analysis = await self._analyze_data_source(
-            context["data_source_name"], context["sample_data"], queries, params_info  # type: ignore[arg-type]
+            context["data_source_name"], context["sample_data"], queries, params_info
         )
         return {**context, **analysis}
 

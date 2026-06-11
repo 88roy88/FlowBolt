@@ -250,7 +250,13 @@ class FixErrorAgent(ChatAgent):
     async def _step_complete(self, state: FixErrorState) -> FixErrorState:
         """Step: Complete the fix process."""
         files = [p for p, _ in state.generated_files]
-        steps = [{"tool": "fix_error", "args": {"file": state.error_file or "unknown"}, "resultPreview": f"fixed {len(files)} file(s)"}]
+        steps = [
+            {
+                "tool": "fix_error",
+                "args": {"file": state.error_file or "unknown"},
+                "resultPreview": f"fixed {len(files)} file(s)",
+            }
+        ]
         await self._save_response(state.explanation, steps, files)
 
         await state.emit_fn({"type": "action_complete"})

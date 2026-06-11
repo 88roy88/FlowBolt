@@ -32,9 +32,7 @@ class ChatAgent(BaseAgent):
                 preview = step.get("resultPreview", "")
 
                 args_str = " ".join(
-                    f"{k}={v!r}" if not isinstance(v, str) else f"{k}={v}"
-                    for k, v in args.items()
-                    if k != "content"
+                    f"{k}={v!r}" if not isinstance(v, str) else f"{k}={v}" for k, v in args.items() if k != "content"
                 )
                 result_short = preview[:80].replace("\n", " ").strip()
                 if len(preview) > 80:
