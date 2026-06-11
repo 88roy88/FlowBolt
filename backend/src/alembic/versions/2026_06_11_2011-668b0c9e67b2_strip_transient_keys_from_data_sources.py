@@ -24,11 +24,7 @@ def upgrade() -> None:
     op.get_bind().execute(sa.text("""
         UPDATE projects
         SET data_sources = (
-            SELECT json_agg(
-                (SELECT json_object_agg(key, value)
-                 FROM json_each(elem)
-                 WHERE key NOT IN ('sample_data', 'generated_files'))
-            )
+            SELECT json_agg(elem::jsonb - 'sample_data' - 'generated_files')
             FROM json_array_elements(data_sources) AS elem
         )
         WHERE data_sources IS NOT NULL
