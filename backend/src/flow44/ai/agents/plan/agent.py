@@ -37,11 +37,12 @@ class PlanAgent(BaseAgent):
         project_id: str,
         sandbox: PnpmSandbox,
         *,
+        user_id: str,
         model: str | None = None,
         trace_id: str | None = None,
         data_source_authorization: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._state = BuildState(project_id=self.project_id, model=self.model)
         self._data_source_authorization = data_source_authorization
         self._flow = self._build_flow()
