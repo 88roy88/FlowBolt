@@ -11,7 +11,6 @@ from flow44.db.project import (
     get_project_data_sources,
     list_all_projects,
     rename_project,
-    update_project_data_source,
     update_project_data_sources,
     update_project_model,
     update_project_published_url,
@@ -89,15 +88,6 @@ class TestProjectCRUD:
         result = await get_project_data_sources(project.id)
         assert len(result) == 1
         assert result[0]["data_source_id"] == "ds1"
-
-    async def test_get_data_sources_fallback_to_single(self, test_db):
-        project = await create_project("App", user_id="test-user")
-        await update_project_data_source(project.id, "ds-legacy", '{"field": "value"}')
-
-        result = await get_project_data_sources(project.id)
-        assert len(result) == 1
-        assert result[0]["data_source_id"] == "ds-legacy"
-        assert result[0]["field"] == "value"
 
     async def test_get_data_sources_empty(self, test_db):
         project = await create_project("App", user_id="test-user")

@@ -16,7 +16,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.db.chat import get_messages
-from flow44.db.project import get_project
+from flow44.db.project import get_project, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -280,7 +280,17 @@ class FollowUpAgent(BaseAgent):
             if module_path not in self._files_changed:
                 self._files_changed.append(module_path)
 
+        await self._persist_data_sources(contexts)
         return contexts
+
+    async def _persist_data_sources(self, new_contexts: list[dict[str, Any]]) -> None:
+        """Merge newly attached data sources into the project's stored list (by id)."""
+        project = await get_project(self.project_id)
+        existing = list(project.data_sources) if project and project.data_sources else []
+        by_id: dict[Any, dict[str, Any]] = {ctx.get("data_source_id"): ctx for ctx in existing}
+        for ctx in new_contexts:
+            by_id[ctx.get("data_source_id")] = ctx
+        await update_project_data_sources(self.project_id, list(by_id.values()))
 
     # TODO: We will want to have a smarted memory system in the future
     async def _build_context(self) -> dict[str, str]:

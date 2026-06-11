@@ -1,4 +1,3 @@
-import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -19,8 +18,6 @@ class Project(SQLModel, table=True):
     updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     summary: str = Field(default="")
     selected_model: str = Field(default="")
-    data_source_id: str = Field(default="")
-    data_source_context: str = Field(default="")
     data_sources: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, default=[]))
     published_url: str | None = Field(default=None, sa_column_kwargs={"unique": True})
     published_at: str | None = Field(default=None)
@@ -85,17 +82,6 @@ async def update_project_model(project_id: str, model: str) -> None:
             await session.commit()
 
 
-async def update_project_data_source(project_id: str, data_source_id: str, data_source_context: str) -> None:
-    async with database.async_session() as session:
-        project = await session.get(Project, project_id)
-        if project:
-            project.data_source_id = data_source_id
-            project.data_source_context = data_source_context
-            project.updated_at = datetime.now(UTC).isoformat()
-            session.add(project)
-            await session.commit()
-
-
 async def update_project_data_sources(project_id: str, data_sources: list[dict[str, Any]]) -> None:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
@@ -111,20 +97,7 @@ async def get_project_data_sources(project_id: str) -> list[dict[str, Any]]:
         project = await session.get(Project, project_id)
         if project is None:
             return []
-        if project.data_sources:
-            return project.data_sources
-        # TODO: what is this VVVVV
-        # Fallback: synthesize from single-source columns
-        dsid = project.data_source_id
-        dsctx = project.data_source_context
-        if dsid:
-            try:
-                ctx = json.loads(dsctx) if dsctx else {}
-            except (json.JSONDecodeError, TypeError):
-                ctx = {}
-            ctx["data_source_id"] = dsid
-            return [ctx]
-        return []
+        return project.data_sources or []
 
 
 async def delete_project(project_id: str) -> None:
