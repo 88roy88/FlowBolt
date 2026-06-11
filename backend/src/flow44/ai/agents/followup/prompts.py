@@ -22,10 +22,12 @@ def render_followup(
     project_summary: str,
     file_tree: str,
     new_data_source_contexts: list[DataSourceContext] | None = None,
+    existing_data_source_contexts: list[dict[str, Any]] | None = None,
 ) -> str:
     return render(
         "followup.jinja2",
         project_summary=project_summary,
         file_tree=file_tree,
         new_data_source_contexts=new_data_source_contexts,
+        existing_data_source_contexts=existing_data_source_contexts,
     )

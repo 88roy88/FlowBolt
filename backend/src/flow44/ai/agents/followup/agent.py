@@ -9,7 +9,7 @@ from typing import Any, cast
 from langfuse.decorators import langfuse_context, observe
 from pydantic import BaseModel
 
-from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
@@ -17,7 +17,7 @@ from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.ai.state import DataSourceContext
 from flow44.db.chat import get_messages
-from flow44.db.project import get_project, update_project_data_sources
+from flow44.db.project import get_project, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class FileDiff:
     is_new: bool = False
 
 
-class FollowUpAgent(BaseAgent):
+class FollowUpAgent(ChatAgent):
     def __init__(
         self,
         project_id: str,
@@ -186,12 +186,12 @@ class FollowUpAgent(BaseAgent):
             new_data_source_contexts = await self._fetch_and_generate_new_data_sources(content, data_source_ids)
 
         await self.emit({"type": "phase", "phase": "exploring"})
-        context = await self._build_context()
-
-        # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
-        history = await get_messages(self.project_id)
+        context, history = await asyncio.gather(
+            self._build_context(),
+            get_messages(self.project_id),
+        )
         messages = [
-            Message(role=m.role, content=m.content)  # type: ignore[arg-type]
+            Message(role=m.role, content=m.content)
             for m in history
             if m.role == "user" or (m.role == "assistant" and m.content.strip())
         ]
@@ -200,6 +200,7 @@ class FollowUpAgent(BaseAgent):
             project_summary=context["summary"],
             file_tree=context["file_tree"],
             new_data_source_contexts=new_data_source_contexts or None,
+            existing_data_source_contexts=context.get("existing_data_source_contexts") or None,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -214,6 +215,8 @@ class FollowUpAgent(BaseAgent):
 
         if answer:
             await self.emit({"type": "text", "content": answer})
+
+        await self._save_response(answer or "", self._steps, self._files_changed)
 
         if self._diffs:
             await self.emit(
@@ -293,8 +296,7 @@ class FollowUpAgent(BaseAgent):
             by_id[ctx["data_source_id"]] = ctx
         await update_project_data_sources(self.project_id, list(by_id.values()))
 
-    # TODO: We will want to have a smarted memory system in the future
-    async def _build_context(self) -> dict[str, str]:
+    async def _build_context(self) -> dict[str, Any]:
         project = await get_project(self.project_id)
         summary = ""
         if project and project.summary:
@@ -314,7 +316,9 @@ class FollowUpAgent(BaseAgent):
         except Exception:
             file_tree = "(unable to list files)"
 
-        return {"summary": summary, "file_tree": file_tree}
+        existing_ds = await get_project_data_sources(self.project_id)
+
+        return {"summary": summary, "file_tree": file_tree, "existing_data_source_contexts": existing_ds}
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
         """Emit ReAct step events and track state for followup agent."""
