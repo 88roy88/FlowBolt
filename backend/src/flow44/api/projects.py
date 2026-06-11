@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, is_admin, require_permission
@@ -119,11 +119,12 @@ async def update_project_selected_model(
 @router.delete("/{project_id}", status_code=204)
 async def delete_existing_project(
     project: ProjectDep,
+    background_tasks: BackgroundTasks,
     _perms: set[Permission] = require_permission(Permission.delete),
 ) -> None:
-    await sandbox_manager.destroy_sandbox(project.id)
     idle_reaper.remove(project.id)
     await delete_project(project.id)
+    background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)
 
 
 @router.post("/{project_id}/debug/reap", status_code=200)
