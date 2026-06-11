@@ -78,14 +78,14 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   // Agent card messages
   if (message.agentCard) {
     return (
-      <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
+      <div className={`flex w-full ${isUser ? 'justify-start' : 'justify-end'} animate-message-in`}>
         <AgentCardRenderer message={message} />
       </div>
     );
   }
 
   return (
-    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
+    <div className={`flex w-full ${isUser ? 'justify-start' : 'justify-end'} animate-message-in`}>
       <div
         className={`min-w-0 overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
           isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
