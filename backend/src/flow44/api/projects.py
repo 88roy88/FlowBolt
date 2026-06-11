@@ -66,8 +66,7 @@ async def list_user_projects(user_id: UserDep) -> list[dict[str, Any]]:
             result.append(p.model_dump(exclude=exclude) | {"role": role})
         return result
 
-    owned = await db_list_user_projects(user_id)
-    shared = await list_shared_projects(user_id)
+    owned, shared = await asyncio.gather(db_list_user_projects(user_id), list_shared_projects(user_id))
 
     result = []
     for p in owned:
