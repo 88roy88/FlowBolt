@@ -1,10 +1,12 @@
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel, col, select
 
+from flow44.ai.state import DataSourceContext
 from flow44.db import database
 
 
@@ -82,12 +84,13 @@ async def update_project_model(project_id: str, model: str) -> None:
             await session.commit()
 
 
-async def update_project_data_sources(project_id: str, data_sources: list[dict[str, Any]]) -> None:
-    data_sources = [{k: v for k, v in ds.items() if k != "sample_data"} for ds in data_sources]
+async def update_project_data_sources(project_id: str, data_sources: Sequence[DataSourceContext]) -> None:
+    # `sample_data` can be very heavy and isn't needed once persisted.
+    stored = [{k: v for k, v in ds.items() if k != "sample_data"} for ds in data_sources]
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
-            project.data_sources = data_sources
+            project.data_sources = stored
             project.updated_at = datetime.now(UTC).isoformat()
             session.add(project)
             await session.commit()

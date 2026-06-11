@@ -5,6 +5,8 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from flow44.ai.state import DataSourceContext
+
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
     loader=FileSystemLoader(str(_templates_dir)), trim_blocks=True, lstrip_blocks=True
@@ -19,7 +21,7 @@ def render_followup(
     *,
     project_summary: str,
     file_tree: str,
-    new_data_source_contexts: list[dict[str, Any]] | None = None,
+    new_data_source_contexts: list[DataSourceContext] | None = None,
 ) -> str:
     return render(
         "followup.jinja2",

@@ -10,6 +10,7 @@ from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
+from flow44.ai.state import DataSourceContext
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 
@@ -22,7 +23,7 @@ async def fetch_and_analyze_data_source(
     authorization: str | None,
     model: str | None,
     llm_metadata_fn: Callable[[str], dict[str, Any]],
-) -> dict[str, Any]:
+) -> DataSourceContext:
     ds_name, usage = await asyncio.gather(
         ds_logic.get_display_name(data_source_id, authorization=authorization),
         ds_logic.get_usage(data_source_id, authorization=authorization),
@@ -55,19 +56,23 @@ async def fetch_and_analyze_data_source(
                 else "No sample available — data source requires parameters."
             ),
         }
-    return {
-        "data_source_id": data_source_id,
-        "data_source_name": ds_name,
-        "sanitized_name": sanitized,
-        "queries": [q.model_dump() for q in usage.queries],
-        "params_info": usage.params.model_dump(),
-        "sample_data": usage.sample,
-        "can_run_without_input": usage.can_run,
-        **analysis,
-    }
+    return DataSourceContext(
+        data_source_id=data_source_id,
+        data_source_name=ds_name,
+        sanitized_name=sanitized,
+        queries=[q.model_dump() for q in usage.queries],
+        params_info=usage.params.model_dump(),
+        sample_data=usage.sample,
+        can_run_without_input=usage.can_run,
+        data_schema=analysis.get("data_schema", ""),
+        relevant_fields=analysis.get("relevant_fields", ""),
+        data_characteristics=analysis.get("data_characteristics", ""),
+        integration_notes=analysis.get("integration_notes", ""),
+        param_ux_hints=analysis.get("param_ux_hints", ""),
+    )
 
 
-def generate_data_source_files(ctx: dict[str, Any]) -> dict[str, str]:
+def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
     sanitized = ctx["sanitized_name"]
     module_path = f"src/dataSources/{sanitized}.ts"
     params_info = DataSourceParamsInfo.model_validate(ctx["params_info"])

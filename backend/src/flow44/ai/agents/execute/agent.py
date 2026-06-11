@@ -243,22 +243,19 @@ class ExecuteAgent(BaseAgent):
             "user_preferences": [d.model_dump() for d in state.build_state.user_overview.decisions],
         }
         if state.build_state.data_source_contexts:
+            merge_keys = {
+                "data_source_id",
+                "data_source_name",
+                "sanitized_name",
+                "relevant_fields",
+                "data_characteristics",
+                "integration_notes",
+                "param_ux_hints",
+                "params_info",
+                "can_run_without_input",
+            }
             merge_data["data_source_integrations"] = [
-                {
-                    k: ctx[k]
-                    for k in (
-                        "data_source_id",
-                        "data_source_name",
-                        "sanitized_name",
-                        "relevant_fields",
-                        "data_characteristics",
-                        "integration_notes",
-                        "param_ux_hints",
-                        "params_info",
-                        "can_run_without_input",
-                    )
-                    if k in ctx
-                }
+                {k: v for k, v in ctx.items() if k in merge_keys}
                 for ctx in state.build_state.data_source_contexts
             ]
 
