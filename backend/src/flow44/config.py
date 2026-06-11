@@ -109,7 +109,7 @@ class LangfuseSettings(Flow44BaseSettings):
     LANGFUSE_PUBLIC_KEY: str | None = None
     LANGFUSE_SECRET_KEY: str | None = None
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
-    LANGFUSE_TRACING_ENVIRONMENT: str = "production"
+    LANGFUSE_TRACING_ENVIRONMENT: str | None = None
 
     def model_post_init(self, __context: Any) -> None:
         """Propagate Langfuse credentials to os.environ so the SDK can read them."""
