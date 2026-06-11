@@ -117,7 +117,8 @@ class LangfuseSettings(Flow44BaseSettings):
             os.environ["LANGFUSE_PUBLIC_KEY"] = self.LANGFUSE_PUBLIC_KEY
             os.environ["LANGFUSE_SECRET_KEY"] = self.LANGFUSE_SECRET_KEY
             os.environ["LANGFUSE_HOST"] = self.LANGFUSE_HOST
-            os.environ["LANGFUSE_TRACING_ENVIRONMENT"] = self.LANGFUSE_TRACING_ENVIRONMENT
+            if self.LANGFUSE_TRACING_ENVIRONMENT:
+                os.environ["LANGFUSE_TRACING_ENVIRONMENT"] = self.LANGFUSE_TRACING_ENVIRONMENT
 
 
 class Settings(
