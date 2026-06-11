@@ -255,8 +255,7 @@ class ExecuteAgent(BaseAgent):
                 "can_run_without_input",
             }
             merge_data["data_source_integrations"] = [
-                {k: v for k, v in ctx.items() if k in merge_keys}
-                for ctx in state.build_state.data_source_contexts
+                {k: v for k, v in ctx.items() if k in merge_keys} for ctx in state.build_state.data_source_contexts
             ]
 
         raw = await complete_chat(

@@ -9,7 +9,8 @@ from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, U
 
 
 class DataSourceContext(TypedDict):
-    """ Data source metadata and generated analysis """
+    """Data source metadata and generated analysis"""
+
     data_source_id: str
     data_source_name: str
     sanitized_name: str
