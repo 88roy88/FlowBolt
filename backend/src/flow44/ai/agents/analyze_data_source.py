@@ -75,6 +75,7 @@ async def fetch_and_analyze_data_source(
 def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
     sanitized = ctx["sanitized_name"]
     module_path = f"src/dataSources/{sanitized}.ts"
+    docs_path = f"src/dataSources/{sanitized}.docs.md"
     params_info = DataSourceParamsInfo.model_validate(ctx["params_info"])
     queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.get("queries", [])]
     content = generate_data_source_module(
@@ -83,4 +84,71 @@ def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
         params_info=params_info,
         queries=queries,
     )
-    return {module_path: content}
+    docs = _generate_data_source_docs(ctx, params_info, queries)
+    return {module_path: content, docs_path: docs}
+
+
+_TYPE_PLACEHOLDERS = {bool: "<bool>", int: "<int>", float: "<number>"}
+
+
+def _redact_sample_data(sample: dict[str, Any] | None) -> str | None:
+    """Redact actual values from sample data, preserving structure and types."""
+    if sample is None:
+        return None
+
+    def _redact(obj: Any) -> Any:  # noqa: PLR0911
+        if isinstance(obj, dict):
+            return {k: _redact(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_redact(obj[0])] if obj else []
+        if obj is None:
+            return None
+        return _TYPE_PLACEHOLDERS.get(type(obj), "<string>")
+
+    return json.dumps(_redact(sample), indent=2)
+
+
+def _generate_data_source_docs(  # noqa: C901
+    ctx: DataSourceContext,
+    params_info: DataSourceParamsInfo,
+    queries: list[DataSourceQuerySchema],
+) -> str:
+    """Generate a markdown docs file describing the data source."""
+    lines: list[str] = [
+        f"# {ctx.get('data_source_name', ctx['sanitized_name'])}",
+        f"**ID:** {ctx['data_source_id']}",
+        f"**Module:** `src/dataSources/{ctx['sanitized_name']}.ts`",
+        "",
+    ]
+
+    for heading, value in [
+        ("Schema", ctx.get("data_schema")),
+        ("Relevant Fields", ctx.get("relevant_fields")),
+        ("Data Characteristics", ctx.get("data_characteristics")),
+        ("Integration Notes", ctx.get("integration_notes")),
+    ]:
+        if value:
+            lines.extend([f"## {heading}\n{value}", ""])
+
+    if queries:
+        lines.append("## Queries")
+        for q in queries:
+            lines.append(f"### `{q.name}`" + (f" — {q.description}" if q.description else ""))
+            for f in q.fields:
+                desc = f" — {f.description}" if f.description else ""
+                lines.append(f"- `{f.name}` ({f.type}){desc}")
+            lines.append("")
+
+    if params_info.parameters:
+        lines.append("## Parameters")
+        for p in params_info.parameters:
+            req = "required" if p.is_required else ("required (one of group)" if p.is_require_any else "optional")
+            multi = "[]" if not p.is_single_value else ""
+            lines.append(f"- `{p.name}` ({p.type}{multi}) — {req}")
+        lines.append("")
+
+    redacted = _redact_sample_data(ctx.get("sample_data"))
+    if redacted:
+        lines.extend(["## Response Structure (redacted)", "```json", redacted, "```", ""])
+
+    return "\n".join(lines)

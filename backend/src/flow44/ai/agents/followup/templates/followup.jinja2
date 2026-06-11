@@ -23,18 +23,10 @@ Use these modules when wiring up the new data sources into the app.
 {% if existing_data_source_contexts %}
 ## Existing Data Sources
 
-This project already uses the following data sources. Their TypeScript modules exist at `src/dataSources/`.
+This project uses the following data sources. Use `read_file` on the `.docs.md` file if you need schema or parameter details.
 
 {% for ctx in existing_data_source_contexts %}
-### {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }})
-{% if ctx.sanitized_name is defined and ctx.sanitized_name %}
-Module: `src/dataSources/{{ ctx.sanitized_name }}.ts`
-Usage: `import { dataSource{{ ctx.sanitized_name }} } from './dataSources/{{ ctx.sanitized_name }}';`
-{% endif %}
-{% if ctx.data_schema is defined and ctx.data_schema %}- **Data Schema:** {{ ctx.data_schema }}{% endif %}
-{% if ctx.relevant_fields is defined and ctx.relevant_fields %}- **Relevant Fields:** {{ ctx.relevant_fields }}{% endif %}
-{% if ctx.data_characteristics is defined and ctx.data_characteristics %}- **Data Characteristics:** {{ ctx.data_characteristics }}{% endif %}
-
+- **{{ ctx.data_source_name }}** → `import { dataSource{{ ctx.sanitized_name }} } from './dataSources/{{ ctx.sanitized_name }}';` (docs: `src/dataSources/{{ ctx.sanitized_name }}.docs.md`)
 {% endfor %}
 {% endif %}
 ## How to Work
