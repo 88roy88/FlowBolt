@@ -84,9 +84,11 @@ async def update_project_model(project_id: str, model: str) -> None:
             await session.commit()
 
 
+_TRANSIENT_KEYS = {"sample_data", "generated_files"}
+
+
 async def update_project_data_sources(project_id: str, data_sources: Sequence[DataSourceContext]) -> None:
-    # `sample_data` can be very heavy and isn't needed once persisted.
-    stored = [{k: v for k, v in ds.items() if k != "sample_data"} for ds in data_sources]
+    stored = [{k: v for k, v in ds.items() if k not in _TRANSIENT_KEYS} for ds in data_sources]
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:

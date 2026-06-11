@@ -24,9 +24,7 @@ class DataSourceContext(TypedDict):
     integration_notes: str
     param_ux_hints: str
 
-    # Optional: held in memory during a build but absent from persisted records
-    # (sample_data is stripped on write; module_path/generated_files are added
-    # only after the deterministic TS module is generated).
+    # Optional (held in memory during the plan, but not persisted to the DB)
     sample_data: NotRequired[dict[str, Any] | None]
     module_path: NotRequired[str]
     generated_files: NotRequired[dict[str, str]]
