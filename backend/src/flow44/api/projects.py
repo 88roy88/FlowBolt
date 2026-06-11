@@ -56,12 +56,14 @@ async def list_user_projects(user_id: UserDep) -> list[dict[str, Any]]:
     user_perms = get_admin_permissions() if is_admin(user_id) else set()
     can_read_all = has_permission(user_perms, Permission.read)
 
+    exclude = {"data_sources"}
+
     if can_read_all:
         all_projects = await list_all_projects()
         result: list[dict[str, Any]] = []
         for p in all_projects:
             role = "owner" if p.user_id == user_id else "admin"
-            result.append(p.model_dump() | {"role": role})
+            result.append(p.model_dump(exclude=exclude) | {"role": role})
         return result
 
     owned = await db_list_user_projects(user_id)
@@ -69,9 +71,9 @@ async def list_user_projects(user_id: UserDep) -> list[dict[str, Any]]:
 
     result = []
     for p in owned:
-        result.append(p.model_dump() | {"role": "owner"})
+        result.append(p.model_dump(exclude=exclude) | {"role": "owner"})
     for p, role in shared:
-        result.append(p.model_dump() | {"role": role})
+        result.append(p.model_dump(exclude=exclude) | {"role": role})
 
     return result
 
