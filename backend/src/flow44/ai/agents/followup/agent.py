@@ -183,11 +183,12 @@ class FollowUpAgent(ChatAgent):
         # (also, we need to standardize session id and project id usage across the codebase).
 
         await self.emit({"type": "phase", "phase": "exploring"})
-        context = await self._build_context()
-
-        history = await get_messages(self.project_id)
+        context, history = await asyncio.gather(
+            self._build_context(),
+            get_messages(self.project_id),
+        )
         messages = [
-            Message(role=m.role, content=m.content)  # type: ignore[arg-type]
+            Message(role=m.role, content=m.content)
             for m in history
             if m.role == "user" or (m.role == "assistant" and m.content.strip())
         ]
