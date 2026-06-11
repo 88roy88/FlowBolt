@@ -83,6 +83,7 @@ async def update_project_model(project_id: str, model: str) -> None:
 
 
 async def update_project_data_sources(project_id: str, data_sources: list[dict[str, Any]]) -> None:
+    data_sources = [{k: v for k, v in ds.items() if k != "sample_data"} for ds in data_sources]
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
