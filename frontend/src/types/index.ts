@@ -75,6 +75,9 @@ export interface Project {
   selected_model?: string;
   published_url?: string;
   role?: ProjectRole;
+
+  /** Not included in list responses, fetch individually to access */
+  data_sources?: string;
 }
 
 export interface ProjectMember {
