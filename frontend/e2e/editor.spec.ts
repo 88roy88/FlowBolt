@@ -15,7 +15,7 @@ async function goToEditor(page: import('@playwright/test').Page) {
 }
 
 function fileTreeContainer(page: import('@playwright/test').Page) {
-  return page.locator('div.py-1').filter({ has: page.getByRole('button', { name: 'Create file' }) }).first();
+  return page.getByTestId('file-tree-root-dropzone').first();
 }
 
 function fileTreeRowByName(page: import('@playwright/test').Page, name: string) {
@@ -374,12 +374,12 @@ test.describe('Editor read-only gating', () => {
 
       await expect(page.getByText('Editing is enabled after the first AI build completes.').first()).toBeVisible();
 
-      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' }).first();
-      await expect(createRoot).toBeDisabled();
+      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' });
+      await expect(createRoot).toHaveCount(0);
       const srcRow = fileTreeRowByName(page, 'src');
       await srcRow.hover();
-      await expect(srcRow.getByTitle('Rename')).toBeDisabled();
-      await expect(srcRow.getByTitle('Delete')).toBeDisabled();
+      await expect(srcRow.getByTitle('Rename')).toHaveCount(0);
+      await expect(srcRow.getByTitle('Delete')).toHaveCount(0);
 
       const getPutCount = trackFileSaveRequests(page);
       const host = page.getByTestId('monaco-editor-host');
@@ -390,7 +390,7 @@ test.describe('Editor read-only gating', () => {
 
       await sendChatEvents([{ type: 'action_complete' }], 20);
       await expect(page.getByText('Editing is enabled after the first AI build completes.')).toHaveCount(0);
-      await expect(createRoot).toBeEnabled({ timeout: 5_000 });
+      await expect(createRoot.first()).toBeVisible({ timeout: 5_000 });
 
       await host.click();
       await page.keyboard.type('UNLOCKED_PHASE');
@@ -404,13 +404,13 @@ test.describe('Editor read-only gating', () => {
       const getUploadCount = trackUploadRequests(page);
       const initialUrl = page.url();
       const initialPageCount = page.context().pages().length;
-      const rootUploadButton = fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first();
-      await expect(rootUploadButton).toBeDisabled();
+      const rootUploadButton = fileTreeContainer(page).getByRole('button', { name: 'Upload files' });
+      await expect(rootUploadButton).toHaveCount(0);
 
       const srcRow = fileTreeRowByName(page, 'src');
       await srcRow.hover();
       const folderUploadButton = srcRow.getByTitle('Upload files');
-      await expect(folderUploadButton).toBeDisabled();
+      await expect(folderUploadButton).toHaveCount(0);
 
       const dataTransfer = await page.evaluateHandle(() => {
         const dt = new DataTransfer();
@@ -437,18 +437,18 @@ test.describe('Editor read-only gating', () => {
     test('locks while AI is working and unlocks again on completion', async ({ page, sendChatEvents }) => {
       await goToEditor(page);
 
-      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' }).first();
-      await expect(createRoot).toBeEnabled();
+      const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' });
+      await expect(createRoot.first()).toBeVisible();
 
       const chatInput = page.getByPlaceholder(/describe what you want/i);
       await expect(chatInput).toBeVisible({ timeout: 10_000 });
       await chatInput.fill('Please continue with a tiny follow-up change');
       await page.getByRole('button', { name: /send message/i }).click();
 
-      await expect(createRoot).toBeDisabled({ timeout: 5_000 });
+      await expect(createRoot).toHaveCount(0, { timeout: 5_000 });
 
       await sendChatEvents([{ type: 'action_complete' }], 20);
-      await expect(createRoot).toBeEnabled({ timeout: 5_000 });
+      await expect(createRoot.first()).toBeVisible({ timeout: 5_000 });
     });
   });
 });
