@@ -80,14 +80,13 @@ class ActionParser:
                         self.on_text(self._buffer[:safe])
                         self._buffer = self._buffer[safe:]
                     return
-                else:
-                    if idx > 0:
-                        self.on_text(self._buffer[:idx])
-                    m = self._ARTIFACT_OPEN.match(self._buffer, idx)
-                    if m is None:
-                        return
-                    self._buffer = self._buffer[m.end() :]
-                    self._state = _State.IN_ARTIFACT
+                if idx > 0:
+                    self.on_text(self._buffer[:idx])
+                m = self._ARTIFACT_OPEN.match(self._buffer, idx)
+                if m is None:
+                    return
+                self._buffer = self._buffer[m.end() :]
+                self._state = _State.IN_ARTIFACT
 
             elif self._state is _State.IN_ARTIFACT:
                 action_idx = self._buffer.find("<flowAction")
