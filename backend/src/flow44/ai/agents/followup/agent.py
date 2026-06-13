@@ -178,7 +178,7 @@ class FollowUpAgent(ChatAgent):
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         langfuse_context.update_current_observation(tags=["follow-up-agent"])
-        # TODO: add metadata. like SID  # noqa: E501
+        # TODO: add metadata. like SID
         # (also, we need to standardize session id and project id usage across the codebase).
 
         new_data_source_contexts: list[DataSourceContext] = []

@@ -108,7 +108,7 @@ def _redact_sample_data(sample: dict[str, Any] | None) -> str | None:
     return json.dumps(_redact(sample), indent=2)
 
 
-def _generate_data_source_docs(  # noqa: C901
+def _generate_data_source_docs(
     ctx: DataSourceContext,
     params_info: DataSourceParamsInfo,
     queries: list[DataSourceQuerySchema],

@@ -65,7 +65,7 @@ def _friendly_name(model_id: str) -> str:
 def _fetch_bedrock_models() -> list[dict[str, str]]:
     """Query AWS Bedrock for available Anthropic cross-region inference profiles."""
     try:
-        import boto3  # noqa: F811, PLC0415
+        import boto3  # noqa: PLC0415
     except ImportError:
         logger.warning("boto3 is not installed; skipping Bedrock model discovery")
         return []

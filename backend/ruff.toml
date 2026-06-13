@@ -69,6 +69,7 @@ select = [
     "PGH", # pygrep-hooks
     "UP", # pyupgrade
     "TRY", # tryceratops
+    "RUF100", # unused noqa directives
 ]
 
 ignore = [
