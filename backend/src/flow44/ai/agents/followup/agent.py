@@ -17,7 +17,7 @@ from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.ai.state import DataSourceContext
 from flow44.db.chat import get_messages
-from flow44.db.project import get_project, get_project_data_sources, update_project_data_sources
+from flow44.db.project import get_project, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -257,32 +257,32 @@ class FollowUpAgent(ChatAgent):
         for ctx in contexts:
             files = generate_data_source_files(ctx)
             module_path = next(iter(files))
-            content = files[module_path]
             ctx["module_path"] = module_path
 
-            try:
-                old_content = await self.sandbox.read_file(module_path)
-                is_new_module = False
-            except FileNotFoundError:
-                old_content = ""
-                is_new_module = True
+            for path, content in files.items():
+                try:
+                    old_content = await self.sandbox.read_file(path)
+                    is_new_file = False
+                except FileNotFoundError:
+                    old_content = ""
+                    is_new_file = True
 
-            await self.sandbox.write_file(module_path, content)
+                await self.sandbox.write_file(path, content)
 
-            diff_str = "".join(
-                difflib.unified_diff(
-                    old_content.splitlines(keepends=True),
-                    content.splitlines(keepends=True),
-                    fromfile=f"a/{module_path}",
-                    tofile=f"b/{module_path}",
-                    lineterm="",
+                diff_str = "".join(
+                    difflib.unified_diff(
+                        old_content.splitlines(keepends=True),
+                        content.splitlines(keepends=True),
+                        fromfile=f"a/{path}",
+                        tofile=f"b/{path}",
+                        lineterm="",
+                    )
                 )
-            )
-            await self.emit({"type": "file", "path": module_path, "content": content})
-            if diff_str:
-                self._diffs.append(FileDiff(path=module_path, diff=diff_str, is_new=is_new_module))
-            if module_path not in self._files_changed:
-                self._files_changed.append(module_path)
+                await self.emit({"type": "file", "path": path, "content": content})
+                if diff_str:
+                    self._diffs.append(FileDiff(path=path, diff=diff_str, is_new=is_new_file))
+                if path not in self._files_changed:
+                    self._files_changed.append(path)
 
         await self._persist_data_sources(contexts)
         return contexts
@@ -316,7 +316,7 @@ class FollowUpAgent(ChatAgent):
         except Exception:
             file_tree = "(unable to list files)"
 
-        existing_ds = await get_project_data_sources(self.project_id)
+        existing_ds = (project.data_sources or []) if project else []
 
         return {"summary": summary, "file_tree": file_tree, "existing_data_source_contexts": existing_ds}
 

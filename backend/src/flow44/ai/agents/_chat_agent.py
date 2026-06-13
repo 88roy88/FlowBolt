@@ -25,24 +25,23 @@ class ChatAgent(BaseAgent):
     ) -> str:
         parts: list[str] = []
 
-        if steps:
-            for step in steps:
-                tool = step.get("tool", "?")
-                args = step.get("args", {})
-                preview = step.get("resultPreview", "")
+        for step in steps:
+            tool = step.get("tool", "?")
+            args = step.get("args", {})
+            preview = step.get("resultPreview", "")
 
-                args_str = " ".join(
-                    f"{k}={v!r}" if not isinstance(v, str) else f"{k}={v}" for k, v in args.items() if k != "content"
-                )
-                result_short = preview[:80].replace("\n", " ").strip()
-                if len(preview) > 80:
-                    result_short += "..."
+            args_str = " ".join(
+                f"{k}={v!r}" if not isinstance(v, str) else f"{k}={v}" for k, v in args.items() if k != "content"
+            )
+            result_short = preview[:80].replace("\n", " ").strip()
+            if len(preview) > 80:
+                result_short += "..."
 
-                line = f"[{tool}: {args_str}".rstrip()
-                if result_short:
-                    line += f" → {result_short}"
-                line += "]"
-                parts.append(line)
+            line = f"[{tool}: {args_str}".rstrip()
+            if result_short:
+                line += f" → {result_short}"
+            line += "]"
+            parts.append(line)
 
         if files_changed:
             parts.append(f"[Changed: {', '.join(files_changed)}]")

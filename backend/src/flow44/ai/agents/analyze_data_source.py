@@ -96,7 +96,7 @@ def _redact_sample_data(sample: dict[str, Any] | None) -> str | None:
     if sample is None:
         return None
 
-    def _redact(obj: Any) -> Any:  # noqa: PLR0911
+    def _redact(obj: Any) -> Any:
         if isinstance(obj, dict):
             return {k: _redact(v) for k, v in obj.items()}
         if isinstance(obj, list):
