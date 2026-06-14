@@ -7,7 +7,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from flow44.ai.state import DataSourceContext
+from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them

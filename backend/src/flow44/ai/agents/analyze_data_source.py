@@ -10,7 +10,7 @@ from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
-from flow44.ai.state import DataSourceContext
+from flow44.db.project_data_source import DataSourceContext
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 

@@ -15,10 +15,9 @@ from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
-from flow44.ai.state import DataSourceContext
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
-from flow44.db.project_data_source import get_project_data_sources, update_project_data_sources
+from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
