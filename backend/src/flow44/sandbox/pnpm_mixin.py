@@ -23,6 +23,7 @@ class BuildCommandResult(BaseModel):
 class PnpmMixin(BaseSandbox, ABC):
     def configure_npmrc(self) -> None:
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
+        # TODO: make this work for namespaced mode too
         store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
 
         content = (

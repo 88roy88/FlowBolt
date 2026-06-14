@@ -46,7 +46,8 @@ dev-mocks: kill-port-$(DEV_PORT_MOCKS)
 # Install dependencies (also installs Husky git hooks)
 install:
 	cd frontend && pnpm install
-	cd mocks/flapi-mock && pnpm install
+	cd mocks/flapi-mock && pnpm clean --lockfile && pnpm install
+	cd backend/pnpm-project-template && pnpm clean --lockfile && pnpm install
 	cd backend && uv sync
 
 # Build Docker image
