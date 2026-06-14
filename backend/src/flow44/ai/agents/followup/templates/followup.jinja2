@@ -11,7 +11,10 @@ The following data sources were just attached and their TypeScript modules have 
 
 Usage: `import { dataSource{{ ds.sanitized_name }} } from './dataSources/{{ ds.sanitized_name }}';`
 {% endfor %}
-Use these modules when wiring up the new data sources into the app.
+Based on the user's request, determine their intent:
+- **Add as an option** — surface this data source as a selectable option alongside existing ones (e.g., a dropdown, tab, or toggle)
+- **Add as a new feature** — build a new UI section or page that presents this data source
+- **Replace an existing one** — swap out a current data source with this new one throughout the app
 {% endif %}
 
 ## Current Project
