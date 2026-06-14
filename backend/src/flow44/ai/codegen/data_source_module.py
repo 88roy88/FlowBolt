@@ -59,7 +59,7 @@ def generate_data_source_module(
     used_types = {p.type for p in params_info.parameters}
     type_defs = "\n".join(v for k, v in _TYPE_DEFS.items() if k in used_types)
 
-    parts = ["import { fetchWithAuth } from '../api/client';"]
+    parts = ["import { fetchDataSource } from '../api/client';"]
     if type_defs:
         parts.append(type_defs)
     parts.append(types_block)
@@ -147,12 +147,7 @@ def _build_body(
     path = f"/api/data-source/{data_source_id}/run"
 
     if not required and not optional:
-        lines.append(
-            f"  const res = await fetchWithAuth('{path}', {{\n"
-            f"    method: 'POST',\n"
-            f"    headers: {{ 'Content-Type': 'application/json' }},\n"
-            f"  }});\n"
-        )
+        lines.append(f"  const res = await fetchDataSource('{path}');\n")
     else:
         all_params = required + optional
         idents = _unique_idents(all_params)
@@ -169,13 +164,7 @@ def _build_body(
                 f"    body[{_js_string(p.cube_id)}][{_js_string(p.name)}] = {ident};\n"
                 f"  }}\n"
             )
-        lines.append(
-            f"  const res = await fetchWithAuth('{path}', {{\n"
-            f"    method: 'POST',\n"
-            f"    headers: {{ 'Content-Type': 'application/json' }},\n"
-            f"    body: JSON.stringify(body),\n"
-            f"  }});\n"
-        )
+        lines.append(f"  const res = await fetchDataSource('{path}', body);\n")
 
     lines.append(f"  const envelope = (await res.json()) as {{ data: {results_type} }};\n")
     if queries:

@@ -136,9 +136,7 @@ class TestGenerateDataSourceFiles:
         assert set(files.keys()) == {"src/dataSources/Sales.ts"}
         content = files["src/dataSources/Sales.ts"]
         assert "export async function dataSourceSales()" in content
-        assert "fetchWithAuth('/api/data-source/42/run', {" in content
-        assert "method: 'POST'" in content
-        assert "headers: { 'Content-Type': 'application/json' }" in content
+        assert "fetchDataSource('/api/data-source/42/run')" in content
         assert "body: JSON.stringify" not in content
 
     def test_requires_input_emits_typed_signature(self) -> None:
