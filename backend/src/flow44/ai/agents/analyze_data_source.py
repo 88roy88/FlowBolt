@@ -73,13 +73,12 @@ async def fetch_and_analyze_data_source(
 
 
 def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
-    sanitized = ctx["sanitized_name"]
-    module_path = f"src/dataSources/{sanitized}.ts"
-    params_info = DataSourceParamsInfo.model_validate(ctx["params_info"])
-    queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.get("queries", [])]
+    module_path = f"src/dataSources/{ctx.sanitized_name}.ts"
+    params_info = DataSourceParamsInfo.model_validate(ctx.params_info)
+    queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.queries]
     content = generate_data_source_module(
-        data_source_id=ctx["data_source_id"],
-        sanitized_name=sanitized,
+        data_source_id=ctx.data_source_id,
+        sanitized_name=ctx.sanitized_name,
         params_info=params_info,
         queries=queries,
     )

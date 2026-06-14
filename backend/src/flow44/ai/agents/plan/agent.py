@@ -112,8 +112,8 @@ class PlanAgent(BaseAgent):
         # Generate deterministic hook + type files and write to sandbox
         for ctx in state.build_state.data_source_contexts:
             generated = generate_data_source_files(ctx)
-            ctx["module_path"] = next(iter(generated))
-            ctx["generated_files"] = generated
+            ctx.module_path = next(iter(generated))
+            ctx.generated_files = generated
             for path, content in generated.items():
                 await state.sandbox_ref.write_file(path, content)
             state.build_state.generated_data_source_files.update(generated)
@@ -127,11 +127,11 @@ class PlanAgent(BaseAgent):
                     "type": "data_sources_fetched",
                     "data_sources": [
                         {
-                            "data_source_id": ctx["data_source_id"],
-                            "data_source_name": ctx["data_source_name"],
-                            "data_schema": ctx.get("data_schema", ""),
-                            "relevant_fields": ctx.get("relevant_fields", ""),
-                            "requires_input": not ctx.get("can_run_without_input", True),
+                            "data_source_id": ctx.data_source_id,
+                            "data_source_name": ctx.data_source_name,
+                            "data_schema": ctx.data_schema,
+                            "relevant_fields": ctx.relevant_fields,
+                            "requires_input": not ctx.can_run_without_input,
                             "params": [
                                 {
                                     "name": p["name"],
@@ -140,7 +140,7 @@ class PlanAgent(BaseAgent):
                                     "is_required": p["is_required"],
                                     "is_single_value": p["is_single_value"],
                                 }
-                                for p in ctx.get("params_info", {}).get("parameters", [])
+                                for p in ctx.params_info.get("parameters", [])
                             ],
                         }
                         for ctx in state.build_state.data_source_contexts

@@ -255,7 +255,7 @@ class FollowUpAgent(BaseAgent):
             files = generate_data_source_files(ctx)
             module_path = next(iter(files))
             content = files[module_path]
-            ctx["module_path"] = module_path
+            ctx.module_path = module_path
 
             try:
                 old_content = await self.sandbox.read_file(module_path)

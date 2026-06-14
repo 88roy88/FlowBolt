@@ -2,6 +2,7 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel, col, select
 
@@ -27,24 +28,24 @@ class ProjectDataSource(SQLModel, table=True):
     integration_notes: str = Field(default="")
     param_ux_hints: str = Field(default="")
 
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        setattr(self, key, value)
+class DataSourceContext(BaseModel):
+    """In-memory representation of a data source, including transient fields not stored to the DB."""
 
-    def get(self, key: str, default: Any = None) -> Any:
-        return getattr(self, key, default)
-
-    def items(self) -> Any:
-        return self.model_dump().items()
-
-
-class DataSourceContext(ProjectDataSource):
-    """In-memory context — extends ProjectDataSource with transient fields not stored to the DB."""
-
-    id: str = Field(default="")  # type: ignore[assignment]
-    project_id: str = Field(default="")  # type: ignore[assignment]
+    id: str = ""
+    project_id: str = ""
+    type: str = "flow_package"
+    data_source_id: str = ""
+    data_source_name: str = ""
+    sanitized_name: str = ""
+    queries: list[dict[str, Any]] = Field(default_factory=list)
+    params_info: dict[str, Any] = Field(default_factory=dict)
+    can_run_without_input: bool = False
+    data_schema: str = ""
+    relevant_fields: str = ""
+    data_characteristics: str = ""
+    integration_notes: str = ""
+    param_ux_hints: str = ""
     sample_data: dict[str, Any] | None = None
     module_path: str = ""
     generated_files: dict[str, str] = Field(default_factory=dict)
