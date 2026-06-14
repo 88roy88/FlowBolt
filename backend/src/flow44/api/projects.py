@@ -20,8 +20,8 @@ from flow44.db.project import (
     update_project_model,
 )
 from flow44.db.project import list_user_projects as db_list_user_projects
-from flow44.integrations.s3 import s3_storage
 from flow44.db.project_member import list_shared_projects
+from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
