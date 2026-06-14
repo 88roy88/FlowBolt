@@ -41,6 +41,31 @@ export interface FileEntry {
   children?: FileEntry[];
 }
 
+export const ProjectRoles = {
+  owner: 'owner',
+  viewer: 'viewer',
+  editor: 'editor',
+  publisher: 'publisher',
+  maintainer: 'maintainer',
+  admin: 'admin',
+} as const;
+
+export type ProjectRole = (typeof ProjectRoles)[keyof typeof ProjectRoles];
+export type AssignableRole = 'viewer' | 'editor' | 'publisher' | 'maintainer';
+
+export const WRITE_ROLES: ReadonlySet<ProjectRole> = new Set([
+  ProjectRoles.owner, ProjectRoles.editor, ProjectRoles.maintainer, ProjectRoles.admin,
+]);
+export const PUBLISH_ROLES: ReadonlySet<ProjectRole> = new Set([
+  ProjectRoles.owner, ProjectRoles.publisher, ProjectRoles.maintainer, ProjectRoles.admin,
+]);
+export const MANAGE_ROLES: ReadonlySet<ProjectRole> = new Set([
+  ProjectRoles.owner, ProjectRoles.maintainer, ProjectRoles.admin,
+]);
+export const DELETE_ROLES: ReadonlySet<ProjectRole> = new Set([
+  ProjectRoles.owner, ProjectRoles.admin,
+]);
+
 export interface Project {
   id: string;
   name: string;
@@ -49,6 +74,20 @@ export interface Project {
   summary?: string;
   selected_model?: string;
   published_url?: string;
+  role?: ProjectRole;
+}
+
+export interface ProjectMember {
+  user_id: string;
+  role: AssignableRole;
+  created_at: string;
+  invited_by: string;
+}
+
+export interface UserStatus {
+  user_id: string;
+  is_admin: boolean;
+  is_platform_user: boolean;
 }
 
 export interface AIModel {

@@ -53,7 +53,7 @@ initializeTheme();
 
 export default function App() {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, loadProjects, createProject } = useSessionStore();
+  const { projects, currentProject, setCurrentProject, loadProjects, loadUserStatus, createProject, userStatus } = useSessionStore();
   const loadHistory = useChatStore((s) => s.loadHistory);
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
   const resetFiles = useFilesStore((s) => s.reset);
@@ -95,7 +95,7 @@ export default function App() {
   }, [t]);
 
   useEffect(() => {
-    loadProjects()
+    Promise.all([loadProjects(), loadUserStatus()])
       .then(() => {
         const hasProjects = useSessionStore.getState().projects.length > 0;
         setHasProjectsCache(hasProjects);
@@ -108,7 +108,7 @@ export default function App() {
         });
       })
       .finally(() => setLoading(false));
-  }, [loadProjects, t]);
+  }, [loadProjects, loadUserStatus, t]);
 
   // On load: match URL hash to a project, or auto-select first
   useEffect(() => {
@@ -184,6 +184,8 @@ export default function App() {
   }
 
   if (showNewProject && projects.length === 0) {
+    const canCreate = userStatus?.is_platform_user || userStatus?.is_admin;
+
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6 px-8 relative overflow-hidden">
         {/* Background glow */}
@@ -211,7 +213,7 @@ export default function App() {
                 {t('app.retryConnection')}
               </button>
             </>
-          ) : (
+          ) : canCreate ? (
             <>
               <p className="text-base text-muted-foreground text-center leading-relaxed">
                 {t('app.createFirstProject')}
@@ -233,6 +235,12 @@ export default function App() {
                 </button>
               </div>
             </>
+          ) : (
+            <div className="w-full px-5 py-4 bg-surface rounded-xl border border-border text-center">
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {t('app.noAccessMessage', "You don't have access to create projects yet. Ask your administrator for an invitation.")}
+              </p>
+            </div>
           )}
         </div>
       </div>

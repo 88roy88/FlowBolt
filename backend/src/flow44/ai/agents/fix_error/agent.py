@@ -15,7 +15,7 @@ from flow44.sandbox.main import PnpmSandbox
 logger = logging.getLogger(__name__)
 
 
-MAX_RETRY_ATTEMPTS = 1
+MAX_RETRY_ATTEMPTS = 3
 
 
 class FixErrorAgent(BaseAgent):

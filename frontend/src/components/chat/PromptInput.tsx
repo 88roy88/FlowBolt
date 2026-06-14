@@ -8,6 +8,8 @@ import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 
+import { WRITE_ROLES } from '../../types';
+
 export function PromptInput() {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
@@ -18,10 +20,13 @@ export function PromptInput() {
   const agentPhase = useChatStore((s) => s.agentPhase);
   const agentAlive = useChatStore(isAgentAlive);
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
-  const inputBlocked = agentAlive || awaitingPlan;
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const projectId = useSessionStore((s) => s.projectId);
+  const currentProject = useSessionStore((s) => s.currentProject);
+  const projectRole = currentProject?.role;
+  const canWrite = !projectRole || WRITE_ROLES.has(projectRole);
+  const inputBlocked = agentAlive || awaitingPlan || !canWrite;
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -63,11 +68,13 @@ export function PromptInput() {
 
   const placeholder = !projectId
     ? t('chat.placeholder.selectProject')
-    : awaitingPlan
-      ? t('chat.placeholder.reviewPlan')
-      : inputBlocked
-        ? t('chat.placeholder.working')
-        : t('chat.placeholder.default');
+    : !canWrite
+      ? t('chat.placeholder.readOnly', 'View-only access')
+      : awaitingPlan
+        ? t('chat.placeholder.reviewPlan')
+        : inputBlocked
+          ? t('chat.placeholder.working')
+          : t('chat.placeholder.default');
 
   const busyLabel =
     agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :

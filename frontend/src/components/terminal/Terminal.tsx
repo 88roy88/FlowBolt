@@ -3,14 +3,13 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useSessionStore } from '../../stores/session';
-import { createTerminalSocket } from '../../services/websocket';
+import { getTerminalSocket } from '../../services/websocket/terminal';
 import { getTerminalTheme } from '../../utils/terminalTheme';
 import '@xterm/xterm/css/xterm.css';
 
 export function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
-  const socketRef = useRef<ReturnType<typeof createTerminalSocket> | null>(null);
   const projectId = useSessionStore((s) => s.projectId);
 
   useEffect(() => {
@@ -34,17 +33,17 @@ export function Terminal() {
     term.open(containerRef.current);
     fitAddon.fit();
 
-    const socket = createTerminalSocket(projectId);
-    socketRef.current = socket;
+    const socket = getTerminalSocket(projectId);
     termRef.current = term;
 
     term.onData((data) => {
       socket.send(data);
     });
 
-    socket.onData((data) => {
+    const handler = (data: string) => {
       term.write(data);
-    });
+    };
+    const unsubscribe = socket.onData(handler);
 
     const resizeObserver = new ResizeObserver(() => {
       try {
@@ -67,12 +66,11 @@ export function Terminal() {
     });
 
     return () => {
+      unsubscribe();
       resizeObserver.disconnect();
       mutationObserver.disconnect();
-      socket.close();
       term.dispose();
       termRef.current = null;
-      socketRef.current = null;
     };
   }, [projectId]);
 
