@@ -25,7 +25,7 @@ from flow44.api.deps import validate_token, validate_ws_token
 from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
-from flow44.integrations.s3 import setup_bucket
+from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
@@ -61,8 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.S3_BUCKET_NAME:
         logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
         try:
-            # TODO: if we keep this here, we should add check_bucket_exists and only call create if not.
-            setup_bucket(settings.S3_BUCKET_NAME)
+            await s3_storage.setup(settings.S3_BUCKET_NAME)
             logger.info("S3 bucket setup complete.")
         except Exception as exc:
             logger.warning("S3 bucket setup issue (may already exist or be misconfigured): %s", exc)
@@ -71,6 +70,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
     await idle_reaper.stop()
     await sandbox_manager.suspend_all()
+    await s3_storage.close()
     logger.info("Shutdown complete.")
 
 

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import re
 from enum import StrEnum
@@ -10,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from flow44.api.deps import ProjectDep
 from flow44.config import settings
 from flow44.db.project import is_handle_taken, update_project_published_url
-from flow44.integrations.s3 import deploy_single_html
+from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.operations import BuildError, build_single_html
 
 logger = logging.getLogger(__name__)
@@ -80,11 +79,9 @@ async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishReque
     except BuildError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # Deploy the single HTML to S3 securely without blocking the event loop
+    # Deploy the single HTML to S3 without blocking the event loop
     try:
-        loop = asyncio.get_running_loop()
-        # TODO - REFACTOR TO AIOBOTO3: boto3 doesn't support async so we have to run in a thread pool.
-        await loop.run_in_executor(None, deploy_single_html, html_content, project.id)
+        await s3_storage.deploy_single_html(html_content, project.id)
     except Exception as exc:
         logger.exception("S3 deployment failed for project %s", project.id)
         raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}") from exc

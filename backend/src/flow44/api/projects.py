@@ -17,6 +17,7 @@ from flow44.db.project import (
     update_project_model,
 )
 from flow44.db.project import list_user_projects as db_list_user_projects
+from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
@@ -79,6 +80,7 @@ async def update_project_selected_model(project: ProjectDep, body: UpdateProject
 async def delete_existing_project(project: ProjectDep) -> None:
     await sandbox_manager.destroy_sandbox(project.id)
     idle_reaper.remove(project.id)
+    await s3_storage.delete_published_html(project.id)
     await delete_project(project.id)
 
 

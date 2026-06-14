@@ -6,6 +6,7 @@ import logging
 import time
 from typing import Any, cast
 
+import aioboto3
 import httpx
 from fastapi import APIRouter
 
@@ -62,17 +63,11 @@ def _friendly_name(model_id: str) -> str:
     return model_id.replace("anthropic.", "").rsplit("-", 1)[0].replace("-", " ").title()
 
 
-def _fetch_bedrock_models() -> list[dict[str, str]]:
+async def _fetch_bedrock_models() -> list[dict[str, str]]:
     """Query AWS Bedrock for available Anthropic cross-region inference profiles."""
     try:
-        import boto3  # noqa: F811, PLC0415
-    except ImportError:
-        logger.warning("boto3 is not installed; skipping Bedrock model discovery")
-        return []
-
-    try:
-        client = boto3.client("bedrock")
-        response = client.list_inference_profiles(typeEquals="SYSTEM_DEFINED")
+        async with aioboto3.Session().client("bedrock") as client:
+            response = await client.list_inference_profiles(typeEquals="SYSTEM_DEFINED")
         models: list[dict[str, str]] = []
         for profile in response.get("inferenceProfileSummaries", []):
             profile_id: str = profile.get("inferenceProfileId", "")
@@ -180,13 +175,13 @@ def _get_openrouter_models() -> list[dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 
-def _refresh_models() -> list[dict[str, str]]:
+async def _refresh_models() -> list[dict[str, str]]:
     """Fetch models from all providers and update the cache."""
     all_models: list[dict[str, str]] = []
 
     # If using Bedrock, fetch Bedrock models; otherwise fetch from AI_BASE_URL
     if settings.AI_MODEL.startswith("bedrock"):
-        all_models.extend(_fetch_bedrock_models())
+        all_models.extend(await _fetch_bedrock_models())
     else:
         all_models.extend(_fetch_models_from_base_url())
 
@@ -205,7 +200,7 @@ async def list_models() -> list[dict[str, str]]:
     """Return the list of available AI models (cached for 60 s)."""
     if _cache_valid():
         return cast(list[dict[str, str]], _cache["models"])
-    return _refresh_models()
+    return await _refresh_models()
 
 
 @router.get("/api/models/default")
