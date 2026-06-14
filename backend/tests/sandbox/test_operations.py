@@ -34,6 +34,14 @@ class TestResolveAssetPath:
         assert result is not None
         assert "chunk.js" in result
 
+    def test_public_base_prefix_is_removed(self, tmp_path) -> None:  # type: ignore[type-arg]
+        dist = tmp_path / "dist"
+        (dist / "assets").mkdir(parents=True)
+
+        result = _resolve_asset_path(str(dist), "/shared/my-app/assets/chunk.js")
+
+        assert result == str(dist / "assets" / "chunk.js")
+
 
 class TestInlineCssAssets:
     def test_inlines_stylesheet(self, tmp_path) -> None:  # type: ignore[type-arg]

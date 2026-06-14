@@ -108,6 +108,12 @@ def test_explicit_mui_prompt_selects_mui() -> None:
     assert selected == ["mui"]
 
 
+def test_deep_link_prompt_selects_react_router() -> None:
+    decision = high_confidence_optional_package_decision("Add a deep link to the project details page.")
+
+    assert selected_package_names(decision) == ["react-router-dom"]
+
+
 def test_chart_dashboard_prompt_selects_recharts() -> None:
     selected = selected_package_names(high_confidence_optional_package_decision(CHART_DASHBOARD_PROMPT))
 

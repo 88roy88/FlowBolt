@@ -38,6 +38,20 @@ class OptionalPackage:
 
 
 OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
+    "react-router-dom": OptionalPackage(
+        name="react-router-dom",
+        capability="client_routing",
+        packages=("react-router-dom",),
+        use_when=(
+            "Use when the user asks for multiple real screens/pages, route URLs, deep links, nested routes, "
+            "or browser back/forward behavior."
+        ),
+        avoid_when=(
+            "Avoid for one-screen apps, simple tabs, accordions, same-page sections, or local conditional "
+            "panels that do not need URLs."
+        ),
+        strong_intent_groups=(("deep link",), ("browser back",), ("route url",)),
+    ),
     "mui": OptionalPackage(
         name="mui",
         capability="material_ui_components",

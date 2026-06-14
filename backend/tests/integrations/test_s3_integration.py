@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from flow44.config import settings
-from flow44.integrations.s3 import connect_to_s3, deploy_single_html, setup_bucket
+from flow44.integrations.s3 import connect_to_s3, deploy_shared_dist, deploy_single_html, setup_bucket
 
 
 @pytest.fixture(autouse=True)
@@ -49,17 +49,36 @@ def test_deploy_single_html():
         project_id = "proj-123"
 
         # Ensure settings are controlled
-        with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
-            with patch.object(settings, "S3_ENDPOINT_URL", "http://s3.local"):
-                url = deploy_single_html(html_content, project_id)
+        with (
+            patch.object(settings, "S3_BUCKET_NAME", "my-bucket"),
+            patch.object(settings, "S3_ENDPOINT_URL", "http://s3.local"),
+        ):
+            url = deploy_single_html(html_content, project_id)
 
-                expected_key = f"published/{project_id}.html"
-                mock_client.put_object.assert_called_once_with(
-                    Bucket="my-bucket",
-                    Key=expected_key,
-                    Body=html_content.encode("utf-8"),
-                    ContentType="text/html",
-                    ACL="public-read",
-                    StorageClass=settings.S3_STORAGE_CLASS,
-                )
-                assert url == f"http://s3.local/my-bucket/{expected_key}"
+            expected_key = f"published/{project_id}.html"
+            mock_client.put_object.assert_called_once_with(
+                Bucket="my-bucket",
+                Key=expected_key,
+                Body=html_content.encode("utf-8"),
+                ContentType="text/html",
+                ACL="public-read",
+                StorageClass=settings.S3_STORAGE_CLASS,
+            )
+            assert url == f"http://s3.local/my-bucket/{expected_key}"
+
+
+def test_deploy_shared_dist(tmp_path):
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html>index</html>")
+    (dist / "assets" / "main.js").write_text("console.log('ok')")
+
+    with patch("flow44.integrations.s3.connect_to_s3") as mock_connect:
+        mock_connect.return_value = MagicMock()
+        with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"), patch.object(
+            settings, "S3_ENDPOINT_URL", "http://s3.local"
+        ):
+            url = deploy_shared_dist(str(dist), "proj-456")
+
+    assert mock_connect.return_value.put_object.call_count == 2
+    assert url == "http://s3.local/my-bucket/published/proj-456/index.html"
