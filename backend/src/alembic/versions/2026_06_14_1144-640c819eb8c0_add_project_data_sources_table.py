@@ -38,7 +38,7 @@ def upgrade() -> None:
         sa.Column("data_characteristics", sa.String(), nullable=False, server_default=""),
         sa.Column("integration_notes", sa.String(), nullable=False, server_default=""),
         sa.Column("param_ux_hints", sa.String(), nullable=False, server_default=""),
-        sa.UniqueConstraint("project_id", "data_source_id", name="uq_project_data_source"),
+        sa.UniqueConstraint("project_id", "type", "data_source_id", name="uq_project_data_source"),
     )
     op.create_index("ix_project_data_sources_project_id", "project_data_sources", ["project_id"])
 
@@ -65,7 +65,7 @@ def upgrade() -> None:
                         (:id, :project_id, :type, :data_source_id, :data_source_name, :sanitized_name,
                          :queries, :params_info, :can_run_without_input, :data_schema,
                          :relevant_fields, :data_characteristics, :integration_notes, :param_ux_hints)
-                    ON CONFLICT (project_id, data_source_id) DO NOTHING
+                    ON CONFLICT (project_id, type, data_source_id) DO NOTHING
                 """),
                 {
                     "id": str(uuid.uuid4()),

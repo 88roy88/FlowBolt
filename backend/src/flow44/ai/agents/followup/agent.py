@@ -287,9 +287,9 @@ class FollowUpAgent(BaseAgent):
     async def _persist_data_sources(self, new_contexts: list[DataSourceContext]) -> None:
         """Merge newly attached data sources into the project's stored list (by id)."""
         existing = await get_project_data_sources(self.project_id)
-        by_id: dict[str, DataSourceContext] = {ds["data_source_id"]: ds for ds in existing}
+        by_id: dict[tuple[str, str], DataSourceContext] = {(ds.type, ds.data_source_id): ds for ds in existing}
         for ctx in new_contexts:
-            by_id[ctx["data_source_id"]] = ctx
+            by_id[(ctx.type, ctx.data_source_id)] = ctx
         await update_project_data_sources(self.project_id, list(by_id.values()))
 
     # TODO: We will want to have a smarted memory system in the future

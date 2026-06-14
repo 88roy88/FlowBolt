@@ -10,7 +10,7 @@ from flow44.db import database
 
 class ProjectDataSource(SQLModel, table=True):
     __tablename__ = "project_data_sources"
-    __table_args__ = (UniqueConstraint("project_id", "data_source_id", name="uq_project_data_source"),)
+    __table_args__ = (UniqueConstraint("project_id", "type", "data_source_id", name="uq_project_data_source"),)
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     project_id: str = Field(index=True)
@@ -70,23 +70,16 @@ async def update_project_data_sources(project_id: str, data_sources: Sequence[Da
         existing = await session.execute(
             select(ProjectDataSource).where(col(ProjectDataSource.project_id) == project_id)
         )
-        by_id = {row.data_source_id: row for row in existing.scalars().all()}
+        by_id = {(row.type, row.data_source_id): row for row in existing.scalars().all()}
 
+        _transient = {"id", "project_id", "sample_data", "module_path", "generated_files"}
         for ctx in data_sources:
-            row = by_id.get(ctx.data_source_id)
+            persistent = ctx.model_dump(exclude=_transient)
+            row = by_id.get((ctx.type, ctx.data_source_id))
             if row is None:
-                row = ProjectDataSource(project_id=project_id, data_source_id=ctx.data_source_id)
-                session.add(row)
-            row.type = ctx.type
-            row.data_source_name = ctx.data_source_name
-            row.sanitized_name = ctx.sanitized_name
-            row.queries = ctx.queries
-            row.params_info = ctx.params_info
-            row.can_run_without_input = ctx.can_run_without_input
-            row.data_schema = ctx.data_schema
-            row.relevant_fields = ctx.relevant_fields
-            row.data_characteristics = ctx.data_characteristics
-            row.integration_notes = ctx.integration_notes
-            row.param_ux_hints = ctx.param_ux_hints
+                session.add(ProjectDataSource(project_id=project_id, **persistent))
+            else:
+                for k, v in persistent.items():
+                    setattr(row, k, v)
 
         await session.commit()
