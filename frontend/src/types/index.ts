@@ -77,7 +77,7 @@ export interface Project {
   role?: ProjectRole;
 
   /** Not included in list responses, fetch individually to access */
-  data_sources?: string;
+  data_sources?: unknown;
 }
 
 export interface ProjectMember {
