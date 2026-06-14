@@ -119,7 +119,7 @@ class PlanAgent(BaseAgent):
             state.build_state.generated_data_source_files.update(generated)
 
         if state.build_state.data_source_contexts:
-            from flow44.db.project import update_project_data_sources  # noqa: PLC0415
+            from flow44.db.project_data_source import update_project_data_sources  # noqa: PLC0415
 
             await update_project_data_sources(state.project_id, state.build_state.data_source_contexts)
             await state.emit_fn(

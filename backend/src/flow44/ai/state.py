@@ -11,6 +11,7 @@ from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, U
 class DataSourceContext(TypedDict):
     """Data source metadata and generated analysis"""
 
+    type: NotRequired[str]  # default "flow_package"
     data_source_id: str
     data_source_name: str
     sanitized_name: str

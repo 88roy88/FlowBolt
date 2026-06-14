@@ -1,12 +1,8 @@
 import uuid
-from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
 
-from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel, col, select
 
-from flow44.ai.state import DataSourceContext
 from flow44.db import database
 
 
@@ -20,7 +16,6 @@ class Project(SQLModel, table=True):
     updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     summary: str = Field(default="")
     selected_model: str = Field(default="")
-    data_sources: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, default=[]))
     published_url: str | None = Field(default=None, sa_column_kwargs={"unique": True})
     published_at: str | None = Field(default=None)
 
@@ -82,28 +77,6 @@ async def update_project_model(project_id: str, model: str) -> None:
             project.updated_at = datetime.now(UTC).isoformat()
             session.add(project)
             await session.commit()
-
-
-_TRANSIENT_KEYS = {"sample_data", "generated_files"}
-
-
-async def update_project_data_sources(project_id: str, data_sources: Sequence[DataSourceContext]) -> None:
-    stored = [{k: v for k, v in ds.items() if k not in _TRANSIENT_KEYS} for ds in data_sources]
-    async with database.async_session() as session:
-        project = await session.get(Project, project_id)
-        if project:
-            project.data_sources = stored
-            project.updated_at = datetime.now(UTC).isoformat()
-            session.add(project)
-            await session.commit()
-
-
-async def get_project_data_sources(project_id: str) -> list[dict[str, Any]]:
-    async with database.async_session() as session:
-        project = await session.get(Project, project_id)
-        if project is None:
-            return []
-        return project.data_sources or []
 
 
 async def delete_project(project_id: str) -> None:

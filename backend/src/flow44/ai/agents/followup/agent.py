@@ -4,7 +4,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from langfuse.decorators import langfuse_context, observe
 from pydantic import BaseModel
@@ -17,7 +17,8 @@ from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.ai.state import DataSourceContext
 from flow44.db.chat import get_messages
-from flow44.db.project import get_project, update_project_data_sources
+from flow44.db.project import get_project
+from flow44.db.project_data_source import get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -286,8 +287,7 @@ class FollowUpAgent(BaseAgent):
 
     async def _persist_data_sources(self, new_contexts: list[DataSourceContext]) -> None:
         """Merge newly attached data sources into the project's stored list (by id)."""
-        project = await get_project(self.project_id)
-        existing = cast(list[DataSourceContext], project.data_sources) if project and project.data_sources else []
+        existing = await get_project_data_sources(self.project_id)
         by_id: dict[str, DataSourceContext] = {ds["data_source_id"]: ds for ds in existing}
         for ctx in new_contexts:
             by_id[ctx["data_source_id"]] = ctx
