@@ -6,7 +6,7 @@ from flow44.ai.agents.execute.models import WorkPlan
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.db.project_data_source import DataSourceContext
 
-__all__ = ["DataSourceContext", "BuildState"]
+__all__ = ["BuildState"]
 
 
 class BuildState(BaseModel):
