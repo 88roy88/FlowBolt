@@ -42,11 +42,7 @@ async def get_project(project_id: str) -> Project | None:
 
 async def list_user_projects(user_id: str) -> list[Project]:
     async with database.async_session() as session:
-        query = (
-            select(Project)
-            .where(Project.user_id == user_id)
-            .order_by(col(Project.created_at).desc())
-        )
+        query = select(Project).where(Project.user_id == user_id).order_by(col(Project.created_at).desc())
         result = await session.execute(query)
         return list(result.scalars().all())
 
