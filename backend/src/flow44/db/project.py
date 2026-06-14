@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, Column
-from sqlalchemy.orm import defer
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -47,7 +46,6 @@ async def list_user_projects(user_id: str) -> list[Project]:
             select(Project)
             .where(Project.user_id == user_id)
             .order_by(col(Project.created_at).desc())
-            .options(defer(Project.data_sources))  # type: ignore[arg-type]
         )
         result = await session.execute(query)
         return list(result.scalars().all())
@@ -56,7 +54,7 @@ async def list_user_projects(user_id: str) -> list[Project]:
 async def list_all_projects() -> list[Project]:
     """Returns every project across all users."""
     async with database.async_session() as session:
-        query = select(Project).order_by(col(Project.created_at).desc()).options(defer(Project.data_sources))  # type: ignore[arg-type]
+        query = select(Project).order_by(col(Project.created_at).desc())
         result = await session.execute(query)
         return list(result.scalars().all())
 
