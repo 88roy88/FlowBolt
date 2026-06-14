@@ -23,7 +23,7 @@ def render_architecture(*, data_source_contexts: list[DataSourceContext] | None 
     if data_source_contexts:
         prepared = [
             {
-                **ctx,
+                **ctx.model_dump(),
                 "sample_data_json": (
                     json.dumps(ctx.sample_data, indent=2)[:1000] if ctx.sample_data is not None else None
                 ),
