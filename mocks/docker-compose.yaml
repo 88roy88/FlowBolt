@@ -7,7 +7,7 @@ services:
     working_dir: /app
     volumes:
       - ./flapi-mock:/app
-    command: sh -c "npm install && node server.js"
+    command: sh -c "npm install && npm start"
     ports:
       - "6001:6001"
     environment:
