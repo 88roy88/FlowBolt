@@ -1,0 +1,34 @@
+## File Safety Rules
+
+Default:
+- You may edit normal app source files needed for the user request.
+- Keep changes focused.
+- Preserve existing behavior unless the task requires changing it.
+- Be careful with shared/core files.
+
+Do not touch:
+- `package.json` or lock files
+- `vite.config.ts`
+- `index.html`
+- env files
+- `src/main.tsx`
+- `src/platform/*`
+- template guard files
+- CI/CD files
+- backend/server files
+- deployment/infrastructure files
+
+Edit only when clearly needed:
+- `src/App.tsx`
+- shared layout files
+- shared mock data/type files
+- global CSS files
+
+Free to edit:
+- `src/components/*`
+- `src/pages/*`
+- `src/data/*`
+- `src/lib/*`
+- `src/hooks/*`
+- `src/types/*`
+- feature-specific app files
