@@ -54,40 +54,26 @@ OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
         ),
         strong_intent_groups=(("real screens",), ("deep link",), ("browser back",), ("route url",)),
     ),
-    # "regraph": OptionalPackage(
-    #     name="regraph",
-    #     capability="connected_data_visualization",
-    #     packages=("regraph",),
-    #     use_when=(
-    #         "Use for interactive relationship, node/edge, network, dependency, or connection maps; assets, "
-    #         "services, APIs, databases, or owners connected to each other; clickable nodes; highlighted "
-    #         "connections; selecting a table row to focus a graph node; or relationship exploration. ReGraph "
-    #         "is paid but available inside the organization, so do not avoid it because it is paid."
-    #     ),
-    #     avoid_when=(
-    #         "Avoid for ordinary charts, static diagrams, simple cards, normal tables, non-interactive "
-    #         "summaries, or a tiny static org chart that can be plain HTML/CSS."
-    #     ),
-    #     strong_intent_groups=(
-    #         ("visual map", "connected"),
-    #         ("connection map", "click"),
-    #         ("connection map", "highlight"),
-    #         ("click a node",),
-    #         ("highlight", "graph node"),
-    #     ),
-    # ),
-    "reagraph": OptionalPackage(
-        name="reagraph",
-        capability="webgl_network_graph",
-        packages=("reagraph",),
+    "regraph": OptionalPackage(
+        name="regraph",
+        capability="connected_data_visualization",
+        packages=("regraph",),
         use_when=(
-            "Use when the user specifically needs a WebGL network graph, draggable nodes, or a force-directed "
-            "or hierarchical layout over separate nodes and edges arrays."
+            "Use for interactive relationship, node/edge, network, dependency, or connection maps; assets, "
+            "services, APIs, databases, or owners connected to each other; clickable nodes; highlighted "
+            "connections; selecting a table row to focus a graph node; or relationship exploration. ReGraph "
+            "is paid but available inside the organization, so do not avoid it because it is paid."
         ),
         avoid_when=(
-            "Do not use for bar/line/pie charts, static diagrams, tables, org charts drawn with CSS, "
-            "Cambridge ReGraph item timelines, general connected-data investigation maps where ReGraph is the "
-            "better fit, or tiny relationship summaries that do not need WebGL rendering."
+            "Avoid for ordinary charts, static diagrams, simple cards, normal tables, non-interactive "
+            "summaries, or a tiny static org chart that can be plain HTML/CSS."
+        ),
+        strong_intent_groups=(
+            ("visual map", "connected"),
+            ("connection map", "click"),
+            ("connection map", "highlight"),
+            ("click a node",),
+            ("highlight", "graph node"),
         ),
     ),
     "react-table": OptionalPackage(

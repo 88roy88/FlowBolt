@@ -62,7 +62,7 @@ async def test_connected_assets_packages_are_installed_before_merge(monkeypatch:
         calls.append("merge")
         return """
         {
-          "summary": "Use reagraph for the graph",
+          "summary": "Use react-table for the asset list",
           "tasks": [
             {
               "id": "unsafe",
@@ -74,7 +74,7 @@ async def test_connected_assets_packages_are_installed_before_merge(monkeypatch:
             {
               "id": "app",
               "title": "Build app",
-              "description": "Use reagraph for the graph",
+              "description": "Use react-table for the asset list",
               "files": ["src/App.tsx"],
               "depends_on": ["unsafe"]
             }
@@ -96,7 +96,7 @@ async def test_connected_assets_packages_are_installed_before_merge(monkeypatch:
     assert plan.selected_packages == ["react-router-dom", "regraph"]
     assert [task.files for task in plan.tasks] == [["src/App.tsx"]]
     assert plan.tasks[0].depends_on == []
-    assert "reagraph" not in plan.tasks[0].description
+    assert "react-table" not in plan.tasks[0].description
 
 
 @pytest.mark.asyncio

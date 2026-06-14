@@ -118,11 +118,11 @@ def test_package_capability_helpers() -> None:
 
 
 def test_recovered_optional_package_mappings() -> None:
-    selected = ["reagraph", "react-table"]
+    selected = ["react-table"]
 
-    assert package_capabilities(selected) == ["webgl_network_graph", "interactive_data_table"]
-    assert package_install_names(selected) == ["reagraph", "@tanstack/react-table"]
-    assert allowed_import_names(selected) == ["reagraph", "@tanstack/react-table"]
+    assert package_capabilities(selected) == ["interactive_data_table"]
+    assert package_install_names(selected) == ["@tanstack/react-table"]
+    assert allowed_import_names(selected) == ["@tanstack/react-table"]
 
 
 def test_leaflet_optional_package_installs_runtime_and_types() -> None:
@@ -158,10 +158,10 @@ def test_selected_packages_recovered_from_actual_dependency_names() -> None:
 
 def test_unselected_known_package_plan_reference_uses_fallback() -> None:
     repaired = repair_unselected_package_references(
-        "Use react-router-dom and regraph, but keep selected reagraph.",
-        ["reagraph"],
+        "Use react-router-dom and react-table, but keep selected regraph.",
+        ["regraph"],
     )
 
     assert "react-router-dom" not in repaired
-    assert "regraph," not in repaired
-    assert "selected reagraph" in repaired
+    assert "react-table" not in repaired
+    assert "selected regraph" in repaired
