@@ -182,13 +182,27 @@ class FollowUpAgent(BaseAgent):
         self._setup_trace(["follow-up-agent"])
 
         new_data_source_contexts: list[DataSourceContext] = []
+        existing_data_source_contexts: list[DataSourceContext] = []
         if data_source_ids:
-            new_data_source_contexts = await self._fetch_and_generate_new_data_sources(content, data_source_ids)
+            new_ids, _ = await self._classify_data_source_ids(data_source_ids)
+            await self.emit({"type": "phase", "phase": "fetching_data_sources"})
+            try:
+                all_contexts: list[DataSourceContext] = list(
+                    await asyncio.gather(
+                        *[self._fetch_analyze_and_write(sid, content) for sid in data_source_ids]
+                    )
+                )
+            except Exception:
+                await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
+                raise
+            new_data_source_contexts = [ctx for ctx in all_contexts if ctx.data_source_id in new_ids]
+            existing_data_source_contexts = [ctx for ctx in all_contexts if ctx.data_source_id not in new_ids]
+            if all_contexts:
+                await self._persist_data_sources(all_contexts)
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
 
-        # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
         history = await get_messages(self.project_id)
         messages = [
             Message(role=m.role, content=m.content)  # type: ignore[arg-type]
@@ -200,6 +214,7 @@ class FollowUpAgent(BaseAgent):
             project_summary=context["summary"],
             file_tree=context["file_tree"],
             new_data_source_contexts=new_data_source_contexts or None,
+            existing_data_source_contexts=existing_data_source_contexts or None,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -227,23 +242,15 @@ class FollowUpAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
-    async def _fetch_and_generate_new_data_sources(
-        self, user_content: str, data_source_ids: list[str]
-    ) -> list[DataSourceContext]:
-        await self.emit({"type": "phase", "phase": "fetching_data_sources"})
-
-        try:
-            contexts: list[DataSourceContext] = list(
-                await asyncio.gather(
-                    *[self._fetch_analyze_and_write(sid, user_content) for sid in data_source_ids]
-                )
-            )
-        except Exception:
-            await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
-            raise
-
-        await self._persist_data_sources(contexts)
-        return contexts
+    async def _classify_data_source_ids(
+        self, data_source_ids: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Split ids into new (not yet in project) and existing (already integrated)."""
+        stored = await get_project_data_sources(self.project_id)
+        stored_ids = {ds.data_source_id for ds in stored}
+        new_ids = [sid for sid in data_source_ids if sid not in stored_ids]
+        existing_ids = [sid for sid in data_source_ids if sid in stored_ids]
+        return new_ids, existing_ids
 
     async def _fetch_analyze_and_write(self, sid: str, user_content: str) -> DataSourceContext:
         ctx = await fetch_and_analyze_data_source(
