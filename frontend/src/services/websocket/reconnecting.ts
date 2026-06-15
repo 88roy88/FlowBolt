@@ -43,12 +43,13 @@ export function createReconnectingSocket(
 
     socket.addEventListener('close', () => {
       socket = null;
-      onClose?.();
       if (!closed) {
         setTimeout(() => {
           retryDelay = Math.min(retryDelay * 2, maxRetryDelay);
           connect();
         }, retryDelay);
+      } else {
+        onClose?.();
       }
     });
 

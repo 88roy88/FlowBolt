@@ -20,7 +20,8 @@
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
     "retryConnection": "Retry Connection",
-    "createFirstProject": "Create your first project to get started"
+    "createFirstProject": "Create your first project to get started",
+    "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation."
   },
   "sidebar": {
     "pinSidebar": "Pin sidebar open",
@@ -30,6 +31,7 @@
     "scaffolding": "Scaffolding project...",
     "rename": "Rename",
     "summary": "Summary",
+    "sleep": "Sleep",
     "confirmDelete": "Confirm delete?"
   },
   "settings": {
@@ -82,6 +84,7 @@
     "deletedTab": "Deleted file (tab kept open)",
     "readOnlyUntilFirstAiResponse": "Editing is enabled after the first AI build completes.",
     "readOnlyWhileAiWorking": "Editing is temporarily locked while AI is working.",
+    "readOnlyNoPermission": "View-only access",
     "newFilePrompt": "Enter a new file path",
     "renamePrompt": "Enter a new name",
     "confirmDeleteFile": "Delete {{name}}?",
@@ -137,6 +140,7 @@
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
+      "readOnly": "View-only access",
       "default": "Describe what you want to build..."
     },
     "phase": {
@@ -171,6 +175,19 @@
       "removeDataSource": "Remove data source",
       "searchPlaceholder": "Search data sources (optional)"
     }
+  },
+  "sharing": {
+    "title": "Share",
+    "share": "Share",
+    "owner": "Owner",
+    "userIdPlaceholder": "User ID",
+    "noMembers": "No members yet"
+  },
+  "admin": {
+    "title": "Platform Users",
+    "userIdPlaceholder": "User ID to invite",
+    "invite": "Invite",
+    "noUsers": "No platform users yet"
   },
   "publish": {
     "publishFailed": "Publish Failed",

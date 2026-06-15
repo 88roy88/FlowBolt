@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 
 from sqlalchemy import Column, ForeignKey, String
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
 
@@ -37,6 +37,6 @@ async def get_messages(project_id: str) -> list[ChatMessage]:
     """Return all messages for a project in chronological order."""
     async with database.async_session() as session:
         result = await session.execute(
-            select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(ChatMessage.created_at.asc())  # type: ignore[attr-defined]
+            select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(col(ChatMessage.created_at).asc())
         )
         return list(result.scalars().all())

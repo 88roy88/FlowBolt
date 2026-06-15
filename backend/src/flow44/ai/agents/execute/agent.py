@@ -4,7 +4,7 @@ import logging
 import uuid
 
 from langfuse import Langfuse
-from langfuse.decorators import langfuse_context, observe
+from langfuse.decorators import observe
 from pydantic import ValidationError
 
 from flow44.ai.agents._base import BaseAgent
@@ -44,7 +44,7 @@ from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
-MAX_FIX_ATTEMPTS = 2
+MAX_FIX_ATTEMPTS = 10
 
 
 class ExecuteAgent(BaseAgent):
@@ -56,10 +56,11 @@ class ExecuteAgent(BaseAgent):
         sandbox: PnpmSandbox,
         state: BuildState,
         *,
+        user_id: str,
         model: str | None = None,
         trace_id: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._build_state = state
         self._flow = self._build_flow()
 
@@ -89,13 +90,7 @@ class ExecuteAgent(BaseAgent):
     @observe(name="execute-agent-run")  # type: ignore[untyped-decorator]
     async def run(self) -> None:
         """Run the execution flow."""
-        self._trace_id = langfuse_context.get_current_trace_id()
-        langfuse_context.update_current_trace(
-            session_id=self.project_id,
-            user_id=self.project_id,
-            metadata={"model": self.model or "default"},
-            tags=["execute-agent"],
-        )
+        self._setup_trace(["execute-agent"])
 
         # Emit plan accepted
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_overview.model_dump()})

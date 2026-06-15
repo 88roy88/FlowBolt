@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project } from '../types';
+import type { Project, UserStatus } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
 import { useChatStore } from './chat';
@@ -9,7 +9,9 @@ interface SessionState {
   projects: Project[];
   projectId: string | null;
   isCreating: boolean;
+  userStatus: UserStatus | null;
   setCurrentProject: (project: Project) => void;
+  loadUserStatus: () => Promise<void>;
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
@@ -23,19 +25,23 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   projects: [],
   projectId: null,
   isCreating: false,
+  userStatus: null,
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, projectId: project.id });
-    // Restore the selected model for this project
     if (project.selected_model) {
       useChatStore.setState({ selectedModel: project.selected_model });
     }
     useChatStore.getState().clearDataSources();
   },
 
+  async loadUserStatus() {
+    const userStatus = await api.fetchMe();
+    set({ userStatus });
+  },
+
   async loadProjects() {
     const projects = await api.fetchProjects();
-    // Newest first
     projects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     set({ projects });
   },
@@ -52,14 +58,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async deleteProject(id: string) {
-    const projectToDelete = get().projects.find((p) => p.id === id);
+    const prevProjects = get().projects;
+    const prevCurrent = get().currentProject;
+    const prevProjectId = get().projectId;
+
+    const projectToDelete = prevProjects.find((p) => p.id === id);
     if (projectToDelete) {
       closeChatSocket(projectToDelete.id);
     }
-    await api.deleteProject(id);
-    const projects = get().projects.filter((p) => p.id !== id);
-    const current = get().currentProject;
-    if (current?.id === id) {
+
+    // Optimistically update the UI before the network round-trip, rolling back on failure.
+    const projects = prevProjects.filter((p) => p.id !== id);
+    if (prevCurrent?.id === id) {
       const next = projects[0] ?? null;
       set({
         projects,
@@ -68,6 +78,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       });
     } else {
       set({ projects });
+    }
+
+    try {
+      await api.deleteProject(id);
+    } catch (e) {
+      set({ projects: prevProjects, currentProject: prevCurrent, projectId: prevProjectId });
+      throw e;
     }
   },
 

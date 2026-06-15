@@ -28,15 +28,20 @@ export function setReplayMode(replay: boolean) {
 
 let _lastEventTs = 0;
 
-/** Clear stale in-progress UI after replaying events from an interrupted run. */
+/**
+ * After replaying history, decide whether to keep or clear in-progress UI.
+ * If the last event is non-terminal the run may still be active — keep the
+ * replayed transient state (tasks, steps, etc.) so the cards render immediately.
+ * The alive poll will clear it if the agent turns out to be dead.
+ */
 export function finalizeHistoryReplayState(
-  set: SetState,
+  _set: SetState,
   get: GetState,
   events: Array<{ type?: string }>,
 ): boolean {
   if (isHistoryRunComplete(events)) return false;
   if (isAwaitingPlanApproval(get())) return false;
-  set(getTransientReset());
+  // Keep replayed transient state — alive poll handles stale cleanup.
   return true;
 }
 
@@ -54,7 +59,9 @@ function generateId(): string {
 
 function refreshFileTreeAfterAgentWrite() {
   if (_skipMessages) return;
-  void useFilesStore.getState().loadFileTree();
+  const store = useFilesStore.getState();
+  void store.loadFileTree();
+  useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
 }
 
 function handleFileUpdate(msg: { path: string; content: string }, set: SetState) {
@@ -79,7 +86,7 @@ function handleText(msg: { content: string }, set: SetState) {
 }
 
 function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
-  set({ ...getTransientReset(), error: msg.message });
+  set({ ...getTransientReset(), agentAlive: false, error: msg.message });
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
   }
@@ -165,16 +172,17 @@ export function createFixErrorHandler(
           set((s) => ({
             messages: [...s.messages, fixMessage],
             ...getTransientReset(),
+            agentAlive: false,
             buildCompleted: true,
           }));
         } else {
-          set({ ...getTransientReset(), buildCompleted: true });
+          set({ ...getTransientReset(), agentAlive: false, buildCompleted: true });
         }
         if (!_skipMessages) {
           notifyBuildComplete(useSessionStore.getState().currentProject?.name);
         }
         cleanup();
-        useFilesStore.getState().loadFileTree();
+        refreshFileTreeAfterAgentWrite();
         useFilesStore.getState().refreshOpenFiles();
         break;
       }
@@ -316,8 +324,6 @@ function handlePhaseChange(
   });
   if (msg.phase === AGENT_PHASE.executing) {
     requestPermissionIfNeeded();
-  } else if (msg.phase === AGENT_PHASE.awaiting_approval && !_skipMessages) {
-    notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
   }
 }
 
@@ -482,6 +488,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
   set((s) => ({
     messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
     ...getTransientReset(),
+    agentAlive: false,
     planOverview: null,
     projectSummary: null,
     buildCompleted: true,
@@ -490,6 +497,6 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
     notifyBuildComplete(useSessionStore.getState().currentProject?.name);
   }
   cleanup();
-  useFilesStore.getState().loadFileTree();
+  refreshFileTreeAfterAgentWrite();
   useFilesStore.getState().refreshOpenFiles();
 }

@@ -1,0 +1,23 @@
+name: Promote to Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    name: Fast-forward main to develop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Fast-forward main to develop
+        run: |
+          git fetch origin develop
+          git merge --ff-only origin/develop
+          git push origin main
