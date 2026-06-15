@@ -256,7 +256,7 @@ class FixErrorAgent(ChatAgent):
             {
                 "tool": "fix_error",
                 "args": {"file": state.error_file or "unknown"},
-                "resultPreview": f"fixed {len(files)} file(s)",
+                "result_preview": f"fixed {len(files)} file(s)",
             }
         ]
         await self._save_response(state.explanation, steps, files)

@@ -333,7 +333,7 @@ class FollowUpAgent(ChatAgent):
                         "tool": event["tool"],
                         "args": event.get("args", {}),
                         "status": "completed",
-                        "resultPreview": event.get("result_preview", ""),
+                        "result_preview": event.get("result_preview", ""),
                         "iteration": self._iteration,
                     }
                 )
