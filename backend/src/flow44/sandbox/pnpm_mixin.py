@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-import shlex
 import shutil
 from abc import ABC
 
@@ -22,7 +20,6 @@ class BuildCommandResult(BaseModel):
 class PnpmMixin(BaseSandbox, ABC):
     def configure_npmrc(self) -> None:
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
-        # TODO: make this work for namespaced mode too
         store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
 
         content = (
@@ -44,31 +41,6 @@ class PnpmMixin(BaseSandbox, ABC):
 
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
-
-    def _npm_package_declared(self, package_name: str) -> bool:
-        pkg_path = os.path.join(self.workspace_dir, "package.json")
-        if not os.path.isfile(pkg_path):
-            return False
-        with open(pkg_path, encoding="utf-8") as handle:
-            pkg = json.load(handle)
-        return package_name in pkg.get("dependencies", {})
-
-    def _npm_package_available(self, package_name: str) -> bool:
-        module_path = os.path.join(self.workspace_dir, "node_modules", *package_name.split("/"))
-        return self._npm_package_declared(package_name) and os.path.exists(module_path)
-
-    async def enable_optional_packages(self, package_names: list[str]) -> None:
-        """Install and verify all already-whitelisted optional packages."""
-        unique_names = list(dict.fromkeys(package_names))
-        missing = [name for name in unique_names if not self._npm_package_available(name)]
-        if missing:
-            command = "pnpm add " + " ".join(shlex.quote(name) for name in missing) + " 2>&1"
-            async for line in self.exec(command):
-                logger.info("[optional-packages] %s", line.rstrip())
-
-        unavailable = [name for name in unique_names if not self._npm_package_available(name)]
-        if unavailable:
-            raise RuntimeError(f"Optional package installation failed: {', '.join(unavailable)}")
 
     def _stamp_vite_config(self, template_dir: str) -> None:
         template_path = os.path.join(template_dir, "vite.config.ts")

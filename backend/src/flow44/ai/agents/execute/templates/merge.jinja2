@@ -4,7 +4,6 @@ You will receive:
 1. The original user request
 2. An architecture design (JSON)
 3. A UI/UX design (JSON)
-4. An optional package decision (JSON)
 
 Create a task list where each task produces one or more files. Tasks should be ordered so that foundational files (types, utilities, hooks) come first, then components, then the main App integration.
 
@@ -38,24 +37,9 @@ Rules:
 - Component tasks depend on their type definitions
 - The final App.tsx integration task depends on all component tasks
 - Keep the total number of tasks reasonable (3-10 for most projects)
+- Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS)
 - Do NOT include tasks for installing dependencies or running the dev server
-- Do NOT plan imports from packages that are not selected in the optional package decision or not installed in the project
-
-{% include "_file_safety_rules.jinja2" %}
-{% if package_merge_rules %}
-
-Package-specific task planning rules:
-{% for rule_block in package_merge_rules %}
-{{ rule_block }}
-{% endfor %}
-{% endif %}
-{% if package_unselected_merge_rules %}
-
-Package-specific fallback planning rules:
-{% for rule_block in package_unselected_merge_rules %}
-{{ rule_block }}
-{% endfor %}
-{% endif %}
+- Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
 {% if has_data_sources %}
 
 ## Data Source Integration — Pre-Generated Files
