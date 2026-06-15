@@ -48,7 +48,6 @@ async def list_user_projects(user_id: str) -> list[Project]:
 
 
 async def list_all_projects() -> list[Project]:
-    """Returns every project across all users."""
     async with database.async_session() as session:
         query = select(Project).order_by(col(Project.created_at).desc())
         result = await session.execute(query)
