@@ -20,6 +20,7 @@ Based on the user's request, determine their intent:
 ## Existing Data Sources
 The following data sources are already integrated in the app. Their TypeScript modules have been regenerated — if the function signature or return type changed, update the relevant call sites to match.
 Based on the user's request, you may also need to build new UI around them (new section, option, or replacement).
+Use `read_file` on the `.docs.md` file to see the previous version of the schema and parameter details.
 {% for ds in existing_data_source_contexts %}
 ### {{ ds.data_source_name }} — `{{ ds.module_path }}`
 - **Schema:** {{ ds.data_schema }}
@@ -27,6 +28,7 @@ Based on the user's request, you may also need to build new UI around them (new 
 - **Params:** {{ ds.param_ux_hints }}
 {% if ds.integration_notes %}- **Integration Notes:** {{ ds.integration_notes }}{% endif %}
 - Usage: `import { dataSource{{ ds.sanitized_name }} } from './dataSources/{{ ds.sanitized_name }}';`
+- Docs: `src/dataSources/{{ ds.sanitized_name }}.docs.md`
 {% endfor %}
 {% endif %}
 
@@ -36,15 +38,7 @@ Based on the user's request, you may also need to build new UI around them (new 
 ## File Tree
 {{ file_tree }}
 
-{% if existing_data_source_contexts %}
-## Existing Data Sources
 
-This project uses the following data sources. Use `read_file` on the `.docs.md` file if you need schema or parameter details.
-
-{% for ctx in existing_data_source_contexts %}
-- **{{ ctx.data_source_name }}** → `import { dataSource{{ ctx.sanitized_name }} } from './dataSources/{{ ctx.sanitized_name }}';` (docs: `src/dataSources/{{ ctx.sanitized_name }}.docs.md`)
-{% endfor %}
-{% endif %}
 ## How to Work
 
 Follow the EXPLORE → REASON → ACT pattern:
