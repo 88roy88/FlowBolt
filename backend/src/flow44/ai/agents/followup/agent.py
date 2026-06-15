@@ -232,20 +232,11 @@ class FollowUpAgent(BaseAgent):
     ) -> list[DataSourceContext]:
         await self.emit({"type": "phase", "phase": "fetching_data_sources"})
 
-        async def _fetch_and_write(sid: str) -> DataSourceContext:
-            ctx = await fetch_and_analyze_data_source(
-                sid,
-                user_content,
-                self._data_source_authorization,
-                self.model,
-                self._llm_metadata,
-            )
-            await self._write_data_source_module(ctx)
-            return ctx
-
         try:
             contexts: list[DataSourceContext] = list(
-                await asyncio.gather(*[_fetch_and_write(sid) for sid in data_source_ids])
+                await asyncio.gather(
+                    *[self._fetch_analyze_and_write(sid, user_content) for sid in data_source_ids]
+                )
             )
         except Exception:
             await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
@@ -253,6 +244,17 @@ class FollowUpAgent(BaseAgent):
 
         await self._persist_data_sources(contexts)
         return contexts
+
+    async def _fetch_analyze_and_write(self, sid: str, user_content: str) -> DataSourceContext:
+        ctx = await fetch_and_analyze_data_source(
+            sid,
+            user_content,
+            self._data_source_authorization,
+            self.model,
+            self._llm_metadata,
+        )
+        await self._write_data_source_module(ctx)
+        return ctx
 
     async def _write_data_source_module(self, ctx: DataSourceContext) -> None:
         files = generate_data_source_files(ctx)
