@@ -177,7 +177,7 @@ class FollowUpAgent(BaseAgent):
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 
-    @observe(name="followup-agent-run")
+    @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._setup_trace(["follow-up-agent"])
 
