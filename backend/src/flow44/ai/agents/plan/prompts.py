@@ -6,7 +6,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from flow44.ai.state import DataSourceContext
+from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
@@ -23,9 +23,9 @@ def render_architecture(*, data_source_contexts: list[DataSourceContext] | None 
     if data_source_contexts:
         prepared = [
             {
-                **ctx,
+                **ctx.model_dump(),
                 "sample_data_json": (
-                    json.dumps(ctx["sample_data"], indent=2)[:1000] if ctx.get("sample_data") is not None else None
+                    json.dumps(ctx.sample_data, indent=2)[:1000] if ctx.sample_data is not None else None
                 ),
             }
             for ctx in data_source_contexts

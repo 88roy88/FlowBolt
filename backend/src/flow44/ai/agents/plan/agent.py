@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from langfuse.decorators import langfuse_context, observe
+from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
@@ -32,11 +32,12 @@ class PlanAgent(BaseAgent):
         project_id: str,
         sandbox: PnpmSandbox,
         *,
+        user_id: str,
         model: str | None = None,
         trace_id: str | None = None,
         data_source_authorization: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._state = BuildState(project_id=self.project_id, model=self.model)
         self._data_source_authorization = data_source_authorization
         self._flow = self._build_flow()
@@ -56,14 +57,7 @@ class PlanAgent(BaseAgent):
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
-        self._trace_id = langfuse_context.get_current_trace_id()
-
-        langfuse_context.update_current_trace(
-            session_id=self.project_id,
-            user_id=self.project_id,
-            metadata={"model": self.model or "default"},
-            tags=["plan-agent"],
-        )
+        self._setup_trace(["plan-agent"])
 
         # Initialize plan state for Flow
         plan_state = PlanState(
@@ -112,14 +106,14 @@ class PlanAgent(BaseAgent):
         # Generate deterministic hook + type files and write to sandbox
         for ctx in state.build_state.data_source_contexts:
             generated = generate_data_source_files(ctx)
-            ctx["module_path"] = next(iter(generated))
-            ctx["generated_files"] = generated
+            ctx.module_path = next(iter(generated))
+            ctx.generated_files = generated
             for path, content in generated.items():
                 await state.sandbox_ref.write_file(path, content)
             state.build_state.generated_data_source_files.update(generated)
 
         if state.build_state.data_source_contexts:
-            from flow44.db.project import update_project_data_sources  # noqa: PLC0415
+            from flow44.db.project_data_source import update_project_data_sources  # noqa: PLC0415
 
             await update_project_data_sources(state.project_id, state.build_state.data_source_contexts)
             await state.emit_fn(
@@ -127,11 +121,11 @@ class PlanAgent(BaseAgent):
                     "type": "data_sources_fetched",
                     "data_sources": [
                         {
-                            "data_source_id": ctx["data_source_id"],
-                            "data_source_name": ctx["data_source_name"],
-                            "data_schema": ctx.get("data_schema", ""),
-                            "relevant_fields": ctx.get("relevant_fields", ""),
-                            "requires_input": not ctx.get("can_run_without_input", True),
+                            "data_source_id": ctx.data_source_id,
+                            "data_source_name": ctx.data_source_name,
+                            "data_schema": ctx.data_schema,
+                            "relevant_fields": ctx.relevant_fields,
+                            "requires_input": not ctx.can_run_without_input,
                             "params": [
                                 {
                                     "name": p["name"],
@@ -140,7 +134,7 @@ class PlanAgent(BaseAgent):
                                     "is_required": p["is_required"],
                                     "is_single_value": p["is_single_value"],
                                 }
-                                for p in ctx.get("params_info", {}).get("parameters", [])
+                                for p in ctx.params_info.get("parameters", [])
                             ],
                         }
                         for ctx in state.build_state.data_source_contexts
@@ -180,10 +174,11 @@ class PlanAgent(BaseAgent):
 
     # -- Rebuild --
 
+    @observe(name="plan-agent-rebuild")  # type: ignore[untyped-decorator]
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
-        self._trace_id = langfuse_context.get_current_trace_id()
+        self._setup_trace(["plan-agent", "rebuild"])
 
         await self.emit({"type": "phase", "phase": "planning"})
 

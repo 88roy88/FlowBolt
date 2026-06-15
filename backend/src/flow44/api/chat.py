@@ -13,7 +13,7 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, require_ws_permission
+from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -67,6 +67,7 @@ async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
 async def chat_ws(  # noqa: C901, PLR0915
     websocket: WebSocket,
     project: WsProjectDep,
+    user_id: WsUserDep,
     data_source_authorization: TokenDep = None,
     _perms: set[Permission] = require_ws_permission(Permission.write),
 ) -> None:
@@ -129,6 +130,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         sandbox=sandbox,
                         model=selected_model,
                         data_source_authorization=data_source_authorization,
+                        user_id=user_id,
                     )
                     _start_agent(
                         project.id,
@@ -142,6 +144,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model,
+                        user_id=user_id,
                         data_source_authorization=data_source_authorization,
                     )
                     _start_agent(
@@ -173,6 +176,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         sandbox=sandbox,
                         state=state,
                         model=selected_model or state.model,
+                        user_id=user_id,
                     )
                     _start_agent(project.id, execute_agent.run())
 
@@ -182,6 +186,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model or state.model,
+                        user_id=user_id,
                     )
                     _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
 
@@ -218,6 +223,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     project_id=project.id,
                     sandbox=sandbox,
                     model=selected_model,
+                    user_id=user_id,
                 )
                 _start_agent(
                     project.id,

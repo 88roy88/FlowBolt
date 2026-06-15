@@ -58,14 +58,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async deleteProject(id: string) {
-    const projectToDelete = get().projects.find((p) => p.id === id);
+    const prevProjects = get().projects;
+    const prevCurrent = get().currentProject;
+    const prevProjectId = get().projectId;
+
+    const projectToDelete = prevProjects.find((p) => p.id === id);
     if (projectToDelete) {
       closeChatSocket(projectToDelete.id);
     }
-    await api.deleteProject(id);
-    const projects = get().projects.filter((p) => p.id !== id);
-    const current = get().currentProject;
-    if (current?.id === id) {
+
+    // Optimistically update the UI before the network round-trip, rolling back on failure.
+    const projects = prevProjects.filter((p) => p.id !== id);
+    if (prevCurrent?.id === id) {
       const next = projects[0] ?? null;
       set({
         projects,
@@ -74,6 +78,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       });
     } else {
       set({ projects });
+    }
+
+    try {
+      await api.deleteProject(id);
+    } catch (e) {
+      set({ projects: prevProjects, currentProject: prevCurrent, projectId: prevProjectId });
+      throw e;
     }
   },
 

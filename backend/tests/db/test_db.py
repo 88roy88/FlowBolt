@@ -8,14 +8,13 @@ from flow44.db.project import (
     create_project,
     delete_project,
     get_project,
-    get_project_data_sources,
     list_all_projects,
     rename_project,
-    update_project_data_sources,
     update_project_model,
     update_project_published_url,
     update_project_summary,
 )
+from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 
 # ---------------------------------------------------------------------------
 # Project CRUD
@@ -82,12 +81,12 @@ class TestProjectCRUD:
 
     async def test_update_project_data_sources(self, test_db):
         project = await create_project("App", user_id="test-user")
-        ds = [{"data_source_id": "ds1", "schema": "..."}]
+        ds = [DataSourceContext(data_source_id="ds1")]
         await update_project_data_sources(project.id, ds)
 
         result = await get_project_data_sources(project.id)
         assert len(result) == 1
-        assert result[0]["data_source_id"] == "ds1"
+        assert result[0].data_source_id == "ds1"
 
     async def test_get_data_sources_empty(self, test_db):
         project = await create_project("App", user_id="test-user")

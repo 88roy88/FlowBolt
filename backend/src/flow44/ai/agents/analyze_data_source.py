@@ -10,7 +10,7 @@ from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
-from flow44.ai.state import DataSourceContext
+from flow44.db.project_data_source import DataSourceContext
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 
@@ -76,11 +76,11 @@ def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
     sanitized = ctx["sanitized_name"]
     module_path = f"src/dataSources/{sanitized}.ts"
     docs_path = f"src/dataSources/{sanitized}.docs.md"
-    params_info = DataSourceParamsInfo.model_validate(ctx["params_info"])
-    queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.get("queries", [])]
+    params_info = DataSourceParamsInfo.model_validate(ctx.params_info)
+    queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.queries]
     content = generate_data_source_module(
-        data_source_id=ctx["data_source_id"],
-        sanitized_name=sanitized,
+        data_source_id=ctx.data_source_id,
+        sanitized_name=ctx.sanitized_name,
         params_info=params_info,
         queries=queries,
     )

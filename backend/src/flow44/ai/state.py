@@ -1,34 +1,12 @@
 """Build state that flows between PlanAgent and ExecuteAgent."""
 
-from typing import Any, NotRequired, TypedDict
-
 from pydantic import BaseModel, Field
 
 from flow44.ai.agents.execute.models import WorkPlan
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
+from flow44.db.project_data_source import DataSourceContext
 
-
-class DataSourceContext(TypedDict):
-    """Data source metadata and generated analysis"""
-
-    data_source_id: str
-    data_source_name: str
-    sanitized_name: str
-    queries: list[dict[str, Any]]  # DataSourceQuerySchema dumps
-    params_info: dict[str, Any]  # DataSourceParamsInfo dump
-    can_run_without_input: bool
-
-    # LLM analysis (see plan/templates/data_source_analysis.jinja2)
-    data_schema: str
-    relevant_fields: str
-    data_characteristics: str
-    integration_notes: str
-    param_ux_hints: str
-
-    # Optional (held in memory during the plan, but not persisted to the DB)
-    sample_data: NotRequired[dict[str, Any] | None]
-    module_path: NotRequired[str]
-    generated_files: NotRequired[dict[str, str]]
+__all__ = ["BuildState"]
 
 
 class BuildState(BaseModel):

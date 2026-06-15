@@ -9,10 +9,10 @@ import { joinPath, parentDirectory, ROOT_DROP_PATH } from './fileTreePaths';
 
 interface FileTreeProps {
   readOnly: boolean;
-  readOnlyMessage: string;
+  readOnlyMessage?: string;
 }
 
-export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
+export function FileTree({ readOnly }: FileTreeProps) {
   const { t, i18n } = useTranslation();
   const isRtl = i18n.dir(i18n.resolvedLanguage) === 'rtl';
   const fileTree = useFilesStore((s) => s.fileTree);
@@ -173,26 +173,23 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
           isRootDropTarget ? 'bg-primary/10 ring-1 ring-primary/30' : ''
         }`}
       >
-        <div className="mb-1 grid w-full max-w-[260px] grid-cols-2 gap-1">
-          <button
-            type="button"
-            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
-            onClick={() => openCreateDialog('/')}
-            disabled={readOnly}
-          >
-            {t('editor.createFile')}
-          </button>
-          <button
-            type="button"
-            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
-            onClick={() => openUploadDialog('/')}
-            disabled={readOnly}
-          >
-            {t('editor.uploadFiles')}
-          </button>
-        </div>
-        {readOnly && (
-          <span className="text-[11px] text-muted-foreground">{readOnlyMessage}</span>
+        {!readOnly && (
+          <div className="mb-1 grid w-full max-w-[260px] grid-cols-2 gap-1">
+            <button
+              type="button"
+              className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+              onClick={() => openCreateDialog('/')}
+            >
+              {t('editor.createFile')}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+              onClick={() => openUploadDialog('/')}
+            >
+              {t('editor.uploadFiles')}
+            </button>
+          </div>
         )}
         {!readOnly && dialogError && (
           <span className="text-[11px] text-destructive">{dialogError}</span>
@@ -222,27 +219,22 @@ export function FileTree({ readOnly, readOnlyMessage }: FileTreeProps) {
         onDrop={handleRootDrop}
         className={`py-1 transition-colors ${isRootDropTarget ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}
       >
-        <div className="grid grid-cols-2 gap-1 px-2 pb-1">
-          <button
-            type="button"
-            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
-            onClick={() => openCreateDialog('/')}
-            disabled={readOnly}
-          >
-            {t('editor.createFile')}
-          </button>
-          <button
-            type="button"
-            className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
-            onClick={() => openUploadDialog('/')}
-            disabled={readOnly}
-          >
-            {t('editor.uploadFiles')}
-          </button>
-        </div>
-        {readOnly && (
-          <div className="px-2 pb-2 text-[11px] text-muted-foreground">
-            {readOnlyMessage}
+        {!readOnly && (
+          <div className="grid grid-cols-2 gap-1 px-2 pb-1">
+            <button
+              type="button"
+              className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+              onClick={() => openCreateDialog('/')}
+            >
+              {t('editor.createFile')}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-muted"
+              onClick={() => openUploadDialog('/')}
+            >
+              {t('editor.uploadFiles')}
+            </button>
           </div>
         )}
         {!readOnly && dialogError && (
