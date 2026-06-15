@@ -1,8 +1,12 @@
-"""add_project_data_sources_table
+"""move data sources to project_data_sources table
 
-Revision ID: 640c819eb8c0
-Revises: 668b0c9e67b2
-Create Date: 2026-06-14 11:44:06.406520
+Combines three prior steps: dropping the legacy single-source columns,
+(data_source_id and data_source_context), stripping transient keys from
+the data_sources JSON column, and creating the project_data_sources table.
+
+Revision ID: 9252bbb0fae2
+Revises: bf979c9b9417
+Create Date: 2026-06-15 09:00:00.000000
 
 """
 
@@ -12,11 +16,12 @@ from collections.abc import Sequence
 from typing import Union
 
 import sqlalchemy as sa
+import sqlmodel
 
 from alembic import op
 
-revision: str = "640c819eb8c0"
-down_revision: Union[str, Sequence[str], None] = "668b0c9e67b2"
+revision: str = "9252bbb0fae2"
+down_revision: Union[str, Sequence[str], None] = "bf979c9b9417"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -42,7 +47,9 @@ def upgrade() -> None:
     )
     op.create_index("ix_project_data_sources_project_id", "project_data_sources", ["project_id"])
 
-    # Migrate existing data from projects.data_sources JSON column
+    # Migrate existing data from projects.data_sources JSON column. Only the
+    # persistent fields are carried over; transient keys (sample_data,
+    # generated_files, etc.) are dropped by virtue of not being selected.
     conn = op.get_bind()
     rows = conn.execute(sa.text("SELECT id, data_sources FROM projects")).fetchall()
     for project_id, raw in rows:
@@ -86,8 +93,18 @@ def upgrade() -> None:
             )
 
     op.drop_column("projects", "data_sources")
+    op.drop_column("projects", "data_source_context")
+    op.drop_column("projects", "data_source_id")
 
 
 def downgrade() -> None:
+    op.add_column(
+        "projects",
+        sa.Column("data_source_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False, server_default=""),
+    )
+    op.add_column(
+        "projects",
+        sa.Column("data_source_context", sqlmodel.sql.sqltypes.AutoString(), nullable=False, server_default=""),
+    )
     op.add_column("projects", sa.Column("data_sources", sa.JSON(), nullable=True))
     op.drop_table("project_data_sources")
