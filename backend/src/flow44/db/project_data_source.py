@@ -2,50 +2,40 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
-from pydantic import BaseModel
-from sqlalchemy import JSON, Column, UniqueConstraint
+from sqlalchemy import JSON, UniqueConstraint
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
 
 
-class ProjectDataSource(SQLModel, table=True):
-    __tablename__ = "project_data_sources"
-    __table_args__ = (UniqueConstraint("project_id", "type", "data_source_id", name="uq_project_data_source"),)
-
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    project_id: str = Field(index=True)
-    type: str = Field(default="flow_package")
-    data_source_id: str
-    data_source_name: str = Field(default="")
-    sanitized_name: str = Field(default="")
-    queries: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, default=[]))
-    params_info: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, default={}))
-    can_run_without_input: bool = Field(default=False)
-    data_schema: str = Field(default="")
-    relevant_fields: str = Field(default="")
-    data_characteristics: str = Field(default="")
-    integration_notes: str = Field(default="")
-    param_ux_hints: str = Field(default="")
-
-
-class DataSourceContext(BaseModel):
-    """In-memory representation of a data source, including transient fields not stored to the DB."""
-
-    id: str = ""
+class DataSourceBase(SQLModel):
     project_id: str = ""
     type: str = "flow_package"
     data_source_id: str = ""
     data_source_name: str = ""
     sanitized_name: str = ""
-    queries: list[dict[str, Any]] = Field(default_factory=list)
-    params_info: dict[str, Any] = Field(default_factory=dict)
+    queries: list[dict[str, Any]] = Field(default_factory=list, sa_type=JSON)
+    params_info: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
     can_run_without_input: bool = False
     data_schema: str = ""
     relevant_fields: str = ""
     data_characteristics: str = ""
     integration_notes: str = ""
     param_ux_hints: str = ""
+
+
+class ProjectDataSource(DataSourceBase, table=True):
+    __tablename__ = "project_data_sources"
+    __table_args__ = (UniqueConstraint("project_id", "type", "data_source_id", name="uq_project_data_source"),)
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    project_id: str = Field(default="", index=True)
+
+
+class DataSourceContext(DataSourceBase):
+    """In-memory representation of a data source, including transient fields not stored to the DB."""
+
+    id: str = ""
     sample_data: dict[str, Any] | None = None
     module_path: str = ""
     generated_files: dict[str, str] = Field(default_factory=dict)
