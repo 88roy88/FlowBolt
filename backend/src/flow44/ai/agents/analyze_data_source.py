@@ -73,7 +73,7 @@ async def fetch_and_analyze_data_source(
 
 
 def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
-    sanitized = ctx["sanitized_name"]
+    sanitized = ctx.sanitized_name
     module_path = f"src/dataSources/{sanitized}.ts"
     docs_path = f"src/dataSources/{sanitized}.docs.md"
     params_info = DataSourceParamsInfo.model_validate(ctx.params_info)
@@ -115,17 +115,17 @@ def _generate_data_source_docs(
 ) -> str:
     """Generate a markdown docs file describing the data source."""
     lines: list[str] = [
-        f"# {ctx.get('data_source_name', ctx['sanitized_name'])}",
-        f"**ID:** {ctx['data_source_id']}",
-        f"**Module:** `src/dataSources/{ctx['sanitized_name']}.ts`",
+        f"# {ctx.data_source_name or ctx.sanitized_name}",
+        f"**ID:** {ctx.data_source_id}",
+        f"**Module:** `src/dataSources/{ctx.sanitized_name}.ts`",
         "",
     ]
 
     for heading, value in [
-        ("Schema", ctx.get("data_schema")),
-        ("Relevant Fields", ctx.get("relevant_fields")),
-        ("Data Characteristics", ctx.get("data_characteristics")),
-        ("Integration Notes", ctx.get("integration_notes")),
+        ("Schema", ctx.data_schema),
+        ("Relevant Fields", ctx.relevant_fields),
+        ("Data Characteristics", ctx.data_characteristics),
+        ("Integration Notes", ctx.integration_notes),
     ]:
         if value:
             lines.extend([f"## {heading}\n{value}", ""])
@@ -147,7 +147,7 @@ def _generate_data_source_docs(
             lines.append(f"- `{p.name}` ({p.type}{multi}) — {req}")
         lines.append("")
 
-    redacted = _redact_sample_data(ctx.get("sample_data"))
+    redacted = _redact_sample_data(ctx.sample_data)
     if redacted:
         lines.extend(["## Response Structure (redacted)", "```json", redacted, "```", ""])
 
