@@ -29,7 +29,7 @@ class ChatAgent(BaseAgent):
         for step in steps:
             tool = step.get("tool", "?")
             args = step.get("args", {})
-            preview = step.get("result_preview", "")
+            preview = step.get("short_preview") or step.get("result_preview", "")
             primary_arg = next((v for k, v in args.items() if k not in ("content",)), "")
             result_short = preview[:80].replace("\n", " ").strip()
             if len(preview) > 80:

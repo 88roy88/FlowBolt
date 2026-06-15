@@ -23,11 +23,13 @@ class ToolResult:
         tool_use_id: str | None = None,
         tool_name: str | None = None,
         is_error: bool = False,
+        short_preview: str | None = None,
     ):
         self.value = value
         self.tool_use_id = tool_use_id
         self.tool_name = tool_name
         self.is_error = is_error
+        self.short_preview = short_preview
 
     def __str__(self) -> str:
         return str(self.value)
@@ -100,6 +102,10 @@ class FunctionTool(Tool):
             result = self._func(**kwargs)
             if inspect.isawaitable(result):
                 result = await result
+            if isinstance(result, ToolResult):
+                result.tool_use_id = tool_use_id
+                result.tool_name = self._name
+                return result
             return ToolResult(value=result, is_error=False, tool_use_id=tool_use_id, tool_name=self._name)
         except Exception as e:
             logger.exception("Tool '%s' failed", self._name)

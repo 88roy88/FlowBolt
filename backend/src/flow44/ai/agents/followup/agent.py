@@ -14,7 +14,7 @@ from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, 
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
-from flow44.ai.core.tools import ToolExecutor, tool
+from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
@@ -57,7 +57,7 @@ class FollowUpAgent(ChatAgent):
 
         # Inline tool implementations - thin wrappers around sandbox
         @tool
-        async def grep(pattern: str, file_pattern: str | None = None) -> str:
+        async def grep(pattern: str, file_pattern: str | None = None) -> str | ToolResult:
             """Search the entire codebase for a text or regex pattern using grep.
 
             Use this to find all occurrences of functions, classes, variables, imports, or any text pattern.
@@ -76,10 +76,11 @@ class FollowUpAgent(ChatAgent):
                 return f"Error: {e}"
             if not matches:
                 return "No matches found."
-            return "\n".join(f"{m.file}:{m.line}:{m.content}" for m in matches)
+            value = "\n".join(f"{m.file}:{m.line}:{m.content}" for m in matches)
+            return ToolResult(value=value, short_preview=f"Found {len(matches)} match(es).")
 
         @tool
-        async def glob(pattern: str = "*") -> str:
+        async def glob(pattern: str = "*") -> str | ToolResult:
             """Find files matching a glob pattern.
 
             Args: pattern: A glob pattern to match files (e.g., "*.tsx", "src/**/*.js"). Defaults to "*".
@@ -89,10 +90,11 @@ class FollowUpAgent(ChatAgent):
             results = await sandbox.glob(pattern)
             if not results:
                 return "No files found matching pattern."
-            return "\n".join(results)
+            value = "\n".join(results)
+            return ToolResult(value=value, short_preview=f"Found {len(results)} file(s).")
 
         @tool
-        async def read_file(path: str, offset: int = 0, limit: int = MAX_READ_LINES) -> str:
+        async def read_file(path: str, offset: int = 0, limit: int = MAX_READ_LINES) -> str | ToolResult:
             """Read file content with line numbers. Always read a file before editing it.
 
             Args:
@@ -111,7 +113,8 @@ class FollowUpAgent(ChatAgent):
             numbered = [f"{i + offset + 1:4d} | {line}" for i, line in enumerate(chunk)]
             if offset + limit < total:
                 numbered.append(f"\n... (showing lines {offset + 1}-{offset + len(chunk)}, file has {total} total)")
-            return "\n".join(numbered)
+            value = "\n".join(numbered)
+            return ToolResult(value=value, short_preview=f"Read {len(chunk)} of {total} lines.")
 
         @tool
         async def write_file(path: str, content: str) -> str:
@@ -334,6 +337,7 @@ class FollowUpAgent(ChatAgent):
                         "args": event.get("args", {}),
                         "status": "completed",
                         "result_preview": event.get("result_preview", ""),
+                        "short_preview": event.get("short_preview", ""),
                         "iteration": self._iteration,
                     }
                 )
