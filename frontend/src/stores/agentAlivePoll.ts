@@ -15,7 +15,7 @@ const POLL_MS = 10000;
 export function handleChatConnectionLost(): void {
   const state = useChatStore.getState();
   if (isAgentWorking(state) && !isAwaitingPlanApproval(state)) {
-    useChatStore.setState(getTransientReset());
+    useChatStore.setState({ ...getTransientReset(), agentAlive: false });
   }
 }
 
@@ -37,7 +37,7 @@ function reconcileAlive(alive: boolean, phase: string | null): void {
 
   if (state.error) {
     if (!alive && busyUi && !awaiting) {
-      useChatStore.setState({ ...getTransientReset(), error: state.error });
+      useChatStore.setState({ ...getTransientReset(), agentAlive: false, error: state.error });
     }
     return;
   }
@@ -52,7 +52,7 @@ function reconcileAlive(alive: boolean, phase: string | null): void {
   }
 
   if (!alive && busyUi && !awaiting) {
-    useChatStore.setState(getTransientReset());
+    useChatStore.setState({ ...getTransientReset(), agentAlive: false });
   }
 }
 

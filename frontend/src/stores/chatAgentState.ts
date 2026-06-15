@@ -34,7 +34,6 @@ export const ACTIVE_AGENT_PHASES: AgentPhase[] = [
 
 export const TRANSIENT_RESET: Partial<ChatState> = {
   isStreaming: false,
-  agentAlive: false,
   agentPhase: AGENT_PHASE.idle,
   currentAssistantMessage: '',
   actions: [],
