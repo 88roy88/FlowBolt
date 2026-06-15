@@ -232,57 +232,57 @@ class FollowUpAgent(BaseAgent):
     ) -> list[DataSourceContext]:
         await self.emit({"type": "phase", "phase": "fetching_data_sources"})
 
+        async def _fetch_and_write(sid: str) -> DataSourceContext:
+            ctx = await fetch_and_analyze_data_source(
+                sid,
+                user_content,
+                self._data_source_authorization,
+                self.model,
+                self._llm_metadata,
+            )
+            await self._write_data_source_module(ctx)
+            return ctx
+
         try:
-            results = await asyncio.gather(
-                *[
-                    fetch_and_analyze_data_source(
-                        sid,
-                        user_content,
-                        self._data_source_authorization,
-                        self.model,
-                        self._llm_metadata,
-                    )
-                    for sid in data_source_ids
-                ]
+            contexts: list[DataSourceContext] = list(
+                await asyncio.gather(*[_fetch_and_write(sid) for sid in data_source_ids])
             )
         except Exception:
             await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
             raise
 
-        contexts: list[DataSourceContext] = list(results)
-
-        for ctx in contexts:
-            files = generate_data_source_files(ctx)
-            module_path = next(iter(files))
-            content = files[module_path]
-            ctx.module_path = module_path
-
-            try:
-                old_content = await self.sandbox.read_file(module_path)
-                is_new_module = False
-            except FileNotFoundError:
-                old_content = ""
-                is_new_module = True
-
-            await self.sandbox.write_file(module_path, content)
-
-            diff_str = "".join(
-                difflib.unified_diff(
-                    old_content.splitlines(keepends=True),
-                    content.splitlines(keepends=True),
-                    fromfile=f"a/{module_path}",
-                    tofile=f"b/{module_path}",
-                    lineterm="",
-                )
-            )
-            await self.emit({"type": "file", "path": module_path, "content": content})
-            if diff_str:
-                self._diffs.append(FileDiff(path=module_path, diff=diff_str, is_new=is_new_module))
-            if module_path not in self._files_changed:
-                self._files_changed.append(module_path)
-
         await self._persist_data_sources(contexts)
         return contexts
+
+    async def _write_data_source_module(self, ctx: DataSourceContext) -> None:
+        files = generate_data_source_files(ctx)
+        module_path = next(iter(files))
+        content = files[module_path]
+        ctx.module_path = module_path
+
+        try:
+            old_content = await self.sandbox.read_file(module_path)
+            is_new_module = False
+        except FileNotFoundError:
+            old_content = ""
+            is_new_module = True
+
+        await self.sandbox.write_file(module_path, content)
+
+        diff_str = "".join(
+            difflib.unified_diff(
+                old_content.splitlines(keepends=True),
+                content.splitlines(keepends=True),
+                fromfile=f"a/{module_path}",
+                tofile=f"b/{module_path}",
+                lineterm="",
+            )
+        )
+        await self.emit({"type": "file", "path": module_path, "content": content})
+        if diff_str:
+            self._diffs.append(FileDiff(path=module_path, diff=diff_str, is_new=is_new_module))
+        if module_path not in self._files_changed:
+            self._files_changed.append(module_path)
 
     async def _persist_data_sources(self, new_contexts: list[DataSourceContext]) -> None:
         """Merge newly attached data sources into the project's stored list (by id)."""
