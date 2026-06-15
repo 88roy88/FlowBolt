@@ -313,9 +313,7 @@ class FollowUpAgent(ChatAgent):
         except Exception:
             file_tree = "(unable to list files)"
 
-        existing_ds = (project.data_sources or []) if project else []
-
-        return {"summary": summary, "file_tree": file_tree, "existing_data_source_contexts": existing_ds}
+        return {"summary": summary, "file_tree": file_tree}
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
         """Emit ReAct step events and track state for followup agent."""
