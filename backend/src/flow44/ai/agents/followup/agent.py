@@ -38,11 +38,13 @@ class FollowUpAgent(BaseAgent):
         self,
         project_id: str,
         sandbox: PnpmSandbox,
+        *,
+        user_id: str,
         model: str | None = None,
         trace_id: str | None = None,
         data_source_authorization: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._steps: list[dict[str, Any]] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []

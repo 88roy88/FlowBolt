@@ -42,7 +42,6 @@ async def list_user_projects(user_id: str) -> list[Project]:
 
 
 async def list_all_projects() -> list[Project]:
-    """System-level: returns every project across all users. Never call from a request handler."""
     async with database.async_session() as session:
         query = select(Project).order_by(col(Project.created_at).desc())
         result = await session.execute(query)

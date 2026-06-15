@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, is_admin, require_permission
@@ -56,22 +56,23 @@ async def list_user_projects(user_id: UserDep) -> list[dict[str, Any]]:
     user_perms = get_admin_permissions() if is_admin(user_id) else set()
     can_read_all = has_permission(user_perms, Permission.read)
 
+    exclude = {"data_sources"}
+
     if can_read_all:
         all_projects = await list_all_projects()
         result: list[dict[str, Any]] = []
         for p in all_projects:
             role = "owner" if p.user_id == user_id else "admin"
-            result.append(p.model_dump() | {"role": role})
+            result.append(p.model_dump(exclude=exclude) | {"role": role})
         return result
 
-    owned = await db_list_user_projects(user_id)
-    shared = await list_shared_projects(user_id)
+    owned, shared = await asyncio.gather(db_list_user_projects(user_id), list_shared_projects(user_id))
 
     result = []
     for p in owned:
-        result.append(p.model_dump() | {"role": "owner"})
+        result.append(p.model_dump(exclude=exclude) | {"role": "owner"})
     for p, role in shared:
-        result.append(p.model_dump() | {"role": role})
+        result.append(p.model_dump(exclude=exclude) | {"role": role})
 
     return result
 
@@ -119,11 +120,12 @@ async def update_project_selected_model(
 @router.delete("/{project_id}", status_code=204)
 async def delete_existing_project(
     project: ProjectDep,
+    background_tasks: BackgroundTasks,
     _perms: set[Permission] = require_permission(Permission.delete),
 ) -> None:
-    await sandbox_manager.destroy_sandbox(project.id)
     idle_reaper.remove(project.id)
     await delete_project(project.id)
+    background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)
 
 
 @router.post("/{project_id}/debug/reap", status_code=200)
