@@ -183,11 +183,13 @@ class FollowUpAgent(BaseAgent):
 
         new_data_source_contexts: list[DataSourceContext] = []
         existing_data_source_contexts: list[DataSourceContext] = []
+
         if data_source_ids:
-            new_ids, _ = await self._classify_data_source_ids(data_source_ids)
+            stored_contexts = await get_project_data_sources(self.project_id)
+            stored_ids = {ds.data_source_id for ds in stored_contexts}
             await self.emit({"type": "phase", "phase": "fetching_data_sources"})
             try:
-                all_contexts: list[DataSourceContext] = list(
+                updated_contexts: list[DataSourceContext] = list(
                     await asyncio.gather(
                         *[self._fetch_analyze_and_write(sid, content) for sid in data_source_ids]
                     )
@@ -195,10 +197,10 @@ class FollowUpAgent(BaseAgent):
             except Exception:
                 await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
                 raise
-            new_data_source_contexts = [ctx for ctx in all_contexts if ctx.data_source_id in new_ids]
-            existing_data_source_contexts = [ctx for ctx in all_contexts if ctx.data_source_id not in new_ids]
-            if all_contexts:
-                await self._persist_data_sources(all_contexts)
+            new_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id not in stored_ids]
+            existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_ids]
+            if updated_contexts:
+                await self._persist_data_sources(updated_contexts, stored_contexts)
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
@@ -242,16 +244,6 @@ class FollowUpAgent(BaseAgent):
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
-    async def _classify_data_source_ids(
-        self, data_source_ids: list[str]
-    ) -> tuple[list[str], list[str]]:
-        """Split ids into new (not yet in project) and existing (already integrated)."""
-        stored = await get_project_data_sources(self.project_id)
-        stored_ids = {ds.data_source_id for ds in stored}
-        new_ids = [sid for sid in data_source_ids if sid not in stored_ids]
-        existing_ids = [sid for sid in data_source_ids if sid in stored_ids]
-        return new_ids, existing_ids
-
     async def _fetch_analyze_and_write(self, sid: str, user_content: str) -> DataSourceContext:
         ctx = await fetch_and_analyze_data_source(
             sid,
@@ -293,11 +285,11 @@ class FollowUpAgent(BaseAgent):
         if module_path not in self._files_changed:
             self._files_changed.append(module_path)
 
-    async def _persist_data_sources(self, new_contexts: list[DataSourceContext]) -> None:
-        """Merge newly attached data sources into the project's stored list (by id)."""
-        existing = await get_project_data_sources(self.project_id)
-        by_id: dict[tuple[str, str], DataSourceContext] = {(ds.type, ds.data_source_id): ds for ds in existing}
-        for ctx in new_contexts:
+    async def _persist_data_sources(
+        self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]
+    ) -> None:
+        by_id: dict[tuple[str, str], DataSourceContext] = {(ds.type, ds.data_source_id): ds for ds in stored}
+        for ctx in updated_contexts:
             by_id[(ctx.type, ctx.data_source_id)] = ctx
         await update_project_data_sources(self.project_id, list(by_id.values()))
 
