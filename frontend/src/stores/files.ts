@@ -111,7 +111,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     // Drop stale responses (newer loadFileTree started, or project switched).
     if (requestId !== _fileTreeRequestSerial) return;
     if (useSessionStore.getState().projectId !== projectId) return;
-    set((s) => ({ fileTree: tree, saveVersion: s.saveVersion + 1 }));
+    set({ fileTree: tree });
 
     if (requestId !== _fileTreeRequestSerial) return;
     if (useSessionStore.getState().projectId !== projectId) return;

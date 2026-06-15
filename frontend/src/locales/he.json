@@ -20,7 +20,8 @@
     "backendUnavailable": "השרת לא זמין",
     "cannotConnect": "לא ניתן להתחבר לשרת. אנא ודא שהשרת פועל ונסה לרענן את הדף.",
     "retryConnection": "נסה להתחבר שוב",
-    "createFirstProject": "צור את הפרויקט הראשון שלך כדי להתחיל"
+    "createFirstProject": "צור את הפרויקט הראשון שלך כדי להתחיל",
+    "noAccessMessage": "אין לך הרשאה ליצור פרויקטים. פנה למנהל המערכת לקבלת הזמנה."
   },
   "sidebar": {
     "pinSidebar": "נעץ סרגל צד",
@@ -30,6 +31,7 @@
     "scaffolding": "מכין פרויקט...",
     "rename": "שנה שם",
     "summary": "סיכום",
+    "sleep": "השהה",
     "confirmDelete": "אשר מחיקה?"
   },
   "settings": {
@@ -80,6 +82,7 @@
     "renameFile": "שנה שם",
     "deleteFile": "מחק",
     "deletedTab": "קובץ נמחק (הלשונית נשארת פתוחה)",
+    "readOnlyNoPermission": "גישת צפייה בלבד",
     "readOnlyUntilFirstAiResponse": "עריכה תופעל רק אחרי שהבנייה הראשונית של ה-\u2068AI\u2069 הושלמה.\u200F",
     "readOnlyWhileAiWorking": "העריכה נעולה זמנית בזמן שה-\u2068AI\u2069 עובד.\u200F",
     "newFilePrompt": "הכנס נתיב לקובץ חדש",
@@ -137,6 +140,7 @@
       "selectProject": "בחר פרויקט תחילה",
       "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר או שנה",
       "working": "הבינה המלאכותית עובדת...",
+      "readOnly": "גישת צפייה בלבד",
       "default": "תאר מה תרצה לבנות..."
     },
     "phase": {
@@ -171,6 +175,19 @@
       "removeDataSource": "הסר מקור נתונים",
       "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)"
     }
+  },
+  "sharing": {
+    "title": "שיתוף",
+    "share": "שתף",
+    "owner": "בעלים",
+    "userIdPlaceholder": "מזהה משתמש",
+    "noMembers": "אין חברים עדיין"
+  },
+  "admin": {
+    "title": "משתמשי פלטפורמה",
+    "userIdPlaceholder": "מזהה משתמש להזמנה",
+    "invite": "הזמן",
+    "noUsers": "אין משתמשי פלטפורמה עדיין"
   },
   "publish": {
     "publishFailed": "הפרסום נכשל",

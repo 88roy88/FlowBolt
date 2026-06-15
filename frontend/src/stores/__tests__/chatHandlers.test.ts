@@ -25,7 +25,9 @@ vi.mock('../files', () => ({
       updateFileContent: vi.fn(),
       loadFileTree: vi.fn(),
       refreshOpenFiles: vi.fn(),
+      saveVersion: 0,
     }),
+    setState: vi.fn(),
   },
 }));
 
@@ -422,7 +424,7 @@ describe('finalizeHistoryReplayState', () => {
     expect(isHistoryRunComplete([{ type: 'followup_step' }])).toBe(false);
   });
 
-  it('clears stale exploring state after interrupted follow-up replay', () => {
+  it('keeps replayed state for in-progress run (alive poll handles cleanup)', () => {
     const store = createTestStore();
     const handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void);
     const events = [
@@ -439,8 +441,9 @@ describe('finalizeHistoryReplayState', () => {
 
     const didReset = finalizeHistoryReplayState(store.set, store.get, events);
     expect(didReset).toBe(true);
-    expect(store.state().agentPhase).toBe('idle');
-    expect(store.state().followUpSteps).toHaveLength(0);
+    // State is preserved — alive poll will clear if agent is dead
+    expect(store.state().agentPhase).toBe('exploring');
+    expect(store.state().followUpSteps).toHaveLength(1);
   });
 
   it('keeps awaiting approval state when plan overview is pending', () => {

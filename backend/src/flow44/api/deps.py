@@ -1,13 +1,23 @@
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
+from flow44.auth.permissions import (
+    Permission,
+    Role,
+    get_admin_permissions,
+    get_owner_permissions,
+    get_role_permissions,
+    has_permission,
+)
 from flow44.config import settings
+from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
+from flow44.db.project_member import get_project_member
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
 
@@ -99,14 +109,73 @@ def get_user_id(token: TokenDep) -> str:
 UserDep = Annotated[str, Depends(get_user_id)]
 
 
+def is_admin(user_id: str) -> bool:
+    return user_id in settings.SYSTEM_ADMIN_IDS
+
+
 async def get_project(project_id: str, user_id: UserDep) -> Project:
     project = await db_get_project(project_id)
-    if project is None or project.user_id != user_id:
+    if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    return project
+
+    if project.user_id == user_id:
+        return project
+
+    if is_admin(user_id):
+        return project
+
+    member = await get_project_member(project_id, user_id)
+    if member is not None:
+        return project
+
+    raise HTTPException(status_code=404, detail="Project not found")
 
 
 ProjectDep = Annotated[Project, Depends(get_project)]
+
+
+async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
+    """Resolve the current user's permissions on a project."""
+    if project.user_id == user_id:
+        return get_owner_permissions()
+
+    if is_admin(user_id):
+        return get_admin_permissions()
+
+    member = await get_project_member(project.id, user_id)
+    if member is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    return get_role_permissions(Role(member.role))
+
+
+PermissionsDep = Annotated[set[Permission], Depends(get_user_permissions)]
+
+
+def require_permission(permission: Permission) -> Any:
+    """Dependency factory: raises 403 if the user lacks the required permission."""
+
+    async def _check(user_permissions: PermissionsDep) -> set[Permission]:
+        if not has_permission(user_permissions, permission):
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return user_permissions
+
+    return Depends(_check)
+
+
+async def require_platform_user(user_id: UserDep) -> str:
+    """Gate: only platform users and admins can create projects."""
+    if is_admin(user_id):
+        return user_id
+    if await db_is_platform_user(user_id):
+        return user_id
+    raise HTTPException(status_code=403, detail="Platform access required")
+
+
+PlatformUserDep = Annotated[str, Depends(require_platform_user)]
+
+
+# --- WebSocket variants ---
 
 
 async def validate_ws_token(token: TokenDep) -> TokenPayload:
@@ -138,6 +207,38 @@ async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
 
 
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
+
+
+async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
+    """WS variant of get_user_permissions."""
+    if project.user_id == user_id:
+        return get_owner_permissions()
+
+    if is_admin(user_id):
+        return get_admin_permissions()
+
+    member = await get_project_member(project.id, user_id)
+    if member is None:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+
+    return get_role_permissions(Role(member.role))
+
+
+WsPermissionsDep = Annotated[set[Permission], Depends(get_ws_permissions)]
+
+
+def require_ws_permission(permission: Permission) -> Any:
+    """WS dependency factory: rejects handshake if the user lacks the required permission."""
+
+    async def _check(user_permissions: WsPermissionsDep) -> set[Permission]:
+        if not has_permission(user_permissions, permission):
+            raise WebSocketException(code=4403, reason="Insufficient permissions")
+        return user_permissions
+
+    return Depends(_check)
+
+
+# --- Sandbox dependencies ---
 
 
 async def get_sandbox(project: ProjectDep) -> PnpmSandbox:

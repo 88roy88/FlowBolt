@@ -99,11 +99,17 @@ class SandboxManager:
             self._available_ports.add(sandbox.port)
 
     async def destroy_sandbox(self, project_id: str) -> None:
-        """Permanently destroy a sandbox and delete its workspace from disk."""
-        await self.suspend_sandbox(project_id)
-        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
-        if os.path.isdir(workspace_dir):  # noqa: ASYNC240
-            shutil.rmtree(workspace_dir, ignore_errors=True)
+        """Permanently destroy a sandbox and delete its workspace from disk.
+
+        Best-effort: failures are logged and swallowed. Any orphaned workspace left
+        behind is cleaned up later by reconcile_workspaces().
+        """
+        try:
+            await self.suspend_sandbox(project_id)
+            workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+            await asyncio.to_thread(shutil.rmtree, workspace_dir, ignore_errors=True)
+        except Exception:
+            logger.exception("Failed to destroy sandbox %s", project_id)
 
     @staticmethod
     async def start_dev_server(sandbox: PnpmSandbox) -> None:

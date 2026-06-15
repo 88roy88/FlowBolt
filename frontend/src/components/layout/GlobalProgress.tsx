@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AgentPhase, ExecutionTask } from '../../types';
 import { useChatStore } from '../../stores/chat';
-import { AGENT_PHASE, isAgentWorking } from '../../stores/chatAgentState';
+import { AGENT_PHASE, isAgentAlive } from '../../stores/chatAgentState';
 
 function getAgentProgress(
   working: boolean,
@@ -12,7 +12,7 @@ function getAgentProgress(
 
   switch (agentPhase) {
     case AGENT_PHASE.idle:
-      return 0;
+      return working ? 5 : 0;
     case AGENT_PHASE.fetching_data_sources:
       return 10;
     case AGENT_PHASE.designing:
@@ -40,7 +40,7 @@ export function GlobalProgress() {
   const tasks = useChatStore((s) => s.executionTasks);
   const [visible, setVisible] = useState(false);
 
-  const working = useChatStore(isAgentWorking);
+  const working = useChatStore(isAgentAlive);
 
   const progress = getAgentProgress(working, agentPhase, tasks);
 

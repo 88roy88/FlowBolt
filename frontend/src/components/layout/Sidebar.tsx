@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon } from 'lucide-react';
+import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
-import type { ProjectSummary } from '../../types';
+import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
+import { ShareModal } from '../sharing/ShareModal';
+import { AdminPanel } from '../admin/AdminPanel';
 import { reapProject } from '../../services/api';
 import { isSpecialUser } from '../../utils/easterEgg';
 import { pollFileTree } from '../../utils/pollFileTree';
@@ -47,17 +49,21 @@ function getInitials(name: string) {
 
 export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBusyChange }: SidebarProps) {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating } = useSessionStore();
+  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
+  const [shareModal, setShareModal] = useState<{ projectId: string; projectName: string; ownerUserId?: string } | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const canCreate = userStatus?.is_platform_user || userStatus?.is_admin;
 
   // Notify parent when user is busy with an action
   useEffect(() => {
@@ -170,34 +176,36 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
       </div>
 
       {/* New project button */}
-      <div className="px-3 mb-2">
-        {showInput ? (
-          <div className="flex gap-1">
-            <Input
-              autoFocus
-              placeholder={t('common.projectName')}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate();
-                if (e.key === 'Escape') setShowInput(false);
-              }}
-            />
-            <Button size="sm" onClick={handleCreate}>{t('common.add')}</Button>
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowInput(true)}
-            disabled={isCreating}
-            className="w-full justify-start gap-2"
-          >
-            <Plus size={14} className="text-primary" />
-            {t('sidebar.newProject')}
-          </Button>
-        )}
-      </div>
+      {canCreate && (
+        <div className="px-3 mb-2">
+          {showInput ? (
+            <div className="flex gap-1">
+              <Input
+                autoFocus
+                placeholder={t('common.projectName')}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreate();
+                  if (e.key === 'Escape') setShowInput(false);
+                }}
+              />
+              <Button size="sm" onClick={handleCreate}>{t('common.add')}</Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInput(true)}
+              disabled={isCreating}
+              className="w-full justify-start gap-2"
+            >
+              <Plus size={14} className="text-primary" />
+              {t('sidebar.newProject')}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Creating indicator */}
       {isCreating && (
@@ -239,7 +247,12 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                     className="flex-1 text-[13px] bg-background border border-border rounded px-1.5 py-0.5"
                   />
                 ) : (
-                  <span className="flex-1 text-[13px] truncate">{project.name}</span>
+                  <span className="flex-1 text-[13px] truncate">
+                    {project.name}
+                    <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                      {project.role}
+                    </span>
+                  </span>
                 )}
                 <Button
                   variant="ghost"
@@ -260,13 +273,15 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                   ref={menuRef}
                   className="absolute end-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
                 >
-                  <button
-                    onClick={() => startRename(project)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <Pencil size={13} className="text-muted-foreground" />
-                    {t('sidebar.rename')}
-                  </button>
+                  {(!project.role || MANAGE_ROLES.has(project.role)) && (
+                    <button
+                      onClick={() => startRename(project)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <Pencil size={13} className="text-muted-foreground" />
+                      {t('sidebar.rename')}
+                    </button>
+                  )}
                   {project.summary && (
                     <button
                       onClick={() => handleShowSummary(project)}
@@ -276,31 +291,45 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                       {t('sidebar.summary')}
                     </button>
                   )}
+                  {(!project.role || MANAGE_ROLES.has(project.role)) && (
+                    <button
+                      onClick={() => {
+                        setMenuOpenId(null);
+                        setShareModal({ projectId: project.id, projectName: project.name, ownerUserId: project.user_id });
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <Share2 size={13} className="text-muted-foreground" />
+                      {t('sharing.share', 'Share')}
+                    </button>
+                  )}
                   {isSpecialUser() && (
                     <button
                       onClick={async () => {
+                        setMenuOpenId(null);
                         try {
                           await reapProject(project.id);
-                          setMenuOpenId(null);
                         } catch { /* sandbox may already be reaped */ }
                       }}
                       className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
                     >
                       <Moon size={13} className="text-muted-foreground" />
-                      Sleep
+                      {t('sidebar.sleep', 'Sleep')}
                     </button>
                   )}
-                  <button
-                    onClick={() => handleDelete(project.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
-                      pendingDeleteId === project.id
-                        ? 'text-destructive bg-destructive/10'
-                        : 'text-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    <Trash2 size={13} className={pendingDeleteId === project.id ? 'text-destructive' : 'text-muted-foreground'} />
-                    {pendingDeleteId === project.id ? t('sidebar.confirmDelete') : t('common.delete')}
-                  </button>
+                  {(!project.role || DELETE_ROLES.has(project.role)) && (
+                    <button
+                      onClick={() => handleDelete(project.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
+                        pendingDeleteId === project.id
+                          ? 'text-destructive bg-destructive/10'
+                          : 'text-foreground hover:bg-muted/50'
+                      }`}
+                    >
+                      <Trash2 size={13} className={pendingDeleteId === project.id ? 'text-destructive' : 'text-muted-foreground'} />
+                      {pendingDeleteId === project.id ? t('sidebar.confirmDelete') : t('common.delete')}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -308,8 +337,14 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
         })}
       </div>
 
-      {/* Bottom: Settings */}
-      <div className="border-t border-border px-3 py-2">
+      {/* Bottom: Settings + Admin */}
+      <div className="border-t border-border px-3 py-2 space-y-0.5">
+        {userStatus?.is_admin && (
+          <Button variant="ghost" size="sm" onClick={() => setShowAdminPanel(true)} className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+            <Shield size={14} className="text-warning/70" />
+            <span className="text-[13px]">{t('admin.title', 'Platform Users')}</span>
+          </Button>
+        )}
         <Button variant="ghost" size="sm" onClick={onOpenSettings} className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
           <Settings size={14} className="text-primary/70" />
           <span className="text-[13px]">{t('common.settings')}</span>
@@ -322,6 +357,19 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
           summary={summaryModal.summary}
           onClose={() => setSummaryModal(null)}
         />
+      )}
+
+      {shareModal && (
+        <ShareModal
+          projectId={shareModal.projectId}
+          projectName={shareModal.projectName}
+          ownerUserId={shareModal.ownerUserId}
+          onClose={() => setShareModal(null)}
+        />
+      )}
+
+      {showAdminPanel && (
+        <AdminPanel onClose={() => setShowAdminPanel(false)} />
       )}
     </div>
   );
