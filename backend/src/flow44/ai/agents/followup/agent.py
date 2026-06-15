@@ -190,9 +190,7 @@ class FollowUpAgent(BaseAgent):
             await self.emit({"type": "phase", "phase": "fetching_data_sources"})
             try:
                 updated_contexts: list[DataSourceContext] = list(
-                    await asyncio.gather(
-                        *[self._fetch_analyze_and_write(sid, content) for sid in data_source_ids]
-                    )
+                    await asyncio.gather(*[self._fetch_analyze_and_write(sid, content) for sid in data_source_ids])
                 )
             except Exception:
                 await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
