@@ -18,7 +18,7 @@ from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
-from flow44.ai.generated_app_contract import GeneratedAppContractError, assert_generated_app_code_allowed
+from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_file_contract
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
@@ -125,7 +125,9 @@ class FollowUpAgent(BaseAgent):
         async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
             try:
-                path = assert_generated_app_code_allowed(path, content, allowed_import_names(self._selected_packages))
+                path = validate_generated_app_file_contract(
+                    path, content, allowed_import_names(self._selected_packages)
+                )
             except GeneratedAppContractError as exc:
                 return _format_generated_app_contract_error(exc)
             try:
@@ -158,7 +160,9 @@ class FollowUpAgent(BaseAgent):
 
             candidate = current.replace(search, replace, 1)
             try:
-                path = assert_generated_app_code_allowed(path, candidate, allowed_import_names(self._selected_packages))
+                path = validate_generated_app_file_contract(
+                    path, candidate, allowed_import_names(self._selected_packages)
+                )
             except GeneratedAppContractError as exc:
                 return _format_generated_app_contract_error(exc)
             try:
