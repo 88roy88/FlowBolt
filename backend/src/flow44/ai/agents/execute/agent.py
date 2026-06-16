@@ -18,6 +18,10 @@ from flow44.ai.agents.execute.prompts import (
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
+from flow44.ai.generated_app_contract import (
+    GeneratedAppContractError,
+    validate_generated_app_edit_path,
+)
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
 from flow44.ai.state import BuildState
@@ -187,7 +191,8 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            for path, content in generated:
+            validated = [(validate_generated_app_edit_path(path), content) for path, content in generated]
+            for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
                 await state.emit_fn({"type": "file", "path": path, "content": content})
@@ -265,16 +270,29 @@ class ExecuteAgent(BaseAgent):
         )
         plan_data = parse_json_response(raw)
 
-        tasks = [
-            Task(
-                id=t.get("id", f"task-{uuid.uuid4().hex[:6]}"),
-                title=t.get("title", "Untitled task"),
-                description=t.get("description", ""),
-                files=t.get("files", []),
-                depends_on=t.get("depends_on", []),
+        tasks: list[Task] = []
+        for task_data in plan_data.get("tasks", []):
+            safe_files: list[str] = []
+            for path in task_data.get("files", []):
+                try:
+                    safe_files.append(validate_generated_app_edit_path(path))
+                except GeneratedAppContractError:
+                    logger.warning("[execute] Dropping protected file from generated plan: %s", path)
+            if not safe_files:
+                continue
+            tasks.append(
+                Task(
+                    id=task_data.get("id", f"task-{uuid.uuid4().hex[:6]}"),
+                    title=task_data.get("title", "Untitled task"),
+                    description=task_data.get("description", ""),
+                    files=safe_files,
+                    depends_on=task_data.get("depends_on", []),
+                )
             )
-            for t in plan_data.get("tasks", [])
-        ]
+
+        task_ids = {task.id for task in tasks}
+        for task in tasks:
+            task.depends_on = [dependency for dependency in task.depends_on if dependency in task_ids]
 
         return WorkPlan(
             id=f"plan-{uuid.uuid4().hex[:8]}",
@@ -328,8 +346,18 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            paths: list[str] = []
+            expected_paths = {validate_generated_app_edit_path(path) for path in task.files}
+            validated: list[tuple[str, str]] = []
             for path, content in generated:
+                normalized_path = validate_generated_app_edit_path(path)
+                if normalized_path not in expected_paths:
+                    raise GeneratedAppContractError(
+                        f"Generated unexpected file outside task contract: {normalized_path}"
+                    )
+                validated.append((normalized_path, content))
+
+            paths: list[str] = []
+            for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
                 paths.append(path)

@@ -1,0 +1,39 @@
+## File Safety Rules
+
+Default:
+- You may edit normal app source files needed for the user request.
+- Keep changes focused.
+- Preserve existing behavior unless the task requires changing it.
+- Be careful with shared/core files.
+
+Do not touch:
+{% for path in file_safety.protected_files -%}
+- `{{ path }}`
+{% endfor -%}
+{% for path in file_safety.protected_src_paths -%}
+- `{{ path }}`
+{% endfor -%}
+{% for path in file_safety.protected_src_dirs -%}
+- `{{ path }}`
+{% endfor -%}
+{% for path in file_safety.protected_root_dirs -%}
+- `{{ path }}`
+{% endfor -%}
+{% for pattern in file_safety.protected_name_patterns -%}
+- files matching `{{ pattern }}`
+{% endfor %}
+
+Edit only when clearly needed:
+- `src/App.tsx`
+- shared layout files
+- shared mock data/type files
+- global CSS files
+
+Free to edit:
+- `src/components/*`
+- `src/pages/*`
+- `src/data/*`
+- `src/lib/*`
+- `src/hooks/*`
+- `src/types/*`
+- feature-specific app files
