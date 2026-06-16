@@ -68,8 +68,8 @@ class TestPublish:
 
     def _patch_build_and_deploy(self):
         return (
-            patch("flow44.api.publish.build_single_html", return_value="<html>ok</html>"),
-            patch("flow44.api.publish.deploy_single_html", return_value=MOCK_S3_URL),
+            patch("flow44.api.publish.build_dist", return_value="dist"),
+            patch("flow44.api.publish.deploy_shared_dist", return_value=MOCK_S3_URL),
             patch.object(settings, "S3_BUCKET_NAME", "test-bucket"),
         )
 
@@ -77,7 +77,7 @@ class TestPublish:
     async def test_publish_with_slug(self):
         p_build, p_deploy, p_bucket = self._patch_build_and_deploy()
         with (
-            p_build,
+            p_build as mock_build,
             p_deploy,
             p_bucket,
             patch("flow44.api.publish.is_handle_taken", return_value=False),
@@ -92,6 +92,7 @@ class TestPublish:
             assert data["url"] == "/shared/my-cool-app"
             assert data["handle"] == "my-cool-app"
             mock_update.assert_awaited_once_with("proj-1", "my-cool-app")
+            mock_build.assert_awaited_once_with("proj-1", public_base="/shared/my-cool-app/")
 
     @pytest.mark.asyncio
     async def test_publish_without_slug(self):
@@ -189,33 +190,35 @@ class TestShareBySlug:
     async def test_share_returns_proxied_html(self):
         mock_proj = _mock_project(published_url="my-app", published_at="2026-04-18T21:00:00Z")
         mock_proj.id = "proj-123"
-        with patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj):
-            with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"), \
-                 patch("httpx.AsyncClient.get") as mock_get:
-                mock_resp = AsyncMock()
-                mock_resp.status_code = 200
-                mock_resp.text = "<html>Shared App</html>"
-                mock_resp.headers = {
-                    "etag": '"abc"',
-                    "last-modified": "Thu, 10 Apr 2026 12:00:00 GMT",
-                }
-                mock_resp.raise_for_status = lambda: None
-                mock_get.return_value = mock_resp
+        with (
+            patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj),
+            patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"),
+            patch("httpx.AsyncClient.get") as mock_get,
+        ):
+            mock_resp = AsyncMock()
+            mock_resp.status_code = 200
+            mock_resp.text = "<html>Shared App</html>"
+            mock_resp.headers = {
+                "etag": '"abc"',
+                "last-modified": "Thu, 10 Apr 2026 12:00:00 GMT",
+            }
+            mock_resp.raise_for_status = lambda: None
+            mock_get.return_value = mock_resp
 
-                response = client.get("/shared/my-app")
+            response = client.get("/shared/my-app")
 
-                assert response.status_code == 200
-                assert response.text == "<html>Shared App</html>"
-                assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
-                assert response.headers["ETag"] == '"abc"'
-                assert response.headers["Last-Modified"] == "Thu, 10 Apr 2026 12:00:00 GMT"
+            assert response.status_code == 200
+            assert response.text == "<html>Shared App</html>"
+            assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
+            assert response.headers["ETag"] == '"abc"'
+            assert response.headers["Last-Modified"] == "Thu, 10 Apr 2026 12:00:00 GMT"
 
     @pytest.mark.asyncio
     async def test_share_unknown_slug_returns_404(self):
         with patch("flow44.api.shared.get_project_by_handle", return_value=None):
             response = client.get("/shared/nonexistent")
             assert response.status_code == 404
-            assert "No published app found" in response.json()["detail"]
+            assert "No shared app found" in response.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_share_route_is_public(self):
@@ -228,20 +231,22 @@ class TestShareBySlug:
         mock_proj.id = "proj-123"
         saved = app.dependency_overrides.pop(validate_token, None)
         try:
-            with patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj):
-                with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"), \
-                     patch("httpx.AsyncClient.get") as mock_get:
-                    mock_resp = AsyncMock()
-                    mock_resp.status_code = 200
-                    mock_resp.text = "<html>Shared App</html>"
-                    mock_resp.headers = {}
-                    mock_resp.raise_for_status = lambda: None
-                    mock_get.return_value = mock_resp
+            with (
+                patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj),
+                patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"),
+                patch("httpx.AsyncClient.get") as mock_get,
+            ):
+                mock_resp = AsyncMock()
+                mock_resp.status_code = 200
+                mock_resp.text = "<html>Shared App</html>"
+                mock_resp.headers = {}
+                mock_resp.raise_for_status = lambda: None
+                mock_get.return_value = mock_resp
 
-                    response = client.get("/shared/my-app")
+                response = client.get("/shared/my-app")
 
-                    assert response.status_code == 200
-                    assert response.text == "<html>Shared App</html>"
+                assert response.status_code == 200
+                assert response.text == "<html>Shared App</html>"
         finally:
             if saved is not None:
                 app.dependency_overrides[validate_token] = saved
@@ -250,9 +255,11 @@ class TestShareBySlug:
     async def test_share_s3_failure_returns_502(self):
         mock_proj = _mock_project(published_url="my-app", published_at="2026-04-18T21:00:00Z")
         mock_proj.id = "proj-123"
-        with patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj):
-            with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"), \
-                 patch("httpx.AsyncClient.get", side_effect=Exception("S3 down")):
-                response = client.get("/shared/my-app")
-                assert response.status_code == 502
-                assert "Error fetching published app" in response.json()["detail"]
+        with (
+            patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj),
+            patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"),
+            patch("httpx.AsyncClient.get", side_effect=Exception("S3 down")),
+        ):
+            response = client.get("/shared/my-app")
+            assert response.status_code == 502
+            assert "Error fetching shared app" in response.json()["detail"]
