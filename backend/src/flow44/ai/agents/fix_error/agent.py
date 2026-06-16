@@ -14,7 +14,7 @@ from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_f
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
-from flow44.ai.generated_app_contract import assert_generated_app_code_allowed
+from flow44.ai.generated_app_contract import validate_generated_app_file_contract
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -177,7 +177,10 @@ class FixErrorAgent(BaseAgent):
         )
 
         state.generated_files = [
-            (assert_generated_app_code_allowed(path, content, allowed_import_names(state.selected_packages)), content)
+            (
+                validate_generated_app_file_contract(path, content, allowed_import_names(state.selected_packages)),
+                content,
+            )
             for path, content in state.generated_files
         ]
         for path, content in state.generated_files:
@@ -251,7 +254,7 @@ class FixErrorAgent(BaseAgent):
 
             validated = [
                 (
-                    assert_generated_app_code_allowed(path, content, allowed_import_names(state.selected_packages)),
+                    validate_generated_app_file_contract(path, content, allowed_import_names(state.selected_packages)),
                     content,
                 )
                 for path, content in generated

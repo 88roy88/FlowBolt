@@ -107,7 +107,7 @@ def find_disallowed_external_imports(content: str, allowed_imports: list[str]) -
     }
 
 
-def assert_generated_app_code_allowed(path: str, content: str, allowed_imports: list[str]) -> str:
+def validate_generated_app_file_contract(path: str, content: str, allowed_imports: list[str]) -> str:
     """Validate a generated file target and its external imports."""
     normalized = validate_generated_app_edit_path(path)
     disallowed = sorted(find_disallowed_external_imports(content, allowed_imports))

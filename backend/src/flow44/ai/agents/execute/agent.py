@@ -33,8 +33,8 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
-    assert_generated_app_code_allowed,
     validate_generated_app_edit_path,
+    validate_generated_app_file_contract,
 )
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
@@ -215,7 +215,7 @@ class ExecuteAgent(BaseAgent):
             parser.flush()
 
             validated = [
-                (assert_generated_app_code_allowed(path, content, allowed_import_names(selected_packages)), content)
+                (validate_generated_app_file_contract(path, content, allowed_import_names(selected_packages)), content)
                 for path, content in generated
             ]
             for path, content in validated:
@@ -419,7 +419,7 @@ class ExecuteAgent(BaseAgent):
             allowed_imports = allowed_import_names(state.build_state.work_plan.selected_packages)
             validated: list[tuple[str, str]] = []
             for path, content in generated:
-                normalized_path = assert_generated_app_code_allowed(path, content, allowed_imports)
+                normalized_path = validate_generated_app_file_contract(path, content, allowed_imports)
                 if normalized_path not in expected_paths:
                     raise GeneratedAppContractError(
                         f"Generated unexpected file outside task contract: {normalized_path}"

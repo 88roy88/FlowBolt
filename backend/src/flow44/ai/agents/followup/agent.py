@@ -17,7 +17,7 @@ from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
-from flow44.ai.generated_app_contract import GeneratedAppContractError, assert_generated_app_code_allowed
+from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_file_contract
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
@@ -119,7 +119,9 @@ class FollowUpAgent(BaseAgent):
             import difflib  # noqa: PLC0415
 
             try:
-                path = assert_generated_app_code_allowed(path, content, allowed_import_names(self._selected_packages))
+                path = validate_generated_app_file_contract(
+                    path, content, allowed_import_names(self._selected_packages)
+                )
             except GeneratedAppContractError as exc:
                 return f"Error: {exc}"
             try:
@@ -154,7 +156,9 @@ class FollowUpAgent(BaseAgent):
 
             candidate = current.replace(search, replace, 1)
             try:
-                path = assert_generated_app_code_allowed(path, candidate, allowed_import_names(self._selected_packages))
+                path = validate_generated_app_file_contract(
+                    path, candidate, allowed_import_names(self._selected_packages)
+                )
             except GeneratedAppContractError as exc:
                 return f"Error: {exc}"
             try:

@@ -6,11 +6,11 @@ import pytest
 
 from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
-    assert_generated_app_code_allowed,
     find_disallowed_external_imports,
     generated_app_path_safety_prompt_context,
     is_generated_app_path_allowed,
     validate_generated_app_edit_path,
+    validate_generated_app_file_contract,
 )
 
 
@@ -41,7 +41,7 @@ def test_unselected_external_import_is_rejected() -> None:
     content = "import { Button } from '@mui/material';"
 
     with pytest.raises(GeneratedAppContractError, match="@mui/material"):
-        assert_generated_app_code_allowed("src/App.tsx", content, [])
+        validate_generated_app_file_contract("src/App.tsx", content, [])
 
 
 @pytest.mark.parametrize("path", ["/src/App.tsx", "../src/App.tsx", "src/../App.tsx"])
@@ -73,7 +73,7 @@ import { helper } from './helper';
 """
 
     assert find_disallowed_external_imports(content, ["@mui/material"]) == set()
-    assert assert_generated_app_code_allowed("src/App.tsx", content, ["@mui/material"]) == "src/App.tsx"
+    assert validate_generated_app_file_contract("src/App.tsx", content, ["@mui/material"]) == "src/App.tsx"
 
 
 def test_dynamic_unselected_import_is_rejected() -> None:
