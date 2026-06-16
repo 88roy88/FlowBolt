@@ -72,3 +72,14 @@ def deploy_single_html(html_content: str, project_id: str) -> str:
         StorageClass=settings.S3_STORAGE_CLASS,
     )
     return get_published_url(project_id)
+
+
+def delete_published_object(project_id: str) -> None:
+    """Delete the published S3 object for a project, if S3 is configured."""
+    if not settings.S3_BUCKET_NAME:
+        logger.info("Skipping published object delete for project %s: S3 bucket is not configured.", project_id)
+        return
+
+    s3 = connect_to_s3()
+    key = _get_s3_key(project_id)
+    s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)

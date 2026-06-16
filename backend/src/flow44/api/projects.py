@@ -21,6 +21,7 @@ from flow44.db.project import (
 )
 from flow44.db.project import list_user_projects as db_list_user_projects
 from flow44.db.project_member import list_shared_projects
+from flow44.integrations.s3 import delete_published_object
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
@@ -125,6 +126,7 @@ async def delete_existing_project(
 ) -> None:
     idle_reaper.remove(project.id)
     await delete_project(project.id)
+    background_tasks.add_task(delete_published_object, project.id)
     background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)
 
 
