@@ -4,12 +4,17 @@ from pathlib import PurePosixPath
 from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.execute.optional_packages import (
+    allowed_import_names,
+    package_install_names,
+    selected_packages_from_package_json,
+)
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
-from flow44.ai.generated_app_contract import validate_generated_app_edit_path
+from flow44.ai.generated_app_contract import assert_generated_app_code_allowed
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -115,12 +120,14 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "generate", "status": "running", "message": "Generating fix with AI..."}
         )
 
+        state.selected_packages = await self._prepare_optional_packages()
         prompt = render_fix_error_direct(
             error_message=state.error_message,
             error_file=state.error_file,
             error_line=state.error_line,
             error_stack=state.error_stack,
             files=state.discovered_files,
+            selected_packages=state.selected_packages,
         )
 
         parser = ActionParser(on_file_action=lambda p, c: state.generated_files.append((p, c)))
@@ -170,7 +177,8 @@ class FixErrorAgent(BaseAgent):
         )
 
         state.generated_files = [
-            (validate_generated_app_edit_path(path), content) for path, content in state.generated_files
+            (assert_generated_app_code_allowed(path, content, allowed_import_names(state.selected_packages)), content)
+            for path, content in state.generated_files
         ]
         for path, content in state.generated_files:
             await state.sandbox_ref.write_file(path, content)
@@ -222,7 +230,12 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."}
         )
 
-        prompt = render_fix_errors(errors=state.validation_errors, files=dict(state.generated_files))
+        await state.sandbox_ref.install_optional_packages(package_install_names(state.selected_packages))
+        prompt = render_fix_errors(
+            errors=state.validation_errors,
+            files=dict(state.generated_files),
+            selected_packages=state.selected_packages,
+        )
         generated: list[tuple[str, str]] = []
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
@@ -236,7 +249,13 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = [(validate_generated_app_edit_path(path), content) for path, content in generated]
+            validated = [
+                (
+                    assert_generated_app_code_allowed(path, content, allowed_import_names(state.selected_packages)),
+                    content,
+                )
+                for path, content in generated
+            ]
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 await state.emit_fn({"type": "file", "path": path, "content": content})
@@ -323,3 +342,12 @@ class FixErrorAgent(BaseAgent):
     async def _build(self) -> str:
         result = await self.sandbox.run_build_command("pnpm build")
         return result.errors
+
+    async def _prepare_optional_packages(self) -> list[str]:
+        try:
+            package_json = await self.sandbox.read_file("package.json")
+        except (FileNotFoundError, PermissionError):
+            return []
+        selected_packages = selected_packages_from_package_json(package_json)
+        await self.sandbox.install_optional_packages(package_install_names(selected_packages))
+        return selected_packages

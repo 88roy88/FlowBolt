@@ -8,11 +8,16 @@ from langfuse.decorators import observe
 from pydantic import BaseModel
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.execute.optional_packages import (
+    allowed_import_names,
+    package_install_names,
+    selected_packages_from_package_json,
+)
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
-from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_edit_path
+from flow44.ai.generated_app_contract import GeneratedAppContractError, assert_generated_app_code_allowed
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
@@ -44,6 +49,7 @@ class FollowUpAgent(BaseAgent):
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
         self._iteration = 0
+        self._selected_packages: list[str] = []
         self._executor = self._build_tool_executor()
 
     def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901, PLR0915
@@ -113,7 +119,7 @@ class FollowUpAgent(BaseAgent):
             import difflib  # noqa: PLC0415
 
             try:
-                path = validate_generated_app_edit_path(path)
+                path = assert_generated_app_code_allowed(path, content, allowed_import_names(self._selected_packages))
             except GeneratedAppContractError as exc:
                 return f"Error: {exc}"
             try:
@@ -146,8 +152,9 @@ class FollowUpAgent(BaseAgent):
             except FileNotFoundError:
                 return f"Error: File not found: {path}"
 
+            candidate = current.replace(search, replace, 1)
             try:
-                path = validate_generated_app_edit_path(path)
+                path = assert_generated_app_code_allowed(path, candidate, allowed_import_names(self._selected_packages))
             except GeneratedAppContractError as exc:
                 return f"Error: {exc}"
             try:
@@ -187,6 +194,7 @@ class FollowUpAgent(BaseAgent):
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
+        self._selected_packages = await self._prepare_optional_packages()
 
         # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
         history = await get_messages(self.project_id)
@@ -199,6 +207,7 @@ class FollowUpAgent(BaseAgent):
         system_prompt = render_followup(
             project_summary=context["summary"],
             file_tree=context["file_tree"],
+            selected_packages=self._selected_packages,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -272,6 +281,15 @@ class FollowUpAgent(BaseAgent):
                     }
                 )
             await self.emit({"type": "followup_step", **step_data})
+
+    async def _prepare_optional_packages(self) -> list[str]:
+        try:
+            package_json = await self.sandbox.read_file("package.json")
+        except (FileNotFoundError, PermissionError):
+            return []
+        selected_packages = selected_packages_from_package_json(package_json)
+        await self.sandbox.install_optional_packages(package_install_names(selected_packages))
+        return selected_packages
 
     # TODO: feels like a general utils that should go out.
     def _format_file_tree(self, entries: list[Any], indent: int = 0) -> str:

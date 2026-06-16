@@ -5,21 +5,35 @@ import uuid
 
 from langfuse import Langfuse
 from langfuse.decorators import observe
+from pydantic import ValidationError
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
+from flow44.ai.agents.execute.optional_packages import (
+    OptionalPackageDecision,
+    allowed_import_names,
+    high_confidence_optional_package_decision,
+    merge_optional_package_decisions,
+    package_capabilities,
+    package_install_names,
+    repair_unselected_package_references,
+    selected_package_names,
+    validate_optional_package_decision,
+)
 from flow44.ai.agents.execute.prompts import (
     SUMMARY_PROMPT,
     render_codegen,
     render_fix_errors,
     render_merge,
+    render_package_decision,
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
+    assert_generated_app_code_allowed,
     validate_generated_app_edit_path,
 )
 from flow44.ai.helpers import parse_json_response
@@ -132,6 +146,9 @@ class ExecuteAgent(BaseAgent):
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
+        await state.sandbox_ref.install_optional_packages(
+            package_install_names(state.build_state.work_plan.selected_packages)
+        )
         span = state.langfuse_client.span(
             trace_id=state.trace_id,
             name="execute-plan",
@@ -177,7 +194,13 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
+        selected_packages = state.build_state.work_plan.selected_packages if state.build_state.work_plan else []
+        await state.sandbox_ref.install_optional_packages(package_install_names(selected_packages))
+        prompt = render_fix_errors(
+            errors=state.all_errors,
+            files=state.build_state.completed_files,
+            selected_packages=selected_packages,
+        )
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
@@ -191,7 +214,10 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = [(validate_generated_app_edit_path(path), content) for path, content in generated]
+            validated = [
+                (assert_generated_app_code_allowed(path, content, allowed_import_names(selected_packages)), content)
+                for path, content in generated
+            ]
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
@@ -236,11 +262,19 @@ class ExecuteAgent(BaseAgent):
 
     async def _build_technical_plan(self, state: ExecutionState) -> WorkPlan:
         """Build technical task plan from user overview."""
+        decision = await self._decide_optional_packages(state)
+        selected_packages = selected_package_names(decision)
+        await state.sandbox_ref.install_optional_packages(package_install_names(selected_packages))
+
         merge_data: dict[str, object] = {
             "user_request": state.build_state.user_content,
             "architecture": state.build_state.architecture.model_dump(),
             "ux_design": state.build_state.ux_design.model_dump(),
             "user_preferences": [d.model_dump() for d in state.build_state.user_overview.decisions],
+            "optional_package_decision": {
+                "selected_packages": [package.model_dump() for package in decision.selected_packages],
+                "selected_capabilities": package_capabilities(selected_packages),
+            },
         }
         if state.build_state.data_source_contexts:
             merge_data["data_source_integrations"] = [
@@ -264,7 +298,10 @@ class ExecuteAgent(BaseAgent):
 
         raw = await complete_chat(
             [Message.user(json.dumps(merge_data, indent=2))],
-            render_merge(has_data_sources=bool(state.build_state.data_source_contexts)),
+            render_merge(
+                has_data_sources=bool(state.build_state.data_source_contexts),
+                selected_packages=selected_packages,
+            ),
             model=state.model,
             metadata=state.llm_metadata_fn("build_technical_plan"),
         )
@@ -283,8 +320,12 @@ class ExecuteAgent(BaseAgent):
             tasks.append(
                 Task(
                     id=task_data.get("id", f"task-{uuid.uuid4().hex[:6]}"),
-                    title=task_data.get("title", "Untitled task"),
-                    description=task_data.get("description", ""),
+                    title=repair_unselected_package_references(
+                        task_data.get("title", "Untitled task"), selected_packages
+                    ),
+                    description=repair_unselected_package_references(
+                        task_data.get("description", ""), selected_packages
+                    ),
                     files=safe_files,
                     depends_on=task_data.get("depends_on", []),
                 )
@@ -296,11 +337,38 @@ class ExecuteAgent(BaseAgent):
 
         return WorkPlan(
             id=f"plan-{uuid.uuid4().hex[:8]}",
-            summary=plan_data.get("summary", ""),
+            summary=repair_unselected_package_references(plan_data.get("summary", ""), selected_packages),
             architecture=state.build_state.architecture,
             ux_design=state.build_state.ux_design,
             tasks=tasks,
+            selected_packages=selected_packages,
         )
+
+    async def _decide_optional_packages(self, state: ExecutionState) -> OptionalPackageDecision:
+        decision_input = json.dumps(
+            {
+                "user_request": state.build_state.user_content,
+                "architecture": state.build_state.architecture.model_dump(),
+                "ux_design": state.build_state.ux_design.model_dump(),
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+        raw = await complete_chat(
+            [Message.user(decision_input)],
+            render_package_decision(),
+            model=state.model,
+            metadata=state.llm_metadata_fn("decide_optional_packages"),
+        )
+        try:
+            decision = OptionalPackageDecision.model_validate(parse_json_response(raw))
+            return merge_optional_package_decisions(
+                validate_optional_package_decision(decision),
+                high_confidence_optional_package_decision(state.build_state.user_content),
+            )
+        except ValidationError:
+            logger.warning("[execute] Invalid optional package decision; using high-confidence package signals")
+            return high_confidence_optional_package_decision(state.build_state.user_content)
 
     async def _execute_task(self, task: Task, state: ExecutionState) -> None:
         """Execute a single task with Langfuse span."""
@@ -332,6 +400,7 @@ class ExecuteAgent(BaseAgent):
                 other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
+                selected_packages=state.build_state.work_plan.selected_packages,
             )
 
             generated: list[tuple[str, str]] = []
@@ -347,9 +416,10 @@ class ExecuteAgent(BaseAgent):
             parser.flush()
 
             expected_paths = {validate_generated_app_edit_path(path) for path in task.files}
+            allowed_imports = allowed_import_names(state.build_state.work_plan.selected_packages)
             validated: list[tuple[str, str]] = []
             for path, content in generated:
-                normalized_path = validate_generated_app_edit_path(path)
+                normalized_path = assert_generated_app_code_allowed(path, content, allowed_imports)
                 if normalized_path not in expected_paths:
                     raise GeneratedAppContractError(
                         f"Generated unexpected file outside task contract: {normalized_path}"
