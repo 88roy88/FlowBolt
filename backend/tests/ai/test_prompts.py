@@ -192,9 +192,10 @@ class TestPromptRendering:
     def test_codegen_package_variants_are_strict_and_phase_specific(self) -> None:
         variants = {
             "none": [],
+            "router": ["react-router-dom"],
             "mui": ["mui"],
             "charts": ["recharts"],
-            "both": ["mui", "recharts"],
+            "all": ["react-router-dom", "mui", "recharts"],
         }
 
         for name, selected in variants.items():
@@ -215,6 +216,8 @@ class TestPromptRendering:
             assert "`src/platform/*`" in result
             assert ("- @mui/material" in dependency_rules) == ("mui" in selected)
             assert ("- recharts" in dependency_rules) == ("recharts" in selected)
+            assert ("- react-router-dom" in dependency_rules) == ("react-router-dom" in selected)
+            assert ("basename={getRouterBasename()}" in result) == ("react-router-dom" in selected)
             assert ("Import Material UI components" in result) == ("mui" in selected)
             assert ("Use Recharts components" in result) == ("recharts" in selected)
 
