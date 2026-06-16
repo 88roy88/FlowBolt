@@ -5,8 +5,15 @@ import re
 from pathlib import Path
 from typing import Any, Literal, overload
 
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, TemplateNotFound
 
+from flow44.ai.agents.execute.optional_packages import (
+    OPTIONAL_PACKAGES,
+    OptionalPackagePrompt,
+    allowed_import_names,
+    optional_package_prompt_context,
+    validate_optional_packages,
+)
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
 from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
@@ -26,8 +33,14 @@ def render(
     template_name: Literal["merge.jinja2"],
     *,
     has_data_sources: bool,
+    package_merge_rules: list[str],
+    package_unselected_merge_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str: ...
+
+
+@overload
+def render(template_name: Literal["package_decision.jinja2"], *, optional_packages: list[dict[str, str]]) -> str: ...
 
 
 @overload
@@ -46,6 +59,10 @@ def render(
     dependency_files: dict[str, str] | None,
     other_completed_exports: dict[str, str] | None,
     data_source_contexts: list[dict[str, Any]] | None,
+    allowed_imports: list[str],
+    package_contexts: list[str],
+    package_rules: list[str],
+    package_unselected_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str: ...
 
@@ -56,6 +73,9 @@ def render(
     *,
     errors: str,
     files: dict[str, str],
+    allowed_imports: list[str],
+    package_fix_rules: list[str],
+    package_unselected_fix_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str: ...
 
@@ -68,12 +88,21 @@ def render(template_name: str, **kwargs: object) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_merge(*, has_data_sources: bool = False) -> str:
+def render_merge(*, has_data_sources: bool = False, selected_packages: list[str] | None = None) -> str:
+    validated_packages = validate_optional_packages(selected_packages or [])
     return render(
         "merge.jinja2",
         has_data_sources=has_data_sources,
+        package_merge_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.MERGE_RULES),
+        package_unselected_merge_rules=_render_unselected_optional_package_prompts(
+            validated_packages, OptionalPackagePrompt.MERGE_UNSELECTED_RULES
+        ),
         file_safety=generated_app_path_safety_prompt_context(),
     )
+
+
+def render_package_decision() -> str:
+    return render("package_decision.jinja2", optional_packages=optional_package_prompt_context())
 
 
 def render_summary() -> str:
@@ -90,6 +119,7 @@ def render_codegen(  # noqa: PLR0913
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
     data_source_contexts: list[dict[str, Any]] | None = None,
+    selected_packages: list[str] | None = None,
 ) -> str:
     prepared_sources = None
     if data_source_contexts:
@@ -117,6 +147,7 @@ def render_codegen(  # noqa: PLR0913
                     preview += f"\n... ({len(lines) - 50} more lines)"
                 other_exports[path] = preview
 
+    validated_packages = validate_optional_packages(selected_packages or [])
     return render(
         "codegen.jinja2",
         task_title=task_title,
@@ -127,17 +158,58 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
+        allowed_imports=allowed_import_names(validated_packages),
+        package_contexts=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.CODEGEN_CONTEXT),
+        package_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.CODEGEN_RULES),
+        package_unselected_rules=_render_unselected_optional_package_prompts(
+            validated_packages, OptionalPackagePrompt.CODEGEN_UNSELECTED_RULES
+        ),
         file_safety=generated_app_path_safety_prompt_context(),
     )
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
+def render_fix_errors(*, errors: str, files: dict[str, str], selected_packages: list[str] | None = None) -> str:
+    validated_packages = validate_optional_packages(selected_packages or [])
     return render(
         "fix_errors.jinja2",
         errors=errors,
         files=files,
+        allowed_imports=allowed_import_names(validated_packages),
+        package_fix_rules=_render_optional_package_prompts(validated_packages, OptionalPackagePrompt.FIX_ERRORS_RULES),
+        package_unselected_fix_rules=_render_unselected_optional_package_prompts(
+            validated_packages, OptionalPackagePrompt.FIX_ERRORS_UNSELECTED_RULES
+        ),
         file_safety=generated_app_path_safety_prompt_context(),
     )
+
+
+def _render_optional_package_prompts(
+    selected_packages: list[str] | None,
+    prompt: OptionalPackagePrompt,
+) -> list[str]:
+    blocks: list[str] = []
+    for package_name in validate_optional_packages(selected_packages or []):
+        try:
+            blocks.append(render(OPTIONAL_PACKAGES[package_name].prompt_template(prompt)).strip())
+        except TemplateNotFound:
+            continue
+    return blocks
+
+
+def _render_unselected_optional_package_prompts(
+    selected_packages: list[str] | None,
+    prompt: OptionalPackagePrompt,
+) -> list[str]:
+    selected = set(validate_optional_packages(selected_packages or []))
+    blocks: list[str] = []
+    for package_name, package in OPTIONAL_PACKAGES.items():
+        if package_name in selected:
+            continue
+        try:
+            blocks.append(render(package.prompt_template(prompt)).strip())
+        except TemplateNotFound:
+            continue
+    return blocks
 
 
 def _extract_exports(content: str) -> str:

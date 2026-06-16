@@ -1,7 +1,8 @@
-"""Backend-enforced file safety contract for AI-generated app files."""
+"""Backend-enforced safety and dependency contract for AI-generated app files."""
 
 from __future__ import annotations
 
+import re
 from pathlib import PurePosixPath, PureWindowsPath
 
 from flow44.ai.generated_app_file_rules import (
@@ -12,6 +13,14 @@ from flow44.ai.generated_app_file_rules import (
 
 class GeneratedAppContractError(ValueError):
     """Raised when generated output violates the app-generation contract."""
+
+
+_IMPORT_PATTERNS = (
+    re.compile(r"""(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']"""),
+    re.compile(r"""import\s*\(\s*["']([^"']+)["']\s*\)"""),
+    re.compile(r"""require\s*\(\s*["']([^"']+)["']\s*\)"""),
+    re.compile(r"""@import\s+(?:url\()?["']([^"']+)["']"""),
+)
 
 
 def generated_app_path_safety_prompt_context() -> GeneratedAppPathSafetyPromptContext:
@@ -65,4 +74,36 @@ def validate_generated_app_path_allowed(path: str) -> str:
     normalized = validate_and_normalize_generated_app_path(path)
     if _is_protected_generated_app_path(normalized):
         raise GeneratedAppContractError(f"AI generation may not edit protected file: {normalized}")
+    return normalized
+
+
+def extract_external_imports(content: str) -> set[str]:
+    """Extract external module specifiers from TypeScript/JavaScript source."""
+    imports: set[str] = set()
+    for pattern in _IMPORT_PATTERNS:
+        for match in pattern.finditer(content):
+            specifier = match.group(1)
+            if not specifier.startswith((".", "/")):
+                imports.add(specifier)
+    return imports
+
+
+def find_disallowed_external_imports(content: str, allowed_imports: list[str]) -> set[str]:
+    """Return external imports not covered by the explicit dependency contract."""
+    allowed = {"react", "react-dom", *allowed_imports}
+    return {
+        specifier
+        for specifier in extract_external_imports(content)
+        if not any(specifier == package or specifier.startswith(f"{package}/") for package in allowed)
+    }
+
+
+def assert_generated_app_code_allowed(path: str, content: str, allowed_imports: list[str]) -> str:
+    """Validate a generated file target and its external imports."""
+    normalized = validate_generated_app_path_allowed(path)
+    disallowed = sorted(find_disallowed_external_imports(content, allowed_imports))
+    if disallowed:
+        raise GeneratedAppContractError(
+            f"Generated file {normalized} imports unselected packages: {', '.join(disallowed)}"
+        )
     return normalized

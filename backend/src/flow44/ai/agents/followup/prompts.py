@@ -5,6 +5,7 @@ from typing import Literal
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
+from flow44.ai.agents.execute.optional_packages import allowed_import_names, validate_optional_packages
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
 from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
@@ -24,19 +25,23 @@ def render(
     *,
     project_summary: str,
     file_tree: str,
+    allowed_imports: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str:
     return _env.get_template(template_name).render(
         project_summary=project_summary,
         file_tree=file_tree,
+        allowed_imports=allowed_imports,
         file_safety=file_safety,
     )
 
 
-def render_followup(*, project_summary: str, file_tree: str) -> str:
+def render_followup(*, project_summary: str, file_tree: str, selected_packages: list[str] | None = None) -> str:
+    validated_packages = validate_optional_packages(selected_packages or [])
     return render(
         "followup.jinja2",
         project_summary=project_summary,
         file_tree=file_tree,
+        allowed_imports=allowed_import_names(validated_packages),
         file_safety=generated_app_path_safety_prompt_context(),
     )

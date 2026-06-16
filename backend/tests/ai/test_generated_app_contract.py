@@ -1,4 +1,4 @@
-"""Tests for backend-enforced generated app file safety."""
+"""Tests for backend-enforced generated app file and import safety."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import pytest
 
 from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
+    assert_generated_app_code_allowed,
+    find_disallowed_external_imports,
     generated_app_path_safety_prompt_context,
     is_generated_app_path_allowed,
     validate_generated_app_path_allowed,
@@ -32,6 +34,13 @@ def test_protected_generated_app_files_are_rejected(path: str) -> None:
 
 def test_normal_app_source_file_is_allowed() -> None:
     assert is_generated_app_path_allowed("src/components/AssetMap.tsx")
+
+
+def test_unselected_external_import_is_rejected() -> None:
+    content = "import { Button } from '@mui/material';"
+
+    with pytest.raises(GeneratedAppContractError, match="@mui/material"):
+        assert_generated_app_code_allowed("src/App.tsx", content, [])
 
 
 @pytest.mark.parametrize(
@@ -71,3 +80,27 @@ def test_file_safety_prompt_context_uses_contract_values() -> None:
     assert "src/main.tsx" in context["protected_src_paths"]
     assert "src/platform/*" in context["protected_src_dirs"]
     assert "vite.config.*" in context["protected_name_patterns"]
+
+
+def test_selected_import_and_react_subpath_are_allowed() -> None:
+    content = """
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { Button } from '@mui/material';
+import { helper } from './helper';
+"""
+
+    assert find_disallowed_external_imports(content, ["@mui/material"]) == set()
+    assert assert_generated_app_code_allowed("src/App.tsx", content, ["@mui/material"]) == "src/App.tsx"
+
+
+def test_dynamic_unselected_import_is_rejected() -> None:
+    assert find_disallowed_external_imports("const dialog = import('@mui/material/Dialog');", []) == {
+        "@mui/material/Dialog"
+    }
+
+
+def test_css_package_import_is_rejected() -> None:
+    assert find_disallowed_external_imports("@import 'unselected-theme/styles.css';", []) == {
+        "unselected-theme/styles.css"
+    }
