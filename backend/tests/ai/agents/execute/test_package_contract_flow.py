@@ -12,7 +12,7 @@ from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
 from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign
 from flow44.ai.state import BuildState
-from tests.ai.agents.test_optional_packages import CHART_DASHBOARD_PROMPT
+from tests.ai.agents.test_optional_packages import DATE_TIMELINE_PROMPT
 
 
 class FakeSandbox:
@@ -39,9 +39,9 @@ class FakeLangfuse:
 
 
 @pytest.mark.asyncio
-async def test_chart_package_is_installed_before_merge(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_date_package_is_installed_before_merge(monkeypatch: pytest.MonkeyPatch) -> None:
     sandbox = FakeSandbox()
-    build_state = BuildState(project_id="project", user_content=CHART_DASHBOARD_PROMPT)
+    build_state = BuildState(project_id="project", user_content=DATE_TIMELINE_PROMPT)
     agent = ExecuteAgent("project", sandbox, build_state, user_id="test-user")  # type: ignore[arg-type]
     calls: list[str] = []
 
@@ -53,13 +53,13 @@ async def test_chart_package_is_installed_before_merge(monkeypatch: pytest.Monke
     ) -> str:
         del messages, model, metadata
         assert "## Allowed Optional Packages" not in system_prompt
-        assert sandbox.install_calls == [["recharts"]]
-        assert "`recharts` is selected" in system_prompt
-        assert "comparison, trend, composition, or distribution" in system_prompt
+        assert sandbox.install_calls == [["date-fns"]]
+        assert "`date-fns` is selected" in system_prompt
+        assert "date formatting, relative time labels, sorting, ranges, and date math" in system_prompt
         calls.append("merge")
         return """
         {
-          "summary": "Use recharts for dashboard trends",
+          "summary": "Use date-fns for timeline due dates",
           "tasks": [
             {
               "id": "unsafe",
@@ -71,7 +71,7 @@ async def test_chart_package_is_installed_before_merge(monkeypatch: pytest.Monke
             {
               "id": "app",
               "title": "Build app",
-              "description": "Use recharts for dashboard trends",
+              "description": "Use date-fns for timeline due dates",
               "files": ["src/App.tsx"],
               "depends_on": ["unsafe"]
             }
@@ -90,10 +90,10 @@ async def test_chart_package_is_installed_before_merge(monkeypatch: pytest.Monke
     plan = await agent._build_technical_plan(state)
 
     assert calls == ["merge"]
-    assert plan.selected_packages == ["recharts"]
+    assert plan.selected_packages == ["date-fns"]
     assert [task.files for task in plan.tasks] == [["src/App.tsx"]]
     assert plan.tasks[0].depends_on == []
-    assert "recharts" in plan.tasks[0].description
+    assert "date-fns" in plan.tasks[0].description
 
 
 @pytest.mark.asyncio
@@ -105,7 +105,7 @@ async def test_selected_packages_are_confirmed_before_codegen(monkeypatch: pytes
         architecture=ArchitectureDesign(),
         ux_design=UXDesign(),
         tasks=[Task(id="app", title="App", description="", files=["src/App.tsx"])],
-        selected_packages=["mui", "recharts"],
+        selected_packages=["lucide-react", "date-fns"],
     )
     build_state = BuildState(project_id="project", work_plan=plan)
     agent = ExecuteAgent("project", sandbox, build_state, user_id="test-user")  # type: ignore[arg-type]
@@ -113,7 +113,7 @@ async def test_selected_packages_are_confirmed_before_codegen(monkeypatch: pytes
 
     async def fake_execute_task(task: Task, state: ExecutionState) -> None:
         del state
-        assert sandbox.install_calls == [["@mui/material", "@emotion/react", "@emotion/styled", "recharts"]]
+        assert sandbox.install_calls == [["lucide-react", "date-fns"]]
         executed.append(task.id)
 
     async def emit(event: dict[str, Any]) -> None:

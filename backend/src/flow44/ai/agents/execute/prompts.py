@@ -97,13 +97,11 @@ def render_merge(
         package_merge_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.MERGE_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_unselected_merge_rules=render_unselected_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.MERGE_UNSELECTED_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),
@@ -168,19 +166,16 @@ def render_codegen(  # noqa: PLR0913
         package_contexts=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.CODEGEN_CONTEXT,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.CODEGEN_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_unselected_rules=render_unselected_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.CODEGEN_UNSELECTED_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),
@@ -203,13 +198,11 @@ def render_fix_errors(
         package_fix_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.FIX_ERRORS_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_unselected_fix_rules=render_unselected_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.FIX_ERRORS_UNSELECTED_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),

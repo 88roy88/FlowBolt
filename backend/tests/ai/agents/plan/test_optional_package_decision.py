@@ -9,12 +9,12 @@ import flow44.ai.agents.plan.agent as plan_agent_module
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.state import BuildState
-from tests.ai.agents.test_optional_packages import CHART_DASHBOARD_PROMPT
+from tests.ai.agents.test_optional_packages import DATE_TIMELINE_PROMPT
 
 
 @pytest.mark.asyncio
 async def test_plan_agent_decides_optional_packages(monkeypatch: pytest.MonkeyPatch) -> None:
-    build_state = BuildState(project_id="project", user_content=CHART_DASHBOARD_PROMPT)
+    build_state = BuildState(project_id="project", user_content=DATE_TIMELINE_PROMPT)
     state = PlanState(
         build_state=build_state,
         project_id="project",
@@ -39,12 +39,12 @@ async def test_plan_agent_decides_optional_packages(monkeypatch: pytest.MonkeyPa
     await PlanAgent._step_decide_optional_packages(agent, state)
 
     assert state.build_state.optional_package_decision is not None
-    assert [pkg.name for pkg in state.build_state.optional_package_decision.selected_packages] == ["recharts"]
+    assert [pkg.name for pkg in state.build_state.optional_package_decision.selected_packages] == ["date-fns"]
 
 
 @pytest.mark.asyncio
 async def test_plan_agent_feature_flag_skips_ai_decision(monkeypatch: pytest.MonkeyPatch) -> None:
-    build_state = BuildState(project_id="project", user_content=CHART_DASHBOARD_PROMPT)
+    build_state = BuildState(project_id="project", user_content=DATE_TIMELINE_PROMPT)
     state = PlanState(
         build_state=build_state,
         project_id="project",
@@ -63,4 +63,4 @@ async def test_plan_agent_feature_flag_skips_ai_decision(monkeypatch: pytest.Mon
     await PlanAgent._step_decide_optional_packages(agent, state)
 
     assert state.build_state.optional_package_decision is not None
-    assert [pkg.name for pkg in state.build_state.optional_package_decision.selected_packages] == ["recharts"]
+    assert [pkg.name for pkg in state.build_state.optional_package_decision.selected_packages] == ["date-fns"]

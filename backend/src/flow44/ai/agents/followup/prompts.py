@@ -64,19 +64,16 @@ def render_followup(
         package_contexts=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.CODEGEN_CONTEXT,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.CODEGEN_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_unselected_rules=render_unselected_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.CODEGEN_UNSELECTED_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),

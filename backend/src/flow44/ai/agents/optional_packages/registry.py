@@ -3,78 +3,21 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
-from dataclasses import dataclass
-from enum import StrEnum
 
-from jinja2 import TemplateNotFound
 from pydantic import BaseModel, Field
 
+from flow44.ai.agents.optional_packages.base import OptionalPackage, OptionalPackagePrompt
+from flow44.ai.agents.optional_packages.date_fns import PACKAGE as DATE_FNS_PACKAGE
+from flow44.ai.agents.optional_packages.lucide_react import PACKAGE as LUCIDE_REACT_PACKAGE
+from flow44.ai.agents.optional_packages.react_hook_form import PACKAGE as REACT_HOOK_FORM_PACKAGE
 
-class OptionalPackagePrompt(StrEnum):
-    CODEGEN_CONTEXT = "codegen_context"
-    CODEGEN_RULES = "codegen_rules"
-    CODEGEN_UNSELECTED_RULES = "codegen_unselected_rules"
-    MERGE_RULES = "merge_rules"
-    MERGE_UNSELECTED_RULES = "merge_unselected_rules"
-    FIX_ERRORS_RULES = "fix_errors_rules"
-    FIX_ERRORS_UNSELECTED_RULES = "fix_errors_unselected_rules"
-
-
-@dataclass(frozen=True)
-class OptionalPackage:
-    name: str
-    capability: str
-    packages: tuple[str, ...]
-    use_when: str
-    avoid_when: str
-    strong_intent_groups: tuple[tuple[str, ...], ...] = ()
-    template_dir: str | None = None
-
-    @property
-    def prompt_dir(self) -> str:
-        return self.template_dir or self.name
-
-    def prompt_template(self, prompt: OptionalPackagePrompt) -> str:
-        return f"optional_packages/{self.prompt_dir}/{prompt.value}.jinja2"
-
-
+OPTIONAL_PACKAGE_DECLARATIONS: tuple[OptionalPackage, ...] = (
+    LUCIDE_REACT_PACKAGE,
+    REACT_HOOK_FORM_PACKAGE,
+    DATE_FNS_PACKAGE,
+)
 OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
-    "mui": OptionalPackage(
-        name="mui",
-        capability="material_ui_components",
-        packages=("@mui/material", "@emotion/react", "@emotion/styled"),
-        use_when=(
-            "Use when the user explicitly asks for Material UI or MUI, or when the app needs a broad set of "
-            "polished Material Design controls such as dialogs, menus, drawers, data-entry controls, and "
-            "consistent accessible components."
-        ),
-        avoid_when=(
-            "Avoid when Tailwind and basic React components are sufficient, when the user asks for another "
-            "design system, or when Material Design would conflict with the requested visual style."
-        ),
-        strong_intent_groups=(("material ui",), ("mui",)),
-    ),
-    "recharts": OptionalPackage(
-        name="recharts",
-        capability="dashboard_charts",
-        packages=("recharts",),
-        use_when=(
-            "Use when the user requests dashboard charts, data visualization, trends, comparisons, "
-            "time-series charts, bar charts, line charts, area charts, or pie charts."
-        ),
-        avoid_when=(
-            "Do not use for maps, relationship graphs, node-edge diagrams, plain numeric KPI cards, "
-            "or data that is clearer as a simple table or list."
-        ),
-        strong_intent_groups=(
-            ("chart",),
-            ("data visualization",),
-            ("time series",),
-            ("trend", "graph"),
-            ("dashboard", "chart"),
-        ),
-    ),
+    package.name: package for package in OPTIONAL_PACKAGE_DECLARATIONS
 }
 
 
@@ -165,7 +108,6 @@ def validate_optional_packages(package_names: list[str]) -> list[str]:
 def render_optional_package_prompts(
     selected_packages: list[str] | None,
     prompt: OptionalPackagePrompt,
-    render_template: Callable[[str], str],
     *,
     enabled: bool = True,
 ) -> list[str]:
@@ -175,17 +117,15 @@ def render_optional_package_prompts(
 
     blocks: list[str] = []
     for package_name in validate_optional_packages(selected_packages or []):
-        try:
-            blocks.append(render_template(OPTIONAL_PACKAGES[package_name].prompt_template(prompt)).strip())
-        except TemplateNotFound:
-            continue
+        block = OPTIONAL_PACKAGES[package_name].render_prompt(prompt)
+        if block:
+            blocks.append(block)
     return blocks
 
 
 def render_unselected_optional_package_prompts(
     selected_packages: list[str] | None,
     prompt: OptionalPackagePrompt,
-    render_template: Callable[[str], str],
     *,
     enabled: bool = True,
 ) -> list[str]:
@@ -198,10 +138,9 @@ def render_unselected_optional_package_prompts(
     for package_name, package in OPTIONAL_PACKAGES.items():
         if package_name in selected:
             continue
-        try:
-            blocks.append(render_template(package.prompt_template(prompt)).strip())
-        except TemplateNotFound:
-            continue
+        block = package.render_prompt(prompt)
+        if block:
+            blocks.append(block)
     return blocks
 
 

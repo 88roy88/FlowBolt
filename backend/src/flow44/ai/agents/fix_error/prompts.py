@@ -79,13 +79,11 @@ def render_fix_errors(
         package_fix_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.FIX_ERRORS_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_unselected_fix_rules=render_unselected_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.FIX_ERRORS_UNSELECTED_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),
@@ -114,13 +112,11 @@ def render_fix_error_direct(
         package_fix_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.FIX_ERRORS_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         package_unselected_fix_rules=render_unselected_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.FIX_ERRORS_UNSELECTED_RULES,
-            render,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),

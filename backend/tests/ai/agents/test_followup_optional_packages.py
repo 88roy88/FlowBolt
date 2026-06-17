@@ -36,18 +36,18 @@ async def test_followup_decides_and_installs_optional_packages(monkeypatch: pyte
     ) -> str:
         del messages, model, metadata
         assert "## Allowed Optional Packages" in system_prompt
-        return '{"selected_packages":[{"name":"mui","reason":"Material UI controls requested"}]}'
+        return '{"selected_packages":[{"name":"lucide-react","reason":"Dashboard icons requested"}]}'
 
     monkeypatch.setattr(followup_agent_module.settings, "FOLLOWUP_OPTIONAL_PACKAGE_AI_DECISION_ENABLED", True)
     monkeypatch.setattr(optional_package_decision_module, "complete_chat", fake_complete_chat)
 
     selected = await agent._prepare_optional_packages(
-        "Add Material UI controls to this dashboard.",
+        "Add icons to this dashboard.",
         {"summary": "", "file_tree": "src/App.tsx"},
     )
 
-    assert selected == ["mui"]
-    assert sandbox.install_calls == [["@mui/material", "@emotion/react", "@emotion/styled"]]
+    assert selected == ["lucide-react"]
+    assert sandbox.install_calls == [["lucide-react"]]
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_followup_feature_flag_reuses_existing_packages(monkeypatch: pytes
     monkeypatch.setattr(optional_package_decision_module, "complete_chat", fail_complete_chat)
 
     selected = await agent._prepare_optional_packages(
-        "Add Material UI controls to this dashboard.",
+        "Add simple controls to this dashboard.",
         {"summary": "", "file_tree": "src/App.tsx"},
     )
 
