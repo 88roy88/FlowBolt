@@ -16,9 +16,7 @@ OPTIONAL_PACKAGE_DECLARATIONS: tuple[OptionalPackage, ...] = (
     REACT_HOOK_FORM_PACKAGE,
     DATE_FNS_PACKAGE,
 )
-OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {
-    package.name: package for package in OPTIONAL_PACKAGE_DECLARATIONS
-}
+OPTIONAL_PACKAGES: dict[str, OptionalPackage] = {package.name: package for package in OPTIONAL_PACKAGE_DECLARATIONS}
 
 
 class SelectedOptionalPackage(BaseModel):

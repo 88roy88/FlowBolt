@@ -85,14 +85,14 @@ class TestPromptRendering:
         result = render_followup(
             project_summary="A todo app built with React",
             file_tree="src/\n  App.tsx\n  Todo.tsx",
-            selected_packages=["mui"],
+            selected_packages=["lucide-react"],
         )
         assert "todo app" in result
         assert "App.tsx" in result
         assert "EXPLORE" in result
         assert result.count("## Dependency Rules") == 1
         assert result.count("## File Safety Rules") == 1
-        assert "- @mui/material" in result
+        assert "- lucide-react" in result
 
     def test_codegen(self) -> None:
         result = render_codegen(
@@ -120,16 +120,14 @@ class TestPromptRendering:
             task_files=["src/App.tsx"],
             architecture={},
             ux_design={},
-            selected_packages=["mui", "recharts", "unknown-package"],
+            selected_packages=["lucide-react", "date-fns", "unknown-package"],
         )
 
         dependency_rules = result.split("## Dependency Rules", 1)[1].split("## Selected Package Rules", 1)[0]
         assert result.count("## Dependency Rules") == 1
         assert result.count("## Selected Package Rules") == 1
-        assert "- @mui/material" in dependency_rules
-        assert "- @emotion/react" in dependency_rules
-        assert "- @emotion/styled" in dependency_rules
-        assert "- recharts" in dependency_rules
+        assert "- lucide-react" in dependency_rules
+        assert "- date-fns" in dependency_rules
         assert "unknown-package" not in result
 
     def test_codegen_with_dependencies(self) -> None:
@@ -192,9 +190,9 @@ class TestPromptRendering:
     def test_codegen_package_variants_are_strict_and_phase_specific(self) -> None:
         variants = {
             "none": [],
-            "mui": ["mui"],
-            "charts": ["recharts"],
-            "both": ["mui", "recharts"],
+            "icons": ["lucide-react"],
+            "dates": ["date-fns"],
+            "both": ["lucide-react", "date-fns"],
         }
 
         for name, selected in variants.items():
@@ -213,10 +211,10 @@ class TestPromptRendering:
             assert "`vite.config.*`" in result
             assert "`index.html`" in result
             assert "`src/platform/*`" in result
-            assert ("- @mui/material" in dependency_rules) == ("mui" in selected)
-            assert ("- recharts" in dependency_rules) == ("recharts" in selected)
-            assert ("Import Material UI components" in result) == ("mui" in selected)
-            assert ("Use Recharts components" in result) == ("recharts" in selected)
+            assert ("- lucide-react" in dependency_rules) == ("lucide-react" in selected)
+            assert ("- date-fns" in dependency_rules) == ("date-fns" in selected)
+            assert ("Import only the icons you use from `lucide-react`" in result) == ("lucide-react" in selected)
+            assert ("Import only the date helpers you use from `date-fns`" in result) == ("date-fns" in selected)
 
     def test_fix_prompts_include_file_safety_rules_once(self) -> None:
         execute_fix = render_fix_errors(errors="broken", files={"src/App.tsx": "broken"})

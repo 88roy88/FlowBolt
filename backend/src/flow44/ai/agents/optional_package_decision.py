@@ -31,9 +31,7 @@ _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoe
 
 
 def render_package_decision() -> str:
-    return _env.get_template("package_decision.jinja2").render(
-        optional_packages=optional_packages_prompt_context()
-    )
+    return _env.get_template("package_decision.jinja2").render(optional_packages=optional_packages_prompt_context())
 
 
 async def decide_optional_packages(
