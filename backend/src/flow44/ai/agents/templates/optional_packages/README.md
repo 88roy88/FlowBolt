@@ -2,7 +2,7 @@
 
 Optional npm packages are whitelisted in `flow44.ai.agents.optional_packages`.
 Each package can own prompt fragments under this folder.
-Prompt fragments are loaded by `OptionalPackagePrompt` in `optional_packages.py`, so each filename maps to one prompt scenario.
+Prompt fragments are loaded by `OptionalPackagePrompt` from the optional package registry, so each filename maps to one prompt scenario.
 
 Package selection itself is shared agent behavior:
 
@@ -40,7 +40,7 @@ Only create the files a package needs. Missing files are ignored.
 
 ## Add A Package
 
-1. Add one entry to `OPTIONAL_PACKAGES` in `optional_packages.py`.
+1. Add one entry to `OPTIONAL_PACKAGES` in `flow44.ai.agents.optional_packages.registry`.
 2. Set `name` to the npm package key used by package decisions.
 3. Set `packages` to the npm packages that should be installed.
 4. Set `capability`, `use_when`, and `avoid_when` for the package decision prompt.
