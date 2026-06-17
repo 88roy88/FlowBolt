@@ -4,13 +4,13 @@ from pathlib import PurePosixPath
 from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
-from flow44.ai.agents.execute.optional_packages import (
+from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
+from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
+from flow44.ai.agents.optional_packages import (
     allowed_import_names,
     package_install_names,
     selected_packages_from_package_json,
 )
-from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
-from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat

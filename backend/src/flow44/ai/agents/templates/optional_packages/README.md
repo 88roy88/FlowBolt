@@ -1,6 +1,6 @@
 # Optional Package Prompt Templates
 
-Optional npm packages are whitelisted in `flow44.ai.agents.execute.optional_packages`.
+Optional npm packages are whitelisted in `flow44.ai.agents.optional_packages`.
 Each package can own prompt fragments under this folder.
 Prompt fragments are loaded by `OptionalPackagePrompt` in `optional_packages.py`, so each filename maps to one prompt scenario.
 

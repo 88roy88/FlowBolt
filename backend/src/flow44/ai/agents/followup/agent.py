@@ -9,12 +9,12 @@ from langfuse.decorators import observe
 from pydantic import BaseModel
 
 from flow44.ai.agents._base import BaseAgent
-from flow44.ai.agents.execute.optional_packages import (
+from flow44.ai.agents.followup.prompts import render_followup
+from flow44.ai.agents.optional_packages import (
     allowed_import_names,
     package_install_names,
     selected_packages_from_package_json,
 )
-from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
