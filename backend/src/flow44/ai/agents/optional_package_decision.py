@@ -56,13 +56,13 @@ async def decide_optional_packages(
         indent=2,
         ensure_ascii=False,
     )
-    raw = await complete_chat(
-        [Message.user(decision_input)],
-        render_package_decision(),
-        model=model,
-        metadata=metadata,
-    )
     try:
+        raw = await complete_chat(
+            [Message.user(decision_input)],
+            render_package_decision(),
+            model=model,
+            metadata=metadata,
+        )
         decision = OptionalPackageDecision.model_validate(parse_json_response(raw))
         return merge_optional_package_decisions(
             validate_optional_package_decision(decision),
@@ -71,6 +71,12 @@ async def decide_optional_packages(
     except ValidationError:
         logger.warning(
             "[%s] Invalid optional package decision; using high-confidence package signals",
+            log_label,
+        )
+        return high_confidence_decision
+    except Exception:
+        logger.exception(
+            "[%s] Optional package decision failed; using high-confidence package signals",
             log_label,
         )
         return high_confidence_decision
