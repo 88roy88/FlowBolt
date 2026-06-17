@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flow44.ai.agents.execute.optional_packages import (
+from flow44.ai.agents.optional_packages import (
     OptionalPackageDecision,
     allowed_import_names,
     has_capability,

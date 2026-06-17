@@ -12,8 +12,7 @@ from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
 from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign
 from flow44.ai.state import BuildState
-
-from .test_optional_packages import CHART_DASHBOARD_PROMPT
+from tests.ai.agents.test_optional_packages import CHART_DASHBOARD_PROMPT
 
 
 class FakeSandbox:

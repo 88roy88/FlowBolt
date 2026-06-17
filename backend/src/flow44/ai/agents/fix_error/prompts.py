@@ -5,7 +5,7 @@ from typing import Literal, overload
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, TemplateNotFound
 
-from flow44.ai.agents.execute.optional_packages import (
+from flow44.ai.agents.optional_packages import (
     OPTIONAL_PACKAGES,
     OptionalPackagePrompt,
     allowed_import_names,

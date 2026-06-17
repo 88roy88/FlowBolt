@@ -10,7 +10,14 @@ from pydantic import ValidationError
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
-from flow44.ai.agents.execute.optional_packages import (
+from flow44.ai.agents.execute.prompts import (
+    SUMMARY_PROMPT,
+    render_codegen,
+    render_fix_errors,
+    render_merge,
+    render_package_decision,
+)
+from flow44.ai.agents.optional_packages import (
     OptionalPackageDecision,
     allowed_import_names,
     high_confidence_optional_package_decision,
@@ -20,13 +27,6 @@ from flow44.ai.agents.execute.optional_packages import (
     repair_unselected_package_references,
     selected_package_names,
     validate_optional_package_decision,
-)
-from flow44.ai.agents.execute.prompts import (
-    SUMMARY_PROMPT,
-    render_codegen,
-    render_fix_errors,
-    render_merge,
-    render_package_decision,
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message

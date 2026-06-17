@@ -5,7 +5,7 @@ from typing import Literal
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
-from flow44.ai.agents.execute.optional_packages import allowed_import_names, validate_optional_packages
+from flow44.ai.agents.optional_packages import allowed_import_names, validate_optional_packages
 from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
     generated_app_path_safety_prompt_context,
