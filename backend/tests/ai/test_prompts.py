@@ -191,12 +191,10 @@ class TestPromptRendering:
         variants = {
             "none": [],
             "icons": ["lucide-react"],
+            "forms": ["react-hook-form"],
             "dates": ["date-fns"],
-            "base": ["lucide-react", "date-fns"],
             "router": ["react-router-dom"],
-            "mui": ["mui"],
-            "charts": ["recharts"],
-            "all": ["lucide-react", "date-fns", "react-router-dom", "mui", "recharts"],
+            "all": ["lucide-react", "react-hook-form", "date-fns", "react-router-dom"],
         }
 
         for name, selected in variants.items():
@@ -216,15 +214,13 @@ class TestPromptRendering:
             assert "`index.html`" in result
             assert "`src/platform/*`" in result
             assert ("- lucide-react" in dependency_rules) == ("lucide-react" in selected)
+            assert ("- react-hook-form" in dependency_rules) == ("react-hook-form" in selected)
             assert ("- date-fns" in dependency_rules) == ("date-fns" in selected)
-            assert ("Import only the icons you use from `lucide-react`" in result) == ("lucide-react" in selected)
-            assert ("Import only the date helpers you use from `date-fns`" in result) == ("date-fns" in selected)
-            assert ("- @mui/material" in dependency_rules) == ("mui" in selected)
-            assert ("- recharts" in dependency_rules) == ("recharts" in selected)
             assert ("- react-router-dom" in dependency_rules) == ("react-router-dom" in selected)
+            assert ("Import only the icons you use from `lucide-react`" in result) == ("lucide-react" in selected)
+            assert ("Use `useForm` from `react-hook-form`" in result) == ("react-hook-form" in selected)
+            assert ("Import only the date helpers you use from `date-fns`" in result) == ("date-fns" in selected)
             assert ("basename={getRouterBasename()}" in result) == ("react-router-dom" in selected)
-            assert ("Import Material UI components" in result) == ("mui" in selected)
-            assert ("Use Recharts components" in result) == ("recharts" in selected)
 
     def test_fix_prompts_include_file_safety_rules_once(self) -> None:
         execute_fix = render_fix_errors(errors="broken", files={"src/App.tsx": "broken"})

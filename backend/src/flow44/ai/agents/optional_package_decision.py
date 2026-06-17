@@ -69,5 +69,8 @@ async def decide_optional_packages(
             high_confidence_decision,
         )
     except ValidationError:
-        logger.warning("[%s] Invalid optional package decision; using high-confidence package signals", log_label)
+        logger.warning(
+            "[%s] Invalid optional package decision; using high-confidence package signals",
+            log_label,
+        )
         return high_confidence_decision
