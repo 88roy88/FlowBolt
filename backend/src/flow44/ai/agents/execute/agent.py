@@ -5,7 +5,6 @@ import uuid
 
 from langfuse import Langfuse
 from langfuse.decorators import observe
-from pydantic import ValidationError
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
@@ -15,18 +14,14 @@ from flow44.ai.agents.execute.prompts import (
     render_codegen,
     render_fix_errors,
     render_merge,
-    render_package_decision,
 )
 from flow44.ai.agents.optional_packages import (
-    OptionalPackageDecision,
     allowed_import_names,
     high_confidence_optional_package_decision,
-    merge_optional_package_decisions,
     package_capabilities,
     package_install_names,
     repair_unselected_package_references,
     selected_package_names,
-    validate_optional_package_decision,
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
@@ -262,7 +257,9 @@ class ExecuteAgent(BaseAgent):
 
     async def _build_technical_plan(self, state: ExecutionState) -> WorkPlan:
         """Build technical task plan from user overview."""
-        decision = await self._decide_optional_packages(state)
+        decision = state.build_state.optional_package_decision
+        if decision is None:
+            decision = high_confidence_optional_package_decision(state.build_state.user_content)
         selected_packages = selected_package_names(decision)
         await state.sandbox_ref.install_optional_packages(package_install_names(selected_packages))
 
@@ -350,32 +347,6 @@ class ExecuteAgent(BaseAgent):
             tasks=tasks,
             selected_packages=selected_packages,
         )
-
-    async def _decide_optional_packages(self, state: ExecutionState) -> OptionalPackageDecision:
-        decision_input = json.dumps(
-            {
-                "user_request": state.build_state.user_content,
-                "architecture": state.build_state.architecture.model_dump(),
-                "ux_design": state.build_state.ux_design.model_dump(),
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-        raw = await complete_chat(
-            [Message.user(decision_input)],
-            render_package_decision(),
-            model=state.model,
-            metadata=state.llm_metadata_fn("decide_optional_packages"),
-        )
-        try:
-            decision = OptionalPackageDecision.model_validate(parse_json_response(raw))
-            return merge_optional_package_decisions(
-                validate_optional_package_decision(decision),
-                high_confidence_optional_package_decision(state.build_state.user_content),
-            )
-        except ValidationError:
-            logger.warning("[execute] Invalid optional package decision; using high-confidence package signals")
-            return high_confidence_optional_package_decision(state.build_state.user_content)
 
     async def _execute_task(self, task: Task, state: ExecutionState) -> None:
         """Execute a single task with Langfuse span."""

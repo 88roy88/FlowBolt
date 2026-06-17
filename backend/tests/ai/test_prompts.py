@@ -6,11 +6,11 @@ from flow44.ai.agents.execute.prompts import (
     render_codegen,
     render_fix_errors,
     render_merge,
-    render_package_decision,
     render_summary,
 )
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct
 from flow44.ai.agents.followup.prompts import render_followup
+from flow44.ai.agents.optional_package_decision import render_package_decision
 from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
 from flow44.ai.generated_app_contract import generated_app_path_safety_prompt_context
 

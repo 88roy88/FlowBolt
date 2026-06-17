@@ -10,15 +10,19 @@ from pydantic import BaseModel
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.followup.prompts import render_followup
+from flow44.ai.agents.optional_package_decision import decide_optional_packages
 from flow44.ai.agents.optional_packages import (
     allowed_import_names,
     package_install_names,
+    selected_package_names,
     selected_packages_from_package_json,
+    validate_optional_packages,
 )
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_file_contract
+from flow44.config import settings
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
@@ -202,7 +206,7 @@ class FollowUpAgent(BaseAgent):
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
-        self._selected_packages = await self._prepare_optional_packages()
+        self._selected_packages = await self._prepare_optional_packages(content, context)
 
         # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
         history = await get_messages(self.project_id)
@@ -290,14 +294,37 @@ class FollowUpAgent(BaseAgent):
                 )
             await self.emit({"type": "followup_step", **step_data})
 
-    async def _prepare_optional_packages(self) -> list[str]:
+    async def _prepare_optional_packages(self, content: str, context: dict[str, Any]) -> list[str]:
         try:
             package_json = await self.sandbox.read_file("package.json")
         except (FileNotFoundError, PermissionError):
             return []
-        selected_packages = selected_packages_from_package_json(package_json)
+        existing_packages = selected_packages_from_package_json(package_json)
+        selected_packages = existing_packages
+        if settings.FOLLOWUP_OPTIONAL_PACKAGE_AI_DECISION_ENABLED:
+            selected_packages = await self._decide_optional_packages_for_followup(content, context, existing_packages)
         await self.sandbox.install_optional_packages(package_install_names(selected_packages))
         return selected_packages
+
+    async def _decide_optional_packages_for_followup(
+        self,
+        content: str,
+        context: dict[str, Any],
+        existing_packages: list[str],
+    ) -> list[str]:
+        decision = await decide_optional_packages(
+            user_request=content,
+            context={
+                "project_summary": context["summary"],
+                "file_tree": context["file_tree"],
+                "existing_selected_packages": existing_packages,
+            },
+            model=self.model,
+            metadata=self._llm_metadata("followup_decide_optional_packages"),
+            ai_enabled=settings.FOLLOWUP_OPTIONAL_PACKAGE_AI_DECISION_ENABLED,
+            log_label="followup",
+        )
+        return validate_optional_packages([*existing_packages, *selected_package_names(decision)])
 
     # TODO: feels like a general utils that should go out.
     def _format_file_tree(self, entries: list[Any], indent: int = 0) -> str:

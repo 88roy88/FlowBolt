@@ -52,9 +52,7 @@ async def test_chart_package_is_installed_before_merge(monkeypatch: pytest.Monke
         metadata: dict[str, Any] | None = None,
     ) -> str:
         del messages, model, metadata
-        if "## Allowed Optional Packages" in system_prompt:
-            calls.append("decision")
-            return '{"selected_packages":[]}'
+        assert "## Allowed Optional Packages" not in system_prompt
         assert sandbox.install_calls == [["recharts"]]
         assert "`recharts` is selected" in system_prompt
         assert "comparison, trend, composition, or distribution" in system_prompt
@@ -91,7 +89,7 @@ async def test_chart_package_is_installed_before_merge(monkeypatch: pytest.Monke
 
     plan = await agent._build_technical_plan(state)
 
-    assert calls == ["decision", "merge"]
+    assert calls == ["merge"]
     assert plan.selected_packages == ["recharts"]
     assert [task.files for task in plan.tasks] == [["src/App.tsx"]]
     assert plan.tasks[0].depends_on == []

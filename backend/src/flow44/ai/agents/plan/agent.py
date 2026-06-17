@@ -6,6 +6,8 @@ from typing import Any
 from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.optional_package_decision import decide_optional_packages
+from flow44.ai.agents.optional_packages import OptionalPackageDecision
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
@@ -21,6 +23,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
+from flow44.config import settings
 from flow44.db.pending_plan import save_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
@@ -52,7 +55,8 @@ class PlanAgent(BaseAgent):
         flow = Flow[PlanState]("plan")
 
         flow.add_step("fetch_data_sources", self._step_fetch_data_sources, next_step="design")
-        flow.add_step("design", self._step_design, next_step="build_overview")
+        flow.add_step("design", self._step_design, next_step="decide_optional_packages")
+        flow.add_step("decide_optional_packages", self._step_decide_optional_packages, next_step="build_overview")
         flow.add_step("build_overview", self._step_build_overview, next_step="persist")
         flow.add_step("persist", self._step_persist, next_step=None)
 
@@ -150,6 +154,11 @@ class PlanAgent(BaseAgent):
 
         return state
 
+    async def _step_decide_optional_packages(self, state: PlanState) -> PlanState:
+        """Step: Decide optional package capabilities before the execution plan is built."""
+        state.build_state.optional_package_decision = await self._decide_optional_packages(state)
+        return state
+
     async def _step_build_overview(self, state: PlanState) -> PlanState:
         """Step: Build user overview from designs."""
         await state.emit_fn({"type": "phase", "phase": "planning"})
@@ -176,6 +185,17 @@ class PlanAgent(BaseAgent):
         self._setup_trace(["plan-agent", "rebuild"])
 
         await self.emit({"type": "phase", "phase": "planning"})
+        plan_state = PlanState(
+            build_state=self._state,
+            project_id=self.project_id,
+            sandbox_ref=self.sandbox,
+            emit_fn=self.emit,
+            model=self.model,
+            trace_id=self._trace_id,
+            llm_metadata_fn=self._llm_metadata,
+            data_source_authorization=self._data_source_authorization,
+        )
+        self._state.optional_package_decision = await self._decide_optional_packages(plan_state)
 
         plan_input = json.dumps(
             {
@@ -234,6 +254,19 @@ class PlanAgent(BaseAgent):
             queries=queries,
         )
         return {module_path: content}
+
+    async def _decide_optional_packages(self, state: PlanState) -> OptionalPackageDecision:
+        return await decide_optional_packages(
+            user_request=state.build_state.user_content,
+            context={
+                "architecture": state.build_state.architecture.model_dump(),
+                "ux_design": state.build_state.ux_design.model_dump(),
+            },
+            model=state.model,
+            metadata=state.llm_metadata_fn("decide_optional_packages"),
+            ai_enabled=settings.PLAN_OPTIONAL_PACKAGE_AI_DECISION_ENABLED,
+            log_label="plan",
+        )
 
     async def _analyze_data_source(
         self,

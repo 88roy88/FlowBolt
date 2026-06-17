@@ -11,7 +11,6 @@ from flow44.ai.agents.optional_packages import (
     OPTIONAL_PACKAGES,
     OptionalPackagePrompt,
     allowed_import_names,
-    optional_packages_prompt_context,
     validate_optional_packages,
 )
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
@@ -37,10 +36,6 @@ def render(
     package_unselected_merge_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str: ...
-
-
-@overload
-def render(template_name: Literal["package_decision.jinja2"], *, optional_packages: list[dict[str, str]]) -> str: ...
 
 
 @overload
@@ -99,10 +94,6 @@ def render_merge(*, has_data_sources: bool = False, selected_packages: list[str]
         ),
         file_safety=generated_app_path_safety_prompt_context(),
     )
-
-
-def render_package_decision() -> str:
-    return render("package_decision.jinja2", optional_packages=optional_packages_prompt_context())
 
 
 def render_summary() -> str:

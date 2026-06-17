@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from flow44.ai.agents.execute.models import WorkPlan
+from flow44.ai.agents.optional_packages import OptionalPackageDecision
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 
 
@@ -21,6 +22,7 @@ class BuildState(BaseModel):
     generated_data_source_files: dict[str, str] = Field(default_factory=dict)
     architecture: ArchitectureDesign = Field(default_factory=ArchitectureDesign)
     ux_design: UXDesign = Field(default_factory=UXDesign)
+    optional_package_decision: OptionalPackageDecision | None = None
     user_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)
     work_plan: WorkPlan | None = None
     completed_files: dict[str, str] = Field(default_factory=dict)
