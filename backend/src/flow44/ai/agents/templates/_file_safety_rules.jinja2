@@ -16,9 +16,6 @@ Do not touch:
 {% for path in file_safety.protected_src_dirs -%}
 - `{{ path }}`
 {% endfor -%}
-{% for path in file_safety.protected_root_dirs -%}
-- `{{ path }}`
-{% endfor -%}
 {% for pattern in file_safety.protected_name_patterns -%}
 - files matching `{{ pattern }}`
 {% endfor %}

@@ -21,10 +21,5 @@ PROTECTED_SRC_DIRS = {
     ("src", "datasources"),
     ("src", "platform"),
 }
-PROTECTED_ROOT_DIRS = {
-    ".github",
-    ".gitlab",
-    "backend",
-}
 PROTECTED_NAME_PREFIXES = (".env", "vite.config.")
 PROTECTED_NAME_SUBSTRINGS = ("template-guard", "template_guard")
