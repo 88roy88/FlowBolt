@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class OptionalPackagePrompt(StrEnum):
@@ -81,19 +81,12 @@ class SelectedOptionalPackage(BaseModel):
     capability: str = ""
     reason: str = ""
 
-    @model_validator(mode="before")
-    @classmethod
-    def _accept_legacy_package_key(cls, data: dict[str, object]) -> dict[str, object]:
-        if "name" not in data and "package" in data:
-            return data | {"name": data["package"]}
-        return data
-
 
 class OptionalPackageDecision(BaseModel):
     selected_packages: list[SelectedOptionalPackage] = Field(default_factory=list)
 
 
-def optional_package_prompt_context() -> list[dict[str, str]]:
+def optional_packages_prompt_context() -> list[dict[str, str]]:
     return [
         {
             "name": package.name,

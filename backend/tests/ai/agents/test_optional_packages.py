@@ -72,18 +72,6 @@ def test_optional_package_decision_defaults_missing_selection_to_empty() -> None
     assert selected_package_names(decision) == []
 
 
-def test_selected_package_names_accepts_legacy_package_key() -> None:
-    decision = OptionalPackageDecision.model_validate(
-        {
-            "selected_packages": [
-                {"package": "mui"},
-            ]
-        }
-    )
-
-    assert selected_package_names(decision) == ["mui"]
-
-
 def test_package_capability_helpers() -> None:
     selected = ["mui", "recharts"]
 
