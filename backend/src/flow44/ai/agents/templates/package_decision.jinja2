@@ -1,4 +1,5 @@
 You decide which optional packages are useful for this app.
+This prompt is used during initial planning and may also be used for follow-up requests.
 
 Return JSON only.
 
@@ -19,6 +20,7 @@ Avoid when: {{ package.avoid_when }}
 Required:
 - Select zero, one, or multiple packages from the allowed list.
 - Select every allowed package that is clearly useful for the requested app.
+- For follow-up requests, preserve already-selected packages unless the new request clearly does not need additional packages.
 - Use more than one package when the app clearly needs multiple package capabilities.
 - Use the package-specific guidance above.
 - Understand the user intent even if the request is written in another language.

@@ -1,5 +1,9 @@
 ## Dependency Rules
 
+Optional packages are selected before this prompt runs. During initial builds,
+PlanAgent selects them before ExecuteAgent writes code. During follow-up edits,
+FollowUpAgent may select additional packages before editing.
+
 Allowed imports:
 - React / React DOM
 - Browser APIs
@@ -12,4 +16,4 @@ Forbidden:
 - Do not import unselected packages.
 - Do not edit `package.json`.
 - Do not install dependencies.
-- Do not use extra npm packages unless they are selected and listed above.
+- Do not use extra npm packages unless they are already selected and listed above.
