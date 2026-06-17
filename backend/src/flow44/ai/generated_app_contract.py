@@ -67,7 +67,7 @@ def _is_protected_generated_app_path(normalized_path: str) -> bool:
     )
 
 
-def validate_generated_app_edit_path(path: str) -> str:
+def validate_generated_app_path_allowed(path: str) -> str:
     """Return a normalized path or raise for a protected target."""
     normalized = normalize_generated_app_path(path)
     if not is_generated_app_path_allowed(normalized):

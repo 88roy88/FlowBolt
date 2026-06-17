@@ -8,7 +8,7 @@ from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
     generated_app_path_safety_prompt_context,
     is_generated_app_path_allowed,
-    validate_generated_app_edit_path,
+    validate_generated_app_path_allowed,
 )
 
 
@@ -38,11 +38,11 @@ def test_normal_app_source_file_is_allowed() -> None:
 @pytest.mark.parametrize("path", ["/src/App.tsx", "../src/App.tsx", "src/../App.tsx"])
 def test_unsafe_generated_paths_are_rejected(path: str) -> None:
     with pytest.raises(GeneratedAppContractError):
-        validate_generated_app_edit_path(path)
+        validate_generated_app_path_allowed(path)
 
 
 def test_generated_path_is_normalized() -> None:
-    assert validate_generated_app_edit_path("src\\components\\AssetMap.tsx") == "src/components/AssetMap.tsx"
+    assert validate_generated_app_path_allowed("src\\components\\AssetMap.tsx") == "src/components/AssetMap.tsx"
 
 
 def test_file_safety_prompt_context_uses_contract_values() -> None:

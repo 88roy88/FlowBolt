@@ -20,7 +20,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
-    validate_generated_app_edit_path,
+    validate_generated_app_path_allowed,
 )
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
@@ -191,7 +191,7 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = [(validate_generated_app_edit_path(path), content) for path, content in generated]
+            validated = [(validate_generated_app_path_allowed(path), content) for path, content in generated]
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
@@ -275,7 +275,7 @@ class ExecuteAgent(BaseAgent):
             safe_files: list[str] = []
             for path in task_data.get("files", []):
                 try:
-                    safe_files.append(validate_generated_app_edit_path(path))
+                    safe_files.append(validate_generated_app_path_allowed(path))
                 except GeneratedAppContractError:
                     logger.warning("[execute] Dropping protected file from generated plan: %s", path)
             if not safe_files:
@@ -346,10 +346,10 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            expected_paths = {validate_generated_app_edit_path(path) for path in task.files}
+            expected_paths = {validate_generated_app_path_allowed(path) for path in task.files}
             validated: list[tuple[str, str]] = []
             for path, content in generated:
-                normalized_path = validate_generated_app_edit_path(path)
+                normalized_path = validate_generated_app_path_allowed(path)
                 if normalized_path not in expected_paths:
                     raise GeneratedAppContractError(
                         f"Generated unexpected file outside task contract: {normalized_path}"
