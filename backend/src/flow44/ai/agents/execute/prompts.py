@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
-from flow44.ai.generated_app_contract import generated_app_path_safety_prompt_context
+from flow44.ai.generated_app_contract import (
+    GeneratedAppPathSafetyPromptContext,
+    generated_app_path_safety_prompt_context,
+)
 
 _templates_dir = Path(__file__).parent / "templates"
 _shared_templates_dir = Path(__file__).parents[1] / "templates"
@@ -18,13 +21,59 @@ _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoe
 )
 
 
-def render(template_name: str, **kwargs: Any) -> str:
-    kwargs.setdefault("file_safety", generated_app_path_safety_prompt_context())
+@overload
+def render(
+    template_name: Literal["merge.jinja2"],
+    *,
+    has_data_sources: bool,
+    file_safety: GeneratedAppPathSafetyPromptContext,
+) -> str: ...
+
+
+@overload
+def render(template_name: Literal["summary.jinja2"]) -> str: ...
+
+
+@overload
+def render(
+    template_name: Literal["codegen.jinja2"],
+    *,
+    task_title: str,
+    task_description: str,
+    task_files: list[str],
+    architecture_json: str,
+    ux_json: str,
+    dependency_files: dict[str, str] | None,
+    other_completed_exports: dict[str, str] | None,
+    data_source_contexts: list[dict[str, Any]] | None,
+    file_safety: GeneratedAppPathSafetyPromptContext,
+) -> str: ...
+
+
+@overload
+def render(
+    template_name: Literal["fix_errors.jinja2"],
+    *,
+    errors: str,
+    files: dict[str, str],
+    file_safety: GeneratedAppPathSafetyPromptContext,
+) -> str: ...
+
+
+@overload
+def render(template_name: str) -> str: ...
+
+
+def render(template_name: str, **kwargs: object) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
 def render_merge(*, has_data_sources: bool = False) -> str:
-    return render("merge.jinja2", has_data_sources=has_data_sources)
+    return render(
+        "merge.jinja2",
+        has_data_sources=has_data_sources,
+        file_safety=generated_app_path_safety_prompt_context(),
+    )
 
 
 def render_summary() -> str:
@@ -78,11 +127,17 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
+        file_safety=generated_app_path_safety_prompt_context(),
     )
 
 
 def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
-    return render("fix_errors.jinja2", errors=errors, files=files)
+    return render(
+        "fix_errors.jinja2",
+        errors=errors,
+        files=files,
+        file_safety=generated_app_path_safety_prompt_context(),
+    )
 
 
 def _extract_exports(content: str) -> str:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import PurePosixPath
+from typing import TypedDict
 
 from flow44.ai.generated_app_file_rules import (
     PROTECTED_FILES,
@@ -18,7 +19,15 @@ class GeneratedAppContractError(ValueError):
     """Raised when generated output violates the app-generation contract."""
 
 
-def generated_app_path_safety_prompt_context() -> dict[str, list[str]]:
+class GeneratedAppPathSafetyPromptContext(TypedDict):
+    protected_files: list[str]
+    protected_src_paths: list[str]
+    protected_src_dirs: list[str]
+    protected_root_dirs: list[str]
+    protected_name_patterns: list[str]
+
+
+def generated_app_path_safety_prompt_context() -> GeneratedAppPathSafetyPromptContext:
     """Return protected path rules for prompt templates from the backend contract."""
     return {
         "protected_files": sorted(PROTECTED_FILES),

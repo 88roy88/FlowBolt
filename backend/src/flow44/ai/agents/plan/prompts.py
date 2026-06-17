@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
-from flow44.ai.generated_app_contract import generated_app_path_safety_prompt_context
+from flow44.ai.generated_app_contract import (
+    GeneratedAppPathSafetyPromptContext,
+    generated_app_path_safety_prompt_context,
+)
 
 _templates_dir = Path(__file__).parent / "templates"
 _shared_templates_dir = Path(__file__).parents[1] / "templates"
@@ -17,8 +20,37 @@ _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoe
 )
 
 
-def render(template_name: str, **kwargs: Any) -> str:
-    kwargs.setdefault("file_safety", generated_app_path_safety_prompt_context())
+@overload
+def render(
+    template_name: Literal["architecture.jinja2"],
+    *,
+    data_source_contexts: list[dict[str, Any]] | None,
+    file_safety: GeneratedAppPathSafetyPromptContext,
+) -> str: ...
+
+
+@overload
+def render(template_name: Literal["ux_design.jinja2"]) -> str: ...
+
+
+@overload
+def render(template_name: Literal["user_plan.jinja2"], *, has_feedback: bool) -> str: ...
+
+
+@overload
+def render(
+    template_name: Literal["data_source_analysis.jinja2"],
+    *,
+    user_content: str,
+    data_source_name: str,
+    sample_data_json: str | None,
+    queries: list[dict[str, Any]],
+    params: list[dict[str, Any]],
+    require_any: bool,
+) -> str: ...
+
+
+def render(template_name: str, **kwargs: object) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
@@ -34,7 +66,11 @@ def render_architecture(*, data_source_contexts: list[dict[str, Any]] | None = N
             }
             for ctx in data_source_contexts
         ]
-    return render("architecture.jinja2", data_source_contexts=prepared)
+    return render(
+        "architecture.jinja2",
+        data_source_contexts=prepared,
+        file_safety=generated_app_path_safety_prompt_context(),
+    )
 
 
 def render_ux_design() -> str:
