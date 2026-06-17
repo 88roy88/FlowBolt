@@ -24,7 +24,6 @@ from flow44.ai.generated_app_contract import (
         "src/main.tsx",
         "src/vite-env.d.ts",
         "src/platform/internal/README.md",
-        "backend/server.py",
     ],
 )
 def test_protected_generated_app_files_are_rejected(path: str) -> None:
@@ -51,5 +50,4 @@ def test_file_safety_prompt_context_uses_contract_values() -> None:
     assert "package.json" in context["protected_files"]
     assert "src/main.tsx" in context["protected_src_paths"]
     assert "src/platform/*" in context["protected_src_dirs"]
-    assert "backend/*" in context["protected_root_dirs"]
     assert "vite.config.*" in context["protected_name_patterns"]

@@ -12,7 +12,7 @@ from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
-from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_edit_path
+from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_path_allowed
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.sandbox.main import PnpmSandbox
@@ -120,7 +120,7 @@ class FollowUpAgent(BaseAgent):
             import difflib  # noqa: PLC0415
 
             try:
-                path = validate_generated_app_edit_path(path)
+                path = validate_generated_app_path_allowed(path)
             except GeneratedAppContractError as exc:
                 return _format_generated_app_contract_error(exc)
             try:
@@ -154,7 +154,7 @@ class FollowUpAgent(BaseAgent):
                 return f"Error: File not found: {path}"
 
             try:
-                path = validate_generated_app_edit_path(path)
+                path = validate_generated_app_path_allowed(path)
             except GeneratedAppContractError as exc:
                 return _format_generated_app_contract_error(exc)
             try:
