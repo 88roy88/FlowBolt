@@ -14,15 +14,15 @@ from flow44.ai.agents.optional_packages import (
     optional_package_prompt_context,
     validate_optional_packages,
 )
+from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
 from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
     generated_app_path_safety_prompt_context,
 )
 
 _templates_dir = Path(__file__).parent / "templates"
-_shared_templates_dir = Path(__file__).parents[1] / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
-    loader=ChoiceLoader([FileSystemLoader(str(_templates_dir)), FileSystemLoader(str(_shared_templates_dir))]),
+    loader=ChoiceLoader([FileSystemLoader(str(_templates_dir)), FileSystemLoader(str(TEMPLATE_PROMPTS_PATH))]),
     trim_blocks=True,
     lstrip_blocks=True,
 )
