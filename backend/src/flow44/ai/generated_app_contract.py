@@ -6,13 +6,7 @@ import re
 from pathlib import PurePosixPath
 from typing import TypedDict
 
-from flow44.ai.generated_app_file_rules import (
-    PROTECTED_FILES,
-    PROTECTED_NAME_PREFIXES,
-    PROTECTED_NAME_SUBSTRINGS,
-    PROTECTED_SRC_DIRS,
-    PROTECTED_SRC_PATHS,
-)
+from flow44.ai.generated_app_file_rules import PROTECTED_APP_FILE_RULES
 
 
 class GeneratedAppContractError(ValueError):
@@ -36,12 +30,13 @@ _IMPORT_PATTERNS = (
 
 def generated_app_path_safety_prompt_context() -> GeneratedAppPathSafetyPromptContext:
     """Return protected path rules for prompt templates from the backend contract."""
+    rules = PROTECTED_APP_FILE_RULES
     return {
-        "protected_files": sorted(PROTECTED_FILES),
-        "protected_src_paths": sorted(PROTECTED_SRC_PATHS),
-        "protected_src_dirs": sorted(f"{'/'.join(path)}/*" for path in PROTECTED_SRC_DIRS),
-        "protected_name_patterns": [f"{prefix}*" for prefix in PROTECTED_NAME_PREFIXES]
-        + [f"*{substring}*" for substring in PROTECTED_NAME_SUBSTRINGS],
+        "protected_files": sorted(rules.files),
+        "protected_src_paths": sorted(rules.src_paths),
+        "protected_src_dirs": sorted(f"{'/'.join(path)}/*" for path in rules.src_dirs),
+        "protected_name_patterns": [f"{prefix}*" for prefix in rules.name_prefixes]
+        + [f"*{substring}*" for substring in rules.name_substrings],
     }
 
 
@@ -63,14 +58,21 @@ def is_generated_app_path_allowed(path: str) -> bool:
     except GeneratedAppContractError:
         return False
 
-    parts = tuple(part.lower() for part in PurePosixPath(normalized).parts)
-    name = parts[-1].lower()
-    return not (
-        name in PROTECTED_FILES
-        or normalized.lower() in PROTECTED_SRC_PATHS
-        or name.startswith(PROTECTED_NAME_PREFIXES)
-        or (len(parts) >= 2 and parts[:2] in PROTECTED_SRC_DIRS)
-        or any(substring in name for substring in PROTECTED_NAME_SUBSTRINGS)
+    return not _is_protected_generated_app_path(normalized)
+
+
+def _is_protected_generated_app_path(normalized_path: str) -> bool:
+    rules = PROTECTED_APP_FILE_RULES
+    normalized = normalized_path.lower()
+    parts = PurePosixPath(normalized).parts
+    name = parts[-1]
+
+    return (
+        name in rules.files
+        or normalized in rules.src_paths
+        or name.startswith(rules.name_prefixes)
+        or (len(parts) >= 2 and parts[:2] in rules.src_dirs)
+        or any(substring in name for substring in rules.name_substrings)
     )
 
 
