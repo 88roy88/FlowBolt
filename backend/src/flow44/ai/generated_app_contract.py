@@ -23,7 +23,6 @@ class GeneratedAppPathSafetyPromptContext(TypedDict):
     protected_files: list[str]
     protected_src_paths: list[str]
     protected_src_dirs: list[str]
-    protected_root_dirs: list[str]
     protected_name_patterns: list[str]
 
 
