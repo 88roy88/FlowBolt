@@ -28,6 +28,13 @@ MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
 
 
+def _format_generated_app_contract_error(exc: GeneratedAppContractError) -> str:
+    return (
+        f"Generated app contract violation: {exc}\n"
+        "Pick an editable app source file and only import packages selected for this project."
+    )
+
+
 @dataclass
 class FileDiff:
     path: str
@@ -123,7 +130,7 @@ class FollowUpAgent(BaseAgent):
                     path, content, allowed_import_names(self._selected_packages)
                 )
             except GeneratedAppContractError as exc:
-                return f"Error: {exc}"
+                return _format_generated_app_contract_error(exc)
             try:
                 old_content = await sandbox.read_file(path)
             except FileNotFoundError:
@@ -160,7 +167,7 @@ class FollowUpAgent(BaseAgent):
                     path, candidate, allowed_import_names(self._selected_packages)
                 )
             except GeneratedAppContractError as exc:
-                return f"Error: {exc}"
+                return _format_generated_app_contract_error(exc)
             try:
                 await sandbox.edit_file(path, search, replace)
             except ValueError:
