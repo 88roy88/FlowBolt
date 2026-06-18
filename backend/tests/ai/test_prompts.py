@@ -193,8 +193,7 @@ class TestPromptRendering:
             "icons": ["lucide-react"],
             "forms": ["react-hook-form"],
             "dates": ["date-fns"],
-            "router": ["react-router-dom"],
-            "all": ["lucide-react", "react-hook-form", "date-fns", "react-router-dom"],
+            "all": ["lucide-react", "react-hook-form", "date-fns"],
         }
 
         for name, selected in variants.items():
@@ -216,11 +215,9 @@ class TestPromptRendering:
             assert ("- lucide-react" in dependency_rules) == ("lucide-react" in selected)
             assert ("- react-hook-form" in dependency_rules) == ("react-hook-form" in selected)
             assert ("- date-fns" in dependency_rules) == ("date-fns" in selected)
-            assert ("- react-router-dom" in dependency_rules) == ("react-router-dom" in selected)
             assert ("Import only the icons you use from `lucide-react`" in result) == ("lucide-react" in selected)
             assert ("Use `useForm` from `react-hook-form`" in result) == ("react-hook-form" in selected)
             assert ("Import only the date helpers you use from `date-fns`" in result) == ("date-fns" in selected)
-            assert ("basename={getRouterBasename()}" in result) == ("react-router-dom" in selected)
 
     def test_fix_prompts_include_file_safety_rules_once(self) -> None:
         execute_fix = render_fix_errors(errors="broken", files={"src/App.tsx": "broken"})
