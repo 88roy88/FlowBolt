@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import NamedTuple, TypedDict
+
+
+class GeneratedAppPathSafetyPromptContext(TypedDict):
+    protected_files: list[str]
+    protected_src_paths: list[str]
+    protected_src_dirs: list[str]
+    protected_name_patterns: list[str]
 
 
 class ProtectedAppFileRules(NamedTuple):
@@ -11,6 +18,16 @@ class ProtectedAppFileRules(NamedTuple):
     src_dirs: frozenset[tuple[str, ...]]
     name_prefixes: tuple[str, ...]
     name_substrings: tuple[str, ...]
+
+    def prompt_context(self) -> GeneratedAppPathSafetyPromptContext:
+        """Return protected path rules formatted for prompt templates."""
+        return {
+            "protected_files": sorted(self.files),
+            "protected_src_paths": sorted(self.src_paths),
+            "protected_src_dirs": sorted(f"{'/'.join(path)}/*" for path in self.src_dirs),
+            "protected_name_patterns": [f"{prefix}*" for prefix in self.name_prefixes]
+            + [f"*{substring}*" for substring in self.name_substrings],
+        }
 
 
 PROTECTED_APP_FILE_RULES = ProtectedAppFileRules(

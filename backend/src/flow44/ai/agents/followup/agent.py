@@ -1,3 +1,4 @@
+import difflib
 import json
 import logging
 import uuid
@@ -117,8 +118,6 @@ class FollowUpAgent(BaseAgent):
         @tool
         async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
-            import difflib  # noqa: PLC0415
-
             try:
                 path = validate_generated_app_path_allowed(path)
             except GeneratedAppContractError as exc:
@@ -146,8 +145,6 @@ class FollowUpAgent(BaseAgent):
         @tool
         async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
-            import difflib  # noqa: PLC0415
-
             try:
                 current = await sandbox.read_file(path)
             except FileNotFoundError:

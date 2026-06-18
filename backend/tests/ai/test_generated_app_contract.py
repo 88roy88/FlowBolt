@@ -34,14 +34,34 @@ def test_normal_app_source_file_is_allowed() -> None:
     assert is_generated_app_path_allowed("src/components/AssetMap.tsx")
 
 
-@pytest.mark.parametrize("path", ["/src/App.tsx", "../src/App.tsx", "src/../App.tsx"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/src/App.tsx",
+        "\\src\\App.tsx",
+        "C:\\src\\App.tsx",
+        "C:src\\App.tsx",
+        "\\\\server\\share\\src\\App.tsx",
+        "../src/App.tsx",
+        "src/../App.tsx",
+    ],
+)
 def test_unsafe_generated_paths_are_rejected(path: str) -> None:
     with pytest.raises(GeneratedAppContractError):
         validate_generated_app_path_allowed(path)
 
 
-def test_generated_path_is_normalized() -> None:
-    assert validate_generated_app_path_allowed("src\\components\\AssetMap.tsx") == "src/components/AssetMap.tsx"
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("./src/components/AssetMap.tsx", "src/components/AssetMap.tsx"),
+        ("src/components/AssetMap.tsx", "src/components/AssetMap.tsx"),
+        ("src/./components/AssetMap.tsx", "src/components/AssetMap.tsx"),
+        ("src\\components\\AssetMap.tsx", "src/components/AssetMap.tsx"),
+    ],
+)
+def test_generated_path_is_normalized_for_posix_and_windows_paths(path: str, expected: str) -> None:
+    assert validate_generated_app_path_allowed(path) == expected
 
 
 def test_file_safety_prompt_context_uses_contract_values() -> None:

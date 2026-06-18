@@ -292,7 +292,14 @@ class ExecuteAgent(BaseAgent):
 
         task_ids = {task.id for task in tasks}
         for task in tasks:
-            task.depends_on = [dependency for dependency in task.depends_on if dependency in task_ids]
+            valid_dependencies = [dependency for dependency in task.depends_on if dependency in task_ids]
+            if len(valid_dependencies) != len(task.depends_on):
+                logger.warning(
+                    "[execute] Dropping missing dependencies from generated task %s: %s",
+                    task.id,
+                    sorted(set(task.depends_on) - task_ids),
+                )
+            task.depends_on = valid_dependencies
 
         return WorkPlan(
             id=f"plan-{uuid.uuid4().hex[:8]}",

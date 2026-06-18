@@ -2,50 +2,43 @@
 
 from __future__ import annotations
 
-from pathlib import PurePosixPath
-from typing import TypedDict
+from pathlib import PurePosixPath, PureWindowsPath
 
-from flow44.ai.generated_app_file_rules import PROTECTED_APP_FILE_RULES
+from flow44.ai.generated_app_file_rules import (
+    PROTECTED_APP_FILE_RULES,
+    GeneratedAppPathSafetyPromptContext,
+)
 
 
 class GeneratedAppContractError(ValueError):
     """Raised when generated output violates the app-generation contract."""
 
 
-class GeneratedAppPathSafetyPromptContext(TypedDict):
-    protected_files: list[str]
-    protected_src_paths: list[str]
-    protected_src_dirs: list[str]
-    protected_name_patterns: list[str]
-
-
 def generated_app_path_safety_prompt_context() -> GeneratedAppPathSafetyPromptContext:
     """Return protected path rules for prompt templates from the backend contract."""
-    rules = PROTECTED_APP_FILE_RULES
-    return {
-        "protected_files": sorted(rules.files),
-        "protected_src_paths": sorted(rules.src_paths),
-        "protected_src_dirs": sorted(f"{'/'.join(path)}/*" for path in rules.src_dirs),
-        "protected_name_patterns": [f"{prefix}*" for prefix in rules.name_prefixes]
-        + [f"*{substring}*" for substring in rules.name_substrings],
-    }
+    return PROTECTED_APP_FILE_RULES.prompt_context()
 
 
-def normalize_generated_app_path(path: str) -> str:
-    """Normalize a generated path and reject absolute or traversal paths."""
-    if path.startswith(("/", "\\")):
+def validate_and_normalize_generated_app_path(path: str) -> str:
+    """Validate a generated path is relative and return its canonical POSIX form."""
+    return str(PurePosixPath(*_safe_generated_app_path_parts(path)))
+
+
+def _safe_generated_app_path_parts(path: str) -> tuple[str, ...]:
+    """Return safe relative path parts or raise for absolute/traversal input."""
+    parsed = PureWindowsPath(path)
+    if parsed.drive or parsed.root:
         raise GeneratedAppContractError(f"Unsafe generated file path: {path}")
-    normalized = path.replace("\\", "/").lstrip("/")
-    parts = PurePosixPath(normalized).parts
-    if not parts or any(part in {"", ".", ".."} for part in parts):
+    parts = parsed.parts
+    if not parts or any(part == ".." for part in parts):
         raise GeneratedAppContractError(f"Unsafe generated file path: {path}")
-    return str(PurePosixPath(*parts))
+    return parts
 
 
 def is_generated_app_path_allowed(path: str) -> bool:
     """Return whether AI generation may edit a path."""
     try:
-        normalized = normalize_generated_app_path(path)
+        normalized = validate_and_normalize_generated_app_path(path)
     except GeneratedAppContractError:
         return False
 
@@ -69,7 +62,7 @@ def _is_protected_generated_app_path(normalized_path: str) -> bool:
 
 def validate_generated_app_path_allowed(path: str) -> str:
     """Return a normalized path or raise for a protected target."""
-    normalized = normalize_generated_app_path(path)
-    if not is_generated_app_path_allowed(normalized):
+    normalized = validate_and_normalize_generated_app_path(path)
+    if _is_protected_generated_app_path(normalized):
         raise GeneratedAppContractError(f"AI generation may not edit protected file: {normalized}")
     return normalized
