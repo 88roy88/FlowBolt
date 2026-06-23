@@ -7,6 +7,7 @@ loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useChatStore } from '../../stores/chat';
+import { useVersionStore } from '../../stores/version';
 import { isAgentAlive } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { WRITE_ROLES } from '../../types';
@@ -47,14 +48,16 @@ export function EditorPanel() {
   const currentProject = useSessionStore((s) => s.currentProject);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
   const aiFlowActive = useChatStore(isAgentAlive);
+  const previewing = useVersionStore((s) => s.previewingVersion != null);
   const noWritePermission = currentProject?.role ? !WRITE_ROLES.has(currentProject.role) : false;
   const readOnlyUntilInitialBuildComplete = !buildCompleted;
-  const editorReadOnly = noWritePermission || readOnlyUntilInitialBuildComplete || aiFlowActive;
-  const readOnlyMessage = noWritePermission
-    ? t('editor.readOnlyNoPermission', 'View-only access')
-    : readOnlyUntilInitialBuildComplete
-      ? t('editor.readOnlyUntilFirstAiResponse')
-      : t('editor.readOnlyWhileAiWorking');
+  const editorReadOnly = noWritePermission || readOnlyUntilInitialBuildComplete || aiFlowActive || previewing;
+  const readOnlyMessage = (() => {
+    if (noWritePermission) return t('editor.readOnlyNoPermission', 'View-only access');
+    if (readOnlyUntilInitialBuildComplete) return t('editor.readOnlyUntilFirstAiResponse');
+    if (previewing) return t('version.previewReadOnly', 'Return to latest to edit');
+    return t('editor.readOnlyWhileAiWorking');
+  })();
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);

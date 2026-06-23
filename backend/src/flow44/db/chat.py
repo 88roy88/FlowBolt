@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from sqlalchemy import Column, ForeignKey, String
+from sqlalchemy import Column, ForeignKey, String, delete
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -43,3 +43,15 @@ async def get_messages(project_id: str) -> list[ChatMessage]:
             select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(col(ChatMessage.created_at).asc())
         )
         return list(result.scalars().all())
+
+
+async def trim_messages_after(project_id: str, created_at: str) -> None:
+    """Delete messages created after the given timestamp (used when a restore forks history)."""
+    async with database.async_session() as session:
+        await session.execute(
+            delete(ChatMessage).where(
+                col(ChatMessage.project_id) == project_id,
+                col(ChatMessage.created_at) > created_at,
+            )
+        )
+        await session.commit()

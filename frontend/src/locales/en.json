@@ -189,6 +189,21 @@
     "invite": "Invite",
     "noUsers": "No platform users yet"
   },
+  "version": {
+    "currentVersion": "Current version",
+    "preview": "Preview",
+    "exitPreview": "Exit preview",
+    "restoreHere": "Restore here",
+    "confirmRestore": "Yes, restore",
+    "returnToLatest": "Return to latest",
+    "previewingBanner": "Previewing {{version}}",
+    "restoreDialogTitle": "Restore version {{version}}?",
+    "restoreDialogBody": "This will discard all versions after {{version}}. They can be recovered by support. This action cannot be undone.",
+    "editFromOldTitle": "Edit from version {{version}}?",
+    "editFromOldBody": "Editing from {{version}} will discard all newer versions. They can be recovered by support. Continue?",
+    "continueAndSend": "Continue",
+    "previewReadOnly": "Return to latest to edit"
+  },
   "publish": {
     "publishFailed": "Publish Failed",
     "successfullyPublished": "Successfully Published!",

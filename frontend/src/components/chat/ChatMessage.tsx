@@ -13,6 +13,7 @@ import {
   FixProgressCard,
   FollowUpProgress,
 } from './cards';
+import { VersionControl } from './VersionControl';
 
 interface ChatMessageProps {
   message: Message;
@@ -75,17 +76,24 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return null;
   }
 
+  const versionControl = !isUser && message.version && (
+    <div className="max-w-[85%] px-1">
+      <VersionControl commit_sha={message.version} />
+    </div>
+  );
+
   // Agent card messages
   if (message.agentCard) {
     return (
-      <div className={`flex w-full ${isUser ? 'justify-start' : 'justify-end'} animate-message-in`}>
+      <div className={`flex flex-col w-full ${isUser ? 'items-start' : 'items-end'} animate-message-in`}>
         <AgentCardRenderer message={message} />
+        {versionControl}
       </div>
     );
   }
 
   return (
-    <div className={`flex w-full ${isUser ? 'justify-start' : 'justify-end'} animate-message-in`}>
+    <div className={`flex flex-col w-full ${isUser ? 'items-start' : 'items-end'} animate-message-in`}>
       <div
         className={`min-w-0 max-w-[85%] overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
           isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
@@ -147,6 +155,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
           </div>
         )}
       </div>
+      {versionControl}
     </div>
   );
 }

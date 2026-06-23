@@ -1,12 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
+import { useVersionStore, formatVersionLabel } from '../../stores/version';
 import { isAgentAlive, isAwaitingPlanApproval } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 
 import { WRITE_ROLES } from '../../types';
 
@@ -15,6 +17,7 @@ export function PromptInput() {
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const [showDsSelector, setShowDsSelector] = useState(false);
+  const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const agentPhase = useChatStore((s) => s.agentPhase);
@@ -22,11 +25,16 @@ export function PromptInput() {
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
+  const previewingVersion = useVersionStore((s) => s.previewingVersion);
+  const versions = useVersionStore((s) => s.versions);
+  const restoreVersion = useVersionStore((s) => s.restoreVersion);
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const projectRole = currentProject?.role;
   const canWrite = !projectRole || WRITE_ROLES.has(projectRole);
   const inputBlocked = agentAlive || awaitingPlan || !canWrite;
+
+  const previewVersionLabel = previewingVersion ? formatVersionLabel(versions, previewingVersion) : '';
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -36,12 +44,28 @@ export function PromptInput() {
     }
   }, []);
 
+  const submitMessage = useCallback((content: string) => {
+    sendMessage(content);
+    setValue('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+  }, [sendMessage]);
+
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || inputBlocked || !projectId) return;
-    sendMessage(trimmed);
-    setValue('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    if (previewingVersion != null) {
+      setConfirmSendOpen(true);
+      return;
+    }
+    submitMessage(trimmed);
+  };
+
+  const handleConfirmSendFromPreview = async () => {
+    setConfirmSendOpen(false);
+    const text = value.trim();
+    if (text && previewingVersion && (await restoreVersion(previewingVersion))) {
+      submitMessage(text);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -86,6 +110,19 @@ export function PromptInput() {
     t('chat.phase.thinking');
 
   return (
+    <>
+    <ConfirmDialog
+      open={confirmSendOpen}
+      onOpenChange={(open) => { if (!open) setConfirmSendOpen(false); }}
+      title={t('version.editFromOldTitle', 'Edit from version {{version}}?', { version: previewVersionLabel })}
+      body={t(
+        'version.editFromOldBody',
+        'Editing from {{version}} will discard all newer versions. They can be recovered by support. Continue?',
+        { version: previewVersionLabel },
+      )}
+      confirmLabel={t('version.continueAndSend', 'Continue')}
+      onConfirm={handleConfirmSendFromPreview}
+    />
     <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
       {/* Data source selector */}
       {!inputBlocked && projectId && showDsSelector && (
@@ -194,5 +231,6 @@ export function PromptInput() {
         </span>
       </div>
     </div>
+    </>
   );
 }

@@ -6,6 +6,7 @@ export interface Message {
   timestamp: number;
   dataSources?: { id: number; name: string }[];
   agentCard?: AgentCard;
+  version?: string; // commit_sha
 }
 
 export interface ProjectSummary {
@@ -186,4 +187,10 @@ export type WSMessage =
   | { type: 'followup_step'; tool: string; args: Record<string, string>; status: string; result_preview?: string; iteration: number }
   | { type: 'file_diffs'; diffs: FileDiff[] }
   | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
-  | { type: 'plan_accepted'; overview: PlanOverview };
+  | { type: 'plan_accepted'; overview: PlanOverview }
+  | { type: 'version_committed'; commit_sha: string }
+  | { type: 'version_preview_active'; commit_sha: string; is_latest: boolean }
+  | { type: 'version_restored'; commit_sha: string }
+  | { type: 'preview_version'; commit_sha: string }
+  | { type: 'exit_preview' }
+  | { type: 'restore_version'; commit_sha: string };

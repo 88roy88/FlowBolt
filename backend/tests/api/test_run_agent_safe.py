@@ -12,6 +12,7 @@ from flow44.api import chat
 
 PROJECT_ID = "test-project-run-agent-safe"
 CLAIMED_AT = datetime(2026, 1, 1, tzinfo=UTC)
+SANDBOX = object()
 
 
 def _patch_heartbeat(monkeypatch: pytest.MonkeyPatch) -> tuple[AsyncMock, AsyncMock]:
@@ -20,6 +21,12 @@ def _patch_heartbeat(monkeypatch: pytest.MonkeyPatch) -> tuple[AsyncMock, AsyncM
     monkeypatch.setattr(chat, "touch_heartbeat", touch)
     monkeypatch.setattr(chat, "clear_heartbeat", clear)
     return touch, clear
+
+
+def _patch_commit_turn(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    commit_turn = AsyncMock(return_value=None)
+    monkeypatch.setattr(chat.versioning, "commit_turn", commit_turn)
+    return commit_turn
 
 
 async def test_supervisor_timeout_emits_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -32,7 +39,7 @@ async def test_supervisor_timeout_emits_error(monkeypatch: pytest.MonkeyPatch) -
     async def _hang() -> None:
         await asyncio.sleep(10)
 
-    await chat._run_agent_safe(PROJECT_ID, _hang(), CLAIMED_AT)
+    await chat._run_agent_safe(PROJECT_ID, SANDBOX, _hang(), CLAIMED_AT)
 
     emitted = [call.args[1] for call in emit.await_args_list]
     assert {"type": "phase", "phase": "idle"} in emitted
@@ -40,19 +47,21 @@ async def test_supervisor_timeout_emits_error(monkeypatch: pytest.MonkeyPatch) -
     clear.assert_awaited_once()
 
 
-async def test_success_emits_no_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_success_commits_and_emits_no_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chat.settings, "AGENT_RUN_TIMEOUT", 5)
     emit = AsyncMock()
     monkeypatch.setattr(chat, "emit_event", emit)
     _, clear = _patch_heartbeat(monkeypatch)
+    commit_turn = _patch_commit_turn(monkeypatch)
 
     async def _ok() -> None:
         return None
 
-    await chat._run_agent_safe(PROJECT_ID, _ok(), CLAIMED_AT)
+    await chat._run_agent_safe(PROJECT_ID, SANDBOX, _ok(), CLAIMED_AT)
 
     emit.assert_not_awaited()
     clear.assert_awaited_once()
+    commit_turn.assert_awaited_once_with(SANDBOX, PROJECT_ID)
 
 
 async def test_exception_emits_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -60,27 +69,30 @@ async def test_exception_emits_error(monkeypatch: pytest.MonkeyPatch) -> None:
     emit = AsyncMock()
     monkeypatch.setattr(chat, "emit_event", emit)
     _, clear = _patch_heartbeat(monkeypatch)
+    commit_turn = _patch_commit_turn(monkeypatch)
 
     async def _boom() -> None:
         raise RuntimeError("agent blew up")
 
-    await chat._run_agent_safe(PROJECT_ID, _boom(), CLAIMED_AT)
+    await chat._run_agent_safe(PROJECT_ID, SANDBOX, _boom(), CLAIMED_AT)
 
     emitted = [call.args[1] for call in emit.await_args_list]
     assert {"type": "phase", "phase": "idle"} in emitted
     assert {"type": "error", "message": "AI processing failed"} in emitted
     clear.assert_awaited_once()
+    commit_turn.assert_not_awaited()  # a failed run must not be committed
 
 
 async def test_supervisor_beats_while_running(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chat.settings, "AGENT_RUN_TIMEOUT", 5)
     monkeypatch.setattr(chat.settings, "AGENT_RUN_STALE_TIMEOUT", 0.04)  # beat = stale/4 = 0.01
     touch, clear = _patch_heartbeat(monkeypatch)
+    _patch_commit_turn(monkeypatch)
 
     async def _work() -> None:
         await asyncio.sleep(0.05)
 
-    await chat._run_agent_safe(PROJECT_ID, _work(), CLAIMED_AT)
+    await chat._run_agent_safe(PROJECT_ID, SANDBOX, _work(), CLAIMED_AT)
 
     assert touch.await_count >= 2
     clear.assert_awaited_once()
@@ -95,7 +107,7 @@ async def test_start_agent_rejects_when_run_active(monkeypatch: pytest.MonkeyPat
         ran = True
 
     with pytest.raises(chat.AgentAlreadyRunning):
-        await chat._start_agent(PROJECT_ID, _agent())
+        await chat._start_agent(PROJECT_ID, SANDBOX, _agent())
 
     assert ran is False  # the coro was closed, never scheduled
 
@@ -104,12 +116,13 @@ async def test_start_agent_starts_when_claim_succeeds(monkeypatch: pytest.Monkey
     monkeypatch.setattr(chat, "try_claim_run", AsyncMock(return_value=CLAIMED_AT))
     monkeypatch.setattr(chat, "emit_event", AsyncMock())
     _patch_heartbeat(monkeypatch)
+    _patch_commit_turn(monkeypatch)
     started = asyncio.Event()
 
     async def _agent() -> None:
         started.set()
 
-    await chat._start_agent(PROJECT_ID, _agent())
+    await chat._start_agent(PROJECT_ID, SANDBOX, _agent())
 
     await asyncio.wait_for(started.wait(), timeout=1)
     await asyncio.sleep(0.01)  # let the supervisor finish and clear the heartbeat

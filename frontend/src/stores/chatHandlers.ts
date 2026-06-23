@@ -27,6 +27,10 @@ export function setReplayMode(replay: boolean) {
   _skipMessages = replay;
 }
 
+export function isReplaying() {
+  return _skipMessages;
+}
+
 let _lastEventTs = 0;
 
 /**

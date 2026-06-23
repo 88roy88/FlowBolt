@@ -189,6 +189,21 @@
     "invite": "הזמן",
     "noUsers": "אין משתמשי פלטפורמה עדיין"
   },
+  "version": {
+    "currentVersion": "גרסה נוכחית",
+    "preview": "תצוגה מקדימה",
+    "exitPreview": "צא מתצוגה מקדימה",
+    "restoreHere": "שחזר לכאן",
+    "confirmRestore": "כן, שחזר",
+    "returnToLatest": "חזור לגרסה האחרונה",
+    "previewingBanner": "מציג תצוגה מקדימה של {{version}}",
+    "restoreDialogTitle": "לשחזר את גרסה {{version}}?",
+    "restoreDialogBody": "פעולה זו תמחק את כל הגרסאות שאחרי {{version}}. ניתן לשחזר אותן דרך התמיכה. לא ניתן לבטל פעולה זו.",
+    "editFromOldTitle": "לערוך מגרסה {{version}}?",
+    "editFromOldBody": "עריכה מגרסה {{version}} תמחק את כל הגרסאות החדשות יותר. ניתן לשחזר אותן דרך התמיכה. להמשיך?",
+    "continueAndSend": "המשך",
+    "previewReadOnly": "חזור לגרסה האחרונה כדי לערוך"
+  },
   "publish": {
     "publishFailed": "הפרסום נכשל",
     "successfullyPublished": "פורסם בהצלחה!",
