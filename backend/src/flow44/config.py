@@ -31,6 +31,7 @@ class SandboxSettings(Flow44BaseSettings):
     NPM_STRICT_SSL: bool = True
     NPM_AUDIT: bool = True
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
+    AGENT_RUN_TIMEOUT: int = 1800
     SANDBOX_IDLE_TTL_SECONDS: int = 5 * 60  # 5 minutes
     SANDBOX_IDLE_CHECK_INTERVAL_SECONDS: int = 60
     # Public base URL of this backend, used in HTML exports so API calls work standalone.
@@ -60,6 +61,7 @@ class AIModelSettings(Flow44BaseSettings):
     # Base URL for OpenAI-compatible endpoints (vLLM, Ollama, OpenRouter, etc.)
     AI_BASE_URL: str | None = "http://flow-44-models.com/openai/v1"
     AI_API_KEY: str | None = "default"
+    AI_REQUEST_TIMEOUT: int = 300
 
     # if ai_model starts with bedrock/ set base_url and api_key to None
     # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)

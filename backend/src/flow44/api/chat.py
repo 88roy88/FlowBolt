@@ -14,6 +14,7 @@ from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
+from flow44.config import settings
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
@@ -38,7 +39,15 @@ async def _is_new_project(project_id: str) -> bool:
 async def _run_agent_safe(project_id: str, coro: Any) -> None:
     mark_agent_started(project_id)
     try:
-        await coro
+        await asyncio.wait_for(coro, timeout=settings.AGENT_RUN_TIMEOUT)
+    except TimeoutError:
+        logger.error(
+            "[chat] Background agent timed out after %ss for session %s",
+            settings.AGENT_RUN_TIMEOUT,
+            project_id,
+        )
+        await emit_event(project_id, {"type": "phase", "phase": "idle"})
+        await emit_event(project_id, {"type": "error", "message": "AI processing timed out"})
     except Exception:
         logger.exception("[chat] Background agent failed for session %s", project_id)
         await emit_event(project_id, {"type": "phase", "phase": "idle"})

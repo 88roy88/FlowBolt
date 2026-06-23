@@ -58,6 +58,7 @@ async def complete_chat(
             api_base=settings.AI_BASE_URL,
             api_key=settings.AI_API_KEY,
             stream=False,
+            timeout=settings.AI_REQUEST_TIMEOUT,
             metadata=metadata or {},
         )
 
@@ -90,6 +91,7 @@ async def complete_chat_with_tools(
             tools=tools,
             tool_choice=tool_choice,
             stream=False,
+            timeout=settings.AI_REQUEST_TIMEOUT,
             metadata=metadata or {},
         )
 
@@ -113,6 +115,7 @@ async def stream_chat(
             api_base=settings.AI_BASE_URL,
             api_key=settings.AI_API_KEY,
             stream=True,
+            timeout=settings.AI_REQUEST_TIMEOUT,
             metadata=metadata or {},
         )
 
