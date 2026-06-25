@@ -34,12 +34,13 @@ use these existing files. Do NOT design new fetch logic or types for data source
 they are ready to import.
 
 {% for ctx in data_source_contexts %}
-### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }})
-Relevant Fields: {{ ctx.relevant_fields }}
-Data Characteristics: {{ ctx.data_characteristics }}
+### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }}) — `{{ ctx.module_path }}`
+- **Data Schema:** {{ ctx.data_schema }}
+- **Relevant Fields:** {{ ctx.relevant_fields }}
+- **Data Characteristics:** {{ ctx.data_characteristics }}
 
 **Pre-generated file (already exists — do NOT include in file_structure):**
-- `src/dataSources/{{ ctx.sanitized_name }}.ts`
+- `{{ ctx.module_path }}`
 
 Usage: `import { dataSource{{ ctx.sanitized_name }} } from './dataSources/{{ ctx.sanitized_name }}';`
 This is a plain async function returning `Promise<{{ ctx.sanitized_name }}Response>`. It does NOT manage React state — you are responsible for calling it from `useEffect`, an event handler, or a loader, and for holding the result in your own `useState`.
