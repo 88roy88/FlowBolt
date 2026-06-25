@@ -104,6 +104,10 @@ class S3Settings(Flow44BaseSettings):
     S3_STORAGE_CLASS: str = "STANDARD_IA"
 
 
+class LoggerSettings(Flow44BaseSettings):
+    LOG_FILE_PATH: str | None = None
+
+
 class LangfuseSettings(Flow44BaseSettings):
     # Langfuse (optional — set public/secret key to enable)
     LANGFUSE_PUBLIC_KEY: str | None = None
@@ -130,6 +134,7 @@ class Settings(
     FlapiSettings,
     S3Settings,
     LangfuseSettings,
+    LoggerSettings,
     Flow44BaseSettings,
 ):
     pass
