@@ -1,5 +1,6 @@
 import logging
 import logging.handlers
+import socket
 from contextvars import ContextVar
 
 from pythonjsonlogger.json import JsonFormatter
@@ -9,7 +10,10 @@ _project_id: ContextVar[str | None] = ContextVar("project_id", default=None)
 
 
 class RequestContextFilter(logging.Filter):
+    _hostname = socket.gethostname()
+
     def filter(self, record: logging.LogRecord) -> bool:
+        record.hostname = self._hostname
         if user_id := _user_id.get():
             record.user_id = user_id
         if project_id := _project_id.get():
@@ -30,7 +34,7 @@ def setup_logging(log_file_path: str | None = None) -> None:
         file = logging.handlers.RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=5)
         file.setFormatter(
             JsonFormatter(
-                "%(asctime)s %(name)s %(levelname)s %(user_id)s %(project_id)s %(message)s",
+                "%(asctime)s %(hostname)s %(name)s %(levelname)s %(user_id)s %(project_id)s %(message)s",
                 rename_fields={"asctime": "@timestamp", "levelname": "level"},
                 json_ensure_ascii=False,
                 datefmt="%Y-%m-%dT%H:%M:%S%z",
