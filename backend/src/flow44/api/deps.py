@@ -14,12 +14,12 @@ from flow44.auth.permissions import (
     has_permission,
 )
 from flow44.config import settings
-from flow44.logging import _project_id as _log_project_id
-from flow44.logging import _user_id as _log_user_id
 from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
 from flow44.db.project_member import get_project_member
+from flow44.logging import _project_id as _log_project_id
+from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
 
