@@ -122,9 +122,7 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     has_access = (
-        project.user_id == user_id
-        or is_admin(user_id)
-        or await get_project_member(project_id, user_id) is not None
+        project.user_id == user_id or is_admin(user_id) or await get_project_member(project_id, user_id) is not None
     )
     if not has_access:
         raise HTTPException(status_code=404, detail="Project not found")

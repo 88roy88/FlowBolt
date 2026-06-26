@@ -11,9 +11,9 @@ _project_id: ContextVar[str | None] = ContextVar("project_id", default=None)
 class RequestContextFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         if user_id := _user_id.get():
-            record.user_id = user_id  # type: ignore[attr-defined]
+            record.user_id = user_id
         if project_id := _project_id.get():
-            record.project_id = project_id  # type: ignore[attr-defined]
+            record.project_id = project_id
         return True
 
 
