@@ -31,7 +31,7 @@ dev = [
     # Linting
     "ruff>=0.14.2",
     "mypy>=1.10.1",
-    "types-aioboto3[bedrock,s3]>=15.5.0",
+    "types-aioboto3>=15.5.0",
     # Benchmarks
     "pyyaml>=6.0",
     "typer>=0.24.1",
