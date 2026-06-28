@@ -218,8 +218,16 @@ async def chat_ws(  # noqa: C901, PLR0915
                         sandbox=sandbox,
                         model=selected_model,
                         user_id=user_id,
+                        data_source_authorization=data_source_authorization,
                     )
-                    await _dispatch(websocket, project.id, followup_agent.run(user_content))
+                    await _dispatch(
+                        websocket,
+                        project.id,
+                        followup_agent.run(
+                            user_content,
+                            data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
+                        ),
+                    )
 
             elif msg_type == "plan_response":
                 action = data.get("action")
