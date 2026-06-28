@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
 
     heartbeat_reaper.start()
-    logger.info("Heartbeat reaper started (sweep=%ds).", settings.AGENT_RUN_SWEEP_INTERVAL)
+    logger.info("Heartbeat reaper started (stale=%ds).", settings.AGENT_RUN_STALE_TIMEOUT)
 
     if settings.S3_BUCKET_NAME:
         logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)

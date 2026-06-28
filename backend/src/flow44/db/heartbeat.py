@@ -33,47 +33,53 @@ def _insert() -> Any:
     return pg_insert if database.get_engine().dialect.name == "postgresql" else sqlite_insert
 
 
+def _stale_cutoff() -> datetime:
+    return datetime.now(UTC) - timedelta(seconds=settings.AGENT_RUN_STALE_TIMEOUT)
+
+
+def _stale_or_missing() -> Any:
+    """WHERE clause matching heartbeats that are stale or absent."""
+    beat_at = col(AgentRunHeartbeat.beat_at)
+    return beat_at.is_(None) | (beat_at < _stale_cutoff())
+
+
+async def _commit(stmt: Any) -> Any:
+    async with database.async_session() as session:
+        result = await session.execute(stmt)
+        await session.commit()
+        return result
+
+
 # ---------------------------------------------------------------------------
 # Heartbeat writes — atomic upserts (the heartbeat row is also the run-lock)
 # ---------------------------------------------------------------------------
 
 
-async def touch_heartbeat(project_id: str) -> None:
-    """Refresh this project's heartbeat (one row per project)."""
+async def touch_heartbeat(project_id: str) -> datetime:
+    """Refresh this project's heartbeat (one row per project); return the beat written."""
     now = datetime.now(UTC)
-    stmt = (
+    await _commit(
         _insert()(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
         .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now})
     )
-    async with database.async_session() as session:
-        await session.execute(stmt)
-        await session.commit()
+    return now
 
 
-async def try_claim_run(project_id: str) -> bool:
-    """Atomically claim the run-lock for this project.
+async def try_claim_run(project_id: str) -> datetime | None:
+    """Atomically claim the run-lock.
 
-    Returns True if claimed — no heartbeat existed, or the existing one was stale.
-    Returns False if a fresh heartbeat already holds the lock (a run is active).
+    Returns the claimed beat (the lock token) on success, or None when a fresh
+    heartbeat already holds it.
     """
     now = datetime.now(UTC)
-    cutoff = now - timedelta(seconds=settings.AGENT_RUN_STALE_TIMEOUT)
-    beat_at = col(AgentRunHeartbeat.beat_at)
     stmt = (
         _insert()(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
-        .on_conflict_do_update(
-            index_elements=["project_id"],
-            set_={"beat_at": now},
-            where=(beat_at < cutoff) | beat_at.is_(None),
-        )
+        .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now}, where=_stale_or_missing())
         .returning(col(AgentRunHeartbeat.project_id))
     )
-    async with database.async_session() as session:
-        result = await session.execute(stmt)
-        await session.commit()
-        return result.first() is not None
+    return now if (await _commit(stmt)).first() is not None else None
 
 
 async def get_heartbeat(project_id: str) -> AgentRunHeartbeat | None:
@@ -81,12 +87,16 @@ async def get_heartbeat(project_id: str) -> AgentRunHeartbeat | None:
         return await session.get(AgentRunHeartbeat, project_id)
 
 
-async def clear_heartbeat(project_id: str) -> None:
-    async with database.async_session() as session:
-        hb = await session.get(AgentRunHeartbeat, project_id)
-        if hb is not None:
-            await session.delete(hb)
-            await session.commit()
+async def clear_heartbeat(project_id: str, *, only_beat: datetime | None = None) -> None:
+    """Release this project's run-lock.
+
+    With only_beat set, delete only while it is still our beat, so a lock a newer run
+    has since claimed (after ours was reaped) is never cleared out from under it.
+    """
+    stmt = delete(AgentRunHeartbeat).where(col(AgentRunHeartbeat.project_id) == project_id)
+    if only_beat is not None:
+        stmt = stmt.where(col(AgentRunHeartbeat.beat_at) == only_beat)
+    await _commit(stmt)
 
 
 # ---------------------------------------------------------------------------
@@ -109,25 +119,19 @@ async def is_run_active(project_id: str) -> bool:
 
 
 async def reap_stale_runs() -> int:
-    """Close every run whose heartbeat has gone stale.
+    """Atomically delete stale heartbeats and emit a terminal 'error' event per reaped run.
 
-    Atomically deletes stale heartbeats (so a run refreshed mid-sweep is left alone,
-    and concurrent sweeps each reap a row at most once), then appends a terminal
-    'error' event per reaped run so the UI unsticks.
+    Atomic delete means a run refreshed mid-sweep is left alone and concurrent sweeps
+    each reap a row at most once.
     """
-    cutoff = datetime.now(UTC) - timedelta(seconds=settings.AGENT_RUN_STALE_TIMEOUT)
-    beat_at = col(AgentRunHeartbeat.beat_at)
-    async with database.async_session() as session:
-        result = await session.execute(
-            delete(AgentRunHeartbeat)
-            .where((beat_at < cutoff) | beat_at.is_(None))
-            .returning(col(AgentRunHeartbeat.project_id))
-        )
-        stale_ids = list(result.scalars().all())
-        await session.commit()
+    result = await _commit(
+        delete(AgentRunHeartbeat).where(_stale_or_missing()).returning(col(AgentRunHeartbeat.project_id))
+    )
+    stale_ids = list(result.scalars().all())
 
     for project_id in stale_ids:
         try:
+            await emit_event(project_id, {"type": "phase", "phase": "idle"})
             await emit_event(project_id, {"type": "error", "message": "Agent run was interrupted"})
         except Exception:
             logger.exception("[heartbeat] Failed to emit interruption for %s", project_id)

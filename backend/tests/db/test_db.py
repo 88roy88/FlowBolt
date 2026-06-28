@@ -12,6 +12,7 @@ from flow44.db.chat import get_messages, save_message
 from flow44.db.events import clear_events, emit_event, get_events
 from flow44.db.heartbeat import (
     AgentRunHeartbeat,
+    clear_heartbeat,
     get_heartbeat,
     is_run_active,
     reap_stale_runs,
@@ -342,20 +343,20 @@ class TestRunLiveness:
     async def test_try_claim_run_claims_when_absent(self, test_db):
         project = await create_project("App", user_id="test-user")
 
-        assert await try_claim_run(project.id) is True
+        assert await try_claim_run(project.id) is not None
         assert await is_run_active(project.id) is True
 
     async def test_try_claim_run_rejects_when_fresh(self, test_db):
         project = await create_project("App", user_id="test-user")
         await touch_heartbeat(project.id)
 
-        assert await try_claim_run(project.id) is False
+        assert await try_claim_run(project.id) is None
 
     async def test_try_claim_run_claims_when_stale(self, test_db):
         project = await create_project("App", user_id="test-user")
         await _seed_heartbeat(project.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
 
-        assert await try_claim_run(project.id) is True
+        assert await try_claim_run(project.id) is not None
         assert await is_run_active(project.id) is True
 
     async def test_touch_heartbeat_upserts_single_row(self, test_db):
@@ -376,3 +377,33 @@ class TestRunLiveness:
         await delete_project(project.id)
 
         assert await get_heartbeat(project.id) is None
+
+    async def test_clear_heartbeat_only_beat_keeps_newer_lock(self, test_db):
+        """A finally that fires after a newer run reclaimed must not clear the new lock."""
+        project = await create_project("App", user_id="test-user")
+        stale_beat = await try_claim_run(project.id)
+        assert stale_beat is not None
+        # A newer run reclaims the lock, overwriting beat_at.
+        await touch_heartbeat(project.id)
+
+        await clear_heartbeat(project.id, only_beat=stale_beat)
+
+        assert await get_heartbeat(project.id) is not None
+        assert await is_run_active(project.id) is True
+
+    async def test_clear_heartbeat_only_beat_clears_own_lock(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        beat = await try_claim_run(project.id)
+        assert beat is not None
+
+        await clear_heartbeat(project.id, only_beat=beat)
+
+        assert await get_heartbeat(project.id) is None
+
+    async def test_reap_stale_runs_emits_idle_phase(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await _seed_heartbeat(project.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
+
+        assert await reap_stale_runs() == 1
+        phases = [e for e in await get_events(project.id) if e.payload.get("type") == "phase"]
+        assert any(e.payload.get("phase") == "idle" for e in phases)

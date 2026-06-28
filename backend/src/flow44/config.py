@@ -31,10 +31,8 @@ class SandboxSettings(Flow44BaseSettings):
     NPM_STRICT_SSL: bool = True
     NPM_AUDIT: bool = True
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
-    AGENT_RUN_TIMEOUT: int = 1800
-    AGENT_HEARTBEAT_INTERVAL: int = 15
-    AGENT_RUN_STALE_TIMEOUT: int = 60
-    AGENT_RUN_SWEEP_INTERVAL: int = 30
+    AGENT_RUN_TIMEOUT: int = 1800  # whole-run budget
+    AGENT_RUN_STALE_TIMEOUT: int = 60  # when a heartbeat is considered dead (beat=/4, sweep=/2)
     SANDBOX_IDLE_TTL_SECONDS: int = 5 * 60  # 5 minutes
     SANDBOX_IDLE_CHECK_INTERVAL_SECONDS: int = 60
     # Public base URL of this backend, used in HTML exports so API calls work standalone.

@@ -16,12 +16,13 @@ class HeartbeatReaper:
     """
 
     def __init__(self) -> None:
-        self._interval = settings.AGENT_RUN_SWEEP_INTERVAL
+        self._interval = 0.0
         self._stop = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
 
     def start(self) -> None:
         if self._task is None:
+            self._interval = settings.AGENT_RUN_STALE_TIMEOUT / 2
             self._stop.clear()
             self._task = asyncio.create_task(self._reap_loop())
 
