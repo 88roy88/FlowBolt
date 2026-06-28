@@ -57,11 +57,17 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+let _treeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Agents emit many file/task events in a burst; coalesce them into a single tree refetch.
 function refreshFileTreeAfterAgentWrite() {
   if (_skipMessages) return;
-  const store = useFilesStore.getState();
-  void store.loadFileTree();
   useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
+  if (_treeRefreshTimer) clearTimeout(_treeRefreshTimer);
+  _treeRefreshTimer = setTimeout(() => {
+    _treeRefreshTimer = null;
+    void useFilesStore.getState().loadFileTree();
+  }, 250);
 }
 
 function handleFileUpdate(msg: { path: string; content: string }, set: SetState) {
