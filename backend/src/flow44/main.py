@@ -30,6 +30,7 @@ from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import setup_bucket
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.heartbeat_reaper import heartbeat_reaper
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -60,6 +61,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     idle_reaper.start()
     logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
 
+    heartbeat_reaper.start()
+    logger.info("Heartbeat reaper started (sweep=%ds).", settings.AGENT_RUN_SWEEP_INTERVAL)
+
     if settings.S3_BUCKET_NAME:
         logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
         try:
@@ -70,8 +74,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("S3 bucket setup issue (may already exist or be misconfigured): %s", exc)
 
     yield
-    logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
+    logger.info("Shutting down — stopping reapers and destroying all sandboxes...")
     await idle_reaper.stop()
+    await heartbeat_reaper.stop()
     await sandbox_manager.suspend_all()
     logger.info("Shutdown complete.")
 

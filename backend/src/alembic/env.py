@@ -21,6 +21,7 @@ from sqlmodel import SQLModel
 
 import flow44.db.chat  # noqa
 import flow44.db.events  # noqa
+import flow44.db.heartbeat  # noqa
 import flow44.db.pending_plan  # noqa
 import flow44.db.platform_user  # noqa
 import flow44.db.project  # noqa

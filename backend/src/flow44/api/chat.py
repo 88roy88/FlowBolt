@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.ai.agent_runtime import mark_agent_finished, mark_agent_started
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
@@ -17,16 +18,14 @@ from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUs
 from flow44.config import settings
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
+from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat, try_claim_run
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
 
-# HTTP routes — included in main's protected api_router
 http_router = APIRouter(prefix="/api/chat", tags=["chat"])
-
-# WebSocket router — auth via Depends() on each endpoint
 ws_router = APIRouter()
 
 
@@ -36,28 +35,66 @@ async def _is_new_project(project_id: str) -> bool:
     return not any(e.payload.get("type") == "action_complete" for e in events)
 
 
+# Strong refs: asyncio holds tasks weakly, so a run could be GC'd mid-flight.
+_RUNNING: set[asyncio.Task[None]] = set()
+
+_AGENT_BUSY = {"type": "error", "message": "An agent is already running for this project"}
+
+
+async def _heartbeat_until_done(project_id: str, run_task: asyncio.Task[Any]) -> None:
+    """Beat while the run executes; raise TimeoutError if it overruns its budget."""
+    started = time.monotonic()
+    while True:
+        remaining = settings.AGENT_RUN_TIMEOUT - (time.monotonic() - started)
+        if remaining <= 0:
+            raise TimeoutError
+        done, _ = await asyncio.wait({run_task}, timeout=min(settings.AGENT_HEARTBEAT_INTERVAL, remaining))
+        if run_task in done:
+            return
+        await touch_heartbeat(project_id)
+
+
+async def _cancel_task(task: asyncio.Task[Any]) -> None:
+    if task.done():
+        return
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+
+async def _report_run_failure(project_id: str, message: str) -> None:
+    await emit_event(project_id, {"type": "phase", "phase": "idle"})
+    await emit_event(project_id, {"type": "error", "message": message})
+
+
 async def _run_agent_safe(project_id: str, coro: Any) -> None:
-    mark_agent_started(project_id)
+    """Run the agent under a heartbeat + timeout, surfacing failures to the client."""
+    run_task = asyncio.create_task(coro)
     try:
-        await asyncio.wait_for(coro, timeout=settings.AGENT_RUN_TIMEOUT)
+        await _heartbeat_until_done(project_id, run_task)
+        await run_task
     except TimeoutError:
         logger.error(
-            "[chat] Background agent timed out after %ss for session %s",
-            settings.AGENT_RUN_TIMEOUT,
-            project_id,
+            "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
         )
-        await emit_event(project_id, {"type": "phase", "phase": "idle"})
-        await emit_event(project_id, {"type": "error", "message": "AI processing timed out"})
+        await _report_run_failure(project_id, "AI processing timed out")
     except Exception:
         logger.exception("[chat] Background agent failed for session %s", project_id)
-        await emit_event(project_id, {"type": "phase", "phase": "idle"})
-        await emit_event(project_id, {"type": "error", "message": "AI processing failed"})
+        await _report_run_failure(project_id, "AI processing failed")
     finally:
-        mark_agent_finished(project_id)
+        await _cancel_task(run_task)
+        await clear_heartbeat(project_id)
 
 
-def _start_agent(project_id: str, coro: Any) -> None:
-    asyncio.create_task(_run_agent_safe(project_id, coro))
+async def _start_agent(project_id: str, coro: Any) -> bool:
+    """Claim the per-project run-lock and start the run; False if one is already active."""
+    if not await try_claim_run(project_id):
+        coro.close()
+        return False
+    task = asyncio.create_task(_run_agent_safe(project_id, coro))
+    _RUNNING.add(task)
+    task.add_done_callback(_RUNNING.discard)
+    return True
 
 
 @http_router.get("/{project_id}/history")
@@ -112,10 +149,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                 selected_model: str | None = data.get("model")
                 ds_ids: list[int] = data.get("dataSourceIds") or []
 
-                # Save user message (for LLM context in followup agent)
                 await save_message(project.id, ChatRole.user, user_content)
 
-                # Emit user_message event (for frontend history reconstruction)
                 user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                 if ds_ids:
                     ds_names: list[str] = []
@@ -133,7 +168,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                 is_new = await _is_new_project(project.id)
 
                 if is_new:
-                    # Use PlanAgent for design and planning
                     plan_agent = PlanAgent(
                         project_id=project.id,
                         sandbox=sandbox,
@@ -141,13 +175,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                         data_source_authorization=data_source_authorization,
                         user_id=user_id,
                     )
-                    _start_agent(
+                    if not await _start_agent(
                         project.id,
                         plan_agent.run(
                             user_content,
                             data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
                         ),
-                    )
+                    ):
+                        await websocket.send_json(_AGENT_BUSY)
                 else:
                     followup_agent = FollowUpAgent(
                         project_id=project.id,
@@ -155,14 +190,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                         model=selected_model,
                         user_id=user_id,
                     )
-                    _start_agent(project.id, followup_agent.run(user_content))
+                    if not await _start_agent(project.id, followup_agent.run(user_content)):
+                        await websocket.send_json(_AGENT_BUSY)
 
             elif msg_type == "plan_response":
                 action = data.get("action")
                 feedback = data.get("feedback")
                 selected_model = data.get("model")
 
-                # Load pending plan from DB
                 state_json = await get_pending_plan(project.id)
                 if state_json is None:
                     await websocket.send_json({"type": "error", "message": "No pending plan found"})
@@ -171,7 +206,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                 state = BuildState.model_validate_json(state_json)
 
                 if action == "accept":
-                    # Execute the plan with ExecuteAgent
                     await delete_pending_plan(project.id)
                     execute_agent = ExecuteAgent(
                         project_id=project.id,
@@ -180,17 +214,18 @@ async def chat_ws(  # noqa: C901, PLR0915
                         model=selected_model or state.model,
                         user_id=user_id,
                     )
-                    _start_agent(project.id, execute_agent.run())
+                    if not await _start_agent(project.id, execute_agent.run()):
+                        await websocket.send_json(_AGENT_BUSY)
 
                 elif action == "modify" and feedback:
-                    # Rebuild plan with feedback using PlanAgent
                     plan_agent = PlanAgent(
                         project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model or state.model,
                         user_id=user_id,
                     )
-                    _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
+                    if not await _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback)):
+                        await websocket.send_json(_AGENT_BUSY)
 
             elif msg_type == "fix_error":
                 error_message = data.get("error_message", "")
@@ -199,13 +234,11 @@ async def chat_ws(  # noqa: C901, PLR0915
                 error_stack = data.get("error_stack")
                 selected_model = data.get("model")
 
-                # Save user message (for LLM context)
                 error_desc = f"Fix error: {error_message}"
                 if error_file:
                     error_desc += f" in {error_file}"
                 await save_message(project.id, ChatRole.user, error_desc)
 
-                # Emit user_message event (for frontend history reconstruction)
                 await emit_event(
                     project.id,
                     {
@@ -227,7 +260,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     model=selected_model,
                     user_id=user_id,
                 )
-                _start_agent(
+                if not await _start_agent(
                     project.id,
                     fix_agent.run(
                         error_message=error_message,
@@ -235,7 +268,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                         error_line=error_line,
                         error_stack=error_stack,
                     ),
-                )
+                ):
+                    await websocket.send_json(_AGENT_BUSY)
 
     forward_task = asyncio.create_task(_forward_events())
 
@@ -250,9 +284,5 @@ async def chat_ws(  # noqa: C901, PLR0915
         except Exception:  # noqa: S110 — WS may already be closed
             pass
     finally:
-        forward_task.cancel()
-        try:
-            await forward_task
-        except asyncio.CancelledError:
-            pass
+        await _cancel_task(forward_task)
         unsubscribe(project.id, queue)

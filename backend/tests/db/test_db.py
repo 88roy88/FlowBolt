@@ -2,8 +2,22 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
+from sqlmodel import select
+
+from flow44.config import settings
+from flow44.db import database
 from flow44.db.chat import get_messages, save_message
 from flow44.db.events import clear_events, emit_event, get_events
+from flow44.db.heartbeat import (
+    AgentRunHeartbeat,
+    get_heartbeat,
+    is_run_active,
+    reap_stale_runs,
+    touch_heartbeat,
+    try_claim_run,
+)
 from flow44.db.project import (
     create_project,
     delete_project,
@@ -243,3 +257,122 @@ class TestAgentEventCRUD:
         assert len(events) == 1
         assert len(events[0].payload["tasks"]) == 2
         assert events[0].payload["tasks"][0]["name"] == "Create Header"
+
+
+async def _seed_heartbeat(project_id: str, *, age_seconds: float = 0.0) -> None:
+    """Insert a heartbeat row directly with an explicit age."""
+    async with database.async_session() as session:
+        session.add(
+            AgentRunHeartbeat(
+                project_id=project_id,
+                beat_at=datetime.now(UTC) - timedelta(seconds=age_seconds),
+            )
+        )
+        await session.commit()
+
+
+class TestRunLiveness:
+    async def test_emit_event_populates_created_at(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await emit_event(project.id, {"type": "phase", "phase": "designing"}, notify=False)
+
+        events = await get_events(project.id)
+        assert events[0].created_at is not None
+
+    async def test_is_run_active_true_for_fresh_heartbeat(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await touch_heartbeat(project.id)
+
+        assert await is_run_active(project.id) is True
+
+    async def test_is_run_active_false_without_heartbeat(self, test_db):
+        project = await create_project("App", user_id="test-user")
+
+        assert await is_run_active(project.id) is False
+
+    async def test_is_run_active_false_with_stale_heartbeat(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await _seed_heartbeat(project.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
+
+        assert await is_run_active(project.id) is False
+
+    async def test_reap_stale_runs_closes_stale_and_is_idempotent(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await _seed_heartbeat(project.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
+
+        assert await reap_stale_runs() == 1
+        errors = [e for e in await get_events(project.id) if e.payload.get("type") == "error"]
+        assert len(errors) == 1
+        assert errors[0].payload["message"] == "Agent run was interrupted"
+        assert await get_heartbeat(project.id) is None
+
+        # Second sweep is a no-op — the heartbeat is already cleared.
+        assert await reap_stale_runs() == 0
+        assert len([e for e in await get_events(project.id) if e.payload.get("type") == "error"]) == 1
+
+    async def test_reap_stale_runs_keeps_fresh_run(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await touch_heartbeat(project.id)
+
+        assert await reap_stale_runs() == 0
+        assert [e for e in await get_events(project.id) if e.payload.get("type") == "error"] == []
+        assert await get_heartbeat(project.id) is not None
+
+    async def test_reap_stale_runs_skips_run_refreshed_before_sweep(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await _seed_heartbeat(project.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
+        # A new run reclaims/refreshes the lock before the sweep deletes it.
+        await touch_heartbeat(project.id)
+
+        assert await reap_stale_runs() == 0
+        assert [e for e in await get_events(project.id) if e.payload.get("type") == "error"] == []
+        assert await get_heartbeat(project.id) is not None
+
+    async def test_reap_stale_runs_reaps_only_stale_rows(self, test_db):
+        stale = await create_project("Stale", user_id="test-user")
+        fresh = await create_project("Fresh", user_id="test-user")
+        await _seed_heartbeat(stale.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
+        await touch_heartbeat(fresh.id)
+
+        assert await reap_stale_runs() == 1
+        assert await get_heartbeat(stale.id) is None
+        assert await get_heartbeat(fresh.id) is not None
+        assert [e for e in await get_events(fresh.id) if e.payload.get("type") == "error"] == []
+
+    async def test_try_claim_run_claims_when_absent(self, test_db):
+        project = await create_project("App", user_id="test-user")
+
+        assert await try_claim_run(project.id) is True
+        assert await is_run_active(project.id) is True
+
+    async def test_try_claim_run_rejects_when_fresh(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await touch_heartbeat(project.id)
+
+        assert await try_claim_run(project.id) is False
+
+    async def test_try_claim_run_claims_when_stale(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await _seed_heartbeat(project.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
+
+        assert await try_claim_run(project.id) is True
+        assert await is_run_active(project.id) is True
+
+    async def test_touch_heartbeat_upserts_single_row(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await touch_heartbeat(project.id)
+        first = await get_heartbeat(project.id)
+        assert first is not None
+        await touch_heartbeat(project.id)
+
+        async with database.async_session() as session:
+            rows = (await session.execute(select(AgentRunHeartbeat))).scalars().all()
+        assert len([r for r in rows if r.project_id == project.id]) == 1
+
+    async def test_delete_project_cascades_heartbeat(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await touch_heartbeat(project.id)
+
+        await delete_project(project.id)
+
+        assert await get_heartbeat(project.id) is None
