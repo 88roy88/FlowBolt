@@ -19,3 +19,12 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}, all
   }
   return res;
 }
+
+export async function fetchDataSource(path: string, body?: Record<string, unknown>): Promise<Response> {
+  const options: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  };
+  return fetchWithAuth(path, options);
+}

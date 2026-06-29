@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
-from flow44.api.deps import ProjectDep
+from flow44.api.deps import Permission, ProjectDep, require_permission
 from flow44.config import settings
 from flow44.db.project import is_handle_taken, update_project_published_url
 from flow44.integrations.s3 import deploy_single_html
@@ -61,7 +61,11 @@ async def _validate_slug(slug: str, project_id: str) -> None:
 
 
 @router.post("/publish")
-async def publish_to_s3(project: ProjectDep, body: PublishRequest = PublishRequest()) -> dict[str, str]:
+async def publish_to_s3(
+    project: ProjectDep,
+    body: PublishRequest = PublishRequest(),
+    _perms: set[Permission] = require_permission(Permission.publish),
+) -> dict[str, str]:
     """Build the project and deploy to S3, returning the public URL."""
 
     if settings.S3_BUCKET_NAME is None:

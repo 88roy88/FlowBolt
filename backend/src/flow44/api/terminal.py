@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from flow44.api.deps import WsProjectDep, WsSandboxDep
+from flow44.api.deps import Permission, WsProjectDep, WsSandboxDep, require_ws_permission
 from flow44.sandbox.pty import BasePTY
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,12 @@ router = APIRouter()
 
 
 @router.websocket("/ws/terminal/{project_id}")
-async def terminal_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandboxDep) -> None:  # noqa: C901
+async def terminal_ws(  # noqa: C901
+    websocket: WebSocket,
+    project: WsProjectDep,
+    sandbox: WsSandboxDep,
+    _perms: set[Permission] = require_ws_permission(Permission.write),
+) -> None:
     await websocket.accept()
 
     pty: BasePTY | None = None

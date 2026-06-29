@@ -39,14 +39,14 @@ This runs `pnpm install` in `frontend/` and `uv sync` in `backend/`.
 ### 2. Configure the backend environment
 
 ```bash
-cp backend/example.env backend/.env
+cp backend/.env.example backend/.env
 ```
 
 Edit `backend/.env` and set at minimum:
 
 | Variable          | Description                                                        |
 | ----------------- | ------------------------------------------------------------------ |
-| `AIB_AI_MODEL`    | LLM model identifier (see comments in `example.env` for providers) |
+| `AIB_AI_MODEL`    | LLM model identifier (see comments in `.env.example` for providers) |
 | `AIB_AI_BASE_URL` | OpenAI-compatible API base URL                                     |
 | `AIB_AI_API_KEY`  | API key for the chosen provider                                    |
 | `AIB_DB_*`        | PostgreSQL connection settings (defaults match Docker Compose)     |
@@ -105,7 +105,7 @@ pnpm dev
 ```bash
 cd backend
 uv sync                        # install/sync deps (first time or after changes)
-cp example.env .env            # copy and edit env vars
+cp .env.example .env           # copy and edit env vars
 uv run --no-sync python -m uvicorn --app-dir src flow44.main:app \
   --host 0.0.0.0 --port 8000 --reload --reload-dir src/flow44
 ```

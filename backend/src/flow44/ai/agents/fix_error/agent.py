@@ -15,7 +15,7 @@ from flow44.sandbox.main import PnpmSandbox
 logger = logging.getLogger(__name__)
 
 
-MAX_RETRY_ATTEMPTS = 1
+MAX_RETRY_ATTEMPTS = 3
 
 
 class FixErrorAgent(BaseAgent):
@@ -24,10 +24,11 @@ class FixErrorAgent(BaseAgent):
         project_id: str,
         sandbox: PnpmSandbox,
         *,
+        user_id: str,
         model: str | None = None,
         trace_id: str | None = None,
     ) -> None:
-        super().__init__(project_id, sandbox, model=model, trace_id=trace_id)
+        super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._flow = self._build_flow()
 
     def _build_flow(self) -> Flow[FixErrorState]:
@@ -62,6 +63,7 @@ class FixErrorAgent(BaseAgent):
         error_line: int | None = None,
         error_stack: str | None = None,
     ) -> None:
+        self._setup_trace(["fix-error-agent"])
         await self.emit({"type": "phase", "phase": "fixing"})
 
         # Initialize fix error state for Flow

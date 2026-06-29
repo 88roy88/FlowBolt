@@ -2,9 +2,13 @@ import type { ReadOnlySocket } from './types';
 import { credentialsStore } from '../../auth';
 import { getWsBase } from './reconnecting';
 
-export function createServerLogSocket(projectId: string): ReadOnlySocket {
-  const handlers: Array<(data: string) => void> = [];
+const serverLogSockets = new Map<string, ReadOnlySocket>();
 
+export function getServerLogSocket(projectId: string): ReadOnlySocket {
+  const existing = serverLogSockets.get(projectId);
+  if (existing) return existing;
+
+  const handlers: Array<(data: string) => void> = [];
   let socket: WebSocket | null = null;
   let closed = false;
 
@@ -33,14 +37,31 @@ export function createServerLogSocket(projectId: string): ReadOnlySocket {
 
   connect();
 
-  return {
+  const instance: ReadOnlySocket = {
     onData(handler: (data: string) => void) {
       handlers.push(handler);
+      return () => {
+        const idx = handlers.indexOf(handler);
+        if (idx !== -1) handlers.splice(idx, 1);
+      };
     },
     close() {
       closed = true;
       socket?.close();
       socket = null;
+      serverLogSockets.delete(projectId);
     },
   };
+
+  serverLogSockets.set(projectId, instance);
+  return instance;
+}
+
+export function closeServerLogSocket(projectId: string): void {
+  const existing = serverLogSockets.get(projectId);
+  if (existing) existing.close();
+}
+
+export function createServerLogSocket(projectId: string): ReadOnlySocket {
+  return getServerLogSocket(projectId);
 }

@@ -26,7 +26,7 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_MEMORY_LIMIT_MB: int = 512
     SANDBOX_PID_LIMIT: int = 256
     SANDBOX_DISABLE_CGROUPS: bool = False
-    PNPM_STORE_DIR: str = "/var/lib/flow-44/workspaces/.pnpm-store"
+    PNPM_STORE_DIR: str = "/var/lib/flow-44/.pnpm-store"
     NPM_REGISTRY: str = "https://registry.npmjs.org/"
     NPM_STRICT_SSL: bool = True
     NPM_AUDIT: bool = True
@@ -85,6 +85,8 @@ class AuthSettings(Flow44BaseSettings):
     AUTH_JWT_ALGORITHM: str = "RS256"
     # Name of the cookie carrying the auth token (must match the frontend's VITE_AUTH_COOKIE_NAME)
     AUTH_COOKIE_NAME: str = "flow44_token"
+    # User IDs with system-admin privileges (can access all projects, invite platform users)
+    SYSTEM_ADMIN_IDS: list[str] = []
 
 
 class FlapiSettings(Flow44BaseSettings):
@@ -107,6 +109,7 @@ class LangfuseSettings(Flow44BaseSettings):
     LANGFUSE_PUBLIC_KEY: str | None = None
     LANGFUSE_SECRET_KEY: str | None = None
     LANGFUSE_HOST: str = "https://cloud.langfuse.com"
+    LANGFUSE_TRACING_ENVIRONMENT: str | None = None
 
     def model_post_init(self, __context: Any) -> None:
         """Propagate Langfuse credentials to os.environ so the SDK can read them."""
@@ -114,6 +117,8 @@ class LangfuseSettings(Flow44BaseSettings):
             os.environ["LANGFUSE_PUBLIC_KEY"] = self.LANGFUSE_PUBLIC_KEY
             os.environ["LANGFUSE_SECRET_KEY"] = self.LANGFUSE_SECRET_KEY
             os.environ["LANGFUSE_HOST"] = self.LANGFUSE_HOST
+            if self.LANGFUSE_TRACING_ENVIRONMENT:
+                os.environ["LANGFUSE_TRACING_ENVIRONMENT"] = self.LANGFUSE_TRACING_ENVIRONMENT
 
 
 class Settings(
