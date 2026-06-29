@@ -20,7 +20,6 @@ Based on the user's request, determine their intent:
 ## Existing Data Sources
 The following data sources are already integrated in the app. Their TypeScript modules have been regenerated — if the function signature or return type changed, update the relevant call sites to match.
 Based on the user's request, you may also need to build new UI around them (new section, option, or replacement).
-If you need to compare against the previous version of the schema or parameter details, use `read_file` on the `.docs.md` file.
 {% for ds in existing_data_source_contexts %}
 ### {{ ds.data_source_name }} — `{{ ds.module_path }}`
 - **Schema:** {{ ds.data_schema }}
