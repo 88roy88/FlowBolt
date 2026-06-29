@@ -1,7 +1,7 @@
 """add heartbeat table and agent_events created_at and fk
 
 Revision ID: f550c1c17fde
-Revises: bf979c9b9417
+Revises: 9252bbb0fae2
 Create Date: 2026-06-25 17:26:14.850158
 
 """
@@ -14,7 +14,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = 'f550c1c17fde'
-down_revision: Union[str, Sequence[str], None] = 'bf979c9b9417'
+down_revision: Union[str, Sequence[str], None] = '9252bbb0fae2'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
