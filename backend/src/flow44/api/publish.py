@@ -83,7 +83,6 @@ async def publish_to_s3(
     except BuildError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # Deploy the single HTML to S3 without blocking the event loop
     try:
         await s3_storage.deploy_single_html(html_content, project.id)
     except Exception as exc:

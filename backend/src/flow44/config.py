@@ -97,6 +97,7 @@ class FlapiSettings(Flow44BaseSettings):
 
 class S3Settings(Flow44BaseSettings):
     S3_ENDPOINT_URL: str | None = None
+    S3_USE_SSL: bool = True
     S3_ACCESS_KEY: str | None = None
     S3_SECRET_KEY: str | None = None
     S3_BUCKET_NAME: str | None = None
