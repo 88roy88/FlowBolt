@@ -21,7 +21,10 @@ AI-powered web app builder. The backend is a FastAPI service; the frontend is a 
 
 # Apply all pending migrations
 
-`uv run alembic upgrade head`
+```bash
+cd backend
+uv run alembic upgrade head
+```
 
 ```bash
 make install
