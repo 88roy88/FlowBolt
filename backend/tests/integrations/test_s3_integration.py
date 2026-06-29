@@ -13,7 +13,7 @@ def storage():
 
 
 @pytest.mark.asyncio
-async def test_init_opens_client_once(storage):
+async def test_setup_opens_client_once(storage):
     client = AsyncMock()
     cm = MagicMock()
     cm.__aenter__ = AsyncMock(return_value=client)
@@ -22,14 +22,15 @@ async def test_init_opens_client_once(storage):
     session.client.return_value = cm
 
     storage._session = session
-    await storage.init()
-    await storage.init()
+    with patch.object(S3Storage, "_ensure_bucket", AsyncMock()):
+        await storage.setup("test-bucket")
+        await storage.setup("test-bucket")
 
     assert storage.client is client
     assert session.client.call_count == 1
 
 
-def test_client_requires_init(storage):
+def test_client_requires_setup(storage):
     with pytest.raises(RuntimeError):
         _ = storage.client
 
@@ -37,16 +38,15 @@ def test_client_requires_init(storage):
 @pytest.mark.asyncio
 async def test_setup_ensures_bucket(storage):
     client = AsyncMock()
-    with patch.object(S3Storage, "client", property(lambda self: client)):
-        bucket_name = "test-bucket"
-        with patch.object(storage, "init", AsyncMock()):
-            await storage.setup(bucket_name)
+    storage._client = client
+    bucket_name = "test-bucket"
+    await storage.setup(bucket_name)
 
-        client.create_bucket.assert_awaited_once_with(Bucket=bucket_name)
-        client.put_bucket_policy.assert_awaited_once()
-        _, kwargs = client.put_bucket_policy.call_args
-        assert kwargs["Bucket"] == bucket_name
-        assert "Statement" in kwargs["Policy"]
+    client.create_bucket.assert_awaited_once_with(Bucket=bucket_name)
+    client.put_bucket_policy.assert_awaited_once()
+    _, kwargs = client.put_bucket_policy.call_args
+    assert kwargs["Bucket"] == bucket_name
+    assert "Statement" in kwargs["Policy"]
 
 
 @pytest.mark.asyncio
