@@ -127,7 +127,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                 # Emit completion if callback provided
                 if emit_fn:
                     preview = result_str[:200] + "..." if len(result_str) > 200 else result_str
-                    event: dict = {
+                    event: dict[str, object] = {
                         "type": "react_step",
                         "tool": tool_name,
                         "args": {k: v for k, v in args.items() if k != "content"},
