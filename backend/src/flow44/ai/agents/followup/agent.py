@@ -135,19 +135,7 @@ class FollowUpAgent(BaseAgent):
                 old_content = ""
                 is_new_file = True
             await sandbox.write_file(path, content)
-
-            # Generate diff
-            old_lines = old_content.splitlines(keepends=True)
-            new_lines = content.splitlines(keepends=True)
-            diff_str = "".join(
-                difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm="")
-            )
-
-            await self.emit({"type": "file", "path": path, "content": content})
-            if diff_str:
-                self._diffs.append(FileDiff(path=path, diff=diff_str, is_new=is_new_file))
-            if path not in self._files_changed:
-                self._files_changed.append(path)
+            await self._record_file_change(path, old_content, content, is_new=is_new_file)
             return f"OK — wrote {path} ({len(content.splitlines())} lines)"
 
         @tool
@@ -176,22 +164,26 @@ class FollowUpAgent(BaseAgent):
                 )
 
             new_content = await sandbox.read_file(path)
-
-            # Generate diff
-            old_lines = current.splitlines(keepends=True)
-            new_lines = new_content.splitlines(keepends=True)
-            diff_str = "".join(
-                difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm="")
-            )
-
-            await self.emit({"type": "file", "path": path, "content": new_content})
-            if diff_str:
-                self._diffs.append(FileDiff(path=path, diff=diff_str))
-            if path not in self._files_changed:
-                self._files_changed.append(path)
+            await self._record_file_change(path, current, new_content, is_new=False)
             return f"OK — edited {path}"
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
+
+    async def _record_file_change(self, path: str, old_content: str, new_content: str, *, is_new: bool) -> None:
+        diff_str = "".join(
+            difflib.unified_diff(
+                old_content.splitlines(keepends=True),
+                new_content.splitlines(keepends=True),
+                fromfile=f"a/{path}",
+                tofile=f"b/{path}",
+                lineterm="",
+            )
+        )
+        await self.emit({"type": "file", "path": path, "content": new_content})
+        if diff_str:
+            self._diffs.append(FileDiff(path=path, diff=diff_str, is_new=is_new))
+        if path not in self._files_changed:
+            self._files_changed.append(path)
 
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
@@ -283,21 +275,7 @@ class FollowUpAgent(BaseAgent):
             is_new_module = True
 
         await self.sandbox.write_file(module_path, content)
-
-        diff_str = "".join(
-            difflib.unified_diff(
-                old_content.splitlines(keepends=True),
-                content.splitlines(keepends=True),
-                fromfile=f"a/{module_path}",
-                tofile=f"b/{module_path}",
-                lineterm="",
-            )
-        )
-        await self.emit({"type": "file", "path": module_path, "content": content})
-        if diff_str:
-            self._diffs.append(FileDiff(path=module_path, diff=diff_str, is_new=is_new_module))
-        if module_path not in self._files_changed:
-            self._files_changed.append(module_path)
+        await self._record_file_change(module_path, old_content, content, is_new=is_new_module)
 
     async def _persist_data_sources(
         self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]

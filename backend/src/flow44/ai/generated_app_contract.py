@@ -45,9 +45,7 @@ def validate_generated_app_path_allowed(path: str) -> str:
 logger = logging.getLogger(__name__)
 
 
-def filter_safe_generated_files(
-    generated: list[tuple[str, str]], *, source: str
-) -> list[tuple[str, str]]:
+def filter_safe_generated_files(generated: list[tuple[str, str]], *, source: str) -> list[tuple[str, str]]:
     """Return generated files with protected/unsafe paths dropped and kept paths normalized."""
     safe: list[tuple[str, str]] = []
     for path, content in generated:
