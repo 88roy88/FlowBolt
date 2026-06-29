@@ -11,6 +11,8 @@ from flow44.ai.generated_app_contract import (
     generated_app_path_safety_prompt_context,
 )
 
+from flow44.db.project_data_source import DataSourceContext
+
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
     loader=ChoiceLoader([FileSystemLoader(str(_templates_dir)), FileSystemLoader(str(TEMPLATE_PROMPTS_PATH))]),
@@ -33,10 +35,18 @@ def render(
     )
 
 
-def render_followup(*, project_summary: str, file_tree: str) -> str:
+def render_followup(
+    *,
+    project_summary: str,
+    file_tree: str,
+    new_data_source_contexts: list[DataSourceContext] | None = None,
+    existing_data_source_contexts: list[DataSourceContext] | None = None,
+) -> str:
     return render(
         "followup.jinja2",
         project_summary=project_summary,
         file_tree=file_tree,
         file_safety=generated_app_path_safety_prompt_context(),
+        new_data_source_contexts=new_data_source_contexts,
+        existing_data_source_contexts=existing_data_source_contexts,
     )

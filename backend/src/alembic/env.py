@@ -1,10 +1,11 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
+from alembic import context
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,12 +25,12 @@ import flow44.db.events  # noqa
 import flow44.db.pending_plan  # noqa
 import flow44.db.platform_user  # noqa
 import flow44.db.project  # noqa
+import flow44.db.project_data_source  # noqa
 import flow44.db.project_member  # noqa
 
 target_metadata = SQLModel.metadata
 
 # Set database URL from settings if not already set
-import flow44.config
 from flow44.db.database import _get_async_url
 
 if not config.get_main_option("sqlalchemy.url"):

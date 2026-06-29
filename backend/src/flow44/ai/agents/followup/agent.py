@@ -1,3 +1,4 @@
+import asyncio
 import difflib
 import json
 import logging
@@ -9,6 +10,7 @@ from langfuse.decorators import observe
 from pydantic import BaseModel
 
 from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
@@ -16,6 +18,7 @@ from flow44.ai.core.tools import ToolExecutor, tool
 from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_path_allowed
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
+from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -35,6 +38,7 @@ def _format_generated_app_contract_error(exc: GeneratedAppContractError) -> str:
 class FileDiff:
     path: str
     diff: str
+    is_new: bool = False
 
 
 class FollowUpAgent(BaseAgent):
@@ -46,12 +50,14 @@ class FollowUpAgent(BaseAgent):
         user_id: str,
         model: str | None = None,
         trace_id: str | None = None,
+        data_source_authorization: str | None = None,
     ) -> None:
         super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._steps: list[dict[str, Any]] = []
         self._diffs: list[FileDiff] = []
         self._files_changed: list[str] = []
         self._iteration = 0
+        self._data_source_authorization = data_source_authorization
         self._executor = self._build_tool_executor()
 
     def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901, PLR0915
@@ -124,8 +130,10 @@ class FollowUpAgent(BaseAgent):
                 return _format_generated_app_contract_error(exc)
             try:
                 old_content = await sandbox.read_file(path)
+                is_new_file = False
             except FileNotFoundError:
                 old_content = ""
+                is_new_file = True
             await sandbox.write_file(path, content)
 
             # Generate diff
@@ -137,7 +145,7 @@ class FollowUpAgent(BaseAgent):
 
             await self.emit({"type": "file", "path": path, "content": content})
             if diff_str:
-                self._diffs.append(FileDiff(path=path, diff=diff_str))
+                self._diffs.append(FileDiff(path=path, diff=diff_str, is_new=is_new_file))
             if path not in self._files_changed:
                 self._files_changed.append(path)
             return f"OK — wrote {path} ({len(content.splitlines())} lines)"
@@ -186,13 +194,31 @@ class FollowUpAgent(BaseAgent):
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
-    async def run(self, content: str) -> None:
+    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._setup_trace(["follow-up-agent"])
+
+        new_data_source_contexts: list[DataSourceContext] = []
+        existing_data_source_contexts: list[DataSourceContext] = []
+
+        if data_source_ids:
+            stored_contexts = await get_project_data_sources(self.project_id)
+            stored_ids = {ds.data_source_id for ds in stored_contexts}
+            await self.emit({"type": "phase", "phase": "fetching_data_sources"})
+            try:
+                updated_contexts: list[DataSourceContext] = list(
+                    await asyncio.gather(*[self._fetch_analyze_and_write(sid, content) for sid in data_source_ids])
+                )
+            except Exception:
+                await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
+                raise
+            new_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id not in stored_ids]
+            existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_ids]
+            if updated_contexts:
+                await self._persist_data_sources(updated_contexts, stored_contexts)
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
 
-        # TODO: fix, after change to messages in db, we dont get internal chat history anymore.
         history = await get_messages(self.project_id)
         messages = [
             Message(role=m.role, content=m.content)  # type: ignore[arg-type]
@@ -203,6 +229,8 @@ class FollowUpAgent(BaseAgent):
         system_prompt = render_followup(
             project_summary=context["summary"],
             file_tree=context["file_tree"],
+            new_data_source_contexts=new_data_source_contexts or None,
+            existing_data_source_contexts=existing_data_source_contexts or None,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -222,13 +250,62 @@ class FollowUpAgent(BaseAgent):
             await self.emit(
                 {
                     "type": "followup_diffs",
-                    "diffs": [{"path": d.path, "diff": d.diff} for d in self._diffs],
+                    "diffs": [{"path": d.path, "diff": d.diff, "is_new": d.is_new} for d in self._diffs],
                 }
             )
 
         # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
+
+    async def _fetch_analyze_and_write(self, sid: str, user_content: str) -> DataSourceContext:
+        ctx = await fetch_and_analyze_data_source(
+            sid,
+            user_content,
+            self._data_source_authorization,
+            self.model,
+            self._llm_metadata,
+        )
+        await self._write_data_source_module(ctx)
+        return ctx
+
+    async def _write_data_source_module(self, ctx: DataSourceContext) -> None:
+        files = generate_data_source_files(ctx)
+        module_path = next(iter(files))
+        content = files[module_path]
+        ctx.module_path = module_path
+
+        try:
+            old_content = await self.sandbox.read_file(module_path)
+            is_new_module = False
+        except FileNotFoundError:
+            old_content = ""
+            is_new_module = True
+
+        await self.sandbox.write_file(module_path, content)
+
+        diff_str = "".join(
+            difflib.unified_diff(
+                old_content.splitlines(keepends=True),
+                content.splitlines(keepends=True),
+                fromfile=f"a/{module_path}",
+                tofile=f"b/{module_path}",
+                lineterm="",
+            )
+        )
+        await self.emit({"type": "file", "path": module_path, "content": content})
+        if diff_str:
+            self._diffs.append(FileDiff(path=module_path, diff=diff_str, is_new=is_new_module))
+        if module_path not in self._files_changed:
+            self._files_changed.append(module_path)
+
+    async def _persist_data_sources(
+        self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]
+    ) -> None:
+        by_id: dict[tuple[str, str], DataSourceContext] = {(ds.type, ds.data_source_id): ds for ds in stored}
+        for ctx in updated_contexts:
+            by_id[(ctx.type, ctx.data_source_id)] = ctx
+        await update_project_data_sources(self.project_id, list(by_id.values()))
 
     # TODO: We will want to have a smarted memory system in the future
     async def _build_context(self) -> dict[str, str]:

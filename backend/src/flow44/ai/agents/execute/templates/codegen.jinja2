@@ -26,10 +26,11 @@ as part of a larger project.
 The following data sources have **pre-generated** async API functions that you should import — do NOT recreate them.
 
 {% for ctx in data_source_contexts %}
-### Data Source: {{ ctx.data_source_name }}
+### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }}) — `{{ ctx.module_path }}`
 
-**Relevant Fields:** {{ ctx.relevant_fields }}
-**Data Characteristics:** {{ ctx.data_characteristics }}
+- **Data Schema:** {{ ctx.data_schema }}
+- **Relevant Fields:** {{ ctx.relevant_fields }}
+- **Data Characteristics:** {{ ctx.data_characteristics }}
 
 Pre-generated module: `import { dataSource{{ ctx.sanitized_name }} } from '../dataSources/{{ ctx.sanitized_name }}';`
 The module also exports the response type `{{ ctx.sanitized_name }}Results`.

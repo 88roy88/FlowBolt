@@ -245,19 +245,15 @@ class ExecuteAgent(BaseAgent):
         if state.build_state.data_source_contexts:
             merge_data["data_source_integrations"] = [
                 {
-                    k: ctx[k]
-                    for k in (
-                        "data_source_id",
-                        "data_source_name",
-                        "sanitized_name",
-                        "relevant_fields",
-                        "data_characteristics",
-                        "integration_notes",
-                        "param_ux_hints",
-                        "params_info",
-                        "can_run_without_input",
-                    )
-                    if k in ctx
+                    "data_source_id": ctx.data_source_id,
+                    "data_source_name": ctx.data_source_name,
+                    "sanitized_name": ctx.sanitized_name,
+                    "relevant_fields": ctx.relevant_fields,
+                    "data_characteristics": ctx.data_characteristics,
+                    "integration_notes": ctx.integration_notes,
+                    "param_ux_hints": ctx.param_ux_hints,
+                    "params_info": ctx.params_info,
+                    "can_run_without_input": ctx.can_run_without_input,
                 }
                 for ctx in state.build_state.data_source_contexts
             ]
