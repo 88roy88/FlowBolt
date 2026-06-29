@@ -11,41 +11,19 @@ class ChatAgent(BaseAgent):
         self,
         answer: str,
         steps: list[dict[str, Any]],
-        files_changed: list[str],
     ) -> None:
-        content = self._build_assistant_message(answer, steps, files_changed)
-        if content.strip():
-            await save_message(self.project_id, ChatRole.assistant, content)
-
-    @staticmethod
-    def _build_assistant_message(
-        answer: str,
-        steps: list[dict[str, Any]],
-        files_changed: list[str],
-    ) -> str:
-        parts: list[str] = []
-
-        action_lines: list[str] = []
         for step in steps:
             tool = step.get("tool", "?")
             args = step.get("args", {})
-            preview = step.get("short_preview") or step.get("result_preview", "")
             primary_arg = next((v for k, v in args.items() if k not in ("content",)), "")
+            call_content = f"{tool} on {primary_arg!r}" if primary_arg else tool
+            await save_message(self.project_id, ChatRole.tool_call, call_content)
+
+            preview = step.get("short_preview") or step.get("result_preview", "")
             result_short = preview[:80].replace("\n", " ").strip()
             if len(preview) > 80:
                 result_short += "..."
-            line = f"- {tool} on {primary_arg!r}" if primary_arg else f"- {tool}"
-            if result_short:
-                line += f": {result_short}"
-            action_lines.append(line)
-        if files_changed:
-            action_lines.append(f"- files changed: {', '.join(files_changed)}")
-        if action_lines:
-            parts.append("Actions taken:\n" + "\n".join(action_lines))
+            await save_message(self.project_id, ChatRole.tool_result, result_short)
 
-        if answer:
-            if parts:
-                parts.append("")
-            parts.append(answer)
-
-        return "\n".join(parts)
+        if answer.strip():
+            await save_message(self.project_id, ChatRole.assistant, answer)

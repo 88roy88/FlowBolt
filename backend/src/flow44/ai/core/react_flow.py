@@ -127,15 +127,17 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                 # Emit completion if callback provided
                 if emit_fn:
                     preview = result_str[:200] + "..." if len(result_str) > 200 else result_str
-                    await emit_fn(
-                        {
-                            "type": "react_step",
-                            "tool": tool_name,
-                            "status": "completed",
-                            "result_preview": preview,
-                            "iteration": iteration,
-                        }
-                    )
+                    event: dict = {
+                        "type": "react_step",
+                        "tool": tool_name,
+                        "args": {k: v for k, v in args.items() if k != "content"},
+                        "status": "completed",
+                        "result_preview": preview,
+                        "iteration": iteration,
+                    }
+                    if result.short_preview:
+                        event["short_preview"] = result.short_preview
+                    await emit_fn(event)
 
                 # Add tool result to messages
                 working_messages.append(

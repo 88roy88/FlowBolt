@@ -11,6 +11,8 @@ from flow44.db import database
 class ChatRole(StrEnum):
     user = "user"
     assistant = "assistant"
+    tool_call = "tool_call"
+    tool_result = "tool_result"
 
 
 class ChatMessage(SQLModel, table=True):

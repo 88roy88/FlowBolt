@@ -234,7 +234,7 @@ class FollowUpAgent(ChatAgent):
         if answer:
             await self.emit({"type": "text", "content": answer})
 
-        await self._save_response(answer or "", self._steps, self._files_changed)
+        await self._save_response(answer or "", self._steps)
 
         if self._diffs:
             await self.emit(

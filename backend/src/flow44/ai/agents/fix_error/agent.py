@@ -259,7 +259,7 @@ class FixErrorAgent(ChatAgent):
                 "result_preview": f"fixed {len(files)} file(s)",
             }
         ]
-        await self._save_response(state.explanation, steps, files)
+        await self._save_response(state.explanation, steps)
 
         await state.emit_fn({"type": "action_complete"})
         await state.emit_fn({"type": "phase", "phase": "idle"})
