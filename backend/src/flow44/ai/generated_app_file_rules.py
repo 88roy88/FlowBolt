@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
 from typing import NamedTuple, TypedDict
 
 
@@ -16,8 +17,21 @@ class ProtectedAppFileRules(NamedTuple):
     files: frozenset[str]
     src_paths: frozenset[str]
     src_dirs: frozenset[tuple[str, ...]]
-    name_prefixes: tuple[str, ...]
-    name_substrings: tuple[str, ...]
+    name_prefixes: frozenset[str]
+    name_substrings: frozenset[str]
+
+    def is_protected(self, normalized_path: str) -> bool:
+        """Return whether AI generation may not edit a normalized POSIX path."""
+        normalized = normalized_path.lower()
+        parts = PurePosixPath(normalized).parts
+        name = parts[-1]
+        return (
+            name in self.files
+            or normalized in self.src_paths
+            or any(name.startswith(prefix) for prefix in self.name_prefixes)
+            or (len(parts) >= 2 and parts[:2] in self.src_dirs)
+            or any(substring in name for substring in self.name_substrings)
+        )
 
     def prompt_context(self) -> GeneratedAppPathSafetyPromptContext:
         """Return protected path rules formatted for prompt templates."""
@@ -25,8 +39,8 @@ class ProtectedAppFileRules(NamedTuple):
             "protected_files": sorted(self.files),
             "protected_src_paths": sorted(self.src_paths),
             "protected_src_dirs": sorted(f"{'/'.join(path)}/*" for path in self.src_dirs),
-            "protected_name_patterns": [f"{prefix}*" for prefix in self.name_prefixes]
-            + [f"*{substring}*" for substring in self.name_substrings],
+            "protected_name_patterns": sorted(f"{prefix}*" for prefix in self.name_prefixes)
+            + sorted(f"*{substring}*" for substring in self.name_substrings),
         }
 
 
@@ -52,10 +66,9 @@ PROTECTED_APP_FILE_RULES = ProtectedAppFileRules(
         {
             ("src", "api"),
             ("src", "auth"),
-            ("src", "datasources"),
             ("src", "platform"),
         }
     ),
-    name_prefixes=(".env", "vite.config."),
-    name_substrings=("template-guard", "template_guard"),
+    name_prefixes=frozenset({".env", "vite.config."}),
+    name_substrings=frozenset({"template-guard", "template_guard"}),
 )

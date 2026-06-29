@@ -20,6 +20,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
+    filter_safe_generated_files,
     validate_generated_app_path_allowed,
 )
 from flow44.ai.helpers import parse_json_response
@@ -351,16 +352,11 @@ class ExecuteAgent(BaseAgent):
 
             expected_paths = {validate_generated_app_path_allowed(path) for path in task.files}
             validated: list[tuple[str, str]] = []
-            for path, content in generated:
-                try:
-                    normalized_path = validate_generated_app_path_allowed(path)
-                except GeneratedAppContractError:
-                    logger.warning("[execute] Dropping protected file from task %s: %s", task.id, path)
+            for path, content in filter_safe_generated_files(generated, source=f"execute/task-{task.id}"):
+                if path not in expected_paths:
+                    logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, path)
                     continue
-                if normalized_path not in expected_paths:
-                    logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, normalized_path)
-                    continue
-                validated.append((normalized_path, content))
+                validated.append((path, content))
 
             paths: list[str] = []
             for path, content in validated:
