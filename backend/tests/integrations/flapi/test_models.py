@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import pytest
-
-from flow44.integrations.flapi.models import QuickParamsInfo
+from flow44.integrations.flapi.models import PackageMetadata, QuickParamsInfo
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -111,3 +110,46 @@ class TestGeoOptionValueItem:
         value = [{"Name": None, "Type": "wkt", "Value": _GEO_OBJECT}]
         result = _info([_param("area", "Haphoch", value)])
         assert result.root["cube1"][0].value[0].Name is None  # type: ignore[index,union-attr]
+
+
+# ---------------------------------------------------------------------------
+# Unknown FieldType (PackageMetadata) and ParamType (QuickParamsInfo)
+# ---------------------------------------------------------------------------
+
+_QUERY_BASE = {
+    "uniqueName": "q1",
+    "originalName": "q1",
+    "Name": "Query 1",
+    "ResultsLimit": 100,
+    "DataSourceName": "ds",
+    "Description": "desc",
+    "id": "q1",
+}
+
+
+def _package_with_field_type(field_type: str) -> dict:
+    return {
+        "Id": 1,
+        "Name": "pkg",
+        "Description": "desc",
+        "Queries": [
+            {
+                **_QUERY_BASE,
+                "Fields": [
+                    {"Name": "col", "DisplayName": "Col", "Type": field_type},
+                ],
+            }
+        ],
+    }
+
+
+class TestPackageMetadataFieldType:
+    def test_unknown_field_type_does_not_raise(self) -> None:
+        result = PackageMetadata.model_validate(_package_with_field_type("html"))
+        assert result.queries[0].fields[0].type_ == "html"
+
+
+class TestQuickParamUnknownType:
+    def test_unknown_param_type_does_not_raise(self) -> None:
+        result = _info([_param("x", "Geospatial", "some_value")])
+        assert result.root["cube1"][0].type_ == "Geospatial"
