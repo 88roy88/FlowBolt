@@ -154,14 +154,14 @@ class FollowUpAgent(BaseAgent):
         async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
             try:
+                path = validate_generated_app_path_allowed(path)
+            except GeneratedAppContractError as exc:
+                return _format_generated_app_contract_error(exc)
+            try:
                 current = await sandbox.read_file(path)
             except FileNotFoundError:
                 return f"Error: File not found: {path}"
 
-            try:
-                path = validate_generated_app_path_allowed(path)
-            except GeneratedAppContractError as exc:
-                return _format_generated_app_contract_error(exc)
             try:
                 await sandbox.edit_file(path, search, replace)
             except ValueError:

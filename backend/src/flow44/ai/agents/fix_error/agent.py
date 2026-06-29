@@ -9,7 +9,7 @@ from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_f
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
-from flow44.ai.generated_app_contract import validate_generated_app_path_allowed
+from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_path_allowed
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -17,6 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 MAX_RETRY_ATTEMPTS = 3
+
+
+def _filter_safe_generated_files(generated: list[tuple[str, str]], *, stage: str) -> list[tuple[str, str]]:
+    """Return generated files with protected/unsafe paths dropped and kept paths normalized."""
+    safe: list[tuple[str, str]] = []
+    for path, content in generated:
+        try:
+            safe.append((validate_generated_app_path_allowed(path), content))
+        except GeneratedAppContractError:
+            logger.warning("[fix-error] Dropping protected file from %s fix: %s", stage, path)
+    return safe
 
 
 class FixErrorAgent(BaseAgent):
@@ -169,9 +180,10 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
-        state.generated_files = [
-            (validate_generated_app_path_allowed(path), content) for path, content in state.generated_files
-        ]
+        state.generated_files = _filter_safe_generated_files(state.generated_files, stage="generated")
+        if not state.generated_files:
+            return state
+
         for path, content in state.generated_files:
             await state.sandbox_ref.write_file(path, content)
             await state.emit_fn({"type": "file", "path": path, "content": content})
@@ -236,7 +248,7 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = [(validate_generated_app_path_allowed(path), content) for path, content in generated]
+            validated = _filter_safe_generated_files(generated, stage="retry")
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 await state.emit_fn({"type": "file", "path": path, "content": content})

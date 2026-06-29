@@ -352,11 +352,14 @@ class ExecuteAgent(BaseAgent):
             expected_paths = {validate_generated_app_path_allowed(path) for path in task.files}
             validated: list[tuple[str, str]] = []
             for path, content in generated:
-                normalized_path = validate_generated_app_path_allowed(path)
+                try:
+                    normalized_path = validate_generated_app_path_allowed(path)
+                except GeneratedAppContractError:
+                    logger.warning("[execute] Dropping protected file from task %s: %s", task.id, path)
+                    continue
                 if normalized_path not in expected_paths:
-                    raise GeneratedAppContractError(
-                        f"Generated unexpected file outside task contract: {normalized_path}"
-                    )
+                    logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, normalized_path)
+                    continue
                 validated.append((normalized_path, content))
 
             paths: list[str] = []

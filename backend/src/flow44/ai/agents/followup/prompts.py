@@ -10,7 +10,6 @@ from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
     generated_app_path_safety_prompt_context,
 )
-
 from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
@@ -27,11 +26,15 @@ def render(
     project_summary: str,
     file_tree: str,
     file_safety: GeneratedAppPathSafetyPromptContext,
+    new_data_source_contexts: list[DataSourceContext] | None = None,
+    existing_data_source_contexts: list[DataSourceContext] | None = None,
 ) -> str:
     return _env.get_template(template_name).render(
         project_summary=project_summary,
         file_tree=file_tree,
         file_safety=file_safety,
+        new_data_source_contexts=new_data_source_contexts,
+        existing_data_source_contexts=existing_data_source_contexts,
     )
 
 
