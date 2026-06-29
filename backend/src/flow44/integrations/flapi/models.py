@@ -25,6 +25,8 @@ FieldType = Literal[
     "object",
     "decimal",
     "dynamic",
+    "number",
+    "html",
 ] | str
 # OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
 
