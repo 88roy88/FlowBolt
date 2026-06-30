@@ -2,6 +2,7 @@ from typing import Any
 
 from langfuse.decorators import langfuse_context
 
+from flow44.ai.agents.optional_packages import package_install_names, selected_packages_from_package_json
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
 
@@ -44,3 +45,12 @@ class BaseAgent:
             "parent_observation_id": observation_id,
             "generation_name": generation_name,
         }
+
+    async def _prepare_optional_packages(self) -> list[str]:
+        try:
+            package_json = await self.sandbox.read_file("package.json")
+        except (FileNotFoundError, PermissionError):
+            return []
+        selected_packages = selected_packages_from_package_json(package_json)
+        await self.sandbox.install_optional_packages(package_install_names(selected_packages))
+        return selected_packages

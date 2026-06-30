@@ -189,7 +189,9 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        selected_packages = state.build_state.work_plan.selected_packages if state.build_state.work_plan else []
+        if state.build_state.work_plan is None:
+            raise RuntimeError("No work plan available")
+        selected_packages = state.build_state.work_plan.selected_packages
         await state.sandbox_ref.install_optional_packages(package_install_names(selected_packages))
         prompt = render_fix_errors(
             errors=state.all_errors,

@@ -51,7 +51,6 @@ Edit `backend/.env` and set at minimum:
 | `AIB_AI_API_KEY`  | API key for the chosen provider                                    |
 | `AIB_DB_*`        | PostgreSQL connection settings (defaults match Docker Compose)     |
 | `AIB_PLAN_OPTIONAL_PACKAGE_AI_DECISION_ENABLED` | Enable AI optional-package selection during initial planning |
-| `AIB_FOLLOWUP_OPTIONAL_PACKAGE_AI_DECISION_ENABLED` | Enable AI optional-package selection during follow-up requests |
 
 > **Tip:** If you use Docker Compose for Postgres (see below), the default DB values work without changes.
 

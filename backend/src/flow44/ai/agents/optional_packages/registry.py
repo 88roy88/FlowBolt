@@ -164,7 +164,8 @@ def repair_unselected_package_references(text: str, selected_packages: list[str]
         if name in selected:
             continue
         for reference in {name, *package.packages}:
-            repaired = re.sub(re.escape(reference), "React/browser fallback", repaired, flags=re.IGNORECASE)
+            pattern = r"(?<![\w-])" + re.escape(reference) + r"(?![\w-])"
+            repaired = re.sub(pattern, "React/browser fallback", repaired, flags=re.IGNORECASE)
     return repaired
 
 

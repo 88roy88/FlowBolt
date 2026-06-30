@@ -143,3 +143,13 @@ def test_unselected_known_package_plan_reference_uses_fallback() -> None:
 
     assert "lucide-react" not in repaired
     assert "react-hook-form" in repaired
+
+
+def test_repair_does_not_match_unselected_package_as_substring() -> None:
+    repaired = repair_unselected_package_references(
+        "Use date-fns-tz for timezones and date-fns for formatting.",
+        [],
+    )
+
+    assert "date-fns-tz" in repaired
+    assert "date-fns for formatting" not in repaired

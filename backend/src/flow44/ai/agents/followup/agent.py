@@ -12,11 +12,7 @@ from pydantic import BaseModel
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.followup.prompts import render_followup
-from flow44.ai.agents.optional_packages import (
-    allowed_import_names,
-    package_install_names,
-    selected_packages_from_package_json,
-)
+from flow44.ai.agents.optional_packages import allowed_import_names
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
@@ -229,7 +225,11 @@ class FollowUpAgent(BaseAgent):
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context = await self._build_context()
-        self._selected_packages = await self._prepare_optional_packages()
+        try:
+            self._selected_packages = await self._prepare_optional_packages()
+        except Exception:
+            await self.emit({"type": "error", "message": "Failed to install required packages."})
+            raise
 
         history = await get_messages(self.project_id)
         messages = [
@@ -352,15 +352,6 @@ class FollowUpAgent(BaseAgent):
                     }
                 )
             await self.emit({"type": "followup_step", **step_data})
-
-    async def _prepare_optional_packages(self) -> list[str]:
-        try:
-            package_json = await self.sandbox.read_file("package.json")
-        except (FileNotFoundError, PermissionError):
-            return []
-        selected_packages = selected_packages_from_package_json(package_json)
-        await self.sandbox.install_optional_packages(package_install_names(selected_packages))
-        return selected_packages
 
     # TODO: feels like a general utils that should go out.
     def _format_file_tree(self, entries: list[Any], indent: int = 0) -> str:

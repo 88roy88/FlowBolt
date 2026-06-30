@@ -23,6 +23,17 @@ _IMPORT_PATTERNS = (
     re.compile(r"""@import\s+(?:url\()?["']([^"']+)["']"""),
 )
 
+# string literal | line comment | block comment
+_STRING_OR_COMMENT = re.compile(
+    r"""(?P<string>"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)"""
+    r"""|//[^\n]*|/\*[\s\S]*?\*/""",
+)
+
+
+def _strip_comments(content: str) -> str:
+    """Remove JS/TS line and block comments, leaving string literals intact."""
+    return _STRING_OR_COMMENT.sub(lambda m: m.group("string") or " ", content)
+
 
 def generated_app_path_safety_prompt_context() -> GeneratedAppPathSafetyPromptContext:
     """Return protected path rules for prompt templates from the backend contract."""
@@ -54,6 +65,7 @@ def validate_generated_app_path_allowed(path: str) -> str:
 def extract_external_imports(content: str) -> set[str]:
     """Extract external module specifiers from TypeScript/JavaScript source."""
     imports: set[str] = set()
+    content = _strip_comments(content)
     for pattern in _IMPORT_PATTERNS:
         for match in pattern.finditer(content):
             specifier = match.group(1)

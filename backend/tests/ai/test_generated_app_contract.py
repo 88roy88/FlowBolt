@@ -118,3 +118,22 @@ def test_css_package_import_is_rejected() -> None:
     assert find_disallowed_external_imports("@import 'unselected-theme/styles.css';", []) == {
         "unselected-theme/styles.css"
     }
+
+
+def test_line_commented_import_is_ignored() -> None:
+    content = "// import { format } from 'date-fns'\nimport { helper } from './helper';"
+
+    assert find_disallowed_external_imports(content, []) == set()
+    assert validate_generated_app_file_contract("src/App.tsx", content, []) == "src/App.tsx"
+
+
+def test_block_commented_import_is_ignored() -> None:
+    content = "/* import { format } from 'date-fns' */\nimport { helper } from './helper';"
+
+    assert find_disallowed_external_imports(content, []) == set()
+
+
+def test_import_inside_string_literal_is_preserved() -> None:
+    content = "const url = 'https://example.com/path';\nimport { Button } from '@mui/material';"
+
+    assert find_disallowed_external_imports(content, []) == {"@mui/material"}
