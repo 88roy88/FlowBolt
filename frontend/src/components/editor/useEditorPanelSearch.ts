@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { Monaco, OnMount } from '@monaco-editor/react';
 import { searchFiles, type SearchResult } from '../../services/api';
+import { useDebouncedCallback } from '../../hooks/useDebounce';
 import { useFilesStore } from '../../stores/files';
 import { normalizeProjectPath } from './editorFilePaths';
 import { ensureEditorSearchHitHighlightStyles } from './searchHighlightStyles';
@@ -25,7 +26,6 @@ export function useEditorPanelSearch(
   const searchRequestIdRef = useRef(0);
   const searchHighlightDecorationIdsRef = useRef<string[]>([]);
   const searchHighlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     ensureEditorSearchHitHighlightStyles();
@@ -65,32 +65,17 @@ export function useEditorPanelSearch(
     }
   }, [searchCaseSensitive, searchWordMatch, searchUseRegex, searchQuery, projectId]);
 
-  // Auto-search with debounce when query changes
-  useEffect(() => {
-    // Clear previous timer
-    if (searchDebounceTimerRef.current) {
-      clearTimeout(searchDebounceTimerRef.current);
-    }
+  const debouncedSearch = useDebouncedCallback(() => void performSearch(), 500);
 
-    // Don't auto-search if query is empty
+  useEffect(() => {
     const query = searchQuery.trim();
     if (!query) {
       setSearchResults([]);
       setSearchError(null);
       return;
     }
-
-    // Debounce: wait 500ms after user stops typing
-    searchDebounceTimerRef.current = setTimeout(() => {
-      void performSearch();
-    }, 500);
-
-    return () => {
-      if (searchDebounceTimerRef.current) {
-        clearTimeout(searchDebounceTimerRef.current);
-      }
-    };
-  }, [searchQuery, searchCaseSensitive, searchWordMatch, searchUseRegex, projectId, performSearch]);
+    debouncedSearch();
+  }, [searchQuery, searchCaseSensitive, searchWordMatch, searchUseRegex, projectId, debouncedSearch]);
 
   const toggleSearchFileCollapsed = useCallback((path: string) => {
     setCollapsedSearchFiles((prev) => {

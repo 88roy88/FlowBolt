@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useDebouncedValue } from '../../hooks/useDebounce';
 import { searchDataSources } from '../../services/api';
 import type { DataSourceSearchResult } from '../../types';
 import { X, Search } from 'lucide-react';
