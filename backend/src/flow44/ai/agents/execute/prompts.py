@@ -19,6 +19,7 @@ from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
     generated_app_path_safety_prompt_context,
 )
+from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
@@ -121,21 +122,11 @@ def render_codegen(  # noqa: PLR0913
     ux_design: dict[str, Any],
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
-    data_source_contexts: list[dict[str, Any]] | None = None,
+    data_source_contexts: list[DataSourceContext] | None = None,
     selected_packages: list[str] | None = None,
     include_optional_package_prompts: bool = True,
 ) -> str:
-    prepared_sources = None
-    if data_source_contexts:
-        prepared_sources = [
-            {
-                **ctx,
-                "sample_data_json": (
-                    json.dumps(ctx["sample_data"], indent=2)[:1000] if ctx.get("sample_data") is not None else None
-                ),
-            }
-            for ctx in data_source_contexts
-        ]
+    prepared_sources = [ctx.to_prompt_context() for ctx in data_source_contexts] if data_source_contexts else None
 
     other_exports = None
     if other_completed_files:

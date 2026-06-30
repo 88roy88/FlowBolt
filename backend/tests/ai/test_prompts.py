@@ -13,6 +13,7 @@ from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.agents.optional_package_decision import render_package_decision
 from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
 from flow44.ai.generated_app_contract import generated_app_path_safety_prompt_context
+from flow44.db.project_data_source import DataSourceContext
 
 
 class TestPromptRendering:
@@ -25,15 +26,15 @@ class TestPromptRendering:
 
     def test_architecture_with_data_sources(self) -> None:
         sources = [
-            {
-                "data_source_id": "123",
-                "data_source_name": "Sales Data",
-                "sanitized_name": "SalesData",
-                "relevant_fields": "date, amount",
-                "data_characteristics": "time-series",
-                "sample_data": {"records": [{"date": "2024-01", "amount": 100}]},
-                "integration_notes": "Use fetch",
-                "queries": [
+            DataSourceContext(
+                data_source_id="123",
+                data_source_name="Sales Data",
+                sanitized_name="SalesData",
+                relevant_fields="date, amount",
+                data_characteristics="time-series",
+                sample_data={"records": [{"date": "2024-01", "amount": 100}]},
+                integration_notes="Use fetch",
+                queries=[
                     {
                         "name": "records",
                         "display_name": "Records",
@@ -44,8 +45,8 @@ class TestPromptRendering:
                         ],
                     }
                 ],
-                "params_info": {"parameters": [], "require_any": False},
-            }
+                params_info={"parameters": [], "require_any": False},
+            )
         ]
         result = render_architecture(data_source_contexts=sources)
         assert "Sales Data" in result
@@ -150,15 +151,15 @@ class TestPromptRendering:
             architecture={},
             ux_design={},
             data_source_contexts=[
-                {
-                    "data_source_id": "456",
-                    "data_source_name": "Analytics",
-                    "sanitized_name": "Analytics",
-                    "relevant_fields": "metric, value",
-                    "data_characteristics": "Real-time",
-                    "sample_data": [{"metric": "users", "value": 100}],
-                    "integration_notes": "Poll every 30s",
-                    "queries": [
+                DataSourceContext(
+                    data_source_id="456",
+                    data_source_name="Analytics",
+                    sanitized_name="Analytics",
+                    relevant_fields="metric, value",
+                    data_characteristics="Real-time",
+                    sample_data={"rows": [{"metric": "users", "value": 100}]},
+                    integration_notes="Poll every 30s",
+                    queries=[
                         {
                             "name": "metrics",
                             "display_name": "Metrics",
@@ -169,8 +170,8 @@ class TestPromptRendering:
                             ],
                         }
                     ],
-                    "params_info": {"parameters": [], "require_any": False},
-                }
+                    params_info={"parameters": [], "require_any": False},
+                )
             ],
         )
         assert "Analytics" in result

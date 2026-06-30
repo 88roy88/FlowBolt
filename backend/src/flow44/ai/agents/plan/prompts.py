@@ -11,6 +11,7 @@ from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
     generated_app_path_safety_prompt_context,
 )
+from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
@@ -54,18 +55,8 @@ def render(template_name: str, **kwargs: object) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_architecture(*, data_source_contexts: list[dict[str, Any]] | None = None) -> str:
-    prepared = None
-    if data_source_contexts:
-        prepared = [
-            {
-                **ctx,
-                "sample_data_json": (
-                    json.dumps(ctx["sample_data"], indent=2)[:1000] if ctx.get("sample_data") is not None else None
-                ),
-            }
-            for ctx in data_source_contexts
-        ]
+def render_architecture(*, data_source_contexts: list[DataSourceContext] | None = None) -> str:
+    prepared = [ctx.to_prompt_context() for ctx in data_source_contexts] if data_source_contexts else None
     return render(
         "architecture.jinja2",
         data_source_contexts=prepared,

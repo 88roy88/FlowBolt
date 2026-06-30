@@ -14,7 +14,7 @@ from flow44.ai.agents.optional_packages import (
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
-from flow44.ai.generated_app_contract import validate_generated_app_file_contract
+from flow44.ai.generated_app_contract import filter_safe_generated_files
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -176,13 +176,14 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
-        state.generated_files = [
-            (
-                validate_generated_app_file_contract(path, content, allowed_import_names(state.selected_packages)),
-                content,
-            )
-            for path, content in state.generated_files
-        ]
+        state.generated_files = filter_safe_generated_files(
+            state.generated_files,
+            source="fix-error/generated",
+            allowed_imports=allowed_import_names(state.selected_packages),
+        )
+        if not state.generated_files:
+            return state
+
         for path, content in state.generated_files:
             await state.sandbox_ref.write_file(path, content)
             await state.emit_fn({"type": "file", "path": path, "content": content})
@@ -252,13 +253,11 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = [
-                (
-                    validate_generated_app_file_contract(path, content, allowed_import_names(state.selected_packages)),
-                    content,
-                )
-                for path, content in generated
-            ]
+            validated = filter_safe_generated_files(
+                generated,
+                source="fix-error/retry",
+                allowed_imports=allowed_import_names(state.selected_packages),
+            )
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 await state.emit_fn({"type": "file", "path": path, "content": content})

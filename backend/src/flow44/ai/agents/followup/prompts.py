@@ -17,6 +17,7 @@ from flow44.ai.generated_app_contract import (
     GeneratedAppPathSafetyPromptContext,
     generated_app_path_safety_prompt_context,
 )
+from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
@@ -37,6 +38,8 @@ def render(
     package_rules: list[str],
     package_unselected_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
+    new_data_source_contexts: list[DataSourceContext] | None,
+    existing_data_source_contexts: list[DataSourceContext] | None,
 ) -> str: ...
 
 
@@ -54,6 +57,8 @@ def render_followup(
     file_tree: str,
     selected_packages: list[str] | None = None,
     include_optional_package_prompts: bool = True,
+    new_data_source_contexts: list[DataSourceContext] | None = None,
+    existing_data_source_contexts: list[DataSourceContext] | None = None,
 ) -> str:
     validated_packages = validate_optional_packages(selected_packages or [])
     return render(
@@ -77,4 +82,6 @@ def render_followup(
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),
+        new_data_source_contexts=new_data_source_contexts,
+        existing_data_source_contexts=existing_data_source_contexts,
     )

@@ -28,7 +28,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.generated_app_contract import (
     GeneratedAppContractError,
-    validate_generated_app_file_contract,
+    filter_safe_generated_files,
     validate_generated_app_path_allowed,
 )
 from flow44.ai.helpers import parse_json_response
@@ -209,10 +209,11 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = [
-                (validate_generated_app_file_contract(path, content, allowed_import_names(selected_packages)), content)
-                for path, content in generated
-            ]
+            validated = filter_safe_generated_files(
+                generated,
+                source="execute/fix-errors",
+                allowed_imports=allowed_import_names(selected_packages),
+            )
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
@@ -276,19 +277,15 @@ class ExecuteAgent(BaseAgent):
         if state.build_state.data_source_contexts:
             merge_data["data_source_integrations"] = [
                 {
-                    k: ctx[k]
-                    for k in (
-                        "data_source_id",
-                        "data_source_name",
-                        "sanitized_name",
-                        "relevant_fields",
-                        "data_characteristics",
-                        "integration_notes",
-                        "param_ux_hints",
-                        "params_info",
-                        "can_run_without_input",
-                    )
-                    if k in ctx
+                    "data_source_id": ctx.data_source_id,
+                    "data_source_name": ctx.data_source_name,
+                    "sanitized_name": ctx.sanitized_name,
+                    "relevant_fields": ctx.relevant_fields,
+                    "data_characteristics": ctx.data_characteristics,
+                    "integration_notes": ctx.integration_notes,
+                    "param_ux_hints": ctx.param_ux_hints,
+                    "params_info": ctx.params_info,
+                    "can_run_without_input": ctx.can_run_without_input,
                 }
                 for ctx in state.build_state.data_source_contexts
             ]
@@ -396,13 +393,13 @@ class ExecuteAgent(BaseAgent):
             expected_paths = {validate_generated_app_path_allowed(path) for path in task.files}
             allowed_imports = allowed_import_names(state.build_state.work_plan.selected_packages)
             validated: list[tuple[str, str]] = []
-            for path, content in generated:
-                normalized_path = validate_generated_app_file_contract(path, content, allowed_imports)
-                if normalized_path not in expected_paths:
-                    raise GeneratedAppContractError(
-                        f"Generated unexpected file outside task contract: {normalized_path}"
-                    )
-                validated.append((normalized_path, content))
+            for path, content in filter_safe_generated_files(
+                generated, source=f"execute/task-{task.id}", allowed_imports=allowed_imports
+            ):
+                if path not in expected_paths:
+                    logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, path)
+                    continue
+                validated.append((path, content))
 
             paths: list[str] = []
             for path, content in validated:

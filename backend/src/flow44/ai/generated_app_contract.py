@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import PurePosixPath, PureWindowsPath
 
@@ -36,43 +37,16 @@ def validate_and_normalize_generated_app_path(path: str) -> str:
 def _safe_generated_app_path_parts(path: str) -> tuple[str, ...]:
     """Return safe relative path parts or raise for absolute/traversal input."""
     parsed = PureWindowsPath(path)
-    if parsed.drive or parsed.root:
-        raise GeneratedAppContractError(f"Unsafe generated file path: {path}")
     parts = parsed.parts
-    if not parts or any(part == ".." for part in parts):
+    if parsed.drive or parsed.root or not parts or ".." in parts:
         raise GeneratedAppContractError(f"Unsafe generated file path: {path}")
     return parts
-
-
-def is_generated_app_path_allowed(path: str) -> bool:
-    """Return whether AI generation may edit a path."""
-    try:
-        normalized = validate_and_normalize_generated_app_path(path)
-    except GeneratedAppContractError:
-        return False
-
-    return not _is_protected_generated_app_path(normalized)
-
-
-def _is_protected_generated_app_path(normalized_path: str) -> bool:
-    rules = PROTECTED_APP_FILE_RULES
-    normalized = normalized_path.lower()
-    parts = PurePosixPath(normalized).parts
-    name = parts[-1]
-
-    return (
-        name in rules.files
-        or normalized in rules.src_paths
-        or name.startswith(rules.name_prefixes)
-        or (len(parts) >= 2 and parts[:2] in rules.src_dirs)
-        or any(substring in name for substring in rules.name_substrings)
-    )
 
 
 def validate_generated_app_path_allowed(path: str) -> str:
     """Return a normalized path or raise for a protected target."""
     normalized = validate_and_normalize_generated_app_path(path)
-    if _is_protected_generated_app_path(normalized):
+    if PROTECTED_APP_FILE_RULES.is_protected(normalized):
         raise GeneratedAppContractError(f"AI generation may not edit protected file: {normalized}")
     return normalized
 
@@ -107,3 +81,26 @@ def validate_generated_app_file_contract(path: str, content: str, allowed_import
             f"Generated file {normalized} imports unselected packages: {', '.join(disallowed)}"
         )
     return normalized
+
+
+logger = logging.getLogger(__name__)
+
+
+def filter_safe_generated_files(
+    generated: list[tuple[str, str]],
+    *,
+    source: str,
+    allowed_imports: list[str] | None = None,
+) -> list[tuple[str, str]]:
+    """Return generated files with protected/unsafe/disallowed-import paths dropped and kept paths normalized."""
+    safe: list[tuple[str, str]] = []
+    for path, content in generated:
+        try:
+            if allowed_imports is None:
+                normalized = validate_generated_app_path_allowed(path)
+            else:
+                normalized = validate_generated_app_file_contract(path, content, allowed_imports)
+            safe.append((normalized, content))
+        except GeneratedAppContractError as exc:
+            logger.warning("Dropping generated file (%s): %s (%s)", source, path, exc)
+    return safe
