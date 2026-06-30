@@ -121,7 +121,6 @@ def render_optional_package_prompts(
     return blocks
 
 
-
 def package_install_names(package_names: list[str]) -> list[str]:
     packages: list[str] = []
     seen: set[str] = set()
