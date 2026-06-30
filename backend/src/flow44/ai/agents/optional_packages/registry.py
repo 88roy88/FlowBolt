@@ -121,26 +121,6 @@ def render_optional_package_prompts(
     return blocks
 
 
-def render_unselected_optional_package_prompts(
-    selected_packages: list[str] | None,
-    prompt: OptionalPackagePrompt,
-    *,
-    enabled: bool = True,
-) -> list[str]:
-    """Render package-specific prompt blocks for optional packages that were not selected."""
-    if not enabled:
-        return []
-
-    selected = set(validate_optional_packages(selected_packages or []))
-    blocks: list[str] = []
-    for package_name, package in OPTIONAL_PACKAGES.items():
-        if package_name in selected:
-            continue
-        block = package.render_prompt(prompt)
-        if block:
-            blocks.append(block)
-    return blocks
-
 
 def package_install_names(package_names: list[str]) -> list[str]:
     packages: list[str] = []

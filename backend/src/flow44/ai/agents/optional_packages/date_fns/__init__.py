@@ -19,11 +19,11 @@ class DateFnsPackage(OptionalPackage):
     )
     strong_intent_groups = (
         ("date-fns",),
-        ("relative", "date"),
-        ("relative", "time"),
+        ("date", "format"),
         ("due date",),
         ("timeline", "date"),
-        ("date", "format"),
+        ("relative", "date"),
+        ("relative", "time"),
     )
 
 

@@ -1,71 +1,44 @@
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
-import flow44.ai.agents.followup.agent as followup_agent_module
-import flow44.ai.agents.optional_package_decision as optional_package_decision_module
 from flow44.ai.agents.followup.agent import FollowUpAgent
 
 
 class FakeSandbox:
     project_id = "project"
 
-    def __init__(self) -> None:
+    def __init__(self, package_json: str = '{"dependencies":{}}') -> None:
         self.install_calls: list[list[str]] = []
+        self._package_json = package_json
 
     async def read_file(self, path: str) -> str:
         assert path == "package.json"
-        return '{"dependencies":{}}'
+        return self._package_json
 
     async def install_optional_packages(self, package_names: list[str]) -> None:
         self.install_calls.append(package_names)
 
 
 @pytest.mark.asyncio
-async def test_followup_decides_and_installs_optional_packages(monkeypatch: pytest.MonkeyPatch) -> None:
-    sandbox = FakeSandbox()
+async def test_followup_reuses_packages_from_package_json() -> None:
+    sandbox = FakeSandbox('{"dependencies":{"lucide-react":"latest"}}')
     agent = FollowUpAgent("project", sandbox, user_id="test-user")  # type: ignore[arg-type]
 
-    async def fake_complete_chat(
-        messages: list[Any],
-        system_prompt: str,
-        model: str | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> str:
-        del messages, model, metadata
-        assert "## Allowed Optional Packages" in system_prompt
-        return '{"selected_packages":[{"name":"lucide-react","reason":"Dashboard icons requested"}]}'
-
-    monkeypatch.setattr(followup_agent_module.settings, "FOLLOWUP_OPTIONAL_PACKAGE_AI_DECISION_ENABLED", True)
-    monkeypatch.setattr(optional_package_decision_module, "complete_chat", fake_complete_chat)
-
-    selected = await agent._prepare_optional_packages(
-        "Add icons to this dashboard.",
-        {"summary": "", "file_tree": "src/App.tsx"},
-    )
+    selected = await agent._prepare_optional_packages()
 
     assert selected == ["lucide-react"]
     assert sandbox.install_calls == [["lucide-react"]]
 
 
 @pytest.mark.asyncio
-async def test_followup_feature_flag_reuses_existing_packages(monkeypatch: pytest.MonkeyPatch) -> None:
-    sandbox = FakeSandbox()
+async def test_followup_makes_no_selection_call() -> None:
+    """Follow-up never triggers an AI package selection — it only reads package.json."""
+    sandbox = FakeSandbox('{"dependencies":{}}')
     agent = FollowUpAgent("project", sandbox, user_id="test-user")  # type: ignore[arg-type]
 
-    async def fail_complete_chat(*args: Any, **kwargs: Any) -> str:
-        del args, kwargs
-        raise AssertionError("AI package decision should be skipped")
-
-    monkeypatch.setattr(followup_agent_module.settings, "FOLLOWUP_OPTIONAL_PACKAGE_AI_DECISION_ENABLED", False)
-    monkeypatch.setattr(optional_package_decision_module, "complete_chat", fail_complete_chat)
-
-    selected = await agent._prepare_optional_packages(
-        "Add simple controls to this dashboard.",
-        {"summary": "", "file_tree": "src/App.tsx"},
-    )
+    # No monkeypatching needed: the agent no longer calls decide_optional_packages at all.
+    selected = await agent._prepare_optional_packages()
 
     assert selected == []
     assert sandbox.install_calls == [[]]

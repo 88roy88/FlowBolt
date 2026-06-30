@@ -11,7 +11,6 @@ from flow44.ai.agents.optional_packages import (
     OptionalPackagePrompt,
     allowed_import_names,
     render_optional_package_prompts,
-    render_unselected_optional_package_prompts,
     validate_optional_packages,
 )
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
@@ -35,7 +34,6 @@ def render(
     *,
     has_data_sources: bool,
     package_merge_rules: list[str],
-    package_unselected_merge_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str: ...
 
@@ -59,7 +57,6 @@ def render(
     allowed_imports: list[str],
     package_contexts: list[str],
     package_rules: list[str],
-    package_unselected_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str: ...
 
@@ -72,7 +69,6 @@ def render(
     files: dict[str, str],
     allowed_imports: list[str],
     package_fix_rules: list[str],
-    package_unselected_fix_rules: list[str],
     file_safety: GeneratedAppPathSafetyPromptContext,
 ) -> str: ...
 
@@ -98,11 +94,6 @@ def render_merge(
         package_merge_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.MERGE_RULES,
-            enabled=include_optional_package_prompts,
-        ),
-        package_unselected_merge_rules=render_unselected_optional_package_prompts(
-            validated_packages,
-            OptionalPackagePrompt.MERGE_UNSELECTED_RULES,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),
@@ -164,11 +155,6 @@ def render_codegen(  # noqa: PLR0913
             OptionalPackagePrompt.CODEGEN_RULES,
             enabled=include_optional_package_prompts,
         ),
-        package_unselected_rules=render_unselected_optional_package_prompts(
-            validated_packages,
-            OptionalPackagePrompt.CODEGEN_UNSELECTED_RULES,
-            enabled=include_optional_package_prompts,
-        ),
         file_safety=generated_app_path_safety_prompt_context(),
     )
 
@@ -189,11 +175,6 @@ def render_fix_errors(
         package_fix_rules=render_optional_package_prompts(
             validated_packages,
             OptionalPackagePrompt.FIX_ERRORS_RULES,
-            enabled=include_optional_package_prompts,
-        ),
-        package_unselected_fix_rules=render_unselected_optional_package_prompts(
-            validated_packages,
-            OptionalPackagePrompt.FIX_ERRORS_UNSELECTED_RULES,
             enabled=include_optional_package_prompts,
         ),
         file_safety=generated_app_path_safety_prompt_context(),

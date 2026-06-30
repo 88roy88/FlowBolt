@@ -49,13 +49,6 @@ Package-specific task planning rules:
 {{ rule_block }}
 {% endfor %}
 {% endif %}
-{% if package_unselected_merge_rules %}
-
-Package-specific fallback planning rules:
-{% for rule_block in package_unselected_merge_rules %}
-{{ rule_block }}
-{% endfor %}
-{% endif %}
 {% if has_data_sources %}
 
 ## Data Source Integration — Pre-Generated Files

@@ -61,7 +61,6 @@ class AIModelSettings(Flow44BaseSettings):
     AI_BASE_URL: str | None = "http://flow-44-models.com/openai/v1"
     AI_API_KEY: str | None = "default"
     PLAN_OPTIONAL_PACKAGE_AI_DECISION_ENABLED: bool = True
-    FOLLOWUP_OPTIONAL_PACKAGE_AI_DECISION_ENABLED: bool = True
 
     # if ai_model starts with bedrock/ set base_url and api_key to None
     # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)

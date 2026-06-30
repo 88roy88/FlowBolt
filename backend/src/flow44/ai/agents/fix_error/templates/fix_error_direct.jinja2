@@ -53,10 +53,3 @@ Package-specific repair rules:
 {{ rule_block }}
 {% endfor %}
 {% endif %}
-{% if package_unselected_fix_rules %}
-
-Package-specific fallback repair rules:
-{% for rule_block in package_unselected_fix_rules %}
-{{ rule_block }}
-{% endfor %}
-{% endif %}

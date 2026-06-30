@@ -12,11 +12,8 @@ from jinja2 import Environment, PackageLoader, TemplateNotFound
 class OptionalPackagePrompt(StrEnum):
     CODEGEN_CONTEXT = "codegen_context"
     CODEGEN_RULES = "codegen_rules"
-    CODEGEN_UNSELECTED_RULES = "codegen_unselected_rules"
     MERGE_RULES = "merge_rules"
-    MERGE_UNSELECTED_RULES = "merge_unselected_rules"
     FIX_ERRORS_RULES = "fix_errors_rules"
-    FIX_ERRORS_UNSELECTED_RULES = "fix_errors_unselected_rules"
 
 
 class OptionalPackage(ABC):
