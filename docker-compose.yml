@@ -80,11 +80,11 @@ services:
     restart: unless-stopped
 
   flapi-mock:
-    image: node:20-alpine
+    image: node:24-alpine
     working_dir: /app
     volumes:
       - ./mocks/flapi-mock:/app
-    command: sh -c "npm install && node server.js"
+    command: sh -c "npm install && npm start"
     expose:
       - "6001"
     environment:

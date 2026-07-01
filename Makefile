@@ -39,14 +39,15 @@ dev-backend: kill-port-$(DEV_PORT_BACKEND)
 dev-frontend: kill-port-$(DEV_PORT_FRONTEND)
 	cd frontend && pnpm dev -- --port $(DEV_PORT_FRONTEND)
 
-# server.js lives under mocks/flapi-mock (FLAPI / package mock)
+# server.ts lives under mocks/flapi-mock (FLAPI / package mock)
 dev-mocks: kill-port-$(DEV_PORT_MOCKS)
 	cd mocks/flapi-mock && pnpm install && MOCK_PORT=$(DEV_PORT_MOCKS) pnpm dev
 
 # Install dependencies (also installs Husky git hooks)
 install:
 	cd frontend && pnpm install
-	cd mocks/flapi-mock && pnpm install
+	cd mocks/flapi-mock && pnpm clean --lockfile && pnpm install
+	cd backend/pnpm-project-template && pnpm clean --lockfile && pnpm install
 	cd backend && uv sync
 
 # Build Docker image

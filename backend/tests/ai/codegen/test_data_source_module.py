@@ -38,11 +38,11 @@ class TestNoParams:
             params_info=_empty_params(),
             queries=_queries("sales"),
         )
-        assert "import { fetchWithAuth } from '../api/client';" in result
+        assert "import { fetchDataSource } from '../api/client';" in result
         assert "export async function dataSourceSales(): Promise<SalesResults>" in result
         assert "/api/data-source/42/run" in result
-        # No body built; fetchWithAuth called with just the path.
-        assert "fetchWithAuth('/api/data-source/42/run')" in result
+        assert "fetchDataSource('/api/data-source/42/run')" in result
+        assert "body: JSON.stringify" not in result
         assert "const body:" not in result
 
 
@@ -82,9 +82,7 @@ class TestRequiredParam:
         )
         assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in result
         assert "body['people']['person_id'] = personId;" in result
-        assert "fetchWithAuth('/api/data-source/7/run', {" in result
-        assert "method: 'POST'" in result
-        assert "body: JSON.stringify(body)" in result
+        assert "fetchDataSource('/api/data-source/7/run', body)" in result
 
     def test_schema_only_response_type_when_no_sample(self) -> None:
         result = generate_data_source_module(
