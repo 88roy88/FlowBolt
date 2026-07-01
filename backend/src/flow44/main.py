@@ -60,14 +60,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     idle_reaper.start()
     logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
 
-    try:
-        async with s3_storage.setup():
-            yield
-    finally:
-        logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
-        await idle_reaper.stop()
-        await sandbox_manager.suspend_all()
-        logger.info("Shutdown complete.")
+    async with s3_storage.setup():
+        yield
+
+    logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
+    await idle_reaper.stop()
+    await sandbox_manager.suspend_all()
+    logger.info("Shutdown complete.")
 
 
 app = FastAPI(
