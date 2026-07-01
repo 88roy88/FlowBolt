@@ -249,9 +249,11 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                 ) : (
                   <span className="flex-1 text-[13px] truncate">
                     {project.name}
-                    <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
-                      {project.role}
-                    </span>
+                    {project.role && (
+                      <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                        {project.role}
+                      </span>
+                    )}
                   </span>
                 )}
                 <Button
