@@ -7,9 +7,9 @@ from typing import Any, Literal, overload
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
-from flow44.ai.generated_app_contract import (
-    GeneratedAppPathSafetyPromptContext,
-    generated_app_path_safety_prompt_context,
+from flow44.ai.file_safety import (
+    ProtectedFileRules,
+    protected_file_rules,
 )
 from flow44.db.project_data_source import DataSourceContext
 
@@ -26,7 +26,7 @@ def render(
     template_name: Literal["architecture.jinja2"],
     *,
     data_source_contexts: list[dict[str, Any]] | None,
-    file_safety: GeneratedAppPathSafetyPromptContext,
+    file_safety: ProtectedFileRules,
 ) -> str: ...
 
 
@@ -60,7 +60,7 @@ def render_architecture(*, data_source_contexts: list[DataSourceContext] | None 
     return render(
         "architecture.jinja2",
         data_source_contexts=prepared,
-        file_safety=generated_app_path_safety_prompt_context(),
+        file_safety=protected_file_rules(),
     )
 
 

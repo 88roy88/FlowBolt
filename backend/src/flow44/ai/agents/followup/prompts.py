@@ -6,9 +6,9 @@ from typing import Literal
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
-from flow44.ai.generated_app_contract import (
-    GeneratedAppPathSafetyPromptContext,
-    generated_app_path_safety_prompt_context,
+from flow44.ai.file_safety import (
+    ProtectedFileRules,
+    protected_file_rules,
 )
 from flow44.db.project_data_source import DataSourceContext
 
@@ -25,7 +25,7 @@ def render(
     *,
     project_summary: str,
     file_tree: str,
-    file_safety: GeneratedAppPathSafetyPromptContext,
+    file_safety: ProtectedFileRules,
     new_data_source_contexts: list[DataSourceContext] | None = None,
     existing_data_source_contexts: list[DataSourceContext] | None = None,
 ) -> str:
@@ -49,7 +49,7 @@ def render_followup(
         "followup.jinja2",
         project_summary=project_summary,
         file_tree=file_tree,
-        file_safety=generated_app_path_safety_prompt_context(),
+        file_safety=protected_file_rules(),
         new_data_source_contexts=new_data_source_contexts,
         existing_data_source_contexts=existing_data_source_contexts,
     )

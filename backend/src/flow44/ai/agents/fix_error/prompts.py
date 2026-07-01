@@ -6,9 +6,9 @@ from typing import Literal, overload
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
-from flow44.ai.generated_app_contract import (
-    GeneratedAppPathSafetyPromptContext,
-    generated_app_path_safety_prompt_context,
+from flow44.ai.file_safety import (
+    ProtectedFileRules,
+    protected_file_rules,
 )
 
 _templates_dir = Path(__file__).parent / "templates"
@@ -25,7 +25,7 @@ def render(
     *,
     errors: str,
     files: dict[str, str],
-    file_safety: GeneratedAppPathSafetyPromptContext,
+    file_safety: ProtectedFileRules,
 ) -> str: ...
 
 
@@ -38,7 +38,7 @@ def render(
     error_line: int | None,
     error_stack: str | None,
     files: dict[str, str],
-    file_safety: GeneratedAppPathSafetyPromptContext,
+    file_safety: ProtectedFileRules,
 ) -> str: ...
 
 
@@ -55,7 +55,7 @@ def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
         "fix_errors.jinja2",
         errors=errors,
         files=files,
-        file_safety=generated_app_path_safety_prompt_context(),
+        file_safety=protected_file_rules(),
     )
 
 
@@ -74,5 +74,5 @@ def render_fix_error_direct(
         error_line=error_line,
         error_stack=error_stack,
         files=files,
-        file_safety=generated_app_path_safety_prompt_context(),
+        file_safety=protected_file_rules(),
     )

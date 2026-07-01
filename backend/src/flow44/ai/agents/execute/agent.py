@@ -18,10 +18,10 @@ from flow44.ai.agents.execute.prompts import (
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
-from flow44.ai.generated_app_contract import (
-    GeneratedAppContractError,
-    filter_safe_generated_files,
-    validate_generated_app_path_allowed,
+from flow44.ai.file_safety import (
+    FileSafetyError,
+    drop_protected_files,
+    normalized_path_or_reject,
 )
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
@@ -192,7 +192,7 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = [(validate_generated_app_path_allowed(path), content) for path, content in generated]
+            validated = drop_protected_files(generated, source="execute/fix-errors")
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
@@ -272,8 +272,8 @@ class ExecuteAgent(BaseAgent):
             safe_files: list[str] = []
             for path in task_data.get("files", []):
                 try:
-                    safe_files.append(validate_generated_app_path_allowed(path))
-                except GeneratedAppContractError:
+                    safe_files.append(normalized_path_or_reject(path))
+                except FileSafetyError:
                     logger.warning("[execute] Dropping protected file from generated plan: %s", path)
             if not safe_files:
                 continue
@@ -350,9 +350,9 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            expected_paths = {validate_generated_app_path_allowed(path) for path in task.files}
+            expected_paths = {normalized_path_or_reject(path) for path in task.files}
             validated: list[tuple[str, str]] = []
-            for path, content in filter_safe_generated_files(generated, source=f"execute/task-{task.id}"):
+            for path, content in drop_protected_files(generated, source=f"execute/task-{task.id}"):
                 if path not in expected_paths:
                     logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, path)
                     continue

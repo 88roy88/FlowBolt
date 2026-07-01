@@ -9,7 +9,7 @@ from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_f
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
-from flow44.ai.generated_app_contract import filter_safe_generated_files
+from flow44.ai.file_safety import drop_protected_files
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -169,7 +169,7 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
-        state.generated_files = filter_safe_generated_files(state.generated_files, source="fix-error/generated")
+        state.generated_files = drop_protected_files(state.generated_files, source="fix-error/generated")
         if not state.generated_files:
             return state
 
@@ -237,7 +237,7 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = filter_safe_generated_files(generated, source="fix-error/retry")
+            validated = drop_protected_files(generated, source="fix-error/retry")
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 await state.emit_fn({"type": "file", "path": path, "content": content})

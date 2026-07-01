@@ -15,7 +15,7 @@ from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, tool
-from flow44.ai.generated_app_contract import GeneratedAppContractError, validate_generated_app_path_allowed
+from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
@@ -27,7 +27,7 @@ MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
 
 
-def _format_generated_app_contract_error(exc: GeneratedAppContractError) -> str:
+def _format_file_safety_error(exc: FileSafetyError) -> str:
     return (
         f"Generated app contract violation: {exc}\n"
         "Pick an editable app source file and only import packages selected for this project."
@@ -125,9 +125,9 @@ class FollowUpAgent(BaseAgent):
         async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
             try:
-                path = validate_generated_app_path_allowed(path)
-            except GeneratedAppContractError as exc:
-                return _format_generated_app_contract_error(exc)
+                path = normalized_path_or_reject(path)
+            except FileSafetyError as exc:
+                return _format_file_safety_error(exc)
             try:
                 old_content = await sandbox.read_file(path)
                 is_new_file = False
@@ -142,9 +142,9 @@ class FollowUpAgent(BaseAgent):
         async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
             try:
-                path = validate_generated_app_path_allowed(path)
-            except GeneratedAppContractError as exc:
-                return _format_generated_app_contract_error(exc)
+                path = normalized_path_or_reject(path)
+            except FileSafetyError as exc:
+                return _format_file_safety_error(exc)
             try:
                 current = await sandbox.read_file(path)
             except FileNotFoundError:

@@ -8,9 +8,9 @@ from typing import Any, Literal, overload
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
-from flow44.ai.generated_app_contract import (
-    GeneratedAppPathSafetyPromptContext,
-    generated_app_path_safety_prompt_context,
+from flow44.ai.file_safety import (
+    ProtectedFileRules,
+    protected_file_rules,
 )
 from flow44.db.project_data_source import DataSourceContext
 
@@ -27,7 +27,7 @@ def render(
     template_name: Literal["merge.jinja2"],
     *,
     has_data_sources: bool,
-    file_safety: GeneratedAppPathSafetyPromptContext,
+    file_safety: ProtectedFileRules,
 ) -> str: ...
 
 
@@ -47,7 +47,7 @@ def render(
     dependency_files: dict[str, str] | None,
     other_completed_exports: dict[str, str] | None,
     data_source_contexts: list[dict[str, Any]] | None,
-    file_safety: GeneratedAppPathSafetyPromptContext,
+    file_safety: ProtectedFileRules,
 ) -> str: ...
 
 
@@ -57,7 +57,7 @@ def render(
     *,
     errors: str,
     files: dict[str, str],
-    file_safety: GeneratedAppPathSafetyPromptContext,
+    file_safety: ProtectedFileRules,
 ) -> str: ...
 
 
@@ -73,7 +73,7 @@ def render_merge(*, has_data_sources: bool = False) -> str:
     return render(
         "merge.jinja2",
         has_data_sources=has_data_sources,
-        file_safety=generated_app_path_safety_prompt_context(),
+        file_safety=protected_file_rules(),
     )
 
 
@@ -118,7 +118,7 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
-        file_safety=generated_app_path_safety_prompt_context(),
+        file_safety=protected_file_rules(),
     )
 
 
@@ -127,7 +127,7 @@ def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
         "fix_errors.jinja2",
         errors=errors,
         files=files,
-        file_safety=generated_app_path_safety_prompt_context(),
+        file_safety=protected_file_rules(),
     )
 
 

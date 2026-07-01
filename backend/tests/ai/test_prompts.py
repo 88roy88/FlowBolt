@@ -6,7 +6,7 @@ from flow44.ai.agents.execute.prompts import render_codegen, render_fix_errors, 
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
-from flow44.ai.generated_app_contract import generated_app_path_safety_prompt_context
+from flow44.ai.file_safety import protected_file_rules
 from flow44.db.project_data_source import DataSourceContext
 
 
@@ -97,7 +97,7 @@ class TestPromptRendering:
         assert "src/Header.tsx" in result
         assert "flowArtifact" in result
         assert result.count("## File Safety Rules") == 1
-        file_safety = generated_app_path_safety_prompt_context()
+        file_safety = protected_file_rules()
         for section in file_safety.values():
             for protected_entry in section:
                 assert f"`{protected_entry}`" in result

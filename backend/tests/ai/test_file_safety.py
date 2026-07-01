@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from flow44.ai.generated_app_contract import (
-    GeneratedAppContractError,
-    filter_safe_generated_files,
-    generated_app_path_safety_prompt_context,
-    validate_generated_app_path_allowed,
+from flow44.ai.file_safety import (
+    FileSafetyError,
+    drop_protected_files,
+    normalized_path_or_reject,
+    protected_file_rules,
 )
 
 
@@ -27,12 +27,12 @@ from flow44.ai.generated_app_contract import (
     ],
 )
 def test_protected_generated_app_files_are_rejected(path: str) -> None:
-    with pytest.raises(GeneratedAppContractError):
-        validate_generated_app_path_allowed(path)
+    with pytest.raises(FileSafetyError):
+        normalized_path_or_reject(path)
 
 
 def test_normal_app_source_file_is_allowed() -> None:
-    assert validate_generated_app_path_allowed("src/components/AssetMap.tsx") == "src/components/AssetMap.tsx"
+    assert normalized_path_or_reject("src/components/AssetMap.tsx") == "src/components/AssetMap.tsx"
 
 
 @pytest.mark.parametrize(
@@ -48,8 +48,8 @@ def test_normal_app_source_file_is_allowed() -> None:
     ],
 )
 def test_unsafe_generated_paths_are_rejected(path: str) -> None:
-    with pytest.raises(GeneratedAppContractError):
-        validate_generated_app_path_allowed(path)
+    with pytest.raises(FileSafetyError):
+        normalized_path_or_reject(path)
 
 
 @pytest.mark.parametrize(
@@ -62,26 +62,26 @@ def test_unsafe_generated_paths_are_rejected(path: str) -> None:
     ],
 )
 def test_generated_path_is_normalized_for_posix_and_windows_paths(path: str, expected: str) -> None:
-    assert validate_generated_app_path_allowed(path) == expected
+    assert normalized_path_or_reject(path) == expected
 
 
-def test_filter_safe_generated_files_drops_protected_and_normalizes() -> None:
+def test_drop_protected_files_drops_protected_and_normalizes() -> None:
     files = [
         ("src/components/AssetMap.tsx", "a"),
         ("package.json", "b"),        # protected -> dropped
         ("./src/App.tsx", "c"),        # kept, normalized to src/App.tsx
         ("../escape.ts", "d"),         # unsafe -> dropped
     ]
-    assert filter_safe_generated_files(files, source="test") == [
+    assert drop_protected_files(files, source="test") == [
         ("src/components/AssetMap.tsx", "a"),
         ("src/App.tsx", "c"),
     ]
 
 
 def test_file_safety_prompt_context_uses_contract_values() -> None:
-    context = generated_app_path_safety_prompt_context()
+    context = protected_file_rules()
 
-    assert "package.json" in context["protected_files"]
-    assert "src/main.tsx" in context["protected_src_paths"]
-    assert "src/platform/*" in context["protected_src_dirs"]
-    assert "vite.config.*" in context["protected_name_patterns"]
+    assert "package.json" in context["protected_paths"]
+    assert "src/main.tsx" in context["protected_paths"]
+    assert "src/platform/*" in context["protected_patterns"]
+    assert "vite.config.*" in context["protected_patterns"]
