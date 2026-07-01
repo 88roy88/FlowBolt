@@ -44,6 +44,7 @@ function credentialsFromPayload(token: string, payload: Record<string, unknown>)
 
 export function credentialsFromToken(token: string): AuthCredentials | null {
   try {
+    // TODO: Add full JWT signature verification once JWKS endpoint is available
     const payload = decodeJwt(token) as Record<string, unknown>;
     return credentialsFromPayload(token, payload);
   } catch {
