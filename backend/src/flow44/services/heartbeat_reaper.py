@@ -8,13 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class HeartbeatReaper:
-    """Periodically closes runs whose heartbeat has gone stale.
-
-    Replaces a per-replica boot sweep: staleness is owner-agnostic, so any replica
-    safely reaps any orphaned run. The first pass runs immediately on start (it
-    covers runs orphaned by this replica's own restart).
-    """
-
     def __init__(self) -> None:
         self._interval = 0.0
         self._stop = asyncio.Event()

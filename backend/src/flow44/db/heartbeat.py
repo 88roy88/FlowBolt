@@ -14,11 +14,6 @@ from flow44.db.events import emit_event
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Heartbeat model
-# ---------------------------------------------------------------------------
-
-
 class AgentRunHeartbeat(SQLModel, table=True):
     __tablename__ = "agent_run_heartbeat"
 
@@ -47,13 +42,7 @@ async def _commit(stmt: Any) -> Any:
         return result
 
 
-# ---------------------------------------------------------------------------
-# Heartbeat writes — atomic upserts (the heartbeat row is also the run-lock)
-# ---------------------------------------------------------------------------
-
-
 async def touch_heartbeat(project_id: str) -> datetime:
-    """Refresh this project's heartbeat (one row per project); return the beat written."""
     now = datetime.now(UTC)
     await _commit(
         _insert()(AgentRunHeartbeat)
@@ -64,11 +53,6 @@ async def touch_heartbeat(project_id: str) -> datetime:
 
 
 async def try_claim_run(project_id: str) -> datetime | None:
-    """Atomically claim the run-lock.
-
-    Returns the claimed beat (the lock token) on success, or None when a fresh
-    heartbeat already holds it.
-    """
     now = datetime.now(UTC)
     stmt = (
         _insert()(AgentRunHeartbeat)
@@ -85,24 +69,13 @@ async def get_heartbeat(project_id: str) -> AgentRunHeartbeat | None:
 
 
 async def clear_heartbeat(project_id: str, *, only_beat: datetime | None = None) -> None:
-    """Release this project's run-lock.
-
-    With only_beat set, delete only while it is still our beat, so a lock a newer run
-    has since claimed (after ours was reaped) is never cleared out from under it.
-    """
     stmt = delete(AgentRunHeartbeat).where(col(AgentRunHeartbeat.project_id) == project_id)
     if only_beat is not None:
         stmt = stmt.where(col(AgentRunHeartbeat.beat_at) == only_beat)
     await _commit(stmt)
 
 
-# ---------------------------------------------------------------------------
-# Liveness — a run is alive iff its heartbeat is still fresh
-# ---------------------------------------------------------------------------
-
-
 def _is_fresh(ts: datetime, window_seconds: int) -> bool:
-    """True if the timestamp is within the given window (SQLite stamps are naive UTC)."""
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=UTC)
     return ts > datetime.now(UTC) - timedelta(seconds=window_seconds)
@@ -114,11 +87,6 @@ async def is_run_active(project_id: str) -> bool:
 
 
 async def reap_stale_runs() -> int:
-    """Atomically delete stale heartbeats and emit a terminal 'error' event per reaped run.
-
-    Atomic delete means a run refreshed mid-sweep is left alone and concurrent sweeps
-    each reap a row at most once.
-    """
     result = await _commit(delete(AgentRunHeartbeat).where(_stale()).returning(col(AgentRunHeartbeat.project_id)))
     stale_ids = list(result.scalars().all())
 
