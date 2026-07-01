@@ -33,19 +33,14 @@ class S3Storage:
 
     @contextlib.asynccontextmanager
     async def setup(self) -> AsyncIterator[None]:
-        bucket_name = settings.S3_BUCKET_NAME
-
-        async with contextlib.AsyncExitStack() as stack:
-            if bucket_name:
-                try:
-                    self._client = await stack.enter_async_context(self._session.client("s3", **self._client_kwargs()))
-                    stack.callback(setattr, self, "_client", None)
-                    await self._ensure_bucket(bucket_name)
-                    logger.info("S3 bucket setup complete.")
-                except Exception as exc:
-                    logger.warning("S3 setup issue (may already exist or be misconfigured): %s", exc)
-
-            yield
+        async with self._session.client("s3", **self._client_kwargs()) as client:
+            self._client = client
+            await self._ensure_bucket(settings.S3_BUCKET_NAME)
+            logger.info("S3 bucket setup complete.")
+            try:
+                yield
+            finally:
+                self._client = None
 
     async def _ensure_bucket(self, bucket_name: str) -> None:
         try:
@@ -91,8 +86,6 @@ class S3Storage:
         return self.published_url(project_id)
 
     async def delete_published_html(self, project_id: str) -> None:
-        if not settings.S3_BUCKET_NAME:
-            return
         key = self._key(project_id)
         try:
             await self.client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)

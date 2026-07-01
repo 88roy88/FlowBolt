@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import Permission, ProjectDep, require_permission
-from flow44.config import settings
 from flow44.db.project import is_handle_taken, update_project_published_url
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.operations import BuildError, build_single_html
@@ -66,10 +65,6 @@ async def publish_to_s3(
     _perms: set[Permission] = require_permission(Permission.publish),
 ) -> dict[str, str]:
     """Build the project and deploy to S3, returning the public URL."""
-
-    if settings.S3_BUCKET_NAME is None:
-        logger.error("S3_BUCKET_NAME environment variable is not set")
-        raise HTTPException(status_code=500, detail="S3_BUCKET_NAME is not set")
 
     slug = body.slug or None
     if slug:

@@ -25,17 +25,6 @@ def test_client_requires_setup(storage):
 
 
 @pytest.mark.asyncio
-async def test_setup_no_bucket_configured(storage):
-    session = MagicMock()
-    storage._session = session
-    with patch.object(settings, "S3_BUCKET_NAME", None):
-        async with storage.setup():
-            with pytest.raises(RuntimeError):
-                _ = storage.client
-    session.client.assert_not_called()
-
-
-@pytest.mark.asyncio
 async def test_setup_opens_and_closes_client(storage):
     client = AsyncMock()
     cm = _mock_client_cm(client)
@@ -72,7 +61,7 @@ async def test_setup_ensures_bucket(storage):
 
 
 @pytest.mark.asyncio
-async def test_setup_keeps_client_when_ensure_bucket_fails(storage):
+async def test_setup_propagates_ensure_bucket_failure(storage):
     client = AsyncMock()
     cm = _mock_client_cm(client)
     session = MagicMock()
@@ -81,24 +70,23 @@ async def test_setup_keeps_client_when_ensure_bucket_fails(storage):
 
     with patch.object(settings, "S3_BUCKET_NAME", "test-bucket"):
         with patch.object(S3Storage, "_ensure_bucket", AsyncMock(side_effect=RuntimeError("boom"))):
-            async with storage.setup():
-                assert storage.client is client
+            with pytest.raises(RuntimeError, match="boom"):
+                async with storage.setup():
+                    pass
 
     cm.__aexit__.assert_awaited_once()
-    with pytest.raises(RuntimeError):
-        _ = storage.client
 
 
 @pytest.mark.asyncio
-async def test_setup_clears_client_when_acquisition_fails(storage):
+async def test_setup_propagates_acquisition_failure(storage):
     session = MagicMock()
     session.client.side_effect = RuntimeError("connection failed")
     storage._session = session
 
     with patch.object(settings, "S3_BUCKET_NAME", "test-bucket"):
-        async with storage.setup():
-            with pytest.raises(RuntimeError):
-                _ = storage.client
+        with pytest.raises(RuntimeError, match="connection failed"):
+            async with storage.setup():
+                pass
 
 
 @pytest.mark.asyncio
@@ -155,16 +143,6 @@ async def test_delete_published_html(storage):
         client.delete_object.assert_awaited_once_with(
             Bucket="my-bucket", Key=f"published/{project_id}.html"
         )
-
-
-@pytest.mark.asyncio
-async def test_delete_published_html_no_bucket(storage):
-    client = AsyncMock()
-    storage._client = client
-    with patch.object(settings, "S3_BUCKET_NAME", None):
-        await storage.delete_published_html("proj-123")
-
-        client.delete_object.assert_not_called()
 
 
 @pytest.mark.asyncio
