@@ -2,7 +2,10 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
+
+from jinja2 import Environment, FileSystemLoader
 
 from flow44.ai.agents.plan.prompts import render_data_source_analysis
 from flow44.ai.codegen.data_source_module import generate_data_source_module
@@ -15,6 +18,12 @@ from flow44.logic import data_source as ds_logic
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 
 logger = logging.getLogger(__name__)
+
+_env = Environment(  # noqa: S701
+    loader=FileSystemLoader(str(Path(__file__).parent.parent / "codegen" / "templates")),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 
 async def fetch_and_analyze_data_source(
@@ -113,42 +122,9 @@ def _generate_data_source_docs(
     params_info: DataSourceParamsInfo,
     queries: list[DataSourceQuerySchema],
 ) -> str:
-    """Generate a markdown docs file describing the data source."""
-    lines: list[str] = [
-        f"# {ctx.data_source_name or ctx.sanitized_name}",
-        f"**ID:** {ctx.data_source_id}",
-        f"**Module:** `src/dataSources/{ctx.sanitized_name}.ts`",
-        "",
-    ]
-
-    for heading, value in [
-        ("Schema", ctx.data_schema),
-        ("Relevant Fields", ctx.relevant_fields),
-        ("Data Characteristics", ctx.data_characteristics),
-        ("Integration Notes", ctx.integration_notes),
-    ]:
-        if value:
-            lines.extend([f"## {heading}\n{value}", ""])
-
-    if queries:
-        lines.append("## Queries")
-        for q in queries:
-            lines.append(f"### `{q.name}`" + (f" — {q.description}" if q.description else ""))
-            for f in q.fields:
-                desc = f" — {f.description}" if f.description else ""
-                lines.append(f"- `{f.name}` ({f.type}){desc}")
-            lines.append("")
-
-    if params_info.parameters:
-        lines.append("## Parameters")
-        for p in params_info.parameters:
-            req = "required" if p.is_required else ("required (one of group)" if p.is_require_any else "optional")
-            multi = "[]" if not p.is_single_value else ""
-            lines.append(f"- `{p.name}` ({p.type}{multi}) — {req}")
-        lines.append("")
-
-    redacted = _redact_sample_data(ctx.sample_data)
-    if redacted:
-        lines.extend(["## Response Structure (redacted)", "```json", redacted, "```", ""])
-
-    return "\n".join(lines)
+    return _env.get_template("data_source_docs.jinja2").render(
+        ctx=ctx,
+        params=params_info.parameters,
+        queries=queries,
+        redacted_sample=_redact_sample_data(ctx.sample_data),
+    )
