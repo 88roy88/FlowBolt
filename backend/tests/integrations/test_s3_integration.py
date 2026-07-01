@@ -12,22 +12,11 @@ def storage():
     return S3Storage()
 
 
-@pytest.mark.asyncio
-async def test_setup_opens_client_once(storage):
-    client = AsyncMock()
+def _mock_client_cm(client):
     cm = MagicMock()
     cm.__aenter__ = AsyncMock(return_value=client)
     cm.__aexit__ = AsyncMock(return_value=False)
-    session = MagicMock()
-    session.client.return_value = cm
-
-    storage._session = session
-    with patch.object(S3Storage, "_ensure_bucket", AsyncMock()):
-        await storage.setup("test-bucket")
-        await storage.setup("test-bucket")
-
-    assert storage.client is client
-    assert session.client.call_count == 1
+    return cm
 
 
 def test_client_requires_setup(storage):
@@ -36,17 +25,99 @@ def test_client_requires_setup(storage):
 
 
 @pytest.mark.asyncio
+async def test_setup_no_bucket_configured(storage):
+    session = MagicMock()
+    storage._session = session
+    with patch.object(settings, "S3_BUCKET_NAME", None):
+        async with storage.setup():
+            with pytest.raises(RuntimeError):
+                _ = storage.client
+    session.client.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_setup_opens_and_closes_client(storage):
+    client = AsyncMock()
+    cm = _mock_client_cm(client)
+    session = MagicMock()
+    session.client.return_value = cm
+    storage._session = session
+
+    with patch.object(settings, "S3_BUCKET_NAME", "test-bucket"):
+        with patch.object(S3Storage, "_ensure_bucket", AsyncMock()):
+            async with storage.setup():
+                assert storage.client is client
+
+    cm.__aexit__.assert_awaited_once()
+    with pytest.raises(RuntimeError):
+        _ = storage.client
+
+
+@pytest.mark.asyncio
 async def test_setup_ensures_bucket(storage):
     client = AsyncMock()
-    storage._client = client
+    cm = _mock_client_cm(client)
+    session = MagicMock()
+    session.client.return_value = cm
+    storage._session = session
     bucket_name = "test-bucket"
-    await storage.setup(bucket_name)
 
-    client.create_bucket.assert_awaited_once_with(Bucket=bucket_name)
-    client.put_bucket_policy.assert_awaited_once()
-    _, kwargs = client.put_bucket_policy.call_args
-    assert kwargs["Bucket"] == bucket_name
-    assert "Statement" in kwargs["Policy"]
+    with patch.object(settings, "S3_BUCKET_NAME", bucket_name):
+        async with storage.setup():
+            client.create_bucket.assert_awaited_once_with(Bucket=bucket_name)
+            client.put_bucket_policy.assert_awaited_once()
+            _, kwargs = client.put_bucket_policy.call_args
+            assert kwargs["Bucket"] == bucket_name
+            assert "Statement" in kwargs["Policy"]
+
+
+@pytest.mark.asyncio
+async def test_setup_keeps_client_when_ensure_bucket_fails(storage):
+    client = AsyncMock()
+    cm = _mock_client_cm(client)
+    session = MagicMock()
+    session.client.return_value = cm
+    storage._session = session
+
+    with patch.object(settings, "S3_BUCKET_NAME", "test-bucket"):
+        with patch.object(S3Storage, "_ensure_bucket", AsyncMock(side_effect=RuntimeError("boom"))):
+            async with storage.setup():
+                assert storage.client is client
+
+    cm.__aexit__.assert_awaited_once()
+    with pytest.raises(RuntimeError):
+        _ = storage.client
+
+
+@pytest.mark.asyncio
+async def test_setup_clears_client_when_acquisition_fails(storage):
+    session = MagicMock()
+    session.client.side_effect = RuntimeError("connection failed")
+    storage._session = session
+
+    with patch.object(settings, "S3_BUCKET_NAME", "test-bucket"):
+        async with storage.setup():
+            with pytest.raises(RuntimeError):
+                _ = storage.client
+
+
+@pytest.mark.asyncio
+async def test_setup_propagates_close_error(storage):
+    client = AsyncMock()
+    cm = _mock_client_cm(client)
+    cm.__aexit__ = AsyncMock(side_effect=RuntimeError("close failed"))
+    session = MagicMock()
+    session.client.return_value = cm
+    storage._session = session
+
+    with patch.object(settings, "S3_BUCKET_NAME", "test-bucket"):
+        with patch.object(S3Storage, "_ensure_bucket", AsyncMock()):
+            with pytest.raises(RuntimeError, match="close failed"):
+                async with storage.setup():
+                    pass
+
+    with pytest.raises(RuntimeError):
+        _ = storage.client
 
 
 @pytest.mark.asyncio

@@ -60,20 +60,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     idle_reaper.start()
     logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
 
-    if settings.S3_BUCKET_NAME:
-        logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
-        try:
-            await s3_storage.setup(settings.S3_BUCKET_NAME)
-            logger.info("S3 bucket setup complete.")
-        except Exception as exc:
-            logger.warning("S3 bucket setup issue (may already exist or be misconfigured): %s", exc)
-
-    yield
-    logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
-    await idle_reaper.stop()
-    await sandbox_manager.suspend_all()
-    await s3_storage.close()
-    logger.info("Shutdown complete.")
+    try:
+        async with s3_storage.setup():
+            yield
+    finally:
+        logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
+        await idle_reaper.stop()
+        await sandbox_manager.suspend_all()
+        logger.info("Shutdown complete.")
 
 
 app = FastAPI(

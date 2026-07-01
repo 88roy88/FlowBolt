@@ -1,6 +1,7 @@
 import contextlib
 import json
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 import aioboto3
@@ -15,7 +16,6 @@ class S3Storage:
     def __init__(self) -> None:
         self._session = aioboto3.Session()
         self._client: Any = None
-        self._exit_stack: contextlib.AsyncExitStack | None = None
 
     def _client_kwargs(self) -> dict[str, Any]:
         return {
@@ -28,22 +28,24 @@ class S3Storage:
     @property
     def client(self) -> Any:
         if self._client is None:
-            raise RuntimeError("S3 client is not initialised; call setup() at startup")
+            raise RuntimeError("S3 client is not initialised; enter setup() during startup")
         return self._client
 
-    async def setup(self, bucket_name: str) -> None:
-        if self._client is None:
-            self._exit_stack = contextlib.AsyncExitStack()
-            self._client = await self._exit_stack.enter_async_context(
-                self._session.client("s3", **self._client_kwargs())
-            )
-        await self._ensure_bucket(bucket_name)
+    @contextlib.asynccontextmanager
+    async def setup(self) -> AsyncIterator[None]:
+        bucket_name = settings.S3_BUCKET_NAME
 
-    async def close(self) -> None:
-        if self._exit_stack is not None:
-            await self._exit_stack.aclose()
-        self._exit_stack = None
-        self._client = None
+        async with contextlib.AsyncExitStack() as stack:
+            if bucket_name:
+                try:
+                    self._client = await stack.enter_async_context(self._session.client("s3", **self._client_kwargs()))
+                    stack.callback(setattr, self, "_client", None)
+                    await self._ensure_bucket(bucket_name)
+                    logger.info("S3 bucket setup complete.")
+                except Exception as exc:
+                    logger.warning("S3 setup issue (may already exist or be misconfigured): %s", exc)
+
+            yield
 
     async def _ensure_bucket(self, bucket_name: str) -> None:
         try:
