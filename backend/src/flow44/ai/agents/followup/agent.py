@@ -94,7 +94,7 @@ class FollowUpAgent(ChatAgent):
             return ToolResult(value=value, short_preview=f"Found {len(results)} file(s).")
 
         @tool
-        async def read_file(path: str, offset: int = 0, limit: int = MAX_READ_LINES) -> str | ToolResult:
+        async def read_file(path: str, offset: int = 0, limit: int = MAX_READ_LINES) -> ToolResult:
             """Read file content with line numbers. Always read a file before editing it.
 
             Args:
@@ -105,7 +105,7 @@ class FollowUpAgent(ChatAgent):
             try:
                 content = await sandbox.read_file(path)
             except (FileNotFoundError, PermissionError) as e:
-                return f"Error: {e}"
+                return ToolResult(value=str(e), is_error=True)
             lines = content.splitlines()
             total = len(lines)
             limit = min(limit, MAX_READ_LINES)
