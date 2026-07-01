@@ -42,7 +42,6 @@ class DataSourceContext(DataSourceBase):
     generated_files: dict[str, str] = Field(default_factory=dict)
 
     def to_prompt_context(self) -> dict[str, Any]:
-        """Return this data source for prompt templates, with sample data truncated."""
         return {
             **self.model_dump(),
             "sample_data_json": (
