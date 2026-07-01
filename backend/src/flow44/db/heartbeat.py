@@ -23,9 +23,7 @@ class AgentRunHeartbeat(SQLModel, table=True):
     __tablename__ = "agent_run_heartbeat"
 
     project_id: str = Field(sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True))
-    beat_at: datetime | None = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
-    )
+    beat_at: datetime = Field(sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False))
 
 
 def _insert() -> Any:
@@ -37,10 +35,9 @@ def _stale_cutoff() -> datetime:
     return datetime.now(UTC) - timedelta(seconds=settings.AGENT_RUN_STALE_TIMEOUT)
 
 
-def _stale_or_missing() -> Any:
-    """WHERE clause matching heartbeats that are stale or absent."""
-    beat_at = col(AgentRunHeartbeat.beat_at)
-    return beat_at.is_(None) | (beat_at < _stale_cutoff())
+def _stale() -> Any:
+    """WHERE clause matching heartbeats older than the stale cutoff."""
+    return col(AgentRunHeartbeat.beat_at) < _stale_cutoff()
 
 
 async def _commit(stmt: Any) -> Any:
@@ -76,7 +73,7 @@ async def try_claim_run(project_id: str) -> datetime | None:
     stmt = (
         _insert()(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
-        .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now}, where=_stale_or_missing())
+        .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now}, where=_stale())
         .returning(col(AgentRunHeartbeat.project_id))
     )
     return now if (await _commit(stmt)).first() is not None else None
@@ -104,10 +101,8 @@ async def clear_heartbeat(project_id: str, *, only_beat: datetime | None = None)
 # ---------------------------------------------------------------------------
 
 
-def _is_fresh(ts: datetime | None, window_seconds: int) -> bool:
+def _is_fresh(ts: datetime, window_seconds: int) -> bool:
     """True if the timestamp is within the given window (SQLite stamps are naive UTC)."""
-    if ts is None:
-        return False
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=UTC)
     return ts > datetime.now(UTC) - timedelta(seconds=window_seconds)
@@ -124,9 +119,7 @@ async def reap_stale_runs() -> int:
     Atomic delete means a run refreshed mid-sweep is left alone and concurrent sweeps
     each reap a row at most once.
     """
-    result = await _commit(
-        delete(AgentRunHeartbeat).where(_stale_or_missing()).returning(col(AgentRunHeartbeat.project_id))
-    )
+    result = await _commit(delete(AgentRunHeartbeat).where(_stale()).returning(col(AgentRunHeartbeat.project_id)))
     stale_ids = list(result.scalars().all())
 
     for project_id in stale_ids:
