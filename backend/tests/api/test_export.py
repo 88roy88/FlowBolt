@@ -139,7 +139,7 @@ async def test_proxy_published_app_basic():
     mock_project.published_at = "2026-04-18T21:00:00Z"
 
     with patch("flow44.api.shared.get_project_by_handle", return_value=mock_project):
-        with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/published.html"):
+        with patch("flow44.api.shared.s3_storage.published_url", return_value="https://s3.local/published.html"):
             with patch("httpx.AsyncClient.get") as mock_get:
                 mock_resp = AsyncMock()
                 mock_resp.status_code = 200
@@ -165,7 +165,7 @@ async def test_proxy_published_app_fetch_error():
     mock_project.published_at = "2026-04-18T21:00:00Z"
 
     with patch("flow44.api.shared.get_project_by_handle", return_value=mock_project):
-        with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/published.html"):
+        with patch("flow44.api.shared.s3_storage.published_url", return_value="https://s3.local/published.html"):
             with patch("httpx.AsyncClient.get", side_effect=Exception("S3 Down")):
                 response = client.get(f"/shared/{project_id}")
                 assert response.status_code == 502
