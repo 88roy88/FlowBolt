@@ -69,7 +69,7 @@ class TestPublish:
     def _patch_build_and_deploy(self):
         return (
             patch("flow44.api.publish.build_single_html", return_value="<html>ok</html>"),
-            patch("flow44.api.publish.deploy_single_html", return_value=MOCK_S3_URL),
+            patch("flow44.api.publish.s3_storage.deploy_single_html", return_value=MOCK_S3_URL),
             patch.object(settings, "S3_BUCKET_NAME", "test-bucket"),
         )
 
@@ -190,7 +190,7 @@ class TestShareBySlug:
         mock_proj = _mock_project(published_url="my-app", published_at="2026-04-18T21:00:00Z")
         mock_proj.id = "proj-123"
         with patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj):
-            with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"), \
+            with patch("flow44.api.shared.s3_storage.published_url", return_value="https://s3.local/proj-123.html"), \
                  patch("httpx.AsyncClient.get") as mock_get:
                 mock_resp = AsyncMock()
                 mock_resp.status_code = 200
@@ -229,7 +229,7 @@ class TestShareBySlug:
         saved = app.dependency_overrides.pop(validate_token, None)
         try:
             with patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj):
-                with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"), \
+                with patch("flow44.api.shared.s3_storage.published_url", return_value="https://s3.local/proj-123.html"), \
                      patch("httpx.AsyncClient.get") as mock_get:
                     mock_resp = AsyncMock()
                     mock_resp.status_code = 200
@@ -251,7 +251,7 @@ class TestShareBySlug:
         mock_proj = _mock_project(published_url="my-app", published_at="2026-04-18T21:00:00Z")
         mock_proj.id = "proj-123"
         with patch("flow44.api.shared.get_project_by_handle", return_value=mock_proj):
-            with patch("flow44.api.shared.get_published_url", return_value="https://s3.local/proj-123.html"), \
+            with patch("flow44.api.shared.s3_storage.published_url", return_value="https://s3.local/proj-123.html"), \
                  patch("httpx.AsyncClient.get", side_effect=Exception("S3 down")):
                 response = client.get("/shared/my-app")
                 assert response.status_code == 502
