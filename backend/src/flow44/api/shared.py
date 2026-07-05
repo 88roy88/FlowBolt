@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 
 from flow44.config import settings
 from flow44.db.project import get_project_by_handle
-from flow44.integrations.s3 import get_published_url
+from flow44.integrations.s3 import s3_storage
 
 logger = logging.getLogger(__name__)
 
@@ -42,5 +42,5 @@ async def serve_published_app(handle: str) -> HTMLResponse:
     if not project or not project.published_at:
         raise HTTPException(status_code=404, detail=f"No published app found for handle '{handle}'.")
 
-    source_url = get_published_url(project.id)
+    source_url = s3_storage.published_url(project.id)
     return await _proxy_from_s3(source_url, f"handle {handle}")

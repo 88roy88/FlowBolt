@@ -6,7 +6,9 @@ from typing import Any
 
 import pytest
 
-from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.agents import analyze_data_source as ads_module
+from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
+from flow44.db.project_data_source import DataSourceContext
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import (
     DataSourceFieldSchema,
@@ -51,28 +53,29 @@ class TestFetchAndAnalyze:
                 sample={"results": {"rows": [{"id": 1}]}},
             )
 
-        async def _analyze(*_a: object, **_kw: object) -> dict[str, str]:
-            return {
-                "data_schema": "schema",
-                "relevant_fields": "id",
-                "data_characteristics": "static",
-                "integration_notes": "none",
-            }
+        analysis = {
+            "data_schema": "schema",
+            "relevant_fields": "id",
+            "data_characteristics": "static",
+            "integration_notes": "none",
+        }
+
+        async def _complete_chat(*_a: object, **_kw: object) -> str:
+            return ""
 
         monkeypatch.setattr(ds_logic, "get_display_name", _name)
         monkeypatch.setattr(ds_logic, "get_usage", _usage_fn)
-        monkeypatch.setattr(PlanAgent, "_analyze_data_source", _analyze)
+        monkeypatch.setattr(ads_module, "complete_chat", _complete_chat)
+        monkeypatch.setattr(ads_module, "parse_json_response", lambda _: analysis)
 
-        agent = PlanAgent.__new__(PlanAgent)
-        agent._data_source_authorization = None  # type: ignore[attr-defined]
-        ctx = await agent._fetch_and_analyze_data_source("42")
+        ctx = await fetch_and_analyze_data_source("42", "", None, None, lambda _: {})
 
-        assert ctx["data_source_id"] == "42"
-        assert ctx["data_source_name"] == "Weather"
-        assert ctx["sanitized_name"] == "Weather"
-        assert ctx["can_run_without_input"] is True
-        assert ctx["sample_data"] == {"results": {"rows": [{"id": 1}]}}
-        assert ctx["params_info"] == {"parameters": [], "require_any": False}
+        assert ctx.data_source_id == "42"
+        assert ctx.data_source_name == "Weather"
+        assert ctx.sanitized_name == "Weather"
+        assert ctx.can_run_without_input is True
+        assert ctx.sample_data == {"results": {"rows": [{"id": 1}]}}
+        assert ctx.params_info == {"parameters": [], "require_any": False}
 
     async def test_params_requiring_input(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _name(*_a: object, **_kw: object) -> str:
@@ -94,35 +97,36 @@ class TestFetchAndAnalyze:
                 sample=None,
             )
 
-        async def _analyze(*_a: object, **_kw: object) -> dict[str, str]:
-            return {
-                "data_schema": "person",
-                "relevant_fields": "id",
-                "data_characteristics": "requires input",
-                "integration_notes": "form",
-                "param_ux_hints": "person_id — user input",
-            }
+        analysis = {
+            "data_schema": "person",
+            "relevant_fields": "id",
+            "data_characteristics": "requires input",
+            "integration_notes": "form",
+            "param_ux_hints": "person_id — user input",
+        }
+
+        async def _complete_chat(*_a: object, **_kw: object) -> str:
+            return ""
 
         monkeypatch.setattr(ds_logic, "get_display_name", _name)
         monkeypatch.setattr(ds_logic, "get_usage", _usage_fn)
-        monkeypatch.setattr(PlanAgent, "_analyze_data_source", _analyze)
+        monkeypatch.setattr(ads_module, "complete_chat", _complete_chat)
+        monkeypatch.setattr(ads_module, "parse_json_response", lambda _: analysis)
 
-        agent = PlanAgent.__new__(PlanAgent)
-        agent._data_source_authorization = None  # type: ignore[attr-defined]
-        ctx = await agent._fetch_and_analyze_data_source("7")
+        ctx = await fetch_and_analyze_data_source("7", "", None, None, lambda _: {})
 
-        assert ctx["can_run_without_input"] is False
-        assert ctx["sample_data"] is None
-        assert ctx["params_info"]["parameters"][0]["name"] == "person_id"
+        assert ctx.can_run_without_input is False
+        assert ctx.sample_data is None
+        assert ctx.params_info["parameters"][0]["name"] == "person_id"
 
 
 class TestGenerateDataSourceFiles:
     def test_no_param_emits_single_module(self) -> None:
-        ctx = {
-            "data_source_id": "42",
-            "sanitized_name": "Sales",
-            "params_info": {"parameters": [], "require_any": False},
-            "queries": [
+        ctx = DataSourceContext(
+            data_source_id="42",
+            sanitized_name="Sales",
+            params_info={"parameters": [], "require_any": False},
+            queries=[
                 {
                     "name": "rows",
                     "display_name": "Rows",
@@ -130,9 +134,9 @@ class TestGenerateDataSourceFiles:
                     "fields": [{"name": "id", "display_name": "ID", "type": "int", "description": None}],
                 }
             ],
-            "sample_data": {"results": {"rows": [{"id": 1}]}},
-        }
-        files = PlanAgent._generate_data_source_files(ctx)
+            sample_data={"results": {"rows": [{"id": 1}]}},
+        )
+        files = generate_data_source_files(ctx)
         assert set(files.keys()) == {"src/dataSources/Sales.ts"}
         content = files["src/dataSources/Sales.ts"]
         assert "export async function dataSourceSales()" in content
@@ -140,10 +144,10 @@ class TestGenerateDataSourceFiles:
         assert "body: JSON.stringify" not in content
 
     def test_requires_input_emits_typed_signature(self) -> None:
-        ctx = {
-            "data_source_id": "7",
-            "sanitized_name": "Person",
-            "params_info": {
+        ctx = DataSourceContext(
+            data_source_id="7",
+            sanitized_name="Person",
+            params_info={
                 "parameters": [
                     {
                         "name": "person_id",
@@ -158,7 +162,7 @@ class TestGenerateDataSourceFiles:
                 ],
                 "require_any": False,
             },
-            "queries": [
+            queries=[
                 {
                     "name": "person",
                     "display_name": "Person",
@@ -166,9 +170,8 @@ class TestGenerateDataSourceFiles:
                     "fields": [{"name": "id", "display_name": "ID", "type": "int", "description": None}],
                 }
             ],
-            "sample_data": None,
-        }
-        files = PlanAgent._generate_data_source_files(ctx)
+        )
+        files = generate_data_source_files(ctx)
         content = files["src/dataSources/Person.ts"]
         assert "}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in content
         assert "export interface PersonPerson" in content

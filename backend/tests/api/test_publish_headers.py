@@ -18,7 +18,7 @@ async def test_proxy_published_app_headers():
     mock_project.published_at = "2015-10-21T07:28:00Z"
 
     with patch("flow44.api.shared.get_project_by_handle", return_value=mock_project):
-        with patch("flow44.api.shared.get_published_url", return_value="https://example.com/index.html"):
+        with patch("flow44.api.shared.s3_storage.published_url", return_value="https://example.com/index.html"):
             with patch("httpx.AsyncClient.get") as mock_get:
                 mock_resp = AsyncMock()
                 mock_resp.status_code = 200
