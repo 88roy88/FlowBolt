@@ -101,14 +101,8 @@ class PnpmMixin(BaseSandbox, ABC):
             return BuildCommandResult(success=False, output="", errors=error_msg)
 
     def _format_build_errors(self, raw_output: str) -> str:
-        """Format build errors for LLM - currently returns raw output.
-
-        Future enhancements:
-        - Extract only error lines
-        - Group by file
-        - Remove ANSI codes (already handled by exec)
-        - Summarize if too long
-        """
+        for root in self.build_error_path_roots():
+            raw_output = raw_output.replace(f"{root}{os.sep}", "").replace(f"{root}/", "")
         return raw_output
 
     async def start_dev_server(self) -> None:
