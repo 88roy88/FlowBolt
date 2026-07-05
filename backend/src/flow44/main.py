@@ -28,10 +28,12 @@ from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import s3_storage
+from flow44.logging import setup_logging
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+setup_logging(settings.LOG_FILE_PATH)
+
 logger = logging.getLogger(__name__)
 
 
