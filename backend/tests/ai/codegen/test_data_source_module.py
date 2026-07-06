@@ -403,6 +403,43 @@ class TestCubeIdDisambiguation:
         assert "body['filters']['start_date'] = filters_startDate;" in result
         assert "if (limit !== undefined) {\n    body['reports']['limit'] = limit;\n  }" in result
 
+    def test_numeric_cube_id_prefix_is_valid_ts_identifier(self) -> None:
+        # cube_id starting with a digit gets a leading underscore so the
+        # generated identifier is valid TS (identifiers cannot start with a digit).
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="1reports",
+                ),
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="2filters",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="10",
+            sanitized_name="Report",
+            params_info=params,
+            queries=_queries("report"),
+        )
+        assert "_1reports_startDate: { From: Date; To: Date }" in result
+        assert "_2filters_startDate: { From: Date; To: Date }" in result
+        assert "body['1reports']['start_date'] = _1reports_startDate;" in result
+        assert "body['2filters']['start_date'] = _2filters_startDate;" in result
+
 
 class TestAllParamTypes:
     def test_all_four_param_types_map_to_correct_ts_types(self) -> None:

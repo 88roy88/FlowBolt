@@ -1,6 +1,10 @@
 import { authConfig } from './config';
 import type { AuthCredentials } from './types';
 
+function isExpired(creds: AuthCredentials): boolean {
+  return creds.exp * 1000 <= Date.now();
+}
+
 function parseStoredCredentials(raw: string): AuthCredentials | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -51,7 +55,10 @@ export const credentialsStore = {
       const token = creds?.auth_token?.trim();
       if (!token) return undefined;
 
-      if (creds && creds.exp * 1000 <= Date.now()) return undefined;
+      if (creds && isExpired(creds)) {
+        this.clear();
+        return undefined;
+      }
 
       return token;
     } catch {

@@ -96,12 +96,17 @@ class FlapiSettings(Flow44BaseSettings):
 
 
 class S3Settings(Flow44BaseSettings):
-    S3_ENDPOINT_URL: str | None = None
-    S3_ACCESS_KEY: str | None = None
-    S3_SECRET_KEY: str | None = None
-    S3_BUCKET_NAME: str | None = None
+    S3_ENDPOINT_URL: str
+    S3_USE_SSL: bool = True
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_BUCKET_NAME: str
     S3_CACHE_TTL: int = 3600
     S3_STORAGE_CLASS: str = "STANDARD_IA"
+
+
+class LoggerSettings(Flow44BaseSettings):
+    LOG_FILE_PATH: str | None = None
 
 
 class LangfuseSettings(Flow44BaseSettings):
@@ -130,6 +135,7 @@ class Settings(
     FlapiSettings,
     S3Settings,
     LangfuseSettings,
+    LoggerSettings,
     Flow44BaseSettings,
 ):
     pass

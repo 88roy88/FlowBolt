@@ -96,7 +96,7 @@ export class PopupAuthenticator {
 
         const creds = extractCredentials(event.data as Record<string, unknown>);
         if (!creds) {
-          finishError(new Error('Login response did not include a valid auth_token'));
+          finishError(new Error('Login response was missing a valid auth_token, user id, or expiry'));
           return;
         }
 

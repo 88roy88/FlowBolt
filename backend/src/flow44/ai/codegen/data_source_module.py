@@ -201,6 +201,8 @@ def _ts_ident(name: str) -> str:
     parts = re.split(r"_+", name)
     head, *rest = parts
     ident = head + "".join(p[:1].upper() + p[1:] for p in rest if p)
+    if ident[:1].isdigit():
+        ident = "_" + ident
     if ident in _TS_RESERVED:
         return f"{ident}_"
     return ident
