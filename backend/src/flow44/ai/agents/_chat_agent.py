@@ -13,6 +13,10 @@ class ChatAgent(BaseAgent):
         steps: list[dict[str, Any]],
     ) -> None:
         for step in steps:
+            if step.get("type") == "reasoning":
+                await save_message(self.project_id, ChatRole.reasoning, step["content"])
+                continue
+
             tool = step.get("tool", "?")
             args = step.get("args", {})
             primary_arg = next((v for k, v in args.items() if k not in ("content",)), "")

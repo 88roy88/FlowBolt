@@ -94,10 +94,21 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             choice = response.choices[0]
             message = choice.message
             last_content = message.content or ""
+            reasoning_content = getattr(message, "reasoning_content", None) or ""
 
             # No tool calls → we're done
             if not message.tool_calls:
                 return last_content
+
+            interim_reasoning = reasoning_content.strip()
+            if emit_fn and interim_reasoning:
+                await emit_fn(
+                    {
+                        "type": "react_reasoning",
+                        "content": interim_reasoning,
+                        "iteration": iteration,
+                    }
+                )
 
             # Add assistant message with tool calls
             working_messages.append(message.model_dump())

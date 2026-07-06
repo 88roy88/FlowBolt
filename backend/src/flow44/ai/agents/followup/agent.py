@@ -320,7 +320,17 @@ class FollowUpAgent(ChatAgent):
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
         """Emit ReAct step events and track state for followup agent."""
-        if event["type"] == "react_step":
+        if event["type"] == "react_reasoning":
+            self._iteration = event["iteration"]
+            self._steps.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "reasoning",
+                    "content": event["content"],
+                    "iteration": self._iteration,
+                }
+            )
+        elif event["type"] == "react_step":
             self._iteration = event["iteration"]
             step_data = {
                 "tool": event["tool"],

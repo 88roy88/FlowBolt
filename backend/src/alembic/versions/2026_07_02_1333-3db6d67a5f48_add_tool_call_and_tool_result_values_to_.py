@@ -1,4 +1,4 @@
-"""Add tool_call and tool_result values to chatrole enum
+"""Add tool_call, tool_result and reasoning values to chatrole enum
 
 Revision ID: 3db6d67a5f48
 Revises: 9252bbb0fae2
@@ -25,7 +25,7 @@ def upgrade() -> None:
     op.sync_enum_values(
         enum_schema='public',
         enum_name='chatrole',
-        new_values=['user', 'assistant', 'tool_call', 'tool_result'],
+        new_values=['user', 'assistant', 'tool_call', 'tool_result', 'reasoning'],
         affected_columns=[TableReference(table_schema='public', table_name='chat_messages', column_name='role')],
         enum_values_to_rename=[],
     )

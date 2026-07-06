@@ -13,6 +13,7 @@ class ChatRole(StrEnum):
     assistant = "assistant"
     tool_call = "tool_call"
     tool_result = "tool_result"
+    reasoning = "reasoning"
 
 
 class ChatMessage(SQLModel, table=True):
