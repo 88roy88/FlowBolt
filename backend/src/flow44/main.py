@@ -78,6 +78,7 @@ app = FastAPI(
 
 
 @app.get("/health")
+@app.get("/api/health")
 async def health_check() -> dict[str, str]:
     """Health check endpoint for Docker/K8s."""
     return {"status": "ok", "version": "0.1.0"}
