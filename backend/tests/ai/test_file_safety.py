@@ -6,9 +6,10 @@ import pytest
 
 from flow44.ai.file_safety import (
     FileSafetyError,
-    drop_protected_files,
+    format_rejection_feedback,
     normalized_path_or_reject,
     protected_file_rules,
+    screen_generated_files,
 )
 
 
@@ -65,17 +66,39 @@ def test_generated_path_is_normalized_for_posix_and_windows_paths(path: str, exp
     assert normalized_path_or_reject(path) == expected
 
 
-def test_drop_protected_files_drops_protected_and_normalizes() -> None:
+def test_screen_generated_files_rejects_protected_and_normalizes() -> None:
     files = [
         ("src/components/AssetMap.tsx", "a"),
-        ("package.json", "b"),        # protected -> dropped
-        ("./src/App.tsx", "c"),        # kept, normalized to src/App.tsx
-        ("../escape.ts", "d"),         # unsafe -> dropped
+        ("package.json", "b"),
+        ("./src/App.tsx", "c"),
+        ("../escape.ts", "d"),
     ]
-    assert drop_protected_files(files, source="test") == [
+
+    safe, rejections = screen_generated_files(files, source="test")
+
+    assert safe == [
         ("src/components/AssetMap.tsx", "a"),
         ("src/App.tsx", "c"),
     ]
+    assert len(rejections) == 2
+
+
+def test_screen_generated_files_rejects_absolute_path() -> None:
+    files = [("/etc/passwd", "content")]
+
+    safe, rejections = screen_generated_files(files, source="test")
+
+    assert safe == []
+    assert len(rejections) == 1
+
+
+def test_format_rejection_feedback_lists_each_rejection() -> None:
+    feedback = format_rejection_feedback(["first reason", "second reason"])
+
+    assert "These files were rejected and not written:" in feedback
+    assert "- first reason" in feedback
+    assert "- second reason" in feedback
+    assert "re-emit it in the same flowArtifact format" in feedback
 
 
 def test_file_safety_prompt_context_uses_contract_values() -> None:

@@ -1,5 +1,6 @@
 import logging
 from pathlib import PurePosixPath
+from typing import Any
 
 from langfuse.decorators import observe
 
@@ -9,7 +10,7 @@ from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_f
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
-from flow44.ai.file_safety import drop_protected_files
+from flow44.ai.file_safety import format_rejection_feedback, screen_generated_files
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -169,7 +170,10 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
-        state.generated_files = drop_protected_files(state.generated_files, source="fix-error/generated")
+        state.generated_files, state.rejected_file_notes = screen_generated_files(
+            state.generated_files,
+            source="fix-error/generated",
+        )
         if not state.generated_files:
             return state
 
@@ -190,7 +194,7 @@ class FixErrorAgent(BaseAgent):
 
     async def _step_validate(self, state: FixErrorState) -> FixErrorState:
         """Step: Validate the fix."""
-        if not state.generated_files:
+        if not state.generated_files and not state.rejected_file_notes:
             return state
 
         await state.emit_fn(
@@ -224,12 +228,17 @@ class FixErrorAgent(BaseAgent):
         )
 
         prompt = render_fix_errors(errors=state.validation_errors, files=dict(state.generated_files))
+        messages: list[dict[str, Any] | Message] = [Message.user("Fix the TypeScript errors.")]
+        if state.rejected_file_notes:
+            messages.append(Message.user(format_rejection_feedback(state.rejected_file_notes)))
+            state.rejected_file_notes = []
+
         generated: list[tuple[str, str]] = []
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
         try:
             async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")],
+                messages,
                 prompt,
                 model=state.model,
                 metadata=state.llm_metadata_fn("fix_error_retry"),
@@ -237,7 +246,10 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = drop_protected_files(generated, source="fix-error/retry")
+            validated, state.rejected_file_notes = screen_generated_files(
+                generated,
+                source="fix-error/retry",
+            )
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 await state.emit_fn({"type": "file", "path": path, "content": content})

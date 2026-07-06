@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import uuid
+from typing import Any
 
 from langfuse import Langfuse
 from langfuse.decorators import observe
@@ -20,8 +21,9 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
-    drop_protected_files,
+    format_rejection_feedback,
     normalized_path_or_reject,
+    screen_generated_files,
 )
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.parser import ActionParser
@@ -179,12 +181,17 @@ class ExecuteAgent(BaseAgent):
         state.fix_attempts += 1
 
         prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
+        messages: list[dict[str, Any] | Message] = [Message.user("Fix the TypeScript errors.")]
+        if state.rejected_file_notes:
+            messages.append(Message.user(format_rejection_feedback(state.rejected_file_notes)))
+            state.rejected_file_notes = []
+
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
             async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")],
+                messages,
                 prompt,
                 model=state.model,
                 metadata=state.llm_metadata_fn("fix_errors"),
@@ -192,7 +199,10 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated = drop_protected_files(generated, source="execute/fix-errors")
+            validated, state.rejected_file_notes = screen_generated_files(
+                generated,
+                source="execute/fix-errors",
+            )
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
@@ -340,7 +350,6 @@ class ExecuteAgent(BaseAgent):
 
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
-
             async for chunk in stream_chat(
                 [Message.user("Generate the code.")],
                 prompt,
@@ -350,13 +359,17 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            expected_paths = {normalized_path_or_reject(path) for path in task.files}
+            expected_paths = set(task.files)
+            safe, rejections = screen_generated_files(generated, source=f"execute/task-{task.id}")
             validated: list[tuple[str, str]] = []
-            for path, content in drop_protected_files(generated, source=f"execute/task-{task.id}"):
+            for path, content in safe:
                 if path not in expected_paths:
                     logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, path)
+                    rejections.append(f"File is outside the task contract: {path}")
                     continue
                 validated.append((path, content))
+            if rejections:
+                state.rejected_file_notes.extend(f"[task {task.id}] {r}" for r in rejections)
 
             paths: list[str] = []
             for path, content in validated:

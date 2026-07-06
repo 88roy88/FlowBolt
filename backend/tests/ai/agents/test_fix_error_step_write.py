@@ -20,7 +20,7 @@ async def _noop_emit(_event: dict[str, Any]) -> None:
     return None
 
 
-async def test_step_write_drops_protected_file_without_raising() -> None:
+async def test_step_write_drops_protected_file_and_records_rejection() -> None:
     sandbox = _RecordingSandbox()
     state = FixErrorState(
         project_id="p",
@@ -35,3 +35,4 @@ async def test_step_write_drops_protected_file_without_raising() -> None:
 
     assert sandbox.written == [("src/components/Foo.tsx", "y")]
     assert result.generated_files == [("src/components/Foo.tsx", "y")]
+    assert len(result.rejected_file_notes) == 1

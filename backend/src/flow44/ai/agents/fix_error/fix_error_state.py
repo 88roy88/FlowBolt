@@ -27,6 +27,7 @@ class FixErrorState(BaseModel):
     full_response: str = ""
     validation_errors: str = ""
     retry_count: int = 0
+    rejected_file_notes: list[str] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True

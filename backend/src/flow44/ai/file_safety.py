@@ -58,11 +58,26 @@ def normalized_path_or_reject(path: str) -> str:
     return normalized
 
 
-def drop_protected_files(generated: list[tuple[str, str]], *, source: str) -> list[tuple[str, str]]:
+def screen_generated_files(
+    generated: list[tuple[str, str]],
+    *,
+    source: str,
+) -> tuple[list[tuple[str, str]], list[str]]:
     safe: list[tuple[str, str]] = []
+    rejections: list[str] = []
     for path, content in generated:
         try:
             safe.append((normalized_path_or_reject(path), content))
-        except FileSafetyError:
-            logger.warning("Dropping protected generated file (%s): %s", source, path)
-    return safe
+        except FileSafetyError as exc:
+            logger.warning("Rejecting generated file (%s): %s", source, exc)
+            rejections.append(str(exc))
+    return safe, rejections
+
+
+def format_rejection_feedback(rejections: list[str]) -> str:
+    lines = "\n".join(f"- {rejection}" for rejection in rejections)
+    return (
+        "These files were rejected and not written:\n"
+        f"{lines}\n"
+        "If a file is still needed, re-emit it in the same flowArtifact format using an allowed path."
+    )
