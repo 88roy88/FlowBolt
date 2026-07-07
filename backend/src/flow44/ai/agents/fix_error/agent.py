@@ -3,7 +3,7 @@ from pathlib import PurePosixPath
 
 from langfuse.decorators import observe
 
-from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
 from flow44.ai.core.flow import Flow
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 MAX_RETRY_ATTEMPTS = 3
 
 
-class FixErrorAgent(BaseAgent):
+class FixErrorAgent(ChatAgent):
     def __init__(
         self,
         project_id: str,
@@ -145,6 +145,7 @@ class FixErrorAgent(BaseAgent):
         artifact_start = state.full_response.find("<flowArtifact")
         cut = artifact_start if artifact_start != -1 else len(state.full_response)
         explanation = state.full_response[:cut].strip()
+        state.explanation = explanation
         if explanation:
             await state.emit_fn({"type": "text", "content": explanation + "\n\n"})
 
@@ -250,6 +251,16 @@ class FixErrorAgent(BaseAgent):
 
     async def _step_complete(self, state: FixErrorState) -> FixErrorState:
         """Step: Complete the fix process."""
+        files = [p for p, _ in state.generated_files]
+        steps = [
+            {
+                "tool": "fix_error",
+                "args": {"file": state.error_file or "unknown"},
+                "result_preview": f"fixed {len(files)} file(s)",
+            }
+        ]
+        await self._save_response(state.explanation, steps)
+
         await state.emit_fn({"type": "action_complete"})
         await state.emit_fn({"type": "phase", "phase": "idle"})
         return state

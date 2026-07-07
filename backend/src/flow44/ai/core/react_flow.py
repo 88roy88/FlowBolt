@@ -94,10 +94,21 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             choice = response.choices[0]
             message = choice.message
             last_content = message.content or ""
+            reasoning_content = getattr(message, "reasoning_content", None) or ""
 
             # No tool calls → we're done
             if not message.tool_calls:
                 return last_content
+
+            interim_reasoning = reasoning_content.strip()
+            if emit_fn and interim_reasoning:
+                await emit_fn(
+                    {
+                        "type": "react_reasoning",
+                        "content": interim_reasoning,
+                        "iteration": iteration,
+                    }
+                )
 
             # Add assistant message with tool calls
             working_messages.append(message.model_dump())
@@ -127,15 +138,17 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                 # Emit completion if callback provided
                 if emit_fn:
                     preview = result_str[:200] + "..." if len(result_str) > 200 else result_str
-                    await emit_fn(
-                        {
-                            "type": "react_step",
-                            "tool": tool_name,
-                            "status": "completed",
-                            "result_preview": preview,
-                            "iteration": iteration,
-                        }
-                    )
+                    event: dict[str, object] = {
+                        "type": "react_step",
+                        "tool": tool_name,
+                        "args": {k: v for k, v in args.items() if k != "content"},
+                        "status": "completed",
+                        "result_preview": preview,
+                        "iteration": iteration,
+                    }
+                    if result.short_preview:
+                        event["short_preview"] = result.short_preview
+                    await emit_fn(event)
 
                 # Add tool result to messages
                 working_messages.append(

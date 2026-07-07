@@ -27,6 +27,7 @@ Based on the user's request, you may also need to build new UI around them (new 
 - **Params:** {{ ds.param_ux_hints }}
 {% if ds.integration_notes %}- **Integration Notes:** {{ ds.integration_notes }}{% endif %}
 - Usage: `import { dataSource{{ ds.sanitized_name }} } from './dataSources/{{ ds.sanitized_name }}';`
+- Docs: `src/dataSources/{{ ds.sanitized_name }}.docs.md`
 {% endfor %}
 {% endif %}
 

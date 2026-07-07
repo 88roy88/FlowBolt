@@ -115,7 +115,7 @@ async def proxy_to_sandbox(
 
 @router.websocket("/{project_id}/proxy/")
 @router.websocket("/{project_id}/proxy")
-async def proxy_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandboxDep) -> None:  # noqa: C901
+async def proxy_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandboxDep) -> None:
     """Proxy WebSocket connections for Vite HMR."""
     await websocket.accept()
 
