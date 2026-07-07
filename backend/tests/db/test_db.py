@@ -136,6 +136,16 @@ class TestProjectCRUD:
         messages = await get_messages(project.id)
         assert messages == []
 
+    async def test_delete_project_cascades_data_sources(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        ds = [DataSourceContext(data_source_id="ds1")]
+        await update_project_data_sources(project.id, ds)
+
+        await delete_project(project.id)
+
+        result = await get_project_data_sources(project.id)
+        assert result == []
+
 
 # ---------------------------------------------------------------------------
 # ChatMessage CRUD

@@ -94,9 +94,9 @@ async def test_start_agent_rejects_when_run_active(monkeypatch: pytest.MonkeyPat
         nonlocal ran
         ran = True
 
-    result = await chat._start_agent(PROJECT_ID, _agent())
+    with pytest.raises(chat.AgentAlreadyRunning):
+        await chat._start_agent(PROJECT_ID, _agent())
 
-    assert result is False
     assert ran is False  # the coro was closed, never scheduled
 
 
@@ -109,8 +109,7 @@ async def test_start_agent_starts_when_claim_succeeds(monkeypatch: pytest.Monkey
     async def _agent() -> None:
         started.set()
 
-    result = await chat._start_agent(PROJECT_ID, _agent())
+    await chat._start_agent(PROJECT_ID, _agent())
 
-    assert result is True
     await asyncio.wait_for(started.wait(), timeout=1)
     await asyncio.sleep(0.01)  # let the supervisor finish and clear the heartbeat
