@@ -170,8 +170,7 @@ class FixErrorAgent(ChatAgent):
         )
 
         for path, content in state.generated_files:
-            await state.sandbox_ref.write_file(path, content)
-            await state.emit_fn({"type": "file", "path": path, "content": content})
+            await self._write_file_and_emit_diff(state.diffs, path, content)
 
         await state.emit_fn(
             {
@@ -234,8 +233,7 @@ class FixErrorAgent(ChatAgent):
             parser.flush()
 
             for path, content in generated:
-                await state.sandbox_ref.write_file(path, content)
-                await state.emit_fn({"type": "file", "path": path, "content": content})
+                await self._write_file_and_emit_diff(state.diffs, path, content)
 
             # Update generated files list
             state.generated_files = generated
@@ -261,6 +259,7 @@ class FixErrorAgent(ChatAgent):
         ]
         await self._save_response(state.explanation, steps)
 
+        await self._emit_file_diffs_summary(state.diffs)
         await state.emit_fn({"type": "action_complete"})
         await state.emit_fn({"type": "phase", "phase": "idle"})
         return state

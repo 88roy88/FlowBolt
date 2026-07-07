@@ -147,6 +147,10 @@ export function createFixErrorHandler(
         handleFixStep(msg, set);
         break;
 
+      case 'file_diffs':
+        set({ fileDiffs: msg.diffs });
+        break;
+
       case 'text':
         handleText(msg, set);
         break;
@@ -167,7 +171,7 @@ export function createFixErrorHandler(
             role: 'assistant',
             content: state.currentAssistantMessage,
             timestamp: getTimestamp(),
-            agentCard: { type: 'fix_progress', steps: [...state.fixSteps] },
+            agentCard: { type: 'fix_progress', steps: [...state.fixSteps], diffs: state.fileDiffs },
           };
           set((s) => ({
             messages: [...s.messages, fixMessage],
@@ -260,8 +264,8 @@ export function createSendMessageHandler(
         handleFixStep(msg, set);
         break;
 
-      case 'followup_diffs':
-        set({ followUpDiffs: msg.diffs });
+      case 'file_diffs':
+        set({ fileDiffs: msg.diffs });
         break;
 
       case 'text':
@@ -430,7 +434,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
       role: 'assistant',
       content: state.currentAssistantMessage,
       timestamp: getTimestamp(),
-      agentCard: { type: 'fix_progress', steps: [...state.fixSteps] },
+      agentCard: { type: 'fix_progress', steps: [...state.fixSteps], diffs: state.fileDiffs },
     });
   } else if (state.followUpSteps.length > 0) {
     const filesChanged = state.actions
@@ -447,7 +451,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
         steps: [...state.followUpSteps],
         answer: state.currentAssistantMessage || undefined,
         filesChanged: filesChanged.length > 0 ? filesChanged : undefined,
-        diffs: state.followUpDiffs.length > 0 ? [...state.followUpDiffs] : undefined,
+        diffs: [...state.fileDiffs],
       },
     });
   } else if (state.currentAssistantMessage) {
