@@ -211,7 +211,7 @@ export async function checkSlugAvailability(
 
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const res = await fetch('/health');
+    const res = await fetch(`${BASE}/health`);
     return res.ok;
   } catch {
     return false;
