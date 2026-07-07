@@ -22,7 +22,7 @@ export interface ChatState {
   executionTasks: ExecutionTask[];
   fixSteps: FixStep[];
   followUpSteps: FollowUpStep[];
-  followUpDiffs: FileDiff[];
+  fileDiffs: FileDiff[];
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
   selectedDataSources: { id: number; name: string }[];
@@ -77,7 +77,7 @@ const RESET_STATE = {
   actions: [] as Action[],
   fixSteps: [] as FixStep[],
   followUpSteps: [] as FollowUpStep[],
-  followUpDiffs: [] as FileDiff[],
+  fileDiffs: [] as FileDiff[],
   error: null,
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
@@ -98,7 +98,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   executionTasks: [],
   fixSteps: [],
   followUpSteps: [],
-  followUpDiffs: [],
+  fileDiffs: [],
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
   selectedDataSources: [],
