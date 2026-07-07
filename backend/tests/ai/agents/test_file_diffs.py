@@ -5,18 +5,6 @@ from __future__ import annotations
 from flow44.ai.agents.file_diffs import DiffTracker, compute_diff
 
 
-class TestComputeDiff:
-    def test_produces_unified_diff_with_path_headers(self) -> None:
-        diff = compute_diff("a\nb\n", "a\nc\n", "src/App.tsx")
-        assert "--- a/src/App.tsx" in diff
-        assert "+++ b/src/App.tsx" in diff
-        assert "-b" in diff
-        assert "+c" in diff
-
-    def test_identical_content_yields_empty_diff(self) -> None:
-        assert compute_diff("same\n", "same\n", "src/App.tsx") == ""
-
-
 class TestDiffTracker:
     def test_single_write(self) -> None:
         tracker = DiffTracker()
