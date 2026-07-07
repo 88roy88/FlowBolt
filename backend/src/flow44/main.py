@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 import litellm
 from fastapi import APIRouter, Depends, FastAPI
@@ -81,7 +82,7 @@ app = FastAPI(
 @app.get("/api/health")
 async def health_check() -> dict[str, str]:
     """Health check endpoint for Docker/K8s."""
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.1.0", "time": datetime.now(UTC).isoformat()}
 
 
 # CORS — allow all origins in development
