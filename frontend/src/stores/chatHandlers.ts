@@ -1,5 +1,5 @@
 import type { WSMessage, Message, FollowUpStep, AgentPhase, ProjectSummary } from '../types';
-import { debounce } from '../utils/debounce';
+import { throttle } from '../utils/debounce';
 import { useFilesStore } from './files';
 import { useSessionStore } from './session';
 import {
@@ -58,8 +58,7 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
-// Agents emit many file/task events in a burst; coalesce them into a single tree refetch.
-const _treeRefresh = debounce(() => void useFilesStore.getState().loadFileTree(), 250);
+const _treeRefresh = throttle(() => void useFilesStore.getState().loadFileTree(), 1000);
 
 function refreshFileTreeAfterAgentWrite() {
   if (_skipMessages) return;

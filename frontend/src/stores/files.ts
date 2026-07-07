@@ -29,6 +29,8 @@ interface FilesState {
   reset: () => void;
 }
 
+let _fileTreeRequestSerial = 0;
+
 function storageKey(projectId: string) { return `editor-tabs:${projectId}`; }
 
 function normalizePath(path: string): string {
@@ -103,12 +105,9 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       });
     }
 
-    const tree = await queryClient.fetchQuery({
-      queryKey: ['fileTree', projectId],
-      queryFn: () => api.fetchFileTree(projectId),
-      staleTime: 0,
-    });
-
+    const requestId = ++_fileTreeRequestSerial;
+    const tree = await api.fetchFileTree(projectId);
+    if (requestId !== _fileTreeRequestSerial) return;
     if (useSessionStore.getState().projectId !== projectId) return;
     set({ fileTree: tree });
 

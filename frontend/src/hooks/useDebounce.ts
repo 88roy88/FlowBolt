@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { debounce, type Debounced } from '../utils/debounce';
+import { debounce, type Debounced, type DebounceOptions } from '../utils/debounce';
 
 export function useDebouncedCallback<A extends unknown[]>(
   fn: (...args: A) => void,
-  ms: number
+  ms: number,
+  opts: DebounceOptions = {}
 ): Debounced<A> {
   const fnRef = useRef(fn);
   fnRef.current = fn;
 
-  const debounced = useMemo(() => debounce((...args: A) => fnRef.current(...args), ms), [ms]);
+  const { leading, maxWait } = opts;
+  const debounced = useMemo(
+    () => debounce((...args: A) => fnRef.current(...args), ms, { leading, maxWait }),
+    [ms, leading, maxWait]
+  );
+
   useEffect(() => debounced.cancel, [debounced]);
   return debounced;
 }

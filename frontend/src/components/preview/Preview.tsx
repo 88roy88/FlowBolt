@@ -48,7 +48,7 @@ export function Preview() {
     console.debug('[Preview] refresh — reason: files saved');
     clearConsole();
     setRefreshKey((k) => k + 1);
-  }, 2000);
+  }, 2000, { maxWait: 8000 });
   useEffect(() => {
     if (saveVersion === saveVersionRef.current) return;
     saveVersionRef.current = saveVersion;
