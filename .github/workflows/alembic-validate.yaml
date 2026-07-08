@@ -1,6 +1,11 @@
 name: Alembic Validate
 
 on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+      - develop
   push:
     branches:
       - main
