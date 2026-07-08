@@ -1,6 +1,6 @@
 import logging
 from pathlib import PurePosixPath, PureWindowsPath
-from typing import TypedDict
+from typing import NamedTuple, TypedDict
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +14,18 @@ class ProtectedFileRules(TypedDict):
     protected_patterns: list[str]
 
 
-_PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
+class ScreenedFiles(NamedTuple):
+    safe: list[tuple[str, str]]
+    rejections: list[FileSafetyError]
+
+
+_PROTECTED_APP_FILE_PATHS: tuple[str, ...] = (
     "src/main.tsx",
     "src/config.ts",
     "src/vite-env.d.ts",
+)
+
+_PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
     "src/api/**",
     "src/auth/**",
     "src/platform/**",
@@ -36,16 +44,17 @@ _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
 
 def _is_protected(normalized_path: str) -> bool:
     path = PurePosixPath(normalized_path)
-    return any(path.full_match(p, case_sensitive=False) for p in _PROTECTED_APP_FILE_PATTERNS)
+    return any(
+        path.full_match(p, case_sensitive=False)
+        for p in (*_PROTECTED_APP_FILE_PATHS, *_PROTECTED_APP_FILE_PATTERNS)
+    )
 
 
 def protected_file_rules() -> ProtectedFileRules:
-    paths: list[str] = []
-    patterns: list[str] = []
-    for pattern in _PROTECTED_APP_FILE_PATTERNS:
-        display = pattern.removeprefix("**/").replace("/**", "/*")
-        (patterns if "*" in display else paths).append(display)
-    return {"protected_paths": sorted(paths), "protected_patterns": sorted(patterns)}
+    return {
+        "protected_paths": list(_PROTECTED_APP_FILE_PATHS),
+        "protected_patterns": list(_PROTECTED_APP_FILE_PATTERNS),
+    }
 
 
 def normalized_path_or_reject(path: str) -> str:
@@ -58,23 +67,19 @@ def normalized_path_or_reject(path: str) -> str:
     return normalized
 
 
-def screen_generated_files(
-    generated: list[tuple[str, str]],
-    *,
-    source: str,
-) -> tuple[list[tuple[str, str]], list[str]]:
+def screen_generated_files(generated: list[tuple[str, str]]) -> ScreenedFiles:
     safe: list[tuple[str, str]] = []
-    rejections: list[str] = []
+    rejections: list[FileSafetyError] = []
     for path, content in generated:
         try:
             safe.append((normalized_path_or_reject(path), content))
         except FileSafetyError as exc:
-            logger.warning("Rejecting generated file (%s): %s", source, exc)
-            rejections.append(str(exc))
-    return safe, rejections
+            logger.warning("Rejecting generated file: %s", exc)
+            rejections.append(exc)
+    return ScreenedFiles(safe, rejections)
 
 
-def format_rejection_feedback(rejections: list[str]) -> str:
+def format_rejection_feedback(rejections: list[FileSafetyError]) -> str:
     lines = "\n".join(f"- {rejection}" for rejection in rejections)
     return (
         "These files were rejected and not written:\n"

@@ -22,7 +22,6 @@ from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
     format_rejection_feedback,
-    normalized_path_or_reject,
     screen_generated_files,
 )
 from flow44.ai.helpers import parse_json_response
@@ -67,7 +66,7 @@ class ExecuteAgent(BaseAgent):
 
     def _route_after_validate(self, state: ExecutionState) -> str | None:
         """Route after validation: fix_errors, summarize, or give up."""
-        if not state.all_errors:
+        if not state.all_errors and not state.rejected_files:
             return "summarize"
 
         if state.fix_attempts >= MAX_FIX_ATTEMPTS:
@@ -181,10 +180,12 @@ class ExecuteAgent(BaseAgent):
         state.fix_attempts += 1
 
         prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
-        messages: list[dict[str, Any] | Message] = [Message.user("Fix the TypeScript errors.")]
-        if state.rejected_file_notes:
-            messages.append(Message.user(format_rejection_feedback(state.rejected_file_notes)))
-            state.rejected_file_notes = []
+        messages: list[dict[str, Any] | Message] = [
+            Message.user("Fix the errors." if state.all_errors else "Apply the required file changes.")
+        ]
+        if state.rejected_files:
+            messages.append(Message.user(format_rejection_feedback(state.rejected_files)))
+            state.rejected_files = []
 
         try:
             generated: list[tuple[str, str]] = []
@@ -199,10 +200,7 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated, state.rejected_file_notes = screen_generated_files(
-                generated,
-                source="execute/fix-errors",
-            )
+            validated, state.rejected_files = screen_generated_files(generated)
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
@@ -214,6 +212,11 @@ class ExecuteAgent(BaseAgent):
 
     async def _step_summarize(self, state: ExecutionState) -> ExecutionState:
         """Step: Generate project summary."""
+        if state.rejected_files:
+            await state.emit_fn(
+                {"type": "error", "message": format_rejection_feedback(state.rejected_files)}
+            )
+
         span = state.langfuse_client.span(trace_id=state.trace_id, name="generate-summary")
         state.observation_id = span.id
 
@@ -277,25 +280,16 @@ class ExecuteAgent(BaseAgent):
         )
         plan_data = parse_json_response(raw)
 
-        tasks: list[Task] = []
-        for task_data in plan_data.get("tasks", []):
-            safe_files: list[str] = []
-            for path in task_data.get("files", []):
-                try:
-                    safe_files.append(normalized_path_or_reject(path))
-                except FileSafetyError:
-                    logger.warning("[execute] Dropping protected file from generated plan: %s", path)
-            if not safe_files:
-                continue
-            tasks.append(
-                Task(
-                    id=task_data.get("id", f"task-{uuid.uuid4().hex[:6]}"),
-                    title=task_data.get("title", "Untitled task"),
-                    description=task_data.get("description", ""),
-                    files=safe_files,
-                    depends_on=task_data.get("depends_on", []),
-                )
+        tasks: list[Task] = [
+            Task(
+                id=task_data.get("id", f"task-{uuid.uuid4().hex[:6]}"),
+                title=task_data.get("title", "Untitled task"),
+                description=task_data.get("description", ""),
+                files=task_data.get("files", []),
+                depends_on=task_data.get("depends_on", []),
             )
+            for task_data in plan_data.get("tasks", [])
+        ]
 
         task_ids = {task.id for task in tasks}
         for task in tasks:
@@ -360,16 +354,16 @@ class ExecuteAgent(BaseAgent):
             parser.flush()
 
             expected_paths = set(task.files)
-            safe, rejections = screen_generated_files(generated, source=f"execute/task-{task.id}")
+            safe, rejections = screen_generated_files(generated)
             validated: list[tuple[str, str]] = []
             for path, content in safe:
                 if path not in expected_paths:
                     logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, path)
-                    rejections.append(f"File is outside the task contract: {path}")
+                    rejections.append(FileSafetyError(f"File is outside the task contract: {path}"))
                     continue
                 validated.append((path, content))
             if rejections:
-                state.rejected_file_notes.extend(f"[task {task.id}] {r}" for r in rejections)
+                state.rejected_files.extend(rejections)
 
             paths: list[str] = []
             for path, content in validated:

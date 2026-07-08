@@ -35,4 +35,4 @@ async def test_step_write_drops_protected_file_and_records_rejection() -> None:
 
     assert sandbox.written == [("src/components/Foo.tsx", "y")]
     assert result.generated_files == [("src/components/Foo.tsx", "y")]
-    assert len(result.rejected_file_notes) == 1
+    assert len(result.rejected_files) == 1

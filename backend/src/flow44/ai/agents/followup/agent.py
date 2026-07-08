@@ -28,10 +28,7 @@ MAX_READ_LINES = 1000
 
 
 def _format_file_safety_error(exc: FileSafetyError) -> str:
-    return (
-        f"Generated app contract violation: {exc}\n"
-        "Pick an editable app source file and only import packages selected for this project."
-    )
+    return f"Generated app contract violation: {exc}\nPick an editable app source file."
 
 
 @dataclass

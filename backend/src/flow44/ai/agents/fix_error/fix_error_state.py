@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from flow44.ai.file_safety import FileSafetyError
+
 
 class FixErrorState(BaseModel):
     """State that flows through FixErrorAgent's Flow steps."""
@@ -27,7 +29,7 @@ class FixErrorState(BaseModel):
     full_response: str = ""
     validation_errors: str = ""
     retry_count: int = 0
-    rejected_file_notes: list[str] = Field(default_factory=list)
+    rejected_files: list[FileSafetyError] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True

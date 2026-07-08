@@ -170,10 +170,7 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
-        state.generated_files, state.rejected_file_notes = screen_generated_files(
-            state.generated_files,
-            source="fix-error/generated",
-        )
+        state.generated_files, state.rejected_files = screen_generated_files(state.generated_files)
         if not state.generated_files:
             return state
 
@@ -194,7 +191,7 @@ class FixErrorAgent(BaseAgent):
 
     async def _step_validate(self, state: FixErrorState) -> FixErrorState:
         """Step: Validate the fix."""
-        if not state.generated_files and not state.rejected_file_notes:
+        if not state.generated_files and not state.rejected_files:
             return state
 
         await state.emit_fn(
@@ -228,10 +225,10 @@ class FixErrorAgent(BaseAgent):
         )
 
         prompt = render_fix_errors(errors=state.validation_errors, files=dict(state.generated_files))
-        messages: list[dict[str, Any] | Message] = [Message.user("Fix the TypeScript errors.")]
-        if state.rejected_file_notes:
-            messages.append(Message.user(format_rejection_feedback(state.rejected_file_notes)))
-            state.rejected_file_notes = []
+        messages: list[dict[str, Any] | Message] = [Message.user("Fix the errors.")]
+        if state.rejected_files:
+            messages.append(Message.user(format_rejection_feedback(state.rejected_files)))
+            state.rejected_files = []
 
         generated: list[tuple[str, str]] = []
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
@@ -246,10 +243,7 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated, state.rejected_file_notes = screen_generated_files(
-                generated,
-                source="fix-error/retry",
-            )
+            validated, state.rejected_files = screen_generated_files(generated)
             for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 await state.emit_fn({"type": "file", "path": path, "content": content})

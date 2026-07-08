@@ -74,26 +74,27 @@ def test_screen_generated_files_rejects_protected_and_normalizes() -> None:
         ("../escape.ts", "d"),
     ]
 
-    safe, rejections = screen_generated_files(files, source="test")
+    safe, rejections = screen_generated_files(files)
 
     assert safe == [
         ("src/components/AssetMap.tsx", "a"),
         ("src/App.tsx", "c"),
     ]
     assert len(rejections) == 2
+    assert all(isinstance(r, FileSafetyError) for r in rejections)
 
 
 def test_screen_generated_files_rejects_absolute_path() -> None:
     files = [("/etc/passwd", "content")]
 
-    safe, rejections = screen_generated_files(files, source="test")
+    safe, rejections = screen_generated_files(files)
 
     assert safe == []
     assert len(rejections) == 1
 
 
 def test_format_rejection_feedback_lists_each_rejection() -> None:
-    feedback = format_rejection_feedback(["first reason", "second reason"])
+    feedback = format_rejection_feedback([FileSafetyError("first reason"), FileSafetyError("second reason")])
 
     assert "These files were rejected and not written:" in feedback
     assert "- first reason" in feedback
@@ -104,7 +105,7 @@ def test_format_rejection_feedback_lists_each_rejection() -> None:
 def test_file_safety_prompt_context_uses_contract_values() -> None:
     context = protected_file_rules()
 
-    assert "package.json" in context["protected_paths"]
     assert "src/main.tsx" in context["protected_paths"]
-    assert "src/platform/*" in context["protected_patterns"]
-    assert "vite.config.*" in context["protected_patterns"]
+    assert "**/package.json" in context["protected_patterns"]
+    assert "src/platform/**" in context["protected_patterns"]
+    assert "**/vite.config.*" in context["protected_patterns"]
