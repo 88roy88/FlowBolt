@@ -71,7 +71,7 @@ const INITIAL_STATE: ChatState = {
   agentAlivePollId: 0,
   fixSteps: [],
   followUpSteps: [],
-  followUpDiffs: [],
+  fileDiffs: [],
   projectSummary: null,
   models: [],
   selectedModel: null,

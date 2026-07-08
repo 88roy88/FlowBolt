@@ -113,7 +113,7 @@ class WindowsLocalSandbox(BaseSandbox):
     def kill_pid(cls, pid: int) -> None:
         """Terminate a process tree via taskkill (Windows)."""
         try:
-            subprocess.run(  # noqa: PLW1510, S603
+            subprocess.run(  # noqa: PLW1510
                 ["taskkill", "/PID", str(pid), "/T", "/F"],  # noqa: S607
                 capture_output=True,
                 timeout=5,

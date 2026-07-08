@@ -6,6 +6,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+import alembic_postgresql_enum
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -22,6 +23,7 @@ from sqlmodel import SQLModel
 
 import flow44.db.chat  # noqa
 import flow44.db.events  # noqa
+import flow44.db.heartbeat  # noqa
 import flow44.db.pending_plan  # noqa
 import flow44.db.platform_user  # noqa
 import flow44.db.project  # noqa

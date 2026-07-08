@@ -2,7 +2,10 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
+
+from jinja2 import Environment, FileSystemLoader
 
 from flow44.ai.agents.plan.prompts import render_data_source_analysis
 from flow44.ai.codegen.data_source_module import generate_data_source_module
@@ -15,6 +18,12 @@ from flow44.logic import data_source as ds_logic
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 
 logger = logging.getLogger(__name__)
+
+_env = Environment(  # noqa: S701
+    loader=FileSystemLoader(str(Path(__file__).parent.parent / "codegen" / "templates")),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 
 async def fetch_and_analyze_data_source(
@@ -73,7 +82,9 @@ async def fetch_and_analyze_data_source(
 
 
 def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
-    module_path = f"src/dataSources/{ctx.sanitized_name}.ts"
+    sanitized = ctx.sanitized_name
+    module_path = f"src/dataSources/{sanitized}.ts"
+    docs_path = f"src/dataSources/{sanitized}.docs.md"
     params_info = DataSourceParamsInfo.model_validate(ctx.params_info)
     queries = [DataSourceQuerySchema.model_validate(q) for q in ctx.queries]
     content = generate_data_source_module(
@@ -82,4 +93,38 @@ def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
         params_info=params_info,
         queries=queries,
     )
-    return {module_path: content}
+    docs = _generate_data_source_docs(ctx, params_info, queries)
+    return {module_path: content, docs_path: docs}
+
+
+_TYPE_PLACEHOLDERS = {bool: "<bool>", int: "<int>", float: "<number>"}
+
+
+def _redact_sample_data(sample: dict[str, Any] | None) -> str | None:
+    """Redact actual values from sample data, preserving structure and types."""
+    if sample is None:
+        return None
+
+    def _redact(obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: _redact(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_redact(obj[0])] if obj else []
+        if obj is None:
+            return None
+        return _TYPE_PLACEHOLDERS.get(type(obj), "<string>")
+
+    return json.dumps(_redact(sample), indent=2)
+
+
+def _generate_data_source_docs(
+    ctx: DataSourceContext,
+    params_info: DataSourceParamsInfo,
+    queries: list[DataSourceQuerySchema],
+) -> str:
+    return _env.get_template("data_source_docs.jinja2").render(
+        ctx=ctx,
+        params=params_info.parameters,
+        queries=queries,
+        redacted_sample=_redact_sample_data(ctx.sample_data),
+    )

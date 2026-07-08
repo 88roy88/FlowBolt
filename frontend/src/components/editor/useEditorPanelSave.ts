@@ -1,5 +1,6 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useFilesStore } from '../../stores/files';
+import { useDebouncedCallback } from '../../hooks/useDebounce';
 
 export function useEditorPanelSave(
   activeFilePath: string | null,
@@ -7,7 +8,6 @@ export function useEditorPanelSave(
   saveFile: (path: string) => Promise<void>,
   readOnly: boolean
 ) {
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const doSave = useCallback(
@@ -23,30 +23,17 @@ export function useEditorPanelSave(
     [saveFile]
   );
 
+  const debouncedSave = useDebouncedCallback(doSave, 1000);
+
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
       if (readOnly) return;
       if (!activeFilePath || value === undefined) return;
       updateFileContent(activeFilePath, value);
-
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-
-      saveTimerRef.current = setTimeout(() => {
-        doSave(activeFilePath);
-      }, 1000);
+      debouncedSave(activeFilePath);
     },
-    [activeFilePath, updateFileContent, doSave, readOnly]
+    [activeFilePath, updateFileContent, debouncedSave, readOnly]
   );
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     function onKeyDown(e: globalThis.KeyboardEvent) {
@@ -55,14 +42,14 @@ export function useEditorPanelSave(
         e.preventDefault();
         const path = useFilesStore.getState().activeFilePath;
         if (path) {
-          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+          debouncedSave.cancel();
           doSave(path);
         }
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [doSave, readOnly]);
+  }, [debouncedSave, doSave, readOnly]);
 
-  return { saveStatus, handleEditorChange, doSave, saveTimerRef };
+  return { saveStatus, handleEditorChange, doSave };
 }

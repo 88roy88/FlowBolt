@@ -8,12 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class IdleReaper:
-    """Tracks last-activity timestamps per project and periodically evicts idle sandboxes.
-
-    Evicted sandboxes are destroyed (processes killed, port freed) but the workspace
-    directory is preserved so re-creation on reconnect is fast (no re-scaffold needed).
-    """
-
     def __init__(self) -> None:
         self._ttl = settings.SANDBOX_IDLE_TTL_SECONDS
         self._check_interval = settings.SANDBOX_IDLE_CHECK_INTERVAL_SECONDS

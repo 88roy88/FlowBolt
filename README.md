@@ -19,10 +19,6 @@ AI-powered web app builder. The backend is a FastAPI service; the frontend is a 
 
 ### 1. Install dependencies
 
-# Apply all pending migrations
-
-`uv run alembic upgrade head`
-
 ```bash
 make install
 ```
@@ -36,7 +32,17 @@ cd backend; uv sync; cd ..
 
 This runs `pnpm install` in `frontend/` and `uv sync` in `backend/`.
 
-### 2. Configure the backend environment
+### 2. Apply database migrations
+
+```bash
+cd backend
+uv run alembic upgrade head
+```
+
+> [!NOTE]
+> To create new migrations, see [Database migrations](#database-migrations) below.
+
+### 3. Configure the backend environment
 
 ```bash
 cp backend/.env.example backend/.env
@@ -53,7 +59,7 @@ Edit `backend/.env` and set at minimum:
 
 > **Tip:** If you use Docker Compose for Postgres (see below), the default DB values work without changes.
 
-### 3. Start everything at once
+### 4. Start everything at once
 
 ```bash
 make dev
