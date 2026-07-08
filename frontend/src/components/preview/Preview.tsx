@@ -8,6 +8,7 @@ import { PUBLISH_ROLES } from '../../types';
 import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
+import { useDebouncedCallback } from '../../hooks/useDebounce';
 
 export function Preview() {
   const { t } = useTranslation();
@@ -43,16 +44,16 @@ export function Preview() {
   // Auto-refresh preview when files are saved (by user or AI).
   // Debounce to avoid rapid refreshes during bulk writes.
   const saveVersionRef = useRef(saveVersion);
+  const debouncedRefresh = useDebouncedCallback(() => {
+    console.debug('[Preview] refresh — reason: files saved');
+    clearConsole();
+    setRefreshKey((k) => k + 1);
+  }, 2000, { maxWait: 8000 });
   useEffect(() => {
     if (saveVersion === saveVersionRef.current) return;
     saveVersionRef.current = saveVersion;
-    const timer = setTimeout(() => {
-      console.debug('[Preview] refresh — reason: files saved', { saveVersion });
-      clearConsole();
-      setRefreshKey((k) => k + 1);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [saveVersion, clearConsole]);
+    debouncedRefresh();
+  }, [saveVersion, debouncedRefresh]);
 
   const handleRefresh = () => {
     console.debug('[Preview] refresh — reason: manual');

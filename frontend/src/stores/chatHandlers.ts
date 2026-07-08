@@ -1,4 +1,5 @@
 import type { WSMessage, Message, FollowUpStep, AgentPhase, ProjectSummary } from '../types';
+import { throttle } from '../utils/debounce';
 import { useFilesStore } from './files';
 import { useSessionStore } from './session';
 import {
@@ -57,11 +58,12 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+const _treeRefresh = throttle(() => void useFilesStore.getState().loadFileTree(), 1000);
+
 function refreshFileTreeAfterAgentWrite() {
   if (_skipMessages) return;
-  const store = useFilesStore.getState();
-  void store.loadFileTree();
   useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
+  _treeRefresh();
 }
 
 function handleFileUpdate(msg: { path: string; content: string }, set: SetState) {
