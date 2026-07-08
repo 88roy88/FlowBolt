@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import JSON, UniqueConstraint
+from sqlalchemy import JSON, Column, ForeignKey, String, UniqueConstraint
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -29,7 +29,10 @@ class ProjectDataSource(DataSourceBase, table=True):
     __table_args__ = (UniqueConstraint("project_id", "type", "data_source_id", name="uq_project_data_source"),)
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    project_id: str = Field(default="", index=True)
+    project_id: str = Field(
+        default="",
+        sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False),
+    )
 
 
 class DataSourceContext(DataSourceBase):

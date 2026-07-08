@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.auth.permissions import Role
@@ -14,7 +14,9 @@ class ProjectMember(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("project_id", "user_id", name="uq_project_member"),)
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    project_id: str = Field(index=True, foreign_key="projects.id")
+    project_id: str = Field(
+        sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    )
     user_id: str = Field(index=True)
     role: str = Field(default=Role.viewer.value)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())

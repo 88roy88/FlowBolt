@@ -32,6 +32,7 @@ from flow44.integrations.s3 import s3_storage
 from flow44.logging import setup_logging
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.heartbeat_reaper import heartbeat_reaper
 
 setup_logging(settings.LOG_FILE_PATH)
 
@@ -63,11 +64,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     idle_reaper.start()
     logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
 
+    heartbeat_reaper.start()
+    logger.info("Heartbeat reaper started (stale=%ds).", settings.AGENT_RUN_STALE_TIMEOUT)
+
     async with s3_storage.setup():
         yield
 
-    logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
+    logger.info("Shutting down — stopping reapers and destroying all sandboxes...")
     await idle_reaper.stop()
+    await heartbeat_reaper.stop()
     await sandbox_manager.suspend_all()
     logger.info("Shutdown complete.")
 

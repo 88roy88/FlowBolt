@@ -74,6 +74,12 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             metadata = metadata_fn(f"react-{iteration}") if metadata_fn else None
 
             try:
+                logger.info(
+                    "[react_loop:%s] Calling LLM | iteration=%d msgs=%d",
+                    self.name,
+                    iteration,
+                    len(working_messages),
+                )
                 response = await complete_chat_with_tools(
                     messages=working_messages,  # type: ignore[arg-type]
                     system_prompt=system_prompt,

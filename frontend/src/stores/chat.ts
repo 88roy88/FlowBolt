@@ -129,6 +129,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = getChatSocket(projectId);
     const handler = createFixErrorHandler(set, get, () => detachHandler(socket, handler));
     attachHandler(projectId, socket, handler);
+    startAgentAlivePolling(projectId);
 
     const selectedModel = get().selectedModel;
     socket.send({
@@ -172,6 +173,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = getChatSocket(projectId);
     const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
     attachHandler(projectId, socket, handler);
+    startAgentAlivePolling(projectId);
 
     socket.send({
       type: 'message',
@@ -202,6 +204,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (action === 'modify') {
       set({ isStreaming: true, agentAlive: true, agentPhase: AGENT_PHASE.planning });
     }
+    startAgentAlivePolling(projectId);
   },
 
   addMessage(message: Message) {
