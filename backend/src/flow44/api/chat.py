@@ -161,7 +161,7 @@ async def chat_ws(  # noqa: C901, PLR0915
         except Exception:
             logger.debug("Event forwarding stopped for session %s", project.id)
 
-    async def _receive_actions() -> None:  # noqa: C901, PLR0915
+    async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
             raw = await websocket.receive_text()
             data = json.loads(raw)
