@@ -146,4 +146,5 @@ async def test_step_retry_composes_single_message(monkeypatch: pytest.MonkeyPatc
     assert "boom" in message
     assert "Changes that could not be applied" in message
     assert "rejected" in message
-    assert state.rejected_files == []
+    assert len(state.rejected_files) == 1
+    assert "something rejected" in str(state.rejected_files[0])

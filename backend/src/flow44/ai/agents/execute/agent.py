@@ -197,11 +197,12 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated, state.rejected_files = screen_generated_files(generated)
-            for path, content in validated:
-                await state.sandbox_ref.write_file(path, content)
-                state.build_state.completed_files[path] = content
-                await state.emit_fn({"type": "file", "path": path, "content": content})
+            if generated:
+                validated, state.rejected_files = screen_generated_files(generated)
+                for path, content in validated:
+                    await state.sandbox_ref.write_file(path, content)
+                    state.build_state.completed_files[path] = content
+                    await state.emit_fn({"type": "file", "path": path, "content": content})
         except Exception:
             logger.exception("[execute] Error fix pass failed")
 
@@ -210,9 +211,7 @@ class ExecuteAgent(BaseAgent):
     async def _step_summarize(self, state: ExecutionState) -> ExecutionState:
         """Step: Generate project summary."""
         if state.rejected_files:
-            await state.emit_fn(
-                {"type": "error", "message": format_rejection_feedback(state.rejected_files)}
-            )
+            await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
 
         span = state.langfuse_client.span(trace_id=state.trace_id, name="generate-summary")
         state.observation_id = span.id
@@ -234,6 +233,11 @@ class ExecuteAgent(BaseAgent):
             )
             summary_data = parse_json_response(raw)
             if summary_data:
+                overview = summary_data.get("file_overview")
+                if isinstance(overview, dict):
+                    summary_data["file_overview"] = {
+                        path: desc for path, desc in overview.items() if path in state.build_state.completed_files
+                    }
                 await update_project_summary(state.project_id, json.dumps(summary_data, ensure_ascii=False))
                 await state.emit_fn({"type": "project_summary", "summary": summary_data})
         except Exception:

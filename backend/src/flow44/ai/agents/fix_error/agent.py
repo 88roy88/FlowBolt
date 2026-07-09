@@ -243,13 +243,12 @@ class FixErrorAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            validated, state.rejected_files = screen_generated_files(generated)
-            for path, content in validated:
-                await state.sandbox_ref.write_file(path, content)
-                await state.emit_fn({"type": "file", "path": path, "content": content})
-
-            # Update generated files list
-            state.generated_files = validated
+            if generated:
+                validated, state.rejected_files = screen_generated_files(generated)
+                for path, content in validated:
+                    await state.sandbox_ref.write_file(path, content)
+                    await state.emit_fn({"type": "file", "path": path, "content": content})
+                state.generated_files = validated
 
             await state.emit_fn(
                 {"type": "fix_step", "step": "retry", "status": "completed", "message": "Auto-fix applied"}

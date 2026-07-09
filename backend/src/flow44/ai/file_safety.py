@@ -45,8 +45,7 @@ _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
 def _is_protected(normalized_path: str) -> bool:
     path = PurePosixPath(normalized_path)
     return any(
-        path.full_match(p, case_sensitive=False)
-        for p in (*_PROTECTED_APP_FILE_PATHS, *_PROTECTED_APP_FILE_PATTERNS)
+        path.full_match(p, case_sensitive=False) for p in (*_PROTECTED_APP_FILE_PATHS, *_PROTECTED_APP_FILE_PATTERNS)
     )
 
 
