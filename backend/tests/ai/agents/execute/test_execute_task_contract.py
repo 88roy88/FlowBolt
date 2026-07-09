@@ -136,8 +136,11 @@ async def test_step_fix_errors_delivers_rejection_notes_as_message(monkeypatch: 
     await agent._step_fix_errors(state)
 
     assert len(captured) == 1
-    assert len(captured[0]) == 2
-    assert "rejected" in captured[0][1].content
+    assert len(captured[0]) == 1
+    message = captured[0][0].content
+    assert "boom" in message
+    assert "Changes that could not be applied" in message
+    assert "rejected" in message
     assert state.rejected_files == []
 
 
@@ -164,6 +167,10 @@ async def test_step_fix_errors_sends_single_message_without_notes(monkeypatch: p
 
     assert len(captured) == 1
     assert len(captured[0]) == 1
+    message = captured[0][0].content
+    assert "## Build errors" in message
+    assert "boom" in message
+    assert "Changes that could not be applied" not in message
 
 
 def test_route_after_validate_treats_rejections_like_errors() -> None:
@@ -180,7 +187,7 @@ def test_route_after_validate_treats_rejections_like_errors() -> None:
     assert agent._route_after_validate(state) == "summarize"
 
 
-async def test_step_fix_errors_rejection_only_uses_apply_changes_message(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_step_fix_errors_rejection_only_composes_single_message(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[list[Any]] = []
 
     def _capturing_stream(messages: list[Any], *_args: Any, **_kwargs: Any) -> AsyncIterator[str]:
@@ -202,10 +209,33 @@ async def test_step_fix_errors_rejection_only_uses_apply_changes_message(monkeyp
     await agent._step_fix_errors(state)
 
     assert len(captured) == 1
-    assert len(captured[0]) == 2
-    assert captured[0][0].content == "Apply the required file changes."
-    assert "rejected" in captured[0][1].content
+    assert len(captured[0]) == 1
+    message = captured[0][0].content
+    assert "## Build errors" not in message
+    assert "Changes that could not be applied" in message
+    assert "rejected" in message
     assert state.rejected_files == []
+
+
+async def test_step_fix_errors_retains_rejections_when_stream_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raising_stream(*_args: Any, **_kwargs: Any) -> AsyncIterator[str]:
+        async def _boom() -> AsyncIterator[str]:
+            raise RuntimeError("stream exploded")
+            yield
+
+        return _boom()
+
+    monkeypatch.setattr(execute_agent, "stream_chat", _raising_stream)
+
+    task = Task(id="t1", title="A", description="", files=["src/components/Foo.tsx"])
+    state = _make_state(task, _RecordingSandbox())
+    state.rejected_files = [FileSafetyError("something rejected")]
+
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+    await agent._step_fix_errors(state)
+
+    assert len(state.rejected_files) == 1
+    assert "rejected" in str(state.rejected_files[0])
 
 
 async def test_step_summarize_emits_error_for_unresolved_rejections(monkeypatch: pytest.MonkeyPatch) -> None:

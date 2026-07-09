@@ -13,7 +13,7 @@ from flow44.ai.agents.execute.models import Task, WorkPlan
 from flow44.ai.agents.execute.prompts import (
     SUMMARY_PROMPT,
     render_codegen,
-    render_fix_errors,
+    render_feedback,
     render_merge,
 )
 from flow44.ai.core.flow import Flow
@@ -24,7 +24,7 @@ from flow44.ai.file_safety import (
     format_rejection_feedback,
     screen_generated_files,
 )
-from flow44.ai.helpers import parse_json_response
+from flow44.ai.helpers import format_agent_feedback, parse_json_response
 from flow44.ai.parser import ActionParser
 from flow44.ai.state import BuildState
 from flow44.db.project import update_project_summary
@@ -179,13 +179,10 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
+        prompt = render_feedback(files=state.build_state.completed_files)
         messages: list[dict[str, Any] | Message] = [
-            Message.user("Fix the errors." if state.all_errors else "Apply the required file changes.")
+            Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
         ]
-        if state.rejected_files:
-            messages.append(Message.user(format_rejection_feedback(state.rejected_files)))
-            state.rejected_files = []
 
         try:
             generated: list[tuple[str, str]] = []

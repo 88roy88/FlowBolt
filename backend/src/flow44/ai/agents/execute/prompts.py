@@ -53,9 +53,8 @@ def render(
 
 @overload
 def render(
-    template_name: Literal["fix_errors.jinja2"],
+    template_name: Literal["feedback.jinja2"],
     *,
-    errors: str,
     files: dict[str, str],
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -122,10 +121,9 @@ def render_codegen(  # noqa: PLR0913
     )
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
+def render_feedback(*, files: dict[str, str]) -> str:
     return render(
-        "fix_errors.jinja2",
-        errors=errors,
+        "feedback.jinja2",
         files=files,
         file_safety=protected_file_rules(),
     )

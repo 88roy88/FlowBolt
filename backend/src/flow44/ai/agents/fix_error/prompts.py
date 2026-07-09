@@ -21,9 +21,8 @@ _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoe
 
 @overload
 def render(
-    template_name: Literal["fix_errors.jinja2"],
+    template_name: Literal["feedback.jinja2"],
     *,
-    errors: str,
     files: dict[str, str],
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -50,10 +49,9 @@ def render(template_name: str, **kwargs: object) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
+def render_feedback(*, files: dict[str, str]) -> str:
     return render(
-        "fix_errors.jinja2",
-        errors=errors,
+        "feedback.jinja2",
         files=files,
         file_safety=protected_file_rules(),
     )

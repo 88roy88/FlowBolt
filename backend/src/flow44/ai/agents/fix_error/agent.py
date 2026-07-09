@@ -6,11 +6,12 @@ from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
-from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
+from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
 from flow44.ai.file_safety import format_rejection_feedback, screen_generated_files
+from flow44.ai.helpers import format_agent_feedback
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -48,7 +49,7 @@ class FixErrorAgent(BaseAgent):
 
     def _route_after_validate(self, state: FixErrorState) -> str | None:
         """Route after validation: retry, or complete."""
-        if not state.validation_errors:
+        if not state.validation_errors and not state.rejected_files:
             return "complete"
 
         if state.retry_count >= MAX_RETRY_ATTEMPTS:
@@ -224,11 +225,10 @@ class FixErrorAgent(BaseAgent):
             {"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."}
         )
 
-        prompt = render_fix_errors(errors=state.validation_errors, files=dict(state.generated_files))
-        messages: list[dict[str, Any] | Message] = [Message.user("Fix the errors.")]
-        if state.rejected_files:
-            messages.append(Message.user(format_rejection_feedback(state.rejected_files)))
-            state.rejected_files = []
+        prompt = render_feedback(files=dict(state.generated_files))
+        messages: list[dict[str, Any] | Message] = [
+            Message.user(format_agent_feedback(state.validation_errors, state.rejected_files))
+        ]
 
         generated: list[tuple[str, str]] = []
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
@@ -262,6 +262,9 @@ class FixErrorAgent(BaseAgent):
 
     async def _step_complete(self, state: FixErrorState) -> FixErrorState:
         """Step: Complete the fix process."""
+        if state.rejected_files:
+            await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
+
         await state.emit_fn({"type": "action_complete"})
         await state.emit_fn({"type": "phase", "phase": "idle"})
         return state

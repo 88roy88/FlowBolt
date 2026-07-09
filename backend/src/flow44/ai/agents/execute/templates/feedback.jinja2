@@ -1,10 +1,4 @@
-You are an expert React/TypeScript developer. The project was just built but has
-errors. Fix ALL errors below by outputting corrected files.
-
-## Errors
-```
-{{ errors }}
-```
+You are an expert React/TypeScript developer. The project was just built. Address the reported issues by outputting corrected files.
 
 ## Current Files
 {% for path, content in files.items() %}
@@ -18,7 +12,7 @@ errors. Fix ALL errors below by outputting corrected files.
 Respond using the flowArtifact XML format. Only output files that need changes.
 
 ```xml
-<flowArtifact id="fix-errors" title="Fix TypeScript errors">
+<flowArtifact id="feedback" title="Address feedback">
   <flowAction type="file" filePath="path/to/file.tsx">
     Full corrected file content
   </flowAction>
@@ -26,8 +20,8 @@ Respond using the flowArtifact XML format. Only output files that need changes.
 ```
 
 Rules:
-1. Fix ALL reported errors.
-2. Do NOT change functionality — only fix type errors.
+1. Address ALL reported issues.
+2. Do NOT change functionality — make only the changes needed to resolve the issues.
 3. Output complete file contents, not patches.
 4. Do NOT include shell actions.
 
