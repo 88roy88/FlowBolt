@@ -17,6 +17,9 @@ class _RecordingSandbox:
     def __init__(self) -> None:
         self.written: list[tuple[str, str]] = []
 
+    async def read_file(self, path: str) -> str:
+        raise FileNotFoundError(path)
+
     async def write_file(self, path: str, content: str) -> None:
         self.written.append((path, content))
 
@@ -35,6 +38,21 @@ def _make_state(sandbox: _RecordingSandbox) -> FixErrorState:
     )
 
 
+def _make_agent(sandbox: _RecordingSandbox | None = None) -> FixErrorAgent:
+    agent = FixErrorAgent.__new__(FixErrorAgent)
+    agent.sandbox = sandbox  # type: ignore[assignment]
+    agent.emit = _noop_emit  # type: ignore[method-assign]
+    agent.project_id = "p"
+    return agent
+
+
+def _silence_save_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_save(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr("flow44.ai.agents._chat_agent.save_message", _fake_save)
+
+
 async def test_step_write_drops_protected_file_and_records_rejection() -> None:
     sandbox = _RecordingSandbox()
     state = FixErrorState(
@@ -45,7 +63,7 @@ async def test_step_write_drops_protected_file_and_records_rejection() -> None:
         generated_files=[("src/main.tsx", "x"), ("src/components/Foo.tsx", "y")],
     )
 
-    agent = FixErrorAgent.__new__(FixErrorAgent)
+    agent = _make_agent(sandbox)
     result = await agent._step_write(state)
 
     assert sandbox.written == [("src/components/Foo.tsx", "y")]
@@ -66,7 +84,8 @@ def test_route_after_validate_treats_rejections_like_errors() -> None:
     assert agent._route_after_validate(state) == "complete"
 
 
-async def test_step_complete_emits_notice_for_unresolved_rejections() -> None:
+async def test_step_complete_emits_notice_for_unresolved_rejections(monkeypatch: pytest.MonkeyPatch) -> None:
+    _silence_save_message(monkeypatch)
     events: list[dict[str, Any]] = []
 
     async def _recording_emit(event: dict[str, Any]) -> None:
@@ -76,7 +95,7 @@ async def test_step_complete_emits_notice_for_unresolved_rejections() -> None:
     state.emit_fn = _recording_emit
     state.rejected_files = [FileSafetyError("something rejected")]
 
-    agent = FixErrorAgent.__new__(FixErrorAgent)
+    agent = _make_agent()
     await agent._step_complete(state)
 
     error_events = [e for e in events if e["type"] == "error"]
@@ -84,7 +103,8 @@ async def test_step_complete_emits_notice_for_unresolved_rejections() -> None:
     assert "rejected" in error_events[0]["message"]
 
 
-async def test_step_complete_emits_no_notice_when_nothing_rejected() -> None:
+async def test_step_complete_emits_no_notice_when_nothing_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    _silence_save_message(monkeypatch)
     events: list[dict[str, Any]] = []
 
     async def _recording_emit(event: dict[str, Any]) -> None:
@@ -93,7 +113,7 @@ async def test_step_complete_emits_no_notice_when_nothing_rejected() -> None:
     state = _make_state(_RecordingSandbox())
     state.emit_fn = _recording_emit
 
-    agent = FixErrorAgent.__new__(FixErrorAgent)
+    agent = _make_agent()
     await agent._step_complete(state)
 
     assert [e for e in events if e["type"] == "error"] == []
