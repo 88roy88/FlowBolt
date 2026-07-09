@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 import litellm
 from fastapi import APIRouter, Depends, FastAPI
@@ -27,11 +28,14 @@ from flow44.api.deps import validate_token, validate_ws_token
 from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
-from flow44.integrations.s3 import setup_bucket
+from flow44.integrations.s3 import s3_storage
+from flow44.logging import setup_logging
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.heartbeat_reaper import heartbeat_reaper
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+setup_logging(settings.LOG_FILE_PATH)
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,18 +64,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     idle_reaper.start()
     logger.info("Idle reaper started (TTL=%ds).", settings.SANDBOX_IDLE_TTL_SECONDS)
 
-    if settings.S3_BUCKET_NAME:
-        logger.info("Setting up S3 bucket: %s", settings.S3_BUCKET_NAME)
-        try:
-            # TODO: if we keep this here, we should add check_bucket_exists and only call create if not.
-            setup_bucket(settings.S3_BUCKET_NAME)
-            logger.info("S3 bucket setup complete.")
-        except Exception as exc:
-            logger.warning("S3 bucket setup issue (may already exist or be misconfigured): %s", exc)
+    heartbeat_reaper.start()
+    logger.info("Heartbeat reaper started (stale=%ds).", settings.AGENT_RUN_STALE_TIMEOUT)
 
-    yield
-    logger.info("Shutting down — stopping idle reaper and destroying all sandboxes...")
+    async with s3_storage.setup():
+        yield
+
+    logger.info("Shutting down — stopping reapers and destroying all sandboxes...")
     await idle_reaper.stop()
+    await heartbeat_reaper.stop()
     await sandbox_manager.suspend_all()
     logger.info("Shutdown complete.")
 
@@ -85,9 +86,10 @@ app = FastAPI(
 
 
 @app.get("/health")
+@app.get("/api/health")
 async def health_check() -> dict[str, str]:
     """Health check endpoint for Docker/K8s."""
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.1.0", "time": datetime.now(UTC).isoformat()}
 
 
 # CORS — allow all origins in development

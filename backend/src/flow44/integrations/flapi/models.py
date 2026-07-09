@@ -8,24 +8,40 @@ from pydantic.alias_generators import to_pascal
 
 # Wire vocabulary — authoritative per FLAPI. Quick-params types are
 # PascalCase; schema field types are lowercase with a few legacy tags.
-ParamType = Literal["String", "Int", "Double", "Boolean", "Datetime", "Timestamp", "Haphoch", "File"]
-FieldType = Literal[
-    "string",
-    "int",
-    "double",
-    "float",
-    "bool",
-    "boolean",
-    "date",
-    "datetime",
-    "haphoch",
-    "wkt",
-    "geojson",
-    "geoellipse",
-    "object",
-    "decimal",
-    "dynamic",
-]
+ParamType = Literal["String", "Int", "Double", "Boolean", "Datetime", "Timestamp", "Haphoch", "File"] | str
+FieldType = (
+    Literal[
+        "string",
+        "datetime",
+        "boolean",
+        "int",
+        "double",
+        "float",
+        "geojson",
+        "wkt",
+        "geoellipse",
+        "object",
+        # Non standard but existant types:
+        "bool",
+        "date",
+        "haphoch",
+        "decimal",
+        "dynamic",
+        "number",
+        "html",
+        "range",
+        "boundingrectangle",
+        "spatial",
+        "relative",
+        "long",
+        "time",
+        "text",
+        "date",
+        "pid",
+        "",
+    ]
+    | str
+)
 # OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
 
 type CubeId = str

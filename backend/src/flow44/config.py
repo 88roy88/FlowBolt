@@ -31,6 +31,8 @@ class SandboxSettings(Flow44BaseSettings):
     NPM_STRICT_SSL: bool = True
     NPM_AUDIT: bool = True
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
+    AGENT_RUN_TIMEOUT: int = 1800  # whole-run budget
+    AGENT_RUN_STALE_TIMEOUT: int = 60  # when a heartbeat is considered dead (beat=/4, sweep=/2)
     SANDBOX_IDLE_TTL_SECONDS: int = 5 * 60  # 5 minutes
     SANDBOX_IDLE_CHECK_INTERVAL_SECONDS: int = 60
     # Public base URL of this backend, used in HTML exports so API calls work standalone.
@@ -60,6 +62,7 @@ class AIModelSettings(Flow44BaseSettings):
     # Base URL for OpenAI-compatible endpoints (vLLM, Ollama, OpenRouter, etc.)
     AI_BASE_URL: str | None = "http://flow-44-models.com/openai/v1"
     AI_API_KEY: str | None = "default"
+    AI_REQUEST_TIMEOUT: int = 300
 
     # if ai_model starts with bedrock/ set base_url and api_key to None
     # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)
@@ -96,12 +99,17 @@ class FlapiSettings(Flow44BaseSettings):
 
 
 class S3Settings(Flow44BaseSettings):
-    S3_ENDPOINT_URL: str | None = None
-    S3_ACCESS_KEY: str | None = None
-    S3_SECRET_KEY: str | None = None
-    S3_BUCKET_NAME: str | None = None
+    S3_ENDPOINT_URL: str
+    S3_USE_SSL: bool = True
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_BUCKET_NAME: str
     S3_CACHE_TTL: int = 3600
     S3_STORAGE_CLASS: str = "STANDARD_IA"
+
+
+class LoggerSettings(Flow44BaseSettings):
+    LOG_FILE_PATH: str | None = None
 
 
 class LangfuseSettings(Flow44BaseSettings):
@@ -130,6 +138,7 @@ class Settings(
     FlapiSettings,
     S3Settings,
     LangfuseSettings,
+    LoggerSettings,
     Flow44BaseSettings,
 ):
     pass

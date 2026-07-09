@@ -18,6 +18,8 @@ from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
 from flow44.db.project_member import get_project_member
+from flow44.logging import _project_id as _log_project_id
+from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
 
@@ -103,6 +105,7 @@ def get_user_id(token: TokenDep) -> str:
     if not payload.unique_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
 
+    _log_user_id.set(payload.unique_id)
     return payload.unique_id
 
 
@@ -118,17 +121,14 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    if project.user_id == user_id:
-        return project
+    has_access = (
+        project.user_id == user_id or is_admin(user_id) or await get_project_member(project_id, user_id) is not None
+    )
+    if not has_access:
+        raise HTTPException(status_code=404, detail="Project not found")
 
-    if is_admin(user_id):
-        return project
-
-    member = await get_project_member(project_id, user_id)
-    if member is not None:
-        return project
-
-    raise HTTPException(status_code=404, detail="Project not found")
+    _log_project_id.set(project.id)
+    return project
 
 
 ProjectDep = Annotated[Project, Depends(get_project)]

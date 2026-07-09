@@ -53,7 +53,7 @@ async def server_log_ws(websocket: WebSocket, project_id: str, sandbox: WsSandbo
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        pass  # noqa: S110 — expected on client disconnect
+        pass  # expected on client disconnect
     except Exception:
         logger.debug("Server log WebSocket error for session %s", project_id)
     finally:

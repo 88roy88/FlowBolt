@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.file_safety import FileSafetyError
 
 
@@ -26,7 +27,9 @@ class FixErrorState(BaseModel):
     # Working state
     discovered_files: dict[str, str] = Field(default_factory=dict)
     generated_files: list[tuple[str, str]] = Field(default_factory=list)
+    diffs: DiffTracker = Field(default_factory=DiffTracker)
     full_response: str = ""
+    explanation: str = ""
     validation_errors: str = ""
     retry_count: int = 0
     rejected_files: list[FileSafetyError] = Field(default_factory=list)

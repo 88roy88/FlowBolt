@@ -137,7 +137,7 @@ class TestGenerateDataSourceFiles:
             sample_data={"results": {"rows": [{"id": 1}]}},
         )
         files = generate_data_source_files(ctx)
-        assert set(files.keys()) == {"src/dataSources/Sales.ts"}
+        assert set(files.keys()) == {"src/dataSources/Sales.ts", "src/dataSources/Sales.docs.md"}
         content = files["src/dataSources/Sales.ts"]
         assert "export async function dataSourceSales()" in content
         assert "fetchDataSource('/api/data-source/42/run')" in content

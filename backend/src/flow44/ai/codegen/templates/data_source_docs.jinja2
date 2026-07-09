@@ -1,0 +1,48 @@
+# {{ ctx.data_source_name or ctx.sanitized_name }}
+**ID:** {{ ctx.data_source_id }}
+**Module:** `src/dataSources/{{ ctx.sanitized_name }}.ts`
+
+{% if ctx.data_schema %}
+## Schema
+{{ ctx.data_schema }}
+
+{% endif %}
+{% if ctx.relevant_fields %}
+## Relevant Fields
+{{ ctx.relevant_fields }}
+
+{% endif %}
+{% if ctx.data_characteristics %}
+## Data Characteristics
+{{ ctx.data_characteristics }}
+
+{% endif %}
+{% if ctx.integration_notes %}
+## Integration Notes
+{{ ctx.integration_notes }}
+
+{% endif %}
+{% if queries %}
+## Queries
+{% for q in queries %}
+### `{{ q.name }}`{% if q.description %} — {{ q.description }}{% endif %}
+
+{% for f in q.fields %}
+- `{{ f.name }}` ({{ f.type }}){% if f.description %} — {{ f.description }}{% endif %}
+
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% if params %}
+## Parameters
+{% for p in params %}
+- `{{ p.name }}` ({{ p.type }}{% if not p.is_single_value %}[]{% endif %}) — {% if p.is_required %}required{% elif p.is_require_any %}required (one of group){% else %}optional{% endif %}
+
+{% endfor %}
+{% endif %}
+{% if redacted_sample %}
+## Response Structure (redacted)
+```json
+{{ redacted_sample }}
+```
+{% endif %}

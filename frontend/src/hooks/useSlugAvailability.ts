@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { checkSlugAvailability } from '../services/api';
 import { SLUG_RE, usePublishStore } from '../stores/publish';
-import { useDebouncedValue } from './useDebouncedValue';
+import { useDebouncedValue } from './useDebounce';
 
 export type SlugStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 

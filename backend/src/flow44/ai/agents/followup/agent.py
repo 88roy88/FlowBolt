@@ -1,27 +1,23 @@
 import asyncio
-import difflib
 import json
-import logging
 import uuid
-from dataclasses import dataclass
 from typing import Any
 
 from langfuse.decorators import observe
 from pydantic import BaseModel
 
-from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
+from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
-from flow44.ai.core.tools import ToolExecutor, tool
+from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
-
-logger = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
@@ -31,14 +27,7 @@ def _format_file_safety_error(exc: FileSafetyError) -> str:
     return f"Generated app contract violation: {exc}\nPick an editable app source file."
 
 
-@dataclass
-class FileDiff:
-    path: str
-    diff: str
-    is_new: bool = False
-
-
-class FollowUpAgent(BaseAgent):
+class FollowUpAgent(ChatAgent):
     def __init__(
         self,
         project_id: str,
@@ -51,18 +40,17 @@ class FollowUpAgent(BaseAgent):
     ) -> None:
         super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._steps: list[dict[str, Any]] = []
-        self._diffs: list[FileDiff] = []
-        self._files_changed: list[str] = []
+        self._diffs = DiffTracker()
         self._iteration = 0
         self._data_source_authorization = data_source_authorization
         self._executor = self._build_tool_executor()
 
-    def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901, PLR0915
+    def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901
         sandbox = self.sandbox
 
         # Inline tool implementations - thin wrappers around sandbox
         @tool
-        async def grep(pattern: str, file_pattern: str | None = None) -> str:
+        async def grep(pattern: str, file_pattern: str | None = None) -> str | ToolResult:
             """Search the entire codebase for a text or regex pattern using grep.
 
             Use this to find all occurrences of functions, classes, variables, imports, or any text pattern.
@@ -81,10 +69,11 @@ class FollowUpAgent(BaseAgent):
                 return f"Error: {e}"
             if not matches:
                 return "No matches found."
-            return "\n".join(f"{m.file}:{m.line}:{m.content}" for m in matches)
+            value = "\n".join(f"{m.file}:{m.line}:{m.content}" for m in matches)
+            return ToolResult(value=value, short_preview=f"Found {len(matches)} match(es).")
 
         @tool
-        async def glob(pattern: str = "*") -> str:
+        async def glob(pattern: str = "*") -> str | ToolResult:
             """Find files matching a glob pattern.
 
             Args: pattern: A glob pattern to match files (e.g., "*.tsx", "src/**/*.js"). Defaults to "*".
@@ -94,10 +83,11 @@ class FollowUpAgent(BaseAgent):
             results = await sandbox.glob(pattern)
             if not results:
                 return "No files found matching pattern."
-            return "\n".join(results)
+            value = "\n".join(results)
+            return ToolResult(value=value, short_preview=f"Found {len(results)} file(s).")
 
         @tool
-        async def read_file(path: str, offset: int = 0, limit: int = MAX_READ_LINES) -> str:
+        async def read_file(path: str, offset: int = 0, limit: int = MAX_READ_LINES) -> ToolResult:
             """Read file content with line numbers. Always read a file before editing it.
 
             Args:
@@ -108,7 +98,7 @@ class FollowUpAgent(BaseAgent):
             try:
                 content = await sandbox.read_file(path)
             except (FileNotFoundError, PermissionError) as e:
-                return f"Error: {e}"
+                return ToolResult(value=str(e), is_error=True)
             lines = content.splitlines()
             total = len(lines)
             limit = min(limit, MAX_READ_LINES)
@@ -116,7 +106,8 @@ class FollowUpAgent(BaseAgent):
             numbered = [f"{i + offset + 1:4d} | {line}" for i, line in enumerate(chunk)]
             if offset + limit < total:
                 numbered.append(f"\n... (showing lines {offset + 1}-{offset + len(chunk)}, file has {total} total)")
-            return "\n".join(numbered)
+            value = "\n".join(numbered)
+            return ToolResult(value=value, short_preview=f"Read {len(chunk)} of {total} lines.")
 
         @tool
         async def write_file(path: str, content: str) -> str:
@@ -125,14 +116,7 @@ class FollowUpAgent(BaseAgent):
                 path = normalized_path_or_reject(path)
             except FileSafetyError as exc:
                 return _format_file_safety_error(exc)
-            try:
-                old_content = await sandbox.read_file(path)
-                is_new_file = False
-            except FileNotFoundError:
-                old_content = ""
-                is_new_file = True
-            await sandbox.write_file(path, content)
-            await self._record_file_change(path, old_content, content, is_new=is_new_file)
+            await self._write_file_and_emit_diff(self._diffs, path, content)
             return f"OK — wrote {path} ({len(content.splitlines())} lines)"
 
         @tool
@@ -143,13 +127,11 @@ class FollowUpAgent(BaseAgent):
             except FileSafetyError as exc:
                 return _format_file_safety_error(exc)
             try:
-                current = await sandbox.read_file(path)
+                await self._edit_file_and_emit_diff(self._diffs, path, search, replace)
             except FileNotFoundError:
                 return f"Error: File not found: {path}"
-
-            try:
-                await sandbox.edit_file(path, search, replace)
             except ValueError:
+                current = await sandbox.read_file(path)
                 lines = current.splitlines()
                 snippet = "\n".join(lines[:40])
                 if len(lines) > 40:
@@ -159,28 +141,9 @@ class FollowUpAgent(BaseAgent):
                     f"The search must match exactly (including whitespace).\n\n"
                     f"Current file content:\n```\n{snippet}\n```"
                 )
-
-            new_content = await sandbox.read_file(path)
-            await self._record_file_change(path, current, new_content, is_new=False)
             return f"OK — edited {path}"
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
-
-    async def _record_file_change(self, path: str, old_content: str, new_content: str, *, is_new: bool) -> None:
-        diff_str = "".join(
-            difflib.unified_diff(
-                old_content.splitlines(keepends=True),
-                new_content.splitlines(keepends=True),
-                fromfile=f"a/{path}",
-                tofile=f"b/{path}",
-                lineterm="",
-            )
-        )
-        await self.emit({"type": "file", "path": path, "content": new_content})
-        if diff_str:
-            self._diffs.append(FileDiff(path=path, diff=diff_str, is_new=is_new))
-        if path not in self._files_changed:
-            self._files_changed.append(path)
 
     @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
@@ -206,11 +169,12 @@ class FollowUpAgent(BaseAgent):
                 await self._persist_data_sources(updated_contexts, stored_contexts)
 
         await self.emit({"type": "phase", "phase": "exploring"})
-        context = await self._build_context()
-
-        history = await get_messages(self.project_id)
+        context, history = await asyncio.gather(
+            self._build_context(),
+            get_messages(self.project_id),
+        )
         messages = [
-            Message(role=m.role, content=m.content)  # type: ignore[arg-type]
+            Message(role=m.role, content=m.content)
             for m in history
             if m.role == "user" or (m.role == "assistant" and m.content.strip())
         ]
@@ -235,13 +199,9 @@ class FollowUpAgent(BaseAgent):
         if answer:
             await self.emit({"type": "text", "content": answer})
 
-        if self._diffs:
-            await self.emit(
-                {
-                    "type": "followup_diffs",
-                    "diffs": [{"path": d.path, "diff": d.diff, "is_new": d.is_new} for d in self._diffs],
-                }
-            )
+        await self._save_response(answer or "", self._steps)
+
+        await self._emit_file_diffs_summary(self._diffs)
 
         # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})
@@ -260,19 +220,10 @@ class FollowUpAgent(BaseAgent):
 
     async def _write_data_source_module(self, ctx: DataSourceContext) -> None:
         files = generate_data_source_files(ctx)
-        module_path = next(iter(files))
-        content = files[module_path]
-        ctx.module_path = module_path
+        ctx.module_path = next(iter(files))
 
-        try:
-            old_content = await self.sandbox.read_file(module_path)
-            is_new_module = False
-        except FileNotFoundError:
-            old_content = ""
-            is_new_module = True
-
-        await self.sandbox.write_file(module_path, content)
-        await self._record_file_change(module_path, old_content, content, is_new=is_new_module)
+        for path, content in files.items():
+            await self._write_file_and_emit_diff(self._diffs, path, content)
 
     async def _persist_data_sources(
         self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]
@@ -282,8 +233,7 @@ class FollowUpAgent(BaseAgent):
             by_id[(ctx.type, ctx.data_source_id)] = ctx
         await update_project_data_sources(self.project_id, list(by_id.values()))
 
-    # TODO: We will want to have a smarted memory system in the future
-    async def _build_context(self) -> dict[str, str]:
+    async def _build_context(self) -> dict[str, Any]:
         project = await get_project(self.project_id)
         summary = ""
         if project and project.summary:
@@ -307,7 +257,17 @@ class FollowUpAgent(BaseAgent):
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
         """Emit ReAct step events and track state for followup agent."""
-        if event["type"] == "react_step":
+        if event["type"] == "react_reasoning":
+            self._iteration = event["iteration"]
+            self._steps.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "reasoning",
+                    "content": event["content"],
+                    "iteration": self._iteration,
+                }
+            )
+        elif event["type"] == "react_step":
             self._iteration = event["iteration"]
             step_data = {
                 "tool": event["tool"],
@@ -323,7 +283,8 @@ class FollowUpAgent(BaseAgent):
                         "tool": event["tool"],
                         "args": event.get("args", {}),
                         "status": "completed",
-                        "resultPreview": event.get("result_preview", ""),
+                        "result_preview": event.get("result_preview", ""),
+                        "short_preview": event.get("short_preview", ""),
                         "iteration": self._iteration,
                     }
                 )

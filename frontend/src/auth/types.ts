@@ -42,19 +42,6 @@ function credentialsFromPayload(token: string, payload: Record<string, unknown>)
   return creds;
 }
 
-export function extractCredentials(data: Record<string, unknown>): AuthCredentials | null {
-  const token = data.auth_token;
-  if (typeof token !== 'string' || !token.trim()) return null;
-
-  try {
-    // TODO: Add full JWT signature verification (jwtVerify with JWKS) once endpoint is available
-    const payload = decodeJwt(token.trim()) as Record<string, unknown>;
-    return credentialsFromPayload(token.trim(), payload);
-  } catch {
-    return null;
-  }
-}
-
 export function credentialsFromToken(token: string): AuthCredentials | null {
   try {
     // TODO: Add full JWT signature verification once JWKS endpoint is available
@@ -63,4 +50,10 @@ export function credentialsFromToken(token: string): AuthCredentials | null {
   } catch {
     return null;
   }
+}
+
+export function extractCredentials(data: Record<string, unknown>): AuthCredentials | null {
+  const token = data.auth_token;
+  if (typeof token !== 'string' || !token.trim()) return null;
+  return credentialsFromToken(token.trim());
 }

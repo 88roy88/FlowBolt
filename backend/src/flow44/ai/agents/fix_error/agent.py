@@ -4,7 +4,7 @@ from typing import Any
 
 from langfuse.decorators import observe
 
-from flow44.ai.agents._base import BaseAgent
+from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 MAX_RETRY_ATTEMPTS = 3
 
 
-class FixErrorAgent(BaseAgent):
+class FixErrorAgent(ChatAgent):
     def __init__(
         self,
         project_id: str,
@@ -148,6 +148,7 @@ class FixErrorAgent(BaseAgent):
         artifact_start = state.full_response.find("<flowArtifact")
         cut = artifact_start if artifact_start != -1 else len(state.full_response)
         explanation = state.full_response[:cut].strip()
+        state.explanation = explanation
         if explanation:
             await state.emit_fn({"type": "text", "content": explanation + "\n\n"})
 
@@ -176,8 +177,7 @@ class FixErrorAgent(BaseAgent):
             return state
 
         for path, content in state.generated_files:
-            await state.sandbox_ref.write_file(path, content)
-            await state.emit_fn({"type": "file", "path": path, "content": content})
+            await self._write_file_and_emit_diff(state.diffs, path, content)
 
         await state.emit_fn(
             {
@@ -246,8 +246,7 @@ class FixErrorAgent(BaseAgent):
             if generated:
                 validated, state.rejected_files = screen_generated_files(generated)
                 for path, content in validated:
-                    await state.sandbox_ref.write_file(path, content)
-                    await state.emit_fn({"type": "file", "path": path, "content": content})
+                    await self._write_file_and_emit_diff(state.diffs, path, content)
                 state.generated_files = validated
 
             await state.emit_fn(
@@ -264,6 +263,17 @@ class FixErrorAgent(BaseAgent):
         if state.rejected_files:
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
 
+        files = [p for p, _ in state.generated_files]
+        steps = [
+            {
+                "tool": "fix_error",
+                "args": {"file": state.error_file or "unknown"},
+                "result_preview": f"fixed {len(files)} file(s)",
+            }
+        ]
+        await self._save_response(state.explanation, steps)
+
+        await self._emit_file_diffs_summary(state.diffs)
         await state.emit_fn({"type": "action_complete"})
         await state.emit_fn({"type": "phase", "phase": "idle"})
         return state

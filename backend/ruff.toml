@@ -69,6 +69,12 @@ select = [
     "PGH", # pygrep-hooks
     "UP", # pyupgrade
     "TRY", # tryceratops
+    "RUF", # ruff-specific (unused noqa, mutable defaults, etc.)
+    "PIE", # misc. unnecessary code (no-op pass, redundant dict.get, etc.)
+    "DTZ", # enforce timezone-aware datetimes
+    "TCH", # type-checking-only imports behind TYPE_CHECKING
+    "RET", # unnecessary return/else patterns
+    "PT", # pytest style
 ]
 
 ignore = [
@@ -93,6 +99,15 @@ ignore = [
     "S603", # `subprocess` call: check for execution of untrusted input
     "TRY400", # Use `logging.exception` instead of `logging.error`
     "PERF401", # Manual list comprehension — prefer explicit loops for readability
+
+    # TCH: moving imports behind TYPE_CHECKING breaks Pydantic/FastAPI runtime introspection
+    "TC001",
+    "TC002",
+    "TC003",
+    "TC006", # quoting cast() expressions — prefer explicit type in cast()
+    "RUF001", # ambiguous unicode — false positive on intentional PS1 prompt glyphs
+    "RUF006", # asyncio.create_task not stored — our fire-and-forget pattern is intentional
+    "RET504", # unnecessary assignment before return — prefer named returns for readability
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.

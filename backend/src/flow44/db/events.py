@@ -1,8 +1,9 @@
 import asyncio
 import logging
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, func
 from sqlmodel import Field, SQLModel, select
 
 from flow44.db import database
@@ -49,10 +50,14 @@ class AgentEvent(SQLModel, table=True):
     __tablename__ = "agent_events"
 
     id: int | None = Field(default=None, primary_key=True)
-    project_id: str = Field(index=True)
+    project_id: str = Field(
+        sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    )
     event_type: str
     payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, default={}))
-    created_at: str | None = Field(default=None)
+    created_at: datetime | None = Field(
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    )
 
 
 # ---------------------------------------------------------------------------

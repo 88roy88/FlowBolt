@@ -84,7 +84,10 @@ export function startAgentAlivePolling(projectId: string): void {
 
   const pollId = useChatStore.getState().agentAlivePollId + 1;
   useChatStore.setState({ agentAlive: null, agentAlivePollId: pollId });
-  void pollOnce(projectId, pollId);
+
+  setTimeout(() => {
+    void pollOnce(projectId, pollId);
+  }, POLL_MS);
 }
 
 export function stopAgentAlivePolling(): void {

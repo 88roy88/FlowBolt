@@ -16,7 +16,7 @@ export function ChatPanel() {
   const { t } = useTranslation();
   const {
     messages, currentAssistantMessage, actions, error, clearError,
-    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, followUpDiffs, historyLoaded,
+    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs, historyLoaded,
   } = useChatStore();
   const agentActive = useChatStore(isAgentAlive);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -83,13 +83,13 @@ export function ChatPanel() {
         {showDesignProgress && <DesignProgress designProgress={designProgress} />}
         {showOverview && planOverview && <WorkPlanView overview={planOverview} />}
         {showTaskProgress && <TaskProgress tasks={executionTasks} />}
-        {showFixProgress && <FixProgressCard steps={fixSteps} content={currentAssistantMessage} isLive />}
+        {showFixProgress && <FixProgressCard steps={fixSteps} content={currentAssistantMessage} diffs={fileDiffs} isLive />}
         {showFollowUpProgress && (
           <FollowUpProgress
             steps={followUpSteps}
             answer={currentAssistantMessage || undefined}
             filesChanged={actions.filter((a) => a.type === 'file' && a.path).map((a) => a.path!)}
-            diffs={followUpDiffs.length > 0 ? followUpDiffs : undefined}
+            diffs={fileDiffs}
             isLive
           />
         )}

@@ -414,6 +414,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: { url: publicPath, handle } });
   });
 
+  // --- Health ---
+  await page.route('**/api/health', async (route) => {
+    return route.fulfill({ json: { status: 'ok', version: '0.1.0' } });
+  });
+
   // --- Agent alive ---
   await page.route('**/api/iaagent/*/alive', async (route) => {
     return route.fulfill({ json: { alive: false, phase: null } });
