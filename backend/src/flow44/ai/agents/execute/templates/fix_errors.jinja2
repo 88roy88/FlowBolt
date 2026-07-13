@@ -14,6 +14,15 @@ errors. Fix ALL errors below by outputting corrected files.
 ```
 {% endfor %}
 
+{% if package_rules %}
+## Package usage rules
+Keep using the app's installed packages correctly when fixing:
+{% for rule_block in package_rules %}
+
+{{ rule_block }}
+{% endfor %}
+
+{% endif %}
 ## Output Format
 Respond using the flowArtifact XML format. Only output files that need changes.
 

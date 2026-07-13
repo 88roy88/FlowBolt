@@ -19,8 +19,18 @@ def render(template_name: str, **kwargs: Any) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_merge(*, has_data_sources: bool = False) -> str:
-    return render("merge.jinja2", has_data_sources=has_data_sources)
+def render_merge(
+    *,
+    has_data_sources: bool = False,
+    allowed_packages: list[str] | None = None,
+    package_rules: list[str] | None = None,
+) -> str:
+    return render(
+        "merge.jinja2",
+        has_data_sources=has_data_sources,
+        allowed_packages=allowed_packages or None,
+        package_rules=package_rules or None,
+    )
 
 
 def render_summary() -> str:
@@ -37,6 +47,8 @@ def render_codegen(  # noqa: PLR0913
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
     data_source_contexts: list[DataSourceContext] | None = None,
+    allowed_packages: list[str] | None = None,
+    package_rules: list[str] | None = None,
 ) -> str:
     prepared_sources = None
     if data_source_contexts:
@@ -74,11 +86,18 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
+        allowed_packages=allowed_packages or None,
+        package_rules=package_rules or None,
     )
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
-    return render("fix_errors.jinja2", errors=errors, files=files)
+def render_fix_errors(
+    *,
+    errors: str,
+    files: dict[str, str],
+    package_rules: list[str] | None = None,
+) -> str:
+    return render("fix_errors.jinja2", errors=errors, files=files, package_rules=package_rules or None)
 
 
 def _extract_exports(content: str) -> str:

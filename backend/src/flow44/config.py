@@ -44,6 +44,11 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_AUTH_POST_MESSAGE_TARGET: str = "*"
 
 
+class FeatureFlagSettings(Flow44BaseSettings):
+    # When enabled, the build agent may select optional npm packages during planning.
+    PLAN_OPTIONAL_PACKAGES_ENABLED: bool = True
+
+
 class DatabaseSettings(Flow44BaseSettings):
     DB_SCHEME: str
     DB_USER: str
@@ -131,6 +136,7 @@ class LangfuseSettings(Flow44BaseSettings):
 
 class Settings(
     SandboxSettings,
+    FeatureFlagSettings,
     DatabaseSettings,
     AIModelSettings,
     SearchIndexSettings,

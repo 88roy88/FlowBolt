@@ -15,6 +15,11 @@ from flow44.ai.agents.execute.prompts import (
     render_fix_errors,
     render_merge,
 )
+from flow44.ai.agents.optional_packages import (
+    OptionalPackagePrompt,
+    install_names,
+    render_optional_package_prompts,
+)
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
@@ -76,6 +81,11 @@ class ExecuteAgent(BaseAgent):
 
         # Emit plan accepted
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_overview.model_dump()})
+
+        # Install optional packages selected during planning (no-op when none)
+        await self.sandbox.install_optional_packages(
+            install_names([p.name for p in self._build_state.selected_packages])
+        )
 
         # Initialize execution state
         exec_state = ExecutionState(
@@ -173,7 +183,12 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
+        pkg_names = [p.name for p in state.build_state.selected_packages]
+        prompt = render_fix_errors(
+            errors=state.all_errors,
+            files=state.build_state.completed_files,
+            package_rules=render_optional_package_prompts(pkg_names, OptionalPackagePrompt.FIX_ERRORS_RULES),
+        )
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
@@ -253,9 +268,14 @@ class ExecuteAgent(BaseAgent):
                 for ctx in state.build_state.data_source_contexts
             ]
 
+        pkg_names = [p.name for p in state.build_state.selected_packages]
         raw = await complete_chat(
             [Message.user(json.dumps(merge_data, indent=2))],
-            render_merge(has_data_sources=bool(state.build_state.data_source_contexts)),
+            render_merge(
+                has_data_sources=bool(state.build_state.data_source_contexts),
+                allowed_packages=pkg_names,
+                package_rules=render_optional_package_prompts(pkg_names, OptionalPackagePrompt.MERGE_RULES),
+            ),
             model=state.model,
             metadata=state.llm_metadata_fn("build_technical_plan"),
         )
@@ -300,6 +320,7 @@ class ExecuteAgent(BaseAgent):
             for dep_id in task.depends_on:
                 dep_paths.update(state.build_state.task_files.get(dep_id, []))
 
+            pkg_names = [p.name for p in state.build_state.selected_packages]
             prompt = render_codegen(
                 task_title=task.title,
                 task_description=task.description,
@@ -310,6 +331,8 @@ class ExecuteAgent(BaseAgent):
                 other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
+                allowed_packages=pkg_names,
+                package_rules=render_optional_package_prompts(pkg_names, OptionalPackagePrompt.CODEGEN_RULES),
             )
 
             generated: list[tuple[str, str]] = []

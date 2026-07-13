@@ -14,7 +14,7 @@ Given the user's request, design the technical architecture. Respond with ONLY a
     "src/types/index.ts"
   ],
   "state_management": "Description of state approach (useState, useReducer, context, etc.)",
-  "key_dependencies": "ONLY use these pre-installed packages: react, react-dom, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss. Do NOT suggest adding other packages.",
+  "key_dependencies": "Use the pre-installed base stack: react, react-dom, typescript, vite, tailwindcss{% if selected_packages %}, plus these approved packages where they fit: {% for p in selected_packages %}{{ p.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}. Do NOT introduce any other packages.",
   "notes": "Any important architectural decisions or trade-offs"
 }
 
@@ -25,7 +25,15 @@ Rules:
 - Keep it simple — prefer useState/useReducer over external state libraries unless complexity warrants it
 - All file paths are relative to the project root (e.g. src/App.tsx)
 - Include only the files that need to be created or modified
+{% if selected_packages %}
+- **Approved packages** (already installed — design with them where they fit):
+{% for p in selected_packages %}
+  - `{{ p.name }}` — {{ p.capability }}. {{ p.use_when }}
+{% endfor %}
+- **CRITICAL**: Beyond the base stack (react, react-dom, typescript, vite, tailwindcss) use ONLY the approved packages above. Do NOT introduce any other package or dependency; use built-in browser APIs for everything else.
+{% else %}
 - **CRITICAL**: ONLY use the pre-installed packages (react, react-dom, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss). Do NOT suggest adding other packages or dependencies. All functionality must be implemented using built-in browser APIs and these pre-configured packages only.
+{% endif %}
 {% if data_source_contexts %}
 
 The user's request includes the following data sources. Pre-built async API functions

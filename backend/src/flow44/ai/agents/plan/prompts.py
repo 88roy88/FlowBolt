@@ -6,6 +6,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from flow44.ai.agents.optional_packages import optional_packages_prompt_context
 from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
@@ -18,7 +19,15 @@ def render(template_name: str, **kwargs: Any) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_architecture(*, data_source_contexts: list[DataSourceContext] | None = None) -> str:
+def render_package_decision() -> str:
+    return render("package_decision.jinja2", packages=optional_packages_prompt_context())
+
+
+def render_architecture(
+    *,
+    data_source_contexts: list[DataSourceContext] | None = None,
+    selected_packages: list[dict[str, str]] | None = None,
+) -> str:
     prepared = None
     if data_source_contexts:
         prepared = [
@@ -30,7 +39,11 @@ def render_architecture(*, data_source_contexts: list[DataSourceContext] | None 
             }
             for ctx in data_source_contexts
         ]
-    return render("architecture.jinja2", data_source_contexts=prepared)
+    return render(
+        "architecture.jinja2",
+        data_source_contexts=prepared,
+        selected_packages=selected_packages or None,
+    )
 
 
 def render_ux_design() -> str:
