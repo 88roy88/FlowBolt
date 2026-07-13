@@ -52,6 +52,18 @@ class TestRegistry:
         assert install_names(["react-hook-form", "lucide-react"]) == ["react-hook-form", "lucide-react"]
         assert install_names(["bogus"]) == []
 
+    def test_dropped_names_are_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("WARNING"):
+            validate_selection(["date-fns", "bogus"])
+            install_names(["bogus"])
+        assert sum("bogus" in r.message for r in caplog.records) == 2
+
+    def test_valid_names_do_not_log(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("WARNING"):
+            validate_selection(["date-fns"])
+            install_names(["date-fns"])
+        assert caplog.records == []
+
     def test_render_returns_blocks(self) -> None:
         blocks = render_optional_package_prompts(["date-fns"], OptionalPackagePrompt.CODEGEN_RULES)
         assert len(blocks) == 1 and "date-fns" in blocks[0]

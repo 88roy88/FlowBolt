@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import pkgutil
 
 import flow44.ai.agents.optional_packages as _pkg
 from flow44.ai.agents.optional_packages.base import OptionalPackage, OptionalPackagePrompt
+
+logger = logging.getLogger(__name__)
 
 
 def _discover() -> dict[str, OptionalPackage]:
@@ -23,15 +26,24 @@ OPTIONAL_PACKAGES: dict[str, OptionalPackage] = _discover()
 
 
 def validate_selection(names: list[str]) -> list[str]:
-    return [name for name in dict.fromkeys(names) if name in OPTIONAL_PACKAGES]
+    unique = list(dict.fromkeys(names))
+    dropped = [name for name in unique if name not in OPTIONAL_PACKAGES]
+    if dropped:
+        logger.warning("Dropping off-list package selection: %s", dropped)
+    return [name for name in unique if name in OPTIONAL_PACKAGES]
 
 
 def install_names(names: list[str]) -> list[str]:
     result: list[str] = []
+    dropped: list[str] = []
     for name in names:
         package = OPTIONAL_PACKAGES.get(name)
         if package:
             result.extend(package.packages)
+        else:
+            dropped.append(name)
+    if dropped:
+        logger.warning("Dropping off-list package install: %s", dropped)
     return list(dict.fromkeys(result))
 
 
