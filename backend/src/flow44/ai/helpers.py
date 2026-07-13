@@ -4,7 +4,23 @@ import json
 import logging
 from typing import Any, cast
 
+from flow44.ai.file_safety import FileSafetyError
+
 logger = logging.getLogger(__name__)
+
+
+def format_agent_feedback(build_errors: str, rejected_files: list[FileSafetyError]) -> str:
+    sections: list[str] = []
+    if build_errors:
+        sections.append(f"## Build errors\n{build_errors}")
+    if rejected_files:
+        rejected = "\n".join(f"- {rejection}" for rejection in rejected_files)
+        sections.append(
+            "## Changes that could not be applied\n"
+            f"{rejected}\n"
+            "Re-emit their logic in the same flowArtifact format using an allowed path."
+        )
+    return "\n\n".join(sections)
 
 
 # TODO: get rid of this when moving to structured output

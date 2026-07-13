@@ -34,6 +34,8 @@ Rules:
 {% else %}
 - **CRITICAL**: ONLY use the pre-installed packages (react, react-dom, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss). Do NOT suggest adding other packages or dependencies. All functionality must be implemented using built-in browser APIs and these pre-configured packages only.
 {% endif %}
+
+{% include "_file_safety_rules.jinja2" %}
 {% if data_source_contexts %}
 
 The user's request includes the following data sources. Pre-built async API functions

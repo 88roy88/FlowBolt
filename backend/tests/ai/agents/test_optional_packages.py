@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from flow44.ai.agents import optional_packages as op
-from flow44.ai.agents.execute.prompts import render_codegen, render_fix_errors, render_merge
+from flow44.ai.agents.execute.prompts import render_codegen, render_feedback, render_merge
 from flow44.ai.agents.optional_packages import (
     OPTIONAL_PACKAGES,
     OptionalPackage,
@@ -132,13 +132,12 @@ class TestPromptInjection:
 
     def test_fix_errors_injects_rules_only_when_present(self) -> None:
         names = ["react-hook-form"]
-        with_rules = render_fix_errors(
-            errors="E",
+        with_rules = render_feedback(
             files={"a.tsx": "x"},
             package_rules=render_optional_package_prompts(names, OptionalPackagePrompt.FIX_ERRORS_RULES),
         )
         assert "Package usage rules" in with_rules
-        assert "Package usage rules" not in render_fix_errors(errors="E", files={})
+        assert "Package usage rules" not in render_feedback(files={})
 
 
 def _make_agent() -> plan_agent.PlanAgent:

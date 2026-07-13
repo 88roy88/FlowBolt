@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from flow44.ai.helpers import parse_json_response
+from flow44.ai.file_safety import FileSafetyError
+from flow44.ai.helpers import format_agent_feedback, parse_json_response
 
 
 class TestParseJsonResponse:
@@ -95,3 +96,31 @@ class TestParseJsonResponse:
         """Handle code blocks with multiple ``` markers."""
         result = parse_json_response('```json\n{"key": "value"}\n```\n```')
         assert result == {"key": "value"}
+
+
+class TestFormatAgentFeedback:
+    """Test the composed build-error / rejection feedback message."""
+
+    def test_errors_only(self) -> None:
+        result = format_agent_feedback("boom", [])
+        assert "## Build errors" in result
+        assert "boom" in result
+        assert "Changes that could not be applied" not in result
+
+    def test_rejections_only(self) -> None:
+        result = format_agent_feedback("", [FileSafetyError("something rejected")])
+        assert "## Build errors" not in result
+        assert "Changes that could not be applied" in result
+        assert "- something rejected" in result
+        assert "re-emit" in result.lower()
+
+    def test_both(self) -> None:
+        result = format_agent_feedback("boom", [FileSafetyError("something rejected")])
+        assert "## Build errors" in result
+        assert "boom" in result
+        assert "Changes that could not be applied" in result
+        assert "- something rejected" in result
+
+    def test_neither(self) -> None:
+        result = format_agent_feedback("", [])
+        assert result == ""

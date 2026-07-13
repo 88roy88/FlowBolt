@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from flow44.ai.agents.file_diffs import DiffTracker
+from flow44.ai.file_safety import FileSafetyError
 
 
 class FixErrorState(BaseModel):
@@ -31,6 +32,7 @@ class FixErrorState(BaseModel):
     explanation: str = ""
     validation_errors: str = ""
     retry_count: int = 0
+    rejected_files: list[FileSafetyError] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True

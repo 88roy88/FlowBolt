@@ -1,14 +1,17 @@
 import logging
 from pathlib import PurePosixPath
+from typing import Any
 
 from langfuse.decorators import observe
 
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
-from flow44.ai.agents.fix_error.prompts import render_fix_error_direct, render_fix_errors
+from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import stream_chat
+from flow44.ai.file_safety import format_rejection_feedback, screen_generated_files
+from flow44.ai.helpers import format_agent_feedback
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
 
@@ -46,7 +49,7 @@ class FixErrorAgent(ChatAgent):
 
     def _route_after_validate(self, state: FixErrorState) -> str | None:
         """Route after validation: retry, or complete."""
-        if not state.validation_errors:
+        if not state.validation_errors and not state.rejected_files:
             return "complete"
 
         if state.retry_count >= MAX_RETRY_ATTEMPTS:
@@ -169,6 +172,10 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
+        state.generated_files, state.rejected_files = screen_generated_files(state.generated_files)
+        if not state.generated_files:
+            return state
+
         for path, content in state.generated_files:
             await self._write_file_and_emit_diff(state.diffs, path, content)
 
@@ -185,7 +192,7 @@ class FixErrorAgent(ChatAgent):
 
     async def _step_validate(self, state: FixErrorState) -> FixErrorState:
         """Step: Validate the fix."""
-        if not state.generated_files:
+        if not state.generated_files and not state.rejected_files:
             return state
 
         await state.emit_fn(
@@ -218,13 +225,17 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."}
         )
 
-        prompt = render_fix_errors(errors=state.validation_errors, files=dict(state.generated_files))
+        prompt = render_feedback(files=dict(state.generated_files))
+        messages: list[dict[str, Any] | Message] = [
+            Message.user(format_agent_feedback(state.validation_errors, state.rejected_files))
+        ]
+
         generated: list[tuple[str, str]] = []
         parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
         try:
             async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")],
+                messages,
                 prompt,
                 model=state.model,
                 metadata=state.llm_metadata_fn("fix_error_retry"),
@@ -232,11 +243,11 @@ class FixErrorAgent(ChatAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            for path, content in generated:
-                await self._write_file_and_emit_diff(state.diffs, path, content)
-
-            # Update generated files list
-            state.generated_files = generated
+            if generated:
+                validated, state.rejected_files = screen_generated_files(generated)
+                for path, content in validated:
+                    await self._write_file_and_emit_diff(state.diffs, path, content)
+                state.generated_files = validated
 
             await state.emit_fn(
                 {"type": "fix_step", "step": "retry", "status": "completed", "message": "Auto-fix applied"}
@@ -249,6 +260,9 @@ class FixErrorAgent(ChatAgent):
 
     async def _step_complete(self, state: FixErrorState) -> FixErrorState:
         """Step: Complete the fix process."""
+        if state.rejected_files:
+            await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
+
         files = [p for p, _ in state.generated_files]
         steps = [
             {

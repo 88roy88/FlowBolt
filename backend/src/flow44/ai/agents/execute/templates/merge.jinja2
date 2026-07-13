@@ -52,6 +52,8 @@ Rules:
 {{ rule_block }}
 {% endfor %}
 {% endif %}
+
+{% include "_file_safety_rules.jinja2" %}
 {% if has_data_sources %}
 
 ## Data Source Integration — Pre-Generated Files

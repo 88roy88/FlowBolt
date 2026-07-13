@@ -129,6 +129,9 @@ class NamespacedSandbox(UnixSandbox):
     #   them is safe and complete. Port-based detection (lsof) misses terminal-spawned
     #   processes and can have false positives from unrelated services.
 
+    def build_error_path_roots(self) -> list[str]:
+        return ["/home/project", *super().build_error_path_roots()]
+
     async def exec(self, command: str) -> AsyncIterator[str]:
         cmd = _build_nsjail_args(self.project_id, self.workspace_dir, self.port, command=command)
         proc = await asyncio.create_subprocess_exec(
