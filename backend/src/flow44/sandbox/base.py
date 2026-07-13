@@ -50,6 +50,9 @@ class BaseSandbox(ABC):
         if delete_workspace and os.path.isdir(self.workspace_dir):  # noqa: ASYNC240
             shutil.rmtree(self.workspace_dir, ignore_errors=True)
 
+    def build_error_path_roots(self) -> list[str]:
+        return list(dict.fromkeys([os.path.realpath(self.workspace_dir), self.workspace_dir]))
+
     # -- Command execution --
 
     @abstractmethod

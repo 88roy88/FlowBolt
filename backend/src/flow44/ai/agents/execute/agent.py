@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import uuid
+from typing import Any
 
 from langfuse import Langfuse
 from langfuse.decorators import observe
@@ -12,13 +13,18 @@ from flow44.ai.agents.execute.models import Task, WorkPlan
 from flow44.ai.agents.execute.prompts import (
     SUMMARY_PROMPT,
     render_codegen,
-    render_fix_errors,
+    render_feedback,
     render_merge,
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat, stream_chat
-from flow44.ai.helpers import parse_json_response
+from flow44.ai.file_safety import (
+    FileSafetyError,
+    format_rejection_feedback,
+    screen_generated_files,
+)
+from flow44.ai.helpers import format_agent_feedback, parse_json_response
 from flow44.ai.parser import ActionParser
 from flow44.ai.state import BuildState
 from flow44.db.project import update_project_summary
@@ -60,7 +66,7 @@ class ExecuteAgent(BaseAgent):
 
     def _route_after_validate(self, state: ExecutionState) -> str | None:
         """Route after validation: fix_errors, summarize, or give up."""
-        if not state.all_errors:
+        if not state.all_errors and not state.rejected_files:
             return "summarize"
 
         if state.fix_attempts >= MAX_FIX_ATTEMPTS:
@@ -173,13 +179,17 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        prompt = render_fix_errors(errors=state.all_errors, files=state.build_state.completed_files)
+        prompt = render_feedback(files=state.build_state.completed_files)
+        messages: list[dict[str, Any] | Message] = [
+            Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
+        ]
+
         try:
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
             async for chunk in stream_chat(
-                [Message.user("Fix the TypeScript errors.")],
+                messages,
                 prompt,
                 model=state.model,
                 metadata=state.llm_metadata_fn("fix_errors"),
@@ -187,10 +197,12 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            for path, content in generated:
-                await state.sandbox_ref.write_file(path, content)
-                state.build_state.completed_files[path] = content
-                await state.emit_fn({"type": "file", "path": path, "content": content})
+            if generated:
+                validated, state.rejected_files = screen_generated_files(generated)
+                for path, content in validated:
+                    await state.sandbox_ref.write_file(path, content)
+                    state.build_state.completed_files[path] = content
+                    await state.emit_fn({"type": "file", "path": path, "content": content})
         except Exception:
             logger.exception("[execute] Error fix pass failed")
 
@@ -198,6 +210,9 @@ class ExecuteAgent(BaseAgent):
 
     async def _step_summarize(self, state: ExecutionState) -> ExecutionState:
         """Step: Generate project summary."""
+        if state.rejected_files:
+            await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
+
         span = state.langfuse_client.span(trace_id=state.trace_id, name="generate-summary")
         state.observation_id = span.id
 
@@ -218,6 +233,11 @@ class ExecuteAgent(BaseAgent):
             )
             summary_data = parse_json_response(raw)
             if summary_data:
+                overview = summary_data.get("file_overview")
+                if isinstance(overview, dict):
+                    summary_data["file_overview"] = {
+                        path: desc for path, desc in overview.items() if path in state.build_state.completed_files
+                    }
                 await update_project_summary(state.project_id, json.dumps(summary_data, ensure_ascii=False))
                 await state.emit_fn({"type": "project_summary", "summary": summary_data})
         except Exception:
@@ -261,16 +281,28 @@ class ExecuteAgent(BaseAgent):
         )
         plan_data = parse_json_response(raw)
 
-        tasks = [
+        tasks: list[Task] = [
             Task(
-                id=t.get("id", f"task-{uuid.uuid4().hex[:6]}"),
-                title=t.get("title", "Untitled task"),
-                description=t.get("description", ""),
-                files=t.get("files", []),
-                depends_on=t.get("depends_on", []),
+                id=task_data.get("id", f"task-{uuid.uuid4().hex[:6]}"),
+                title=task_data.get("title", "Untitled task"),
+                description=task_data.get("description", ""),
+                files=task_data.get("files", []),
+                depends_on=task_data.get("depends_on", []),
             )
-            for t in plan_data.get("tasks", [])
+            for task_data in plan_data.get("tasks", [])
         ]
+
+        # TODO(#166): no plan-level guard here — have the planner revise dangling depends_on instead of dropping them
+        task_ids = {task.id for task in tasks}
+        for task in tasks:
+            valid_dependencies = [dependency for dependency in task.depends_on if dependency in task_ids]
+            if len(valid_dependencies) != len(task.depends_on):
+                logger.warning(
+                    "[execute] Dropping missing dependencies from generated task %s: %s",
+                    task.id,
+                    sorted(set(task.depends_on) - task_ids),
+                )
+            task.depends_on = valid_dependencies
 
         return WorkPlan(
             id=f"plan-{uuid.uuid4().hex[:8]}",
@@ -314,7 +346,6 @@ class ExecuteAgent(BaseAgent):
 
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
-
             async for chunk in stream_chat(
                 [Message.user("Generate the code.")],
                 prompt,
@@ -324,8 +355,20 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
+            expected_paths = set(task.files)
+            safe, rejections = screen_generated_files(generated)
+            validated: list[tuple[str, str]] = []
+            for path, content in safe:
+                if path not in expected_paths:
+                    logger.warning("[execute] Dropping file outside task contract %s: %s", task.id, path)
+                    rejections.append(FileSafetyError(f"File is outside the task contract: {path}"))
+                    continue
+                validated.append((path, content))
+            if rejections:
+                state.rejected_files.extend(rejections)
+
             paths: list[str] = []
-            for path, content in generated:
+            for path, content in validated:
                 await state.sandbox_ref.write_file(path, content)
                 state.build_state.completed_files[path] = content
                 paths.append(path)

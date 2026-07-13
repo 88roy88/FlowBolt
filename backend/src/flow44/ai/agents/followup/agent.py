@@ -13,6 +13,7 @@ from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
+from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
@@ -20,6 +21,10 @@ from flow44.sandbox.main import PnpmSandbox
 
 MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
+
+
+def _format_file_safety_error(exc: FileSafetyError) -> str:
+    return f"Generated app contract violation: {exc}\nPick an editable app source file."
 
 
 class FollowUpAgent(ChatAgent):
@@ -107,12 +112,20 @@ class FollowUpAgent(ChatAgent):
         @tool
         async def write_file(path: str, content: str) -> str:
             """Write the full content of a file, creating it if needed. For small changes, prefer edit_file."""
+            try:
+                path = normalized_path_or_reject(path)
+            except FileSafetyError as exc:
+                return _format_file_safety_error(exc)
             await self._write_file_and_emit_diff(self._diffs, path, content)
             return f"OK — wrote {path} ({len(content.splitlines())} lines)"
 
         @tool
         async def edit_file(path: str, search: str, replace: str) -> str:
             """Apply a targeted search-and-replace edit. The search string must match exactly."""
+            try:
+                path = normalized_path_or_reject(path)
+            except FileSafetyError as exc:
+                return _format_file_safety_error(exc)
             try:
                 await self._edit_file_and_emit_diff(self._diffs, path, search, replace)
             except FileNotFoundError:
@@ -128,7 +141,6 @@ class FollowUpAgent(ChatAgent):
                     f"The search must match exactly (including whitespace).\n\n"
                     f"Current file content:\n```\n{snippet}\n```"
                 )
-
             return f"OK — edited {path}"
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])

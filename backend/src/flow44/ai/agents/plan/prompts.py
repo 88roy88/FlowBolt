@@ -2,35 +2,66 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
+from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
+from flow44.ai.file_safety import (
+    ProtectedFileRules,
+    protected_file_rules,
+)
 from flow44.db.project_data_source import DataSourceContext
 
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
-    loader=FileSystemLoader(str(_templates_dir)), trim_blocks=True, lstrip_blocks=True
+    loader=ChoiceLoader([FileSystemLoader(str(_templates_dir)), FileSystemLoader(str(TEMPLATE_PROMPTS_PATH))]),
+    trim_blocks=True,
+    lstrip_blocks=True,
 )
 
 
-def render(template_name: str, **kwargs: Any) -> str:
+@overload
+def render(
+    template_name: Literal["architecture.jinja2"],
+    *,
+    data_source_contexts: list[dict[str, Any]] | None,
+    file_safety: ProtectedFileRules,
+) -> str: ...
+
+
+@overload
+def render(template_name: Literal["ux_design.jinja2"]) -> str: ...
+
+
+@overload
+def render(template_name: Literal["user_plan.jinja2"], *, has_feedback: bool) -> str: ...
+
+
+@overload
+def render(
+    template_name: Literal["data_source_analysis.jinja2"],
+    *,
+    user_content: str,
+    data_source_name: str,
+    sample_data_json: str | None,
+    queries: list[dict[str, Any]],
+    params: list[dict[str, Any]],
+    require_any: bool,
+) -> str: ...
+
+
+def render(template_name: str, **kwargs: object) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
 def render_architecture(*, data_source_contexts: list[DataSourceContext] | None = None) -> str:
-    prepared = None
-    if data_source_contexts:
-        prepared = [
-            {
-                **ctx.model_dump(),
-                "sample_data_json": (
-                    json.dumps(ctx.sample_data, indent=2)[:1000] if ctx.sample_data is not None else None
-                ),
-            }
-            for ctx in data_source_contexts
-        ]
-    return render("architecture.jinja2", data_source_contexts=prepared)
+    prepared = [ctx.to_prompt_context() for ctx in data_source_contexts] if data_source_contexts else None
+    return render(
+        "architecture.jinja2",
+        data_source_contexts=prepared,
+        file_safety=protected_file_rules(),
+    )
 
 
 def render_ux_design() -> str:
