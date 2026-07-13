@@ -292,6 +292,7 @@ class ExecuteAgent(BaseAgent):
             for task_data in plan_data.get("tasks", [])
         ]
 
+        # TODO(#166): no plan-level guard here — have the planner revise dangling depends_on instead of dropping them
         task_ids = {task.id for task in tasks}
         for task in tasks:
             valid_dependencies = [dependency for dependency in task.depends_on if dependency in task_ids]
