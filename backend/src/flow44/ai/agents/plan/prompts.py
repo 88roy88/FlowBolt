@@ -6,7 +6,7 @@ from typing import Any, Literal, overload
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
-from flow44.ai.agents.optional_packages import optional_packages_prompt_context
+from flow44.ai.agents.optional_packages import OPTIONAL_PACKAGES, OptionalPackage, resolve_packages
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
 from flow44.ai.file_safety import (
     ProtectedFileRules,
@@ -27,13 +27,13 @@ def render(
     template_name: Literal["architecture.jinja2"],
     *,
     data_source_contexts: list[dict[str, Any]] | None,
-    selected_packages: list[dict[str, str]] | None,
+    selected_packages: list[OptionalPackage] | None,
     file_safety: ProtectedFileRules,
 ) -> str: ...
 
 
 @overload
-def render(template_name: Literal["package_decision.jinja2"], *, packages: list[dict[str, str]]) -> str: ...
+def render(template_name: Literal["package_decision.jinja2"], *, packages: list[OptionalPackage]) -> str: ...
 
 
 @overload
@@ -62,19 +62,19 @@ def render(template_name: str, **kwargs: object) -> str:
 
 
 def render_package_decision() -> str:
-    return render("package_decision.jinja2", packages=optional_packages_prompt_context())
+    return render("package_decision.jinja2", packages=list(OPTIONAL_PACKAGES.values()))
 
 
 def render_architecture(
     *,
     data_source_contexts: list[DataSourceContext] | None = None,
-    selected_packages: list[dict[str, str]] | None = None,
+    selected_package_names: list[str] | None = None,
 ) -> str:
     prepared = [ctx.to_prompt_context() for ctx in data_source_contexts] if data_source_contexts else None
     return render(
         "architecture.jinja2",
         data_source_contexts=prepared,
-        selected_packages=selected_packages or None,
+        selected_packages=resolve_packages(selected_package_names or []),
         file_safety=protected_file_rules(),
     )
 

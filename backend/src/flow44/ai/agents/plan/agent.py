@@ -6,11 +6,7 @@ from langfuse.decorators import observe
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
-from flow44.ai.agents.optional_packages import (
-    SelectedOptionalPackage,
-    selected_packages_context,
-    validate_selection,
-)
+from flow44.ai.agents.optional_packages import validate_selection
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
@@ -24,7 +20,6 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
-from flow44.config import settings
 from flow44.db.pending_plan import save_pending_plan
 from flow44.sandbox.main import PnpmSandbox
 
@@ -154,9 +149,6 @@ class PlanAgent(BaseAgent):
 
     async def _step_decide_packages(self, state: PlanState) -> PlanState:
         """Step: Let the model select optional npm packages for the app."""
-        if not settings.PLAN_OPTIONAL_PACKAGES_ENABLED:
-            return state
-
         try:
             raw = await complete_chat(
                 [Message.user(self._state.user_content)],
@@ -164,12 +156,9 @@ class PlanAgent(BaseAgent):
                 model=self.model,
                 metadata=self._llm_metadata("decide_packages"),
             )
-            selected_raw = parse_json_response(raw).get("selected", [])
-            by_name = {item["name"]: item.get("reason", "") for item in selected_raw if item.get("name")}
-            names = validate_selection(list(by_name))
-            state.build_state.selected_packages = [
-                SelectedOptionalPackage(name=name, reason=by_name[name]) for name in names
-            ]
+            selected = parse_json_response(raw).get("selected", [])
+            raw_names = [item["name"] for item in selected if item.get("name")]
+            state.build_state.selected_packages = validate_selection(raw_names)
         except Exception:
             logger.exception("[plan] Optional package decision failed")
             state.build_state.selected_packages = []
@@ -243,7 +232,7 @@ class PlanAgent(BaseAgent):
     async def _design_architecture(self) -> ArchitectureDesign:
         prompt = render_architecture(
             data_source_contexts=self._state.data_source_contexts or None,
-            selected_packages=selected_packages_context([p.name for p in self._state.selected_packages]) or None,
+            selected_package_names=self._state.selected_packages,
         )
         try:
             raw = await complete_chat(

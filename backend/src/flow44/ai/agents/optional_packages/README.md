@@ -14,9 +14,9 @@ optional_packages/
   <python_safe_name>/          # e.g. date_fns  (folder name may not contain dashes)
     __init__.py                # declares the package + `PACKAGE = <Class>()`
     templates/
-      codegen_rules.jinja2     # rules injected into the codegen + fix prompts
-      merge_rules.jinja2       # rules injected into the task-planning (merge) prompt
-      fix_errors_rules.jinja2  # rules injected into the validate->fix loop
+      codegen_rules.md         # rules injected into the codegen + fix prompts
+      merge_rules.md           # rules injected into the task-planning (merge) prompt
+      fix_errors_rules.md      # rules injected into the validate->fix loop
 ```
 
 `__init__.py`:
@@ -36,18 +36,18 @@ class DateFnsPackage(OptionalPackage):
 PACKAGE = DateFnsPackage()
 ```
 
-Only ship the `templates/*.jinja2` a package needs — missing files are skipped.
+Only ship the `templates/*.md` a package needs — missing files are skipped.
 
 ## Rule-fragment style (example-first)
 
-Each `codegen_rules.jinja2` is ~≤15 lines:
+Each `codegen_rules.md` is ~≤15 lines:
 1. one line: "Use `<pkg>` for <capability>:"
 2. ONE canonical `tsx` example — correct import + idiomatic usage.
 3. 2-3 `Why:` notes — the reasoning that prevents the top failure.
 4. at most one positive "Use only <pkg> for this" line (no `Forbidden:` lists).
 
-`merge_rules.jinja2` (≤4 lines): what to plan + any data transform + one scope line.
-`fix_errors_rules.jinja2` (≤4 lines): the top 1-2 symptom→cause fixes, phrased positively.
+`merge_rules.md` (≤4 lines): what to plan + any data transform + one scope line.
+`fix_errors_rules.md` (≤4 lines): the top 1-2 symptom→cause fixes, phrased positively.
 
 Prefer showing the right thing over forbidding the wrong thing. Start lean; grow a fragment only
 when the build model is observed getting it wrong.

@@ -37,8 +37,8 @@ Rules:
 - Component tasks depend on their type definitions
 - The final App.tsx integration task depends on all component tasks
 - Keep the total number of tasks reasonable (3-10 for most projects)
-{% if allowed_packages %}
-- Available packages: React, TypeScript, Vite, Tailwind CSS, plus {% for name in allowed_packages %}`{{ name }}`{% if not loop.last %}, {% endif %}{% endfor %}. Do NOT plan imports from anything outside this list.
+{% if selected_packages %}
+- Available packages: React, TypeScript, Vite, Tailwind CSS, plus {% for name in selected_packages %}`{{ name }}`{% if not loop.last %}, {% endif %}{% endfor %}. Do NOT plan imports from anything outside this list.
 {% else %}
 - Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS)
 {% endif %}

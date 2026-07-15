@@ -5,7 +5,7 @@ import logging
 import pkgutil
 
 import flow44.ai.agents.optional_packages as _pkg
-from flow44.ai.agents.optional_packages.base import OptionalPackage, OptionalPackagePrompt
+from flow44.ai.agents.optional_packages.base import OptionalPackage, PackageRuleset
 
 logger = logging.getLogger(__name__)
 
@@ -33,43 +33,15 @@ def validate_selection(names: list[str]) -> list[str]:
     return [name for name in unique if name in OPTIONAL_PACKAGES]
 
 
-def install_names(names: list[str]) -> list[str]:
-    result: list[str] = []
-    dropped: list[str] = []
-    for name in names:
-        package = OPTIONAL_PACKAGES.get(name)
-        if package:
-            result.extend(package.packages)
-        else:
-            dropped.append(name)
-    if dropped:
-        logger.warning("Dropping off-list package install: %s", dropped)
+def resolve_packages(names: list[str]) -> list[OptionalPackage]:
+    unique = list(dict.fromkeys(names))
+    return [package for name in unique if (package := OPTIONAL_PACKAGES.get(name))]
+
+
+def npm_dependencies(names: list[str]) -> list[str]:
+    result = [pkg for package in resolve_packages(names) for pkg in package.packages]
     return list(dict.fromkeys(result))
 
 
-def optional_packages_prompt_context() -> list[dict[str, str]]:
-    return [
-        {"name": p.name, "capability": p.capability, "use_when": p.use_when, "avoid_when": p.avoid_when}
-        for p in OPTIONAL_PACKAGES.values()
-    ]
-
-
-def selected_packages_context(names: list[str]) -> list[dict[str, str]]:
-    context: list[dict[str, str]] = []
-    for name in names:
-        package = OPTIONAL_PACKAGES.get(name)
-        if package:
-            context.append({"name": package.name, "capability": package.capability, "use_when": package.use_when})
-    return context
-
-
-def render_optional_package_prompts(names: list[str], prompt: OptionalPackagePrompt) -> list[str]:
-    blocks: list[str] = []
-    for name in names:
-        package = OPTIONAL_PACKAGES.get(name)
-        if package is None:
-            continue
-        block = package.render_prompt(prompt)
-        if block:
-            blocks.append(block)
-    return blocks
+def render_package_rules(names: list[str], prompt: PackageRuleset) -> list[str]:
+    return [block for package in resolve_packages(names) if (block := package.render_prompt(prompt))]

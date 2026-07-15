@@ -7,6 +7,7 @@ from typing import Any, Literal, overload
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
+from flow44.ai.agents.optional_packages import PackageRuleset, render_package_rules
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
 from flow44.ai.file_safety import (
     ProtectedFileRules,
@@ -27,7 +28,7 @@ def render(
     template_name: Literal["merge.jinja2"],
     *,
     has_data_sources: bool,
-    allowed_packages: list[str] | None,
+    selected_packages: list[str] | None,
     package_rules: list[str] | None,
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -49,7 +50,7 @@ def render(
     dependency_files: dict[str, str] | None,
     other_completed_exports: dict[str, str] | None,
     data_source_contexts: list[dict[str, Any]] | None,
-    allowed_packages: list[str] | None,
+    selected_packages: list[str] | None,
     package_rules: list[str] | None,
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -76,14 +77,13 @@ def render(template_name: str, **kwargs: object) -> str:
 def render_merge(
     *,
     has_data_sources: bool = False,
-    allowed_packages: list[str] | None = None,
-    package_rules: list[str] | None = None,
+    selected_packages: list[str] | None = None,
 ) -> str:
     return render(
         "merge.jinja2",
         has_data_sources=has_data_sources,
-        allowed_packages=allowed_packages or None,
-        package_rules=package_rules or None,
+        selected_packages=selected_packages or None,
+        package_rules=render_package_rules(selected_packages or [], PackageRuleset.MERGE) or None,
         file_safety=protected_file_rules(),
     )
 
@@ -102,8 +102,7 @@ def render_codegen(  # noqa: PLR0913
     dependency_files: dict[str, str] | None = None,
     other_completed_files: dict[str, str] | None = None,
     data_source_contexts: list[DataSourceContext] | None = None,
-    allowed_packages: list[str] | None = None,
-    package_rules: list[str] | None = None,
+    selected_packages: list[str] | None = None,
 ) -> str:
     prepared_sources = [ctx.to_prompt_context() for ctx in data_source_contexts] if data_source_contexts else None
 
@@ -131,17 +130,17 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
-        allowed_packages=allowed_packages or None,
-        package_rules=package_rules or None,
+        selected_packages=selected_packages or None,
+        package_rules=render_package_rules(selected_packages or [], PackageRuleset.CODEGEN) or None,
         file_safety=protected_file_rules(),
     )
 
 
-def render_feedback(*, files: dict[str, str], package_rules: list[str] | None = None) -> str:
+def render_feedback(*, files: dict[str, str], selected_packages: list[str] | None = None) -> str:
     return render(
         "feedback.jinja2",
         files=files,
-        package_rules=package_rules or None,
+        package_rules=render_package_rules(selected_packages or [], PackageRuleset.FIX_ERRORS) or None,
         file_safety=protected_file_rules(),
     )
 
