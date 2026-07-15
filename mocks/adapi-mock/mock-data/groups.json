@@ -1,0 +1,184 @@
+[
+  {
+    "cn": "Cloud Leads",
+    "displayName": "Cloud Leads",
+    "distinguishedName": "CN=Cloud Leads,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Cloud platform team leads",
+    "groupType": "-2147483640",
+    "mail": "cloud.leads@corp.example.com",
+    "mailNickname": "Cloud Leads",
+    "managedBy": "CN=Gwen Gibson,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Michael Lee,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Rohan Patel,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Carol Wilson,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [],
+    "sAMAccountName": "Cloud Leads",
+    "objectGUID": "c330021a-a75a-09a8-1725-d8e0af4fc83e"
+  },
+  {
+    "cn": "Legal Leads",
+    "displayName": "Legal Leads",
+    "distinguishedName": "CN=Legal Leads,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Legal department leads",
+    "groupType": "-2147483640",
+    "mail": "legal.leads@corp.example.com",
+    "mailNickname": "Legal Leads",
+    "managedBy": "CN=Carol Wilson,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Sarah Lewis,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Carol Wilson,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [
+      "CN=Legal,OU=Groups,DC=corp,DC=example,DC=com"
+    ],
+    "sAMAccountName": "Legal Leads",
+    "objectGUID": "bc76bfa1-5ea6-bab3-e21f-b5065767f21e"
+  },
+  {
+    "cn": "Legal",
+    "displayName": "Legal",
+    "distinguishedName": "CN=Legal,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Legal department",
+    "groupType": "-2147483640",
+    "mail": "legal@corp.example.com",
+    "mailNickname": "Legal",
+    "managedBy": "CN=Carol Wilson,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Sarah Lewis,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Carol Wilson,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Karen Brooks,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [],
+    "sAMAccountName": "Legal",
+    "objectGUID": "82e16f20-f05e-6d5c-3589-79cd6b398160"
+  },
+  {
+    "cn": "Engineering Team",
+    "displayName": "Engineering Team",
+    "distinguishedName": "CN=Engineering Team,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Core engineering staff",
+    "groupType": "-2147483640",
+    "mail": "engineering.team@corp.example.com",
+    "mailNickname": "Engineering Team",
+    "managedBy": "CN=Michael Lee,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Michael Lee,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Rohan Patel,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Alice Smith,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Bob Jones,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [],
+    "sAMAccountName": "Engineering Team",
+    "objectGUID": "4cd9beb4-9726-8b27-c255-93a3cbd74868"
+  },
+  {
+    "cn": "Engineering Admins",
+    "displayName": "Engineering Admins",
+    "distinguishedName": "CN=Engineering Admins,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Engineering administrators",
+    "groupType": "-2147483640",
+    "mail": "engineering.admins@corp.example.com",
+    "mailNickname": "Engineering Admins",
+    "managedBy": "CN=Michael Lee,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Michael Lee,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Rohan Patel,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [
+      "CN=Engineering Team,OU=Groups,DC=corp,DC=example,DC=com"
+    ],
+    "sAMAccountName": "Engineering Admins",
+    "objectGUID": "262bec2d-1009-0d29-1002-2e93a7ca5b30"
+  },
+  {
+    "cn": "Security Admins",
+    "displayName": "Security Admins",
+    "distinguishedName": "CN=Security Admins,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Security administrators",
+    "groupType": "-2147483640",
+    "mail": "security.admins@corp.example.com",
+    "mailNickname": "Security Admins",
+    "managedBy": "CN=Tom Turner,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Tom Turner,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Karen Brooks,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [],
+    "sAMAccountName": "Security Admins",
+    "objectGUID": "c00fccef-61bf-770a-1dd8-1e8e0e7c7cbe"
+  },
+  {
+    "cn": "Helpdesk Leads",
+    "displayName": "Helpdesk Leads",
+    "distinguishedName": "CN=Helpdesk Leads,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Helpdesk team leads",
+    "groupType": "-2147483640",
+    "mail": "helpdesk.leads@corp.example.com",
+    "mailNickname": "Helpdesk Leads",
+    "managedBy": "CN=Gwen Gibson,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Peter Nguyen,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Bob Jones,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [],
+    "sAMAccountName": "Helpdesk Leads",
+    "objectGUID": "59f793ae-7549-ddbc-0bd5-07cd9364996a"
+  },
+  {
+    "cn": "Quality Assurance Contractors",
+    "displayName": "Quality Assurance Contractors",
+    "distinguishedName": "CN=Quality Assurance Contractors,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "External QA contractors",
+    "groupType": "-2147483640",
+    "mail": "quality.assurance.contractors@corp.example.com",
+    "mailNickname": "Quality Assurance Contractors",
+    "managedBy": "CN=Gwen Gibson,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Daniel Jenkins,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Diane Jenman,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [
+      "CN=Legal,OU=Groups,DC=corp,DC=example,DC=com",
+      "CN=Cloud Leads,OU=Groups,DC=corp,DC=example,DC=com"
+    ],
+    "sAMAccountName": "Quality Assurance Contractors",
+    "objectGUID": "5240ab36-4019-2b5e-f1e8-ed4692152887"
+  },
+  {
+    "cn": "Executive Users",
+    "displayName": "Executive Users",
+    "distinguishedName": "CN=Executive Users,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Executive leadership",
+    "groupType": "-2147483640",
+    "mail": "executive.users@corp.example.com",
+    "mailNickname": "Executive Users",
+    "managedBy": "CN=Carol Wilson,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Carol Wilson,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Gwen Gibson,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [],
+    "sAMAccountName": "Executive Users",
+    "objectGUID": "ba279190-48a9-777e-fec3-915b4cc5c79c"
+  },
+  {
+    "cn": "Analytics Operators",
+    "displayName": "Analytics Operators",
+    "distinguishedName": "CN=Analytics Operators,OU=Groups,DC=corp,DC=example,DC=com",
+    "description": "Data analytics operators",
+    "groupType": "-2147483640",
+    "mail": "analytics.operators@corp.example.com",
+    "mailNickname": "Analytics Operators",
+    "managedBy": "CN=Rohan Patel,OU=Users,DC=corp,DC=example,DC=com",
+    "member": [
+      "CN=Rohan Patel,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Alice Smith,OU=Users,DC=corp,DC=example,DC=com",
+      "CN=Sarah Lewis,OU=Users,DC=corp,DC=example,DC=com"
+    ],
+    "memberOf": [],
+    "sAMAccountName": "Analytics Operators",
+    "objectGUID": "82c0f75f-6e58-3ea4-4265-a43fdeaaf55c"
+  }
+]

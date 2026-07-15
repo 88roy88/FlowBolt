@@ -9,9 +9,16 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, is_admin, require_permission
-from flow44.auth.permissions import get_admin_permissions, has_permission
-from flow44.db.platform_user import is_platform_user as db_is_platform_user
+from flow44.api.deps import (
+    Permission,
+    PlatformUserDep,
+    ProjectDep,
+    UserDep,
+    has_platform_access,
+    is_admin,
+    require_permission,
+)
+from flow44.auth.permissions import Role, get_admin_permissions, has_permission
 from flow44.db.project import (
     Project,
     create_project,
@@ -22,6 +29,8 @@ from flow44.db.project import (
 )
 from flow44.db.project import list_user_projects as db_list_user_projects
 from flow44.db.project_member import list_shared_projects
+from flow44.db.project_member_group import list_group_shared_projects
+from flow44.integrations.adapi.client import adapi_client
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
@@ -60,13 +69,25 @@ def _serialize_project(project: Project, role: str) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
 
 
+# Display precedence when a project reaches a user through more than one source
+# (e.g. a direct share and a group grant). Higher wins; the label is cosmetic —
+# actual authorization unions permissions in deps._resolve_project_permissions.
+_ROLE_RANK: dict[str, int] = {
+    Role.viewer.value: 1,
+    Role.editor.value: 2,
+    Role.publisher.value: 2,
+    Role.maintainer.value: 3,
+    "admin": 4,
+    "owner": 5,
+}
+
+
 @router.get("/me")
 async def get_current_user(user_id: UserDep) -> dict[str, Any]:
-    admin = is_admin(user_id)
     return {
         "user_id": user_id,
-        "is_admin": admin,
-        "is_platform_user": admin or await db_is_platform_user(user_id),
+        "is_admin": is_admin(user_id),
+        "is_platform_user": await has_platform_access(user_id),
     }
 
 
@@ -83,15 +104,32 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
             result.append(_serialize_project(p, role))
         return result
 
-    owned, shared = await asyncio.gather(db_list_user_projects(user_id), list_shared_projects(user_id))
+    owned, shared, user_group_ids = await asyncio.gather(
+        db_list_user_projects(user_id),
+        list_shared_projects(user_id),
+        adapi_client.get_user_group_ids(user_id),
+    )
+    group_shared = await list_group_shared_projects(user_group_ids)
 
-    result = []
+    # A project can reach a user through several sources (owned, a direct share,
+    # and one or more group grants). Collapse to one entry per project, keeping
+    # the highest-ranked role for display. Insertion order (owned, then direct,
+    # then group shares) is preserved by the dict.
+    by_id: dict[str, tuple[Project, str]] = {}
+
+    def _merge(project: Project, role: str) -> None:
+        existing = by_id.get(project.id)
+        if existing is None or _ROLE_RANK.get(role, 0) > _ROLE_RANK.get(existing[1], 0):
+            by_id[project.id] = (project, role)
+
     for p in owned:
-        result.append(_serialize_project(p, "owner"))
+        _merge(p, "owner")
     for p, role in shared:
-        result.append(_serialize_project(p, role.value))
+        _merge(p, role.value)
+    for p, role in group_shared:
+        _merge(p, role.value)
 
-    return result
+    return [_serialize_project(p, role) for p, role in by_id.values()]
 
 
 @router.post("", status_code=201)

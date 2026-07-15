@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, UserStatus } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
 
 const BASE = '/api';
 
@@ -248,6 +248,39 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   await request(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
+// --- Project group grants (share a project with a whole directory group) ---
+
+export async function fetchProjectGroups(projectId: string): Promise<ProjectGroupGrant[]> {
+  return request<ProjectGroupGrant[]>(`/projects/${projectId}/members/groups`);
+}
+
+export async function addProjectGroup(
+  projectId: string,
+  groupId: string,
+  groupName: string,
+  role: AssignableRole
+): Promise<ProjectGroupGrant> {
+  return request<ProjectGroupGrant>(`/projects/${projectId}/members/groups`, {
+    method: 'POST',
+    body: JSON.stringify({ group_id: groupId, group_name: groupName, role }),
+  });
+}
+
+export async function updateProjectGroupRole(
+  projectId: string,
+  groupId: string,
+  role: AssignableRole
+): Promise<ProjectGroupGrant> {
+  return request<ProjectGroupGrant>(`/projects/${projectId}/members/groups/${encodeURIComponent(groupId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeProjectGroup(projectId: string, groupId: string): Promise<void> {
+  await request(`/projects/${projectId}/members/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+}
+
 // --- Admin: platform user management ---
 
 export async function fetchPlatformUsers(): Promise<{ user_id: string; invited_by: string; created_at: string }[]> {
@@ -263,4 +296,33 @@ export async function invitePlatformUser(userId: string): Promise<{ user_id: str
 
 export async function revokePlatformUser(userId: string): Promise<void> {
   await request(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+export async function fetchPlatformGroups(): Promise<PlatformGroup[]> {
+  return request<PlatformGroup[]>('/admin/groups');
+}
+
+export async function invitePlatformGroup(groupId: string, groupName: string): Promise<PlatformGroup> {
+  return request<PlatformGroup>('/admin/groups', {
+    method: 'POST',
+    body: JSON.stringify({ group_id: groupId, group_name: groupName }),
+  });
+}
+
+export async function revokePlatformGroup(groupId: string): Promise<void> {
+  await request(`/admin/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+}
+
+// --- ADAPI (users & groups) search ---
+// Proxied through the backend (/api/adapi/*) rather than hitting ADAPI directly:
+// in production ADAPI is internal-only and doesn't serve CORS, so the browser
+// can only reach it via our own authenticated backend.
+
+// The backend matches the term against sAMAccountName, displayName and mail.
+export async function searchAdUsers(query: string): Promise<AdUser[]> {
+  return request<AdUser[]>(`/adapi/users?q=${encodeURIComponent(query)}`);
+}
+
+export async function searchAdGroups(query: string): Promise<AdGroup[]> {
+  return request<AdGroup[]>(`/adapi/groups?q=${encodeURIComponent(query)}`);
 }

@@ -15,9 +15,12 @@ from flow44.auth.permissions import (
 )
 from flow44.config import settings
 from flow44.db.platform_user import is_platform_user as db_is_platform_user
+from flow44.db.platform_user_group import platform_group_ids
 from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
 from flow44.db.project_member import get_project_member
+from flow44.db.project_member_group import list_project_groups
+from flow44.integrations.adapi.client import adapi_client
 from flow44.logging import _project_id as _log_project_id
 from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
@@ -29,7 +32,12 @@ logger = logging.getLogger(__name__)
 def _claim_with_suffix(payload: dict[str, object], suffix: str) -> str | None:
     """Return the first claim value whose key ends with ``suffix`` (e.g. ``/UniqueID``)."""
     for key, value in payload.items():
-        if isinstance(key, str) and key.endswith(suffix) and isinstance(value, str) and value.strip():
+        if (
+            isinstance(key, str)
+            and key.endswith(suffix)
+            and isinstance(value, str)
+            and value.strip()
+        ):
             return value.strip()
     return None
 
@@ -116,13 +124,63 @@ def is_admin(user_id: str) -> bool:
     return user_id in settings.SYSTEM_ADMIN_IDS
 
 
+async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permission]:
+    """Permissions the user gains via directory groups the project is shared with.
+
+    Short-circuits to an empty set (no ADAPI call) when the project has no group
+    grants, so only projects actually shared with a group pay the directory
+    round-trip. The user's group membership — including nesting — is resolved by
+    ADAPI; we just intersect it with the project's grants and union the roles.
+    """
+    grants = await list_project_groups(project_id)
+    if not grants:
+        return set()
+
+    user_group_ids = await adapi_client.get_user_group_ids(user_id)
+    if not user_group_ids:
+        return set()
+
+    permissions: set[Permission] = set()
+    for grant in grants:
+        if grant.group_id in user_group_ids:
+            permissions |= get_role_permissions(Role(grant.role))
+    return permissions
+
+
+async def _resolve_project_permissions(
+    project: Project, user_id: str
+) -> set[Permission]:
+    """Full permission set for a user on a project, unioned across every source.
+
+    Owner is the definitive maximum, so it returns early. Otherwise a user may
+    accumulate permissions from being a system admin, a direct member, and/or a
+    member of one or more granted groups. An empty result means no access.
+    """
+    if project.user_id == user_id:
+        return get_owner_permissions()
+
+    permissions: set[Permission] = set()
+    if is_admin(user_id):
+        permissions |= get_admin_permissions()
+
+    member = await get_project_member(project.id, user_id)
+    if member is not None:
+        permissions |= get_role_permissions(Role(member.role))
+
+    permissions |= await resolve_group_permissions(project.id, user_id)
+    return permissions
+
+
 async def get_project(project_id: str, user_id: UserDep) -> Project:
     project = await db_get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
     has_access = (
-        project.user_id == user_id or is_admin(user_id) or await get_project_member(project_id, user_id) is not None
+        project.user_id == user_id
+        or is_admin(user_id)
+        or await get_project_member(project_id, user_id) is not None
+        or bool(await resolve_group_permissions(project_id, user_id))
     )
     if not has_access:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -134,19 +192,14 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
+async def get_user_permissions(
+    project: ProjectDep, user_id: UserDep
+) -> set[Permission]:
     """Resolve the current user's permissions on a project."""
-    if project.user_id == user_id:
-        return get_owner_permissions()
-
-    if is_admin(user_id):
-        return get_admin_permissions()
-
-    member = await get_project_member(project.id, user_id)
-    if member is None:
+    permissions = await _resolve_project_permissions(project, user_id)
+    if not permissions:
         raise HTTPException(status_code=404, detail="Project not found")
-
-    return get_role_permissions(Role(member.role))
+    return permissions
 
 
 PermissionsDep = Annotated[set[Permission], Depends(get_user_permissions)]
@@ -163,11 +216,35 @@ def require_permission(permission: Permission) -> Any:
     return Depends(_check)
 
 
+async def _is_platform_group_member(user_id: str) -> bool:
+    """Whether the user belongs to any directory group granted platform access.
+
+    Short-circuits (no ADAPI call) when no group has been granted access, so only
+    deployments that actually use group grants pay the directory round-trip.
+    if this becomes too heavy create an index on group id and use the user's group to search on the db
+    """
+    group_ids = await platform_group_ids()
+    if not group_ids:
+        return False
+    user_group_ids = await adapi_client.get_user_group_ids(user_id)
+    return bool(user_group_ids & group_ids)
+
+
+async def has_platform_access(user_id: str) -> bool:
+    """Whether the user may create projects.
+
+    Access is granted by being a system admin, a direct platform user
+    (``platform_users``), or a member of a directory group granted access
+    (``platform_user_groups``).
+    """
+    if is_admin(user_id) or await db_is_platform_user(user_id):
+        return True
+    return await _is_platform_group_member(user_id)
+
+
 async def require_platform_user(user_id: UserDep) -> str:
     """Gate: only platform users and admins can create projects."""
-    if is_admin(user_id):
-        return user_id
-    if await db_is_platform_user(user_id):
+    if await has_platform_access(user_id):
         return user_id
     raise HTTPException(status_code=403, detail="Platform access required")
 
@@ -209,19 +286,14 @@ async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
+async def get_ws_permissions(
+    project: WsProjectDep, user_id: WsUserDep
+) -> set[Permission]:
     """WS variant of get_user_permissions."""
-    if project.user_id == user_id:
-        return get_owner_permissions()
-
-    if is_admin(user_id):
-        return get_admin_permissions()
-
-    member = await get_project_member(project.id, user_id)
-    if member is None:
+    permissions = await _resolve_project_permissions(project, user_id)
+    if not permissions:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
-
-    return get_role_permissions(Role(member.role))
+    return permissions
 
 
 WsPermissionsDep = Annotated[set[Permission], Depends(get_ws_permissions)]
@@ -245,7 +317,9 @@ async def get_sandbox(project: ProjectDep) -> PnpmSandbox:
     try:
         return await sandbox_manager.get_sandbox(project.id)
     except Exception as exc:
-        raise HTTPException(status_code=404, detail=f"No sandbox found for project {project.id}") from exc
+        raise HTTPException(
+            status_code=404, detail=f"No sandbox found for project {project.id}"
+        ) from exc
 
 
 SandboxDep = Annotated[PnpmSandbox, Depends(get_sandbox)]

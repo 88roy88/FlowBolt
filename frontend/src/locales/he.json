@@ -180,14 +180,23 @@
     "title": "שיתוף",
     "share": "שתף",
     "owner": "בעלים",
-    "userIdPlaceholder": "מזהה משתמש",
+    "inviteAs": "הזמן בתור",
     "noMembers": "אין חברים עדיין"
   },
   "admin": {
     "title": "משתמשי פלטפורמה",
-    "userIdPlaceholder": "מזהה משתמש להזמנה",
     "invite": "הזמן",
-    "noUsers": "אין משתמשי פלטפורמה עדיין"
+    "noUsers": "אין משתמשי פלטפורמה עדיין",
+    "searchAll": "הכול",
+    "searchUsers": "משתמשים",
+    "searchGroups": "קבוצות",
+    "searchPlaceholder": "חיפוש משתמשים וקבוצות לפי שם או דוא\"ל…",
+    "searchUsersPlaceholder": "חיפוש משתמשים לפי שם או דוא\"ל…",
+    "searchGroupsPlaceholder": "חיפוש קבוצות לפי שם או דוא\"ל…",
+    "searchMinChars": "יש להקליד לפחות 3 תווים כדי לחפש",
+    "searchNoResults": "אין תוצאות",
+    "searchUnavailable": "חיפוש הספרייה אינו זמין",
+    "searchInvite": "הזמן"
   },
   "publish": {
     "publishFailed": "הפרסום נכשל",

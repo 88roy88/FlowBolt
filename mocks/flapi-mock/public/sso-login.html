@@ -51,18 +51,28 @@
         color: #4a5568;
         margin-bottom: 6px;
       }
-      input {
+      input,
+      select {
         width: 100%;
         padding: 10px 12px;
         border: 1px solid #e2e8f0;
         border-radius: 6px;
         font-size: 14px;
+        background: white;
         transition: border-color 0.2s;
       }
-      input:focus {
+      input:focus,
+      select:focus {
         outline: none;
         border-color: #667eea;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      .hint {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #718096;
+        line-height: 1.4;
+        min-height: 16px;
       }
       button {
         width: 100%;
@@ -115,6 +125,14 @@
 
       <form id="loginForm">
         <div class="form-group">
+          <label for="memberSelect">Log in as member (from ADAPI mock)</label>
+          <select id="memberSelect">
+            <option value="">— manual entry below —</option>
+          </select>
+          <p id="memberHint" class="hint"></p>
+        </div>
+
+        <div class="form-group">
           <label for="uniqueId">Unique ID</label>
           <input type="text" id="uniqueId" placeholder="dev-user" value="dev-user" />
         </div>
@@ -163,6 +181,65 @@
 
       // Parse URL parameters for pre-filled values
       const params = new URLSearchParams(window.location.search);
+
+      // Member picker: populate from the ADAPI directory mock so you can sign in
+      // as any listed user without typing their sAMAccountName. Override the mock
+      // location with ?adapiUrl=... ; defaults to the dev port. Falls back
+      // silently to manual entry if the mock isn't reachable.
+      const adapiUrl = (params.get('adapiUrl') || 'http://localhost:6666').replace(/\/$/, '');
+      const memberSelect = document.getElementById('memberSelect');
+      const memberHint = document.getElementById('memberHint');
+
+      const nameParts = (u) => {
+        const parts = (u.displayName || '').trim().split(/\s+/).filter(Boolean);
+        return {
+          givenName: parts[0] || u.sAMAccountName || '',
+          surname: u.sn || parts.slice(1).join(' ') || '',
+        };
+      };
+
+      (async () => {
+        let users;
+        try {
+          const resp = await fetch(`${adapiUrl}/api/users`);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          users = await resp.json();
+        } catch {
+          memberHint.textContent = `Directory mock unavailable (${adapiUrl}) — use manual entry.`;
+          return;
+        }
+        if (!Array.isArray(users) || users.length === 0) {
+          memberHint.textContent = 'No members returned by the directory mock.';
+          return;
+        }
+        users.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
+        for (const u of users) {
+          const opt = document.createElement('option');
+          opt.value = u.sAMAccountName;
+          opt.textContent = `${u.displayName} (${u.sAMAccountName})`;
+          opt.dataset.mail = u.mail || '';
+          const { givenName, surname } = nameParts(u);
+          opt.dataset.givenName = givenName;
+          opt.dataset.surname = surname;
+          memberSelect.appendChild(opt);
+        }
+        memberHint.textContent = `${users.length} members loaded from the directory mock.`;
+      })();
+
+      memberSelect.addEventListener('change', () => {
+        const opt = memberSelect.selectedOptions[0];
+        if (!opt || !opt.value) {
+          memberHint.textContent = '';
+          return;
+        }
+        document.getElementById('uniqueId').value = opt.value;
+        document.getElementById('givenName').value = opt.dataset.givenName || '';
+        document.getElementById('surname').value = opt.dataset.surname || '';
+        memberHint.textContent = opt.dataset.mail
+          ? `Signing in as ${opt.dataset.mail}`
+          : `Signing in as ${opt.value}`;
+      });
+
       if (params.has('uniqueId')) {
         document.getElementById('uniqueId').value = params.get('uniqueId');
       }

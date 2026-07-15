@@ -84,6 +84,23 @@ export interface ProjectMember {
   invited_by: string;
 }
 
+// A directory group granted access to a project (keyed on the AD objectGUID).
+export interface ProjectGroupGrant {
+  group_id: string;
+  group_name: string;
+  role: AssignableRole;
+  created_at: string;
+  invited_by: string;
+}
+
+// A directory group granted platform access (keyed on the AD objectGUID).
+export interface PlatformGroup {
+  group_id: string;
+  group_name: string;
+  invited_by: string;
+  created_at: string;
+}
+
 export interface UserStatus {
   user_id: string;
   is_admin: boolean;
@@ -100,6 +117,26 @@ export interface DataSourceSearchResult {
   id: number;
   name: string;
   description: string | null;
+}
+
+// ADAPI search results (see mocks/adapi-mock).
+export interface AdUser {
+  cn: string;
+  displayName: string;
+  distinguishedName: string;
+  mail: string;
+  sAMAccountName: string;
+}
+
+export interface AdGroup {
+  cn: string;
+  displayName: string;
+  distinguishedName: string;
+  description: string;
+  mail: string;
+  sAMAccountName: string;
+  // Stable directory id, used to grant the group access to a project.
+  objectGUID: string;
 }
 
 // Agent types

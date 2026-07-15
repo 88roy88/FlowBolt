@@ -1,15 +1,16 @@
-.PHONY: dev dev-backend dev-frontend dev-mocks kill-ports build run install stop
+.PHONY: dev dev-backend dev-frontend dev-mocks dev-adapi kill-ports build run install stop
 
-# Local dev: mock (flapi-mock), FastAPI, Vite — free these before (re)starting
+# Local dev: mocks (flapi-mock, adapi-mock), FastAPI, Vite — free these before (re)starting
 DEV_PORT_BACKEND := 8000
 DEV_PORT_FRONTEND := 5173
 DEV_PORT_MOCKS := 6001
-DEV_PORTS := $(DEV_PORT_BACKEND) $(DEV_PORT_FRONTEND) $(DEV_PORT_MOCKS)
+DEV_PORT_ADAPI := 6666
+DEV_PORTS := $(DEV_PORT_BACKEND) $(DEV_PORT_FRONTEND) $(DEV_PORT_MOCKS) $(DEV_PORT_ADAPI)
 
-# All three at once: backend blocks forever if run sequentially, so we use parallel sub-makes (GNU Make).
-# Single service: make dev-backend | make dev-frontend | make dev-mocks
+# All at once: backend blocks forever if run sequentially, so we use parallel sub-makes (GNU Make).
+# Single service: make dev-backend | make dev-frontend | make dev-mocks | make dev-adapi
 dev: kill-ports
-	+$(MAKE) -j3 dev-backend dev-frontend dev-mocks
+	+$(MAKE) -j4 dev-backend dev-frontend dev-mocks dev-adapi
 
 ifeq ($(OS),Windows_NT)
 kill-ports:
@@ -43,10 +44,15 @@ dev-frontend: kill-port-$(DEV_PORT_FRONTEND)
 dev-mocks: kill-port-$(DEV_PORT_MOCKS)
 	cd mocks/flapi-mock && pnpm install && MOCK_PORT=$(DEV_PORT_MOCKS) pnpm dev
 
+# ADAPI directory mock (users & groups) under mocks/adapi-mock; frontend proxies /adapi here
+dev-adapi: kill-port-$(DEV_PORT_ADAPI)
+	cd mocks/adapi-mock && pnpm install && MOCK_PORT=$(DEV_PORT_ADAPI) pnpm dev
+
 # Install dependencies (also installs Husky git hooks)
 install:
 	cd frontend && pnpm install
 	cd mocks/flapi-mock && pnpm clean --lockfile && pnpm install
+	cd mocks/adapi-mock && pnpm install
 	cd backend/pnpm-project-template && pnpm clean --lockfile && pnpm install
 	cd backend && uv sync
 

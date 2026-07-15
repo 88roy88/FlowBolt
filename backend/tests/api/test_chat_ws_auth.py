@@ -63,6 +63,7 @@ def test_wrong_owner_rejected():
     project = _mock_project(user_id="owner-user")
     with patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project), \
          patch("flow44.api.deps.get_project_member", new_callable=AsyncMock, return_value=None), \
+         patch("flow44.api.deps.list_project_groups", new_callable=AsyncMock, return_value=[]), \
          patch("flow44.api.deps.get_user_id", return_value="other-user"), \
          patch("flow44.api.chat.sandbox_manager") as mock_mgr:
 

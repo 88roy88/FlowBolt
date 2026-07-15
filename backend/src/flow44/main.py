@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from flow44.api import (
+    adapi,
     admin,
     chat,
     data_source_api,
@@ -113,6 +114,7 @@ auth_routes.include_router(data_source_api.router)
 auth_routes.include_router(chat.http_router)
 auth_routes.include_router(iaagent.router)
 auth_routes.include_router(members.router)
+auth_routes.include_router(adapi.router)
 auth_routes.include_router(admin.router)
 app.include_router(auth_routes)
 
