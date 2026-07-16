@@ -24,8 +24,7 @@
     "noAccessMessage": "אין לך הרשאה ליצור פרויקטים. פנה למנהל המערכת לקבלת הזמנה."
   },
   "sidebar": {
-    "pinSidebar": "נעץ סרגל צד",
-    "unpinSidebar": "בטל נעיצת סרגל צד",
+    "collapseSidebar": "כווץ סרגל צד",
     "expandSidebar": "הרחב סרגל צד",
     "newProject": "פרויקט חדש",
     "scaffolding": "מכין פרויקט...",

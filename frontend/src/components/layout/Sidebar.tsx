@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield } from 'lucide-react';
+import { Plus, PanelLeftClose, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
 import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { ShareModal } from '../sharing/ShareModal';
-import { AdminPanel } from '../admin/AdminPanel';
 import { reapProject } from '../../services/api';
 import { isSpecialUser } from '../../utils/easterEgg';
 import { pollFileTree } from '../../utils/pollFileTree';
@@ -16,11 +15,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 type SidebarProps = {
-  onCloseSidebar?: () => void;
-  isPinned?: boolean;
-  onPin?: () => void;
+  onCollapse?: () => void;
   onOpenSettings?: () => void;
-  onBusyChange?: (busy: boolean) => void;
+  onOpenAdmin?: () => void;
 };
 
 // Stable color per project based on name hash
@@ -47,7 +44,7 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBusyChange }: SidebarProps) {
+export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProps) {
   const { t } = useTranslation();
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
@@ -56,7 +53,6 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
   const [showInput, setShowInput] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
   const [shareModal, setShareModal] = useState<{ projectId: string; projectName: string; ownerUserId?: string } | null>(null);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -64,12 +60,6 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
   const menuRef = useRef<HTMLDivElement>(null);
 
   const canCreate = userStatus?.is_platform_user || userStatus?.is_admin;
-
-  // Notify parent when user is busy with an action
-  useEffect(() => {
-    const isBusy = showInput || !!menuOpenId || !!renamingId || !!pendingDeleteId;
-    onBusyChange?.(isBusy);
-  }, [showInput, menuOpenId, renamingId, pendingDeleteId, onBusyChange]);
 
   useEffect(() => {
     if (!menuOpenId) return;
@@ -162,14 +152,9 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
       <div className="flex items-center justify-between px-3 py-3">
         <FlowBrand size="sm" />
         <div className="flex items-center gap-0.5">
-          {onPin && !isPinned && (
-            <Button variant="ghost" size="icon-sm" onClick={onPin} title={t('sidebar.pinSidebar')}>
-              <Pin size={14} className="text-primary/60" />
-            </Button>
-          )}
-          {isPinned && onCloseSidebar && (
-            <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title={t('sidebar.unpinSidebar')}>
-              <PinOff size={14} className="text-primary/60" />
+          {onCollapse && (
+            <Button variant="ghost" size="icon-sm" onClick={onCollapse} title={t('sidebar.collapseSidebar')}>
+              <PanelLeftClose size={14} className="text-primary/60" />
             </Button>
           )}
         </div>
@@ -342,7 +327,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
       {/* Bottom: Settings + Admin */}
       <div className="border-t border-border px-3 py-2 space-y-0.5">
         {userStatus?.is_admin && (
-          <Button variant="ghost" size="sm" onClick={() => setShowAdminPanel(true)} className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="sm" onClick={onOpenAdmin} className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
             <Shield size={14} className="text-warning/70" />
             <span className="text-[13px]">{t('admin.title', 'Platform Users')}</span>
           </Button>
@@ -368,10 +353,6 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
           ownerUserId={shareModal.ownerUserId}
           onClose={() => setShareModal(null)}
         />
-      )}
-
-      {showAdminPanel && (
-        <AdminPanel onClose={() => setShowAdminPanel(false)} />
       )}
     </div>
   );

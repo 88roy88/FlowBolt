@@ -2,6 +2,7 @@ import type { WSMessage, Message, FollowUpStep, AgentPhase, ProjectSummary } fro
 import { throttle } from '../utils/debounce';
 import { useFilesStore } from './files';
 import { useSessionStore } from './session';
+import { useErrorStore } from './errors';
 import {
   requestPermissionIfNeeded,
   notifyAgentNeedsAttention,
@@ -77,8 +78,7 @@ function handleFileUpdate(msg: { path: string; content: string }, set: SetState)
   if (filesStore.openFiles.has(msg.path)) {
     filesStore.updateFileContent(msg.path, msg.content);
   }
-  // New files on disk (e.g. fix pass) — keep explorer in sync before action_complete.
-  refreshFileTreeAfterAgentWrite();
+  if (!_skipMessages) _treeRefresh();
 }
 
 function handleText(msg: { content: string }, set: SetState) {
@@ -186,6 +186,7 @@ export function createFixErrorHandler(
         }
         if (!_skipMessages) {
           notifyBuildComplete(useSessionStore.getState().currentProject?.name);
+          useErrorStore.getState().clearErrors();
         }
         cleanup();
         refreshFileTreeAfterAgentWrite();
@@ -501,6 +502,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
   }));
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name);
+    useErrorStore.getState().clearErrors();
   }
   cleanup();
   refreshFileTreeAfterAgentWrite();

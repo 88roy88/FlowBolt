@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
@@ -16,51 +16,48 @@ export function ChatPanel() {
   const { t } = useTranslation();
   const {
     messages, currentAssistantMessage, actions, error, clearError,
-    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs, historyLoaded,
+    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
   } = useChatStore();
   const agentActive = useChatStore(isAgentAlive);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const pinToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
-  // Auto-scroll on new content
-  useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    // Only auto-scroll if already near the bottom
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-    if (isNearBottom) scrollToBottom();
-  }, [messages, currentAssistantMessage, agentPhase, planOverview, executionTasks, fixSteps, followUpSteps, scrollToBottom]);
+  const observeContentForPinning = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current) pinToBottom();
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [pinToBottom]);
 
-  // Track scroll position to show/hide the button
-  useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const handleScroll = () => {
-      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      setShowScrollBtn(distFromBottom > 200);
-    };
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, []);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distFromBottom < 150;
+    setShowScrollBtn(distFromBottom > 200);
+  };
 
-  // Force scroll to bottom when plan overview appears (including on reconnect)
+  const jumpToBottom = () => {
+    stickToBottomRef.current = true;
+    scrollContainerRef.current?.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
+  };
+
+  const wasAgentActiveRef = useRef(agentActive);
   useEffect(() => {
-    if (agentPhase === 'awaiting_approval' && planOverview) {
-      setTimeout(scrollToBottom, 100);
+    const runJustStarted = agentActive && !wasAgentActiveRef.current;
+    if (runJustStarted) {
+      stickToBottomRef.current = true;
+      pinToBottom();
     }
-  }, [agentPhase, planOverview, scrollToBottom]);
-
-  // Scroll to bottom on initial history load (after page refresh)
-  useEffect(() => {
-    if (historyLoaded && messages.length > 0) {
-      setTimeout(scrollToBottom, 100);
-    }
-  }, [historyLoaded, scrollToBottom]);
+    wasAgentActiveRef.current = agentActive;
+  }, [agentActive, pinToBottom]);
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
@@ -74,7 +71,8 @@ export function ChatPanel() {
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Messages */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-4 flex flex-col gap-4 scroll-smooth">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-auto p-4">
+        <div ref={observeContentForPinning} className="flex flex-col gap-4">
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}
@@ -118,13 +116,13 @@ export function ChatPanel() {
           />
         )}
 
-        <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Scroll to bottom button */}
       {showScrollBtn && (
         <button
-          onClick={scrollToBottom}
+          onClick={jumpToBottom}
           className="absolute bottom-[120px] start-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-surface border border-primary/30 shadow-[var(--shadow-md)] flex items-center justify-center text-primary/70 hover:text-primary hover:bg-primary/10 transition-all duration-150 z-10"
           title={t('chat.scrollToBottom')}
         >
@@ -134,9 +132,9 @@ export function ChatPanel() {
 
       {/* Error banner */}
       {error && (
-        <div className="flex items-center justify-between px-4 py-2 bg-danger-bg border-t border-destructive text-destructive text-[13px] shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 bg-warning/10 border-t border-warning text-warning text-[13px] shrink-0">
           <span>{error}</span>
-          <button onClick={clearError} className="text-destructive px-1.5 py-0.5 text-xs">
+          <button onClick={clearError} className="text-warning px-1.5 py-0.5 text-xs">
             Dismiss
           </button>
         </div>
