@@ -84,9 +84,7 @@ async def preview_version(sandbox: PnpmSandbox, project_id: str, commit_sha: str
 async def exit_preview(sandbox: PnpmSandbox, project_id: str) -> None:
     async with _locked_git(sandbox, project_id) as git:
         await git.checkout_latest()
-    await emit_transient(
-        project_id, {"type": "version_preview_active", "commit_sha": "", "is_latest": True}
-    )
+    await emit_transient(project_id, {"type": "version_preview_active", "commit_sha": "", "is_latest": True})
 
 
 async def ensure_at_latest(sandbox: PnpmSandbox, project_id: str) -> None:
