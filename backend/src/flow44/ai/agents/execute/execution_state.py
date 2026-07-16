@@ -2,8 +2,9 @@
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from flow44.ai.file_safety import FileSafetyError
 from flow44.ai.state import BuildState
 
 
@@ -26,6 +27,7 @@ class ExecutionState(BaseModel):
     build_errors: str = ""
     all_errors: str = ""
     fix_attempts: int = 0
+    rejected_files: list[FileSafetyError] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True

@@ -1,22 +1,60 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Literal, overload
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader
+
+from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
+from flow44.ai.file_safety import (
+    ProtectedFileRules,
+    protected_file_rules,
+)
 
 _templates_dir = Path(__file__).parent / "templates"
 _env = Environment(  # noqa: S701 — templates are LLM prompts, not HTML; autoescape would break them
-    loader=FileSystemLoader(str(_templates_dir)), trim_blocks=True, lstrip_blocks=True
+    loader=ChoiceLoader([FileSystemLoader(str(_templates_dir)), FileSystemLoader(str(TEMPLATE_PROMPTS_PATH))]),
+    trim_blocks=True,
+    lstrip_blocks=True,
 )
 
 
-def render(template_name: str, **kwargs: Any) -> str:
+@overload
+def render(
+    template_name: Literal["feedback.jinja2"],
+    *,
+    files: dict[str, str],
+    file_safety: ProtectedFileRules,
+) -> str: ...
+
+
+@overload
+def render(
+    template_name: Literal["fix_error_direct.jinja2"],
+    *,
+    error_message: str,
+    error_file: str | None,
+    error_line: int | None,
+    error_stack: str | None,
+    files: dict[str, str],
+    file_safety: ProtectedFileRules,
+) -> str: ...
+
+
+@overload
+def render(template_name: str) -> str: ...
+
+
+def render(template_name: str, **kwargs: object) -> str:
     return _env.get_template(template_name).render(**kwargs)
 
 
-def render_fix_errors(*, errors: str, files: dict[str, str]) -> str:
-    return render("fix_errors.jinja2", errors=errors, files=files)
+def render_feedback(*, files: dict[str, str]) -> str:
+    return render(
+        "feedback.jinja2",
+        files=files,
+        file_safety=protected_file_rules(),
+    )
 
 
 def render_fix_error_direct(
@@ -34,4 +72,5 @@ def render_fix_error_direct(
         error_line=error_line,
         error_stack=error_stack,
         files=files,
+        file_safety=protected_file_rules(),
     )

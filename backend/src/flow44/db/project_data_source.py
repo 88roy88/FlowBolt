@@ -1,3 +1,4 @@
+import json
 import uuid
 from collections.abc import Sequence
 from typing import Any
@@ -42,6 +43,14 @@ class DataSourceContext(DataSourceBase):
     sample_data: dict[str, Any] | None = None
     module_path: str = ""
     generated_files: dict[str, str] = Field(default_factory=dict)
+
+    def to_prompt_context(self) -> dict[str, Any]:
+        return {
+            **self.model_dump(),
+            "sample_data_json": (
+                json.dumps(self.sample_data, indent=2)[:1000] if self.sample_data is not None else None
+            ),
+        }
 
 
 def _row_to_context(row: ProjectDataSource) -> DataSourceContext:
