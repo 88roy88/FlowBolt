@@ -1,8 +1,11 @@
+import functools
+import os
 from pathlib import Path
 
 import pytest  # noqa: E402
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
+from sqlalchemy.pool import NullPool  # noqa: E402
 
 # Load test.env to satisfy required environment variables in tests
 # Must happen before importing flow44.config (which reads env vars)
@@ -12,8 +15,19 @@ import flow44.config  # noqa: E402
 import flow44.db.database  # noqa: E402
 from flow44.api.deps import TokenPayload, get_user_id, get_user_permissions, validate_token, validate_ws_token  # noqa: E402
 from flow44.auth.permissions import get_owner_permissions  # noqa: E402
-from flow44.db.database import get_engine, init_db, reset  # noqa: E402
+from flow44.db.database import build_db_url, init_db, reset  # noqa: E402
 from flow44.main import app  # noqa: E402
+
+
+@functools.lru_cache
+def get_engine(url: str | None = None) -> AsyncEngine:
+    # asyncpg connections can't be reused across pytest's per-test event loops,
+    # so tests use NullPool instead of the production QueuePool.
+    async_url = url or build_db_url(flow44.config.settings, async_db=True)
+    return create_async_engine(async_url, echo=False, poolclass=NullPool)
+
+
+flow44.db.database.get_engine = get_engine
 
 
 @pytest.fixture
@@ -39,20 +53,33 @@ def authenticated_user():
 
 @pytest.fixture(scope="session")
 async def setup_test_db():
-    """Session-scoped: create engine and tables once for all tests."""
+    """Session-scoped: create an isolated database on the running Postgres and build tables once."""
+    from pytest_postgresql.janitor import DatabaseJanitor  # noqa: PLC0415
 
-    await reset()
-    await init_db()
+    settings = flow44.config.settings
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    dbname = f"test_flow44_{worker}"
 
-    # Create tables for the test session
-    from sqlmodel import SQLModel  # noqa: PLC0415
+    with DatabaseJanitor(
+        user=settings.DB_USER,
+        host=settings.DB_HOST,
+        port=settings.DB_PORT,
+        dbname=dbname,
+        version="16",
+        password=settings.DB_PASSWORD,
+    ):
+        settings.DB_NAME = dbname
+        await reset()
+        await init_db()
 
-    async with get_engine().begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        from sqlmodel import SQLModel  # noqa: PLC0415
 
-    yield
+        async with get_engine().begin() as conn:
+            await conn.run_sync(SQLModel.metadata.create_all)
 
-    await reset()
+        yield
+
+        await reset()
 
 
 @pytest.fixture

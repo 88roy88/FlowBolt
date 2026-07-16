@@ -33,7 +33,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      AIB_DB_SCHEME: postgresql
       AIB_DB_USER: postgres
       AIB_DB_PASSWORD: postgres
       AIB_DB_HOST: localhost

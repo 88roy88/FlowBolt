@@ -1,20 +1,13 @@
 import functools
-from typing import Any
 
-from sqlalchemy import event, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 import flow44.config
 
 
 def build_db_url(config: flow44.config.Settings, async_db: bool) -> str:
-    """Builds a database URL string from components, supporting both SQLite and Postgres."""
-    if config.DB_SCHEME == "sqlite":
-        # SQLite: use aiosqlite for async, standard sqlite driver otherwise
-        adapter = "sqlite+aiosqlite" if async_db else "sqlite"
-        return f"{adapter}:///{config.DB_NAME}"
-
-    # Postgres: use asyncpg (we only use async connections)
+    """Builds a Postgres database URL string from components."""
     db_adapter = "postgresql+asyncpg" if async_db else "postgresql"
     url = f"{db_adapter}://{config.DB_USER}:{config.DB_PASSWORD}@{config.DB_HOST}:{config.DB_PORT}"
     if config.DB_NAME:
@@ -31,28 +24,14 @@ def _get_async_url() -> str:
 def get_engine(url: str | None = None) -> AsyncEngine:
     async_url = url or _get_async_url()
 
-    kwargs = {}
-    if not async_url.startswith("sqlite"):
-        kwargs.update(
-            {
-                "pool_size": flow44.config.settings.DB_POOL_SIZE,
-                "max_overflow": flow44.config.settings.DB_MAX_OVERFLOW,
-                "pool_recycle": flow44.config.settings.DB_POOL_RECYCLE,
-                "pool_pre_ping": flow44.config.settings.DB_POOL_PRE_PING,
-            }
-        )
-
-    eng = create_async_engine(async_url, echo=False, **kwargs)
-
-    # Enable foreign keys for SQLite (SQLite-specific pragma)
-    @event.listens_for(eng.sync_engine, "connect")
-    def _enable_foreign_keys(dbapi_conn: Any, _connection_record: Any) -> None:
-        if eng.dialect.name == "sqlite":
-            cursor = dbapi_conn.cursor()
-            cursor.execute("PRAGMA foreign_keys = ON")
-            cursor.close()
-
-    return eng
+    return create_async_engine(
+        async_url,
+        echo=False,
+        pool_size=flow44.config.settings.DB_POOL_SIZE,
+        max_overflow=flow44.config.settings.DB_MAX_OVERFLOW,
+        pool_recycle=flow44.config.settings.DB_POOL_RECYCLE,
+        pool_pre_ping=flow44.config.settings.DB_POOL_PRE_PING,
+    )
 
 
 @functools.lru_cache
