@@ -84,7 +84,7 @@ export interface ProjectMember {
   invited_by: string;
 }
 
-// A directory group granted access to a project (keyed on the AD objectGUID).
+// A directory group granted access to a project (keyed on the AD distinguishedName).
 export interface ProjectGroupGrant {
   group_id: string;
   group_name: string;
@@ -93,7 +93,7 @@ export interface ProjectGroupGrant {
   invited_by: string;
 }
 
-// A directory group granted platform access (keyed on the AD objectGUID).
+// A directory group granted platform access (keyed on the AD distinguishedName).
 export interface PlatformGroup {
   group_id: string;
   group_name: string;
@@ -135,7 +135,8 @@ export interface AdGroup {
   description: string;
   mail: string;
   sAMAccountName: string;
-  // Stable directory id, used to grant the group access to a project.
+  // Stable directory id (kept for reference/display). Group access is granted
+  // by distinguishedName — the id ADAPI reports in a user's memberOf.
   objectGUID: string;
 }
 

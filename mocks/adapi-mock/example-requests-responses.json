@@ -1,6 +1,6 @@
 {
   "search_users": {
-    "request": "curl 'http://localhost:6666/api/users?samAccountName=*dje*&customFilter=(|(displayName=*dje*) (mail=*dje*))'",
+    "request": "curl 'http://localhost:6666/users?samAccountName=*dje*&customFilter=(|(displayName=*dje*) (mail=*dje*))'",
     "response": [
       {
         "cn": "djenkins",
@@ -14,7 +14,12 @@
         "sAMAccountName": "djenkins",
         "sn": "Jenkins",
         "userAccountControl": "512",
-        "extensionAttribute10": "LOC-102"
+        "extensionAttribute10": "LOC-102",
+        "memberOf": [
+          "CN=Quality Assurance Contractors,OU=Groups,DC=corp,DC=example,DC=com",
+          "CN=Legal,OU=Groups,DC=corp,DC=example,DC=com",
+          "CN=Cloud Leads,OU=Groups,DC=corp,DC=example,DC=com"
+        ]
       },
       {
         "cn": "djenman",
@@ -27,12 +32,17 @@
         "sAMAccountName": "djenman",
         "sn": "Jenkins",
         "userAccountControl": "512",
-        "extensionAttribute10": "LOC-284"
+        "extensionAttribute10": "LOC-284",
+        "memberOf": [
+          "CN=Quality Assurance Contractors,OU=Groups,DC=corp,DC=example,DC=com",
+          "CN=Legal,OU=Groups,DC=corp,DC=example,DC=com",
+          "CN=Cloud Leads,OU=Groups,DC=corp,DC=example,DC=com"
+        ]
       }
     ]
   },
   "search_groups": {
-    "request": "curl 'http://localhost:6666/api/groups?samAccountName=*le*&customFilter=(|(displayName=*le*) (mail=*le*))'",
+    "request": "curl 'http://localhost:6666/groups?samAccountName=*le*&customFilter=(|(displayName=*le*) (mail=*le*))'",
     "response": [
       {
         "cn": "Quality Assurance Contractors",

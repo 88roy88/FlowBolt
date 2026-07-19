@@ -2,9 +2,14 @@
 
 Exposes what the backend needs from ADAPI: the set of groups a user belongs to
 (for project-access resolution) and free-text search over users and groups (for
-the "share a project with a person/group" UI). Nested (transitive) membership is
-resolved by ADAPI itself, so the backend never has to deal with DNs or
-``memberOf`` chains.
+the "share a project with a person/group" UI).
+
+Group membership is read from the user record's ``memberOf`` attribute, which
+ADAPI returns as a list of group distinguished names (DNs). Those DNs are the
+identifier the backend stores when a project or the platform is shared with a
+group, so access resolution is a direct DN set-intersection — no objectGUID
+mapping. ADAPI resolves nested (transitive) membership, so ``memberOf`` already
+includes groups reached through nesting.
 
 The two use cases differ in how they treat failure. Group-access resolution is
 deliberately soft: if ADAPI is unreachable or errors, we log and return an empty
@@ -15,7 +20,7 @@ silently showing an empty result set that looks like "no matches".
 """
 
 import logging
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import httpx
 from pydantic import BaseModel, ConfigDict
@@ -44,14 +49,17 @@ class _AdRecord(BaseModel):
 
 
 class AdUser(_AdRecord):
-    pass
+    # DNs of every group the user belongs to (transitive membership resolved by
+    # ADAPI). Group grants key on these DNs, so this is what drives group-based
+    # access resolution — see ``get_user_group_ids``.
+    memberOf: list[str] = []  # noqa: N815 — mirrors the AD attribute name (wire contract)
 
 
 class AdGroup(_AdRecord):
     description: str = ""
-    # Stable directory identifier. Needed to grant a group access to a project
-    # (project_member_groups keys on it), so it must survive the wire, unlike the
-    # display-only fields above.
+    # AD objectGUID — a stable directory id, kept for reference/display. The
+    # grant key is the group's ``distinguishedName`` (on ``_AdRecord``), which is
+    # what ADAPI reports in a user's ``memberOf``.
     objectGUID: str = ""  # noqa: N815 — mirrors the AD attribute name (wire contract)
 
 
@@ -65,42 +73,35 @@ class AdapiClient:
         self._headers = {"ClientId": client_id if client_id is not None else settings.ADAPI_CLIENT_ID}
 
     async def get_user_group_ids(self, user_id: str) -> set[str]:
-        """Return the ``objectGUID``s of every group ``user_id`` belongs to (transitive).
+        """Return the DNs of every group ``user_id`` belongs to (transitive).
 
         ``user_id`` is the identifier carried in the auth token's UniqueID claim,
-        which maps to the directory's ``sAMAccountName``. Returns an empty set on
-        any failure (unknown user, ADAPI down, malformed response).
+        which maps to the directory's ``sAMAccountName``. We look the user up via
+        the same search ADAPI exposes and read the ``memberOf`` (group DNs) off
+        the record whose ``sAMAccountName`` matches exactly — ADAPI carries the
+        group DNs on the user object, so no separate membership endpoint is
+        needed. Returns an empty set on any failure (unknown user, ADAPI down,
+        malformed response) so group-derived access is unavailable, never fatal.
         """
-        path = f"/api/users/{quote(user_id, safe='')}/groups"
         try:
-            async with httpx.AsyncClient(
-                base_url=self.base_url,
-                timeout=self._timeout,
-                verify=settings.ADAPI_VERIFY_SSL,
-                headers=self._headers,
-            ) as http:
-                resp = await http.get(path)
-            if resp.status_code == 404:
-                logger.warning("ADAPI user not found: %s (404)", user_id)
-                return set()
-            resp.raise_for_status()
-            groups = resp.json()
-        except (httpx.HTTPError, ValueError) as exc:
+            users = await self.search_users(user_id)
+        except AdapiError as exc:
             logger.warning("ADAPI group lookup failed for user %s: %s", user_id, exc)
             return set()
 
-        if not isinstance(groups, list):
-            logger.warning("ADAPI returned unexpected payload for user %s groups", user_id)
+        match = next((u for u in users if u.sAMAccountName.casefold() == user_id.casefold()), None)
+        if match is None:
+            logger.warning("ADAPI user not found for group lookup: %s", user_id)
             return set()
-        return {g["objectGUID"] for g in groups if isinstance(g, dict) and g.get("objectGUID")}
+        return {dn for dn in match.memberOf if dn}
 
     async def search_users(self, query: str) -> list[AdUser]:
         """Search ADAPI for users matching ``query`` by account name, display name or email."""
-        return [AdUser.model_validate(r) for r in await self._search("/api/users", query)]
+        return [AdUser.model_validate(r) for r in await self._search("/users", query)]
 
     async def search_groups(self, query: str) -> list[AdGroup]:
         """Search ADAPI for groups matching ``query`` by account name, display name or email."""
-        return [AdGroup.model_validate(r) for r in await self._search("/api/groups", query)]
+        return [AdGroup.model_validate(r) for r in await self._search("/groups", query)]
 
     @staticmethod
     def _search_params(query: str) -> dict[str, str]:
@@ -119,10 +120,17 @@ class AdapiClient:
     async def _search(self, path: str, query: str) -> list[dict]:
         """GET ``path`` with the substring filter and return the raw list of records.
 
+        The query string is pre-encoded and appended to the URL rather than passed
+        via ``params=``: httpx would encode the space inside ``customFilter`` as
+        ``+``, which ADAPI reads literally and rejects. ``quote`` encodes it as
+        ``%20`` instead, and httpx preserves an already-encoded query verbatim (no
+        double-encoding).
+
         Raises ``AdapiError`` on any transport/HTTP/decoding failure or an
         unexpected (non-list) payload, so interactive callers can distinguish
         "ADAPI unavailable" from "no matches".
         """
+        query_string = urlencode(self._search_params(query), quote_via=quote)
         try:
             async with httpx.AsyncClient(
                 base_url=self.base_url,
@@ -130,7 +138,7 @@ class AdapiClient:
                 verify=settings.ADAPI_VERIFY_SSL,
                 headers=self._headers,
             ) as http:
-                resp = await http.get(path, params=self._search_params(query))
+                resp = await http.get(f"{path}?{query_string}")
             resp.raise_for_status()
             data = resp.json()
         except (httpx.HTTPError, ValueError) as exc:

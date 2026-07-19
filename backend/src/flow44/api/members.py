@@ -37,7 +37,7 @@ class MemberResponse(BaseModel):
 
 
 class AddGroupRequest(BaseModel):
-    group_id: str  # AD objectGUID
+    group_id: str  # AD distinguishedName (DN)
     group_name: str = ""
     role: Role = Role.viewer
 

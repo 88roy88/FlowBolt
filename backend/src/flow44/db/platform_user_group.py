@@ -1,7 +1,7 @@
 """Platform access granted to a whole directory group.
 
 Mirrors :class:`~flow44.db.platform_user.PlatformUser`, but the principal is a
-group (identified by its stable AD ``objectGUID``) rather than an individual. A
+group (identified by its AD ``distinguishedName``) rather than an individual. A
 user gains platform access if ADAPI reports them as a member of any granted
 group — the same "verify by group membership" pattern the project-level
 :mod:`flow44.db.project_member_group` grants use.
@@ -17,7 +17,8 @@ from flow44.db import database
 class PlatformUserGroup(SQLModel, table=True):
     __tablename__ = "platform_user_groups"
 
-    # AD objectGUID of the group. Stable across renames/moves (unlike DN or name).
+    # AD distinguishedName (DN) of the group — the identifier ADAPI reports in a
+    # user's ``memberOf``, so access resolution intersects on it directly.
     group_id: str = Field(primary_key=True)
     # Human-readable name, cached for display so the admin UI need not re-query
     # ADAPI. Not used for access decisions.
@@ -54,7 +55,7 @@ async def list_platform_groups() -> list[PlatformUserGroup]:
 
 
 async def platform_group_ids() -> set[str]:
-    """objectGUIDs of every group granted platform access (empty if none)."""
+    """DNs of every group granted platform access (empty if none)."""
     async with database.async_session() as session:
         result = await session.execute(select(PlatformUserGroup.group_id))
         return set(result.scalars().all())

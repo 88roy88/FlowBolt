@@ -13,7 +13,7 @@ class ProjectMemberGroup(SQLModel, table=True):
     """A directory group granted access to a project (a "group invite").
 
     Mirrors :class:`~flow44.db.project_member.ProjectMember`, but the principal
-    is a group (identified by its stable AD ``objectGUID``) rather than a user.
+    is a group (identified by its AD ``distinguishedName``) rather than a user.
     A user gains the group's role on the project if ADAPI reports them as a
     member of ``group_id``.
     """
@@ -25,7 +25,8 @@ class ProjectMemberGroup(SQLModel, table=True):
     project_id: str = Field(
         sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
     )
-    # AD objectGUID of the group. Stable across renames/moves (unlike DN or name).
+    # AD distinguishedName (DN) of the group — the identifier ADAPI reports in a
+    # user's ``memberOf``, so access resolution intersects on it directly.
     group_id: str = Field(index=True)
     # Human-readable group name, cached for display so the members UI need not
     # re-query ADAPI. Not used for access decisions.

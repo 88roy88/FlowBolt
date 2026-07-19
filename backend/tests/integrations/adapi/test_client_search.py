@@ -35,11 +35,15 @@ class TestSearchUsers:
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)) as mock_get:
             users = await client.search_users("dje")
 
-        # The term is wildcard-wrapped and matched against account name, display name and mail.
-        assert mock_get.call_args.kwargs["params"] == {
-            "samAccountName": "*dje*",
-            "customFilter": "(|(displayName=*dje*) (mail=*dje*))",
-        }
+        # The term is wildcard-wrapped and matched against account name, display name
+        # and mail. The query rides in the URL, pre-encoded: the space inside
+        # customFilter must be %20 (not +, which ADAPI rejects).
+        requested_url = mock_get.call_args.args[0]
+        assert requested_url == (
+            "/users?samAccountName=%2Adje%2A"
+            "&customFilter=%28%7C%28displayName%3D%2Adje%2A%29%20%28mail%3D%2Adje%2A%29%29"
+        )
+        assert "+" not in requested_url
         assert len(users) == 1
         assert users[0].cn == "djenkins"
         assert users[0].displayName == "Dana Jenkins"
@@ -98,5 +102,60 @@ class TestSearchGroups:
         assert len(groups) == 1
         assert groups[0].cn == "Legal"
         assert groups[0].description == "Legal department"
-        # objectGUID is surfaced so a group can be granted project access.
+        # objectGUID is surfaced as a stable directory id, alongside the DN used for grants.
         assert groups[0].objectGUID == "82e16f20-f05e-6d5c-3589-79cd6b398160"
+
+
+class TestGetUserGroupIds:
+    """``get_user_group_ids`` reads the group DNs off the matching user's ``memberOf``.
+
+    Unlike search it soft-fails to an empty set, so a directory outage or an
+    unknown user simply yields no group-derived access rather than an error.
+    """
+
+    @staticmethod
+    def _user(sam: str, member_of: list[str]) -> dict:
+        return {
+            "cn": sam,
+            "displayName": sam,
+            "distinguishedName": f"CN={sam},OU=Users,DC=corp",
+            "mail": f"{sam}@corp.local",
+            "sAMAccountName": sam,
+            "memberOf": member_of,
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_member_of_dns_for_exact_match(self):
+        dns = ["CN=Legal,OU=Groups,DC=corp", "CN=Engineering,OU=Groups,DC=corp"]
+        # A substring search can return several users; only the exact sAMAccountName counts.
+        payload = [self._user("djenkins", dns), self._user("djenkinson", ["CN=Other,OU=Groups,DC=corp"])]
+        client = AdapiClient(base_url="http://adapi.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            assert await client.get_user_group_ids("djenkins") == set(dns)
+
+    @pytest.mark.asyncio
+    async def test_match_is_case_insensitive(self):
+        client = AdapiClient(base_url="http://adapi.local")
+        payload = [self._user("DJenkins", ["CN=Legal,OU=Groups,DC=corp"])]
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            assert await client.get_user_group_ids("djenkins") == {"CN=Legal,OU=Groups,DC=corp"}
+
+    @pytest.mark.asyncio
+    async def test_no_exact_match_returns_empty_set(self):
+        client = AdapiClient(base_url="http://adapi.local")
+        # A substring hit that is not the requested account must not leak its groups.
+        payload = [self._user("djenkinson", ["CN=Legal,OU=Groups,DC=corp"])]
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            assert await client.get_user_group_ids("djenkins") == set()
+
+    @pytest.mark.asyncio
+    async def test_user_without_groups_returns_empty_set(self):
+        client = AdapiClient(base_url="http://adapi.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [self._user("djenkins", [])])):
+            assert await client.get_user_group_ids("djenkins") == set()
+
+    @pytest.mark.asyncio
+    async def test_adapi_failure_soft_fails_to_empty_set(self):
+        client = AdapiClient(base_url="http://adapi.local")
+        with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("refused")):
+            assert await client.get_user_group_ids("djenkins") == set()

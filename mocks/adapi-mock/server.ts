@@ -17,6 +17,13 @@ async function loadJson<T>(file: string): Promise<T> {
   return JSON.parse(await readFile(file, "utf8")) as T;
 }
 
+// Loaded once at startup — the fixtures don't change while the server runs, so
+// there's no need to re-read them on every request. Restart to pick up edits.
+const [users, groups] = await Promise.all([
+  loadJson<AdUser[]>(usersFile),
+  loadJson<AdGroup[]>(groupsFile),
+]);
+
 /**
  * The backend queries with `?samAccountName=*term*&customFilter=(|(displayName=*term*)
  * (mail=*term*))`. All three carry the same wildcard-wrapped term, so we recover
@@ -42,73 +49,55 @@ function matchesTerm(
 }
 
 /**
- * Resolve the full (transitive) set of groups a user belongs to.
+ * Resolve the full (transitive) set of group DNs a user belongs to.
  *
  * Real AD/ADAPI computes nested membership server-side (via
- * LDAP_MATCHING_RULE_IN_CHAIN); we mirror that here so callers never have to
- * deal with DNs or `memberOf` nesting themselves. Membership is matched by the
- * user's `distinguishedName` against each group's `member` list, then expanded
- * upward through `memberOf`.
+ * LDAP_MATCHING_RULE_IN_CHAIN) and reports it on the user record's `memberOf`,
+ * so callers never have to walk the nesting themselves. We mirror that: match
+ * the user's `distinguishedName` against each group's `member` list, then expand
+ * upward through each group's own `memberOf`, and return the resulting DNs.
  */
-function resolveUserGroups(user: AdUser, groups: AdGroup[]): AdGroup[] {
+function resolveUserGroupDns(user: AdUser, groups: AdGroup[]): string[] {
   const byDn = new Map(groups.map((g) => [g.distinguishedName, g]));
-  const resolved = new Map<string, AdGroup>();
+  const resolved = new Set<string>();
   const queue: AdGroup[] = groups.filter((g) =>
     g.member?.includes(user.distinguishedName),
   );
   while (queue.length > 0) {
     const group = queue.shift()!;
     if (resolved.has(group.distinguishedName)) continue;
-    resolved.set(group.distinguishedName, group);
+    resolved.add(group.distinguishedName);
     for (const parentDn of group.memberOf ?? []) {
       const parent = byDn.get(parentDn);
       if (parent && !resolved.has(parentDn)) queue.push(parent);
     }
   }
-  return [...resolved.values()];
+  return [...resolved];
 }
 
 const server = Fastify({ logger: false });
 await server.register(cors);
 
+/**
+ * User search. Each returned record carries a `memberOf` array of group DNs —
+ * the user's full (transitive) group membership — which is how the backend
+ * resolves group-based access (`get_user_group_ids` reads it off the match).
+ */
 server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
-  "/api/users",
+  "/users",
   async (request) => {
-    const users = await loadJson<AdUser[]>(usersFile);
     const term = searchTerm(request.query.samAccountName);
-    return users.filter((u) => matchesTerm(u, term));
+    return users
+      .filter((u) => matchesTerm(u, term))
+      .map((u) => ({ ...u, memberOf: resolveUserGroupDns(u, groups) }));
   },
 );
 
 server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
-  "/api/groups",
+  "/groups",
   async (request) => {
-    const groups = await loadJson<AdGroup[]>(groupsFile);
     const term = searchTerm(request.query.samAccountName);
     return groups.filter((g) => matchesTerm(g, term));
-  },
-);
-
-/**
- * Return every group the given user is a member of, transitively (nested groups
- * included). Lookup is by `sAMAccountName` — the identifier carried in the auth
- * token's UniqueID claim. Returns 404 if no such user exists.
- */
-server.get<{ Params: { sAMAccountName: string } }>(
-  "/api/users/:sAMAccountName/groups",
-  async (request, reply) => {
-    const [users, groups] = await Promise.all([
-      loadJson<AdUser[]>(usersFile),
-      loadJson<AdGroup[]>(groupsFile),
-    ]);
-    const target = request.params.sAMAccountName.toLowerCase();
-    const user = users.find(
-      (u) => u.sAMAccountName.toLowerCase() === target,
-    );
-    if (!user) {
-      return reply.status(404).send({ error: "user not found" });
-    }
-    return resolveUserGroups(user, groups);
   },
 );
 

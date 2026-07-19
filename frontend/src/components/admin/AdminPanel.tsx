@@ -76,7 +76,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
         {/* Directory search — hover a result and invite the user or group */}
         <AdapiSearch
           onInviteUser={(u) => handleInviteUser(u.sAMAccountName)}
-          onInviteGroup={(g) => handleInviteGroup(g.objectGUID, g.displayName)}
+          onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName)}
         />
 
         {error && (
