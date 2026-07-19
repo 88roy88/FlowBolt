@@ -71,25 +71,30 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
     setError(false);
 
     (async () => {
-      try {
-        const [nextUsers, nextGroups] = await Promise.all([
-          showUsers ? searchAdUsers(trimmed) : Promise.resolve([]),
-          showGroups ? searchAdGroups(trimmed) : Promise.resolve([]),
-        ]);
-        if (seq === latestSeq.current) {
-          setUsers(nextUsers);
-          setGroups(nextGroups);
-        }
-      } catch (err) {
-        console.error('ADAPI search failed:', err);
-        if (seq === latestSeq.current) {
-          setUsers([]);
-          setGroups([]);
-          setError(true);
-        }
-      } finally {
-        if (seq === latestSeq.current) setIsLoading(false);
-      }
+      // Settle each endpoint independently: in 'all' mode one entity type having
+      // no matches (which real ADAPI surfaces as an error, not an empty list)
+      // must not discard the other type's results. We only report an error when
+      // every endpoint we actually queried failed.
+      const [usersRes, groupsRes] = await Promise.allSettled([
+        showUsers ? searchAdUsers(trimmed) : Promise.resolve<AdUser[]>([]),
+        showGroups ? searchAdGroups(trimmed) : Promise.resolve<AdGroup[]>([]),
+      ]);
+      if (seq !== latestSeq.current) return;
+
+      if (usersRes.status === 'rejected') console.error('ADAPI user search failed:', usersRes.reason);
+      if (groupsRes.status === 'rejected') console.error('ADAPI group search failed:', groupsRes.reason);
+
+      setUsers(usersRes.status === 'fulfilled' ? usersRes.value : []);
+      setGroups(groupsRes.status === 'fulfilled' ? groupsRes.value : []);
+
+      // Error only when every entity type we queried failed. If either succeeds
+      // (even with no matches), we show its results instead of an error.
+      const usersFailed = showUsers && usersRes.status === 'rejected';
+      const groupsFailed = showGroups && groupsRes.status === 'rejected';
+      const allQueriedFailed =
+        (!showUsers || usersFailed) && (!showGroups || groupsFailed);
+      setError(allQueriedFailed);
+      setIsLoading(false);
     })();
   }, [trimmed, hasQuery, showUsers, showGroups]);
 
@@ -246,8 +251,8 @@ function FilterButton({
       aria-pressed={active}
       className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[13px] transition-colors ${
         active
-          ? 'bg-background text-foreground shadow-[var(--shadow-sm)]'
-          : 'text-muted-foreground hover:text-foreground'
+          ? 'bg-primary text-primary-foreground font-medium shadow-[var(--shadow-sm)]'
+          : 'text-muted-foreground hover:text-foreground hover:bg-background/60'
       }`}
     >
       {icon}
