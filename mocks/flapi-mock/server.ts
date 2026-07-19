@@ -172,6 +172,7 @@ server.post(
       body: Type.Partial(
         Type.Object({
           uniqueId: Type.String(),
+          emailAddress: Type.String(),
           givenName: Type.String(),
           surname: Type.String(),
           expiresInSeconds: Type.Number(),
@@ -189,17 +190,21 @@ server.post(
     },
   },
   async (request, reply) => {
-    const { uniqueId, givenName, surname, expiresInSeconds, issuer } = request.body ?? {};
+    const { uniqueId, emailAddress, givenName, surname, expiresInSeconds, issuer } = request.body ?? {};
     if (!uniqueId?.trim()) {
       return reply.status(422).send(errorBody('validation_failed', 'uniqueId is required'));
     }
     const claimPrefix = 'https://issuer.example/v1/claims/';
+    // The backend identifies the user by an exact-match on this claim key, so the
+    // mock must emit the identical URI the production IdP uses (deps.get_user_id).
+    const emailClaimKey = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress';
     const expSeconds = Number.isFinite(Number(expiresInSeconds)) ? Number(expiresInSeconds) : 3600;
     const claims: Record<string, unknown> = {
       exp: Math.floor(Date.now() / 1000) + expSeconds,
       iss: issuer?.trim() || 'flapi-mock',
       [claimPrefix + 'UniqueID']: uniqueId.trim(),
     };
+    if (emailAddress?.trim()) claims[emailClaimKey] = emailAddress.trim();
     if (givenName?.trim()) claims[claimPrefix + 'givenname'] = givenName.trim();
     if (surname?.trim()) claims[claimPrefix + 'surname'] = surname.trim();
     try {

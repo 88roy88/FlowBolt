@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, User, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { AdapiSearch } from './AdapiSearch';
-import type { PlatformGroup } from '../../types';
+import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
 
-interface PlatformUser {
-  user_id: string;
-  invited_by: string;
-  created_at: string;
+// Sort comparator: rows whose id is in `hits` (case-insensitive) sort before
+// those that aren't; ties preserve input order under a stable sort.
+function rankHit(hits: Set<string>, a: string, b: string): number {
+  const aHit = hits.has(a.toLowerCase());
+  const bHit = hits.has(b.toLowerCase());
+  return aHit === bHit ? 0 : aHit ? -1 : 1;
 }
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
@@ -19,6 +21,33 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [groups, setGroups] = useState<PlatformGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Existing users/groups matched by the current directory search — highlighted
+  // and floated to the top of their list instead of shown again in the results.
+  const [highlightedUserIds, setHighlightedUserIds] = useState<string[]>([]);
+  const [highlightedGroupIds, setHighlightedGroupIds] = useState<string[]>([]);
+
+  // Lowercased for case-insensitive matching (stored user_id comes from a token
+  // email claim, whose casing can differ from the directory mail).
+  const memberIds = useMemo(() => new Set(users.map((u) => u.user_id.toLowerCase())), [users]);
+  const groupIds = useMemo(() => new Set(groups.map((g) => g.group_id.toLowerCase())), [groups]);
+  const highlightedUserSet = useMemo(
+    () => new Set(highlightedUserIds.map((id) => id.toLowerCase())),
+    [highlightedUserIds],
+  );
+  const highlightedGroupSet = useMemo(
+    () => new Set(highlightedGroupIds.map((id) => id.toLowerCase())),
+    [highlightedGroupIds],
+  );
+
+  // Matched-existing rows float to the top. sort() is stable, so the rest keep order.
+  const orderedUsers = useMemo(
+    () => [...users].sort((a, b) => rankHit(highlightedUserSet, a.user_id, b.user_id)),
+    [users, highlightedUserSet],
+  );
+  const orderedGroups = useMemo(
+    () => [...groups].sort((a, b) => rankHit(highlightedGroupSet, a.group_id, b.group_id)),
+    [groups, highlightedGroupSet],
+  );
 
   useEffect(() => {
     Promise.all([api.fetchPlatformUsers(), api.fetchPlatformGroups()])
@@ -27,20 +56,20 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleInviteUser = async (email: string) => {
+  const handleInviteUser = async (email: string, displayName: string) => {
     setError('');
     try {
-      const user = await api.invitePlatformUser(email);
+      const user = await api.invitePlatformUser(email, displayName);
       setUsers((prev) => [user, ...prev.filter((u) => u.user_id !== user.user_id)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite user');
     }
   };
 
-  const handleInviteGroup = async (groupId: string, groupName: string) => {
+  const handleInviteGroup = async (groupId: string, groupName: string, email: string) => {
     setError('');
     try {
-      const group = await api.invitePlatformGroup(groupId, groupName);
+      const group = await api.invitePlatformGroup(groupId, groupName, email);
       setGroups((prev) => [group, ...prev.filter((g) => g.group_id !== group.group_id)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite group');
@@ -69,32 +98,56 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="w-[440px]">
+      <DialogContent className="w-[440px] flex flex-col overflow-hidden">
         <DialogClose onClose={onClose} />
-        <DialogTitle className="mb-4">{t('admin.title', 'Platform Users')}</DialogTitle>
 
-        {/* Directory search — hover a result and invite the user or group */}
-        <AdapiSearch
-          onInviteUser={(u) => handleInviteUser(u.mail)}
-          onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName)}
-        />
+        {/* Fixed header + search (the search has its own scrollable results). */}
+        <div className="shrink-0">
+          <DialogTitle className="mb-4">{t('admin.title', 'Platform Users')}</DialogTitle>
 
-        {error && (
-          <p className="text-destructive text-xs mt-2">{error}</p>
-        )}
+          {/* Directory search — hover a result and invite the user or group */}
+          <AdapiSearch
+            onInviteUser={(u) => handleInviteUser(u.mail, u.displayName)}
+            onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName, g.mail)}
+            existingUserIds={memberIds}
+            onExistingUsersMatched={setHighlightedUserIds}
+            existingGroupIds={groupIds}
+            onExistingGroupsMatched={setHighlightedGroupIds}
+          />
 
-        {/* Platform access list — direct users and granted groups */}
-        <div className="border-t border-border mt-3 pt-3 max-h-[300px] overflow-auto space-y-1">
+          {error && (
+            <p className="text-destructive text-xs mt-2">{error}</p>
+          )}
+        </div>
+
+        {/* Platform access list — its own scrollable region */}
+        <div className="border-t border-border mt-3 pt-3 flex-auto min-h-0 overflow-auto space-y-1">
           {loading ? (
             <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>
           ) : isEmpty ? (
             <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noUsers', 'No platform users yet')}</p>
           ) : (
             <>
-              {users.map((u) => (
-                <div key={`u:${u.user_id}`} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30 group">
-                  <User size={13} className="shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-[13px] truncate">{u.user_id}</span>
+              {orderedUsers.map((u) => {
+                const highlighted = highlightedUserSet.has(u.user_id.toLowerCase());
+                return (
+                <div
+                  key={`u:${u.user_id}`}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md group transition-colors ${
+                    highlighted
+                      ? 'bg-primary/15 ring-1 ring-inset ring-primary/50'
+                      : 'hover:bg-muted/30'
+                  }`}
+                >
+                  <User size={13} className={`shrink-0 ${highlighted ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-[13px] truncate ${highlighted ? 'font-semibold' : ''}`}>
+                      {u.display_name || u.user_id}
+                    </span>
+                    {u.display_name && (
+                      <span className="block text-xs text-muted-foreground truncate">{u.user_id}</span>
+                    )}
+                  </span>
                   <span className="text-muted-foreground text-xs shrink-0">
                     {u.invited_by === 'system' ? 'system' : `by ${u.invited_by}`}
                   </span>
@@ -107,11 +160,26 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                     <Trash2 size={13} className="text-destructive" />
                   </Button>
                 </div>
-              ))}
-              {groups.map((g) => (
-                <div key={`g:${g.group_id}`} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/30 group">
-                  <Users size={13} className="shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-[13px] truncate">{g.group_name || g.group_id}</span>
+                );
+              })}
+              {orderedGroups.map((g) => {
+                const highlighted = highlightedGroupSet.has(g.group_id.toLowerCase());
+                return (
+                <div
+                  key={`g:${g.group_id}`}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md group transition-colors ${
+                    highlighted
+                      ? 'bg-primary/15 ring-1 ring-inset ring-primary/50'
+                      : 'hover:bg-muted/30'
+                  }`}
+                >
+                  <Users size={13} className={`shrink-0 ${highlighted ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-[13px] truncate ${highlighted ? 'font-semibold' : ''}`}>
+                      {g.group_name || g.group_id}
+                    </span>
+                    {g.email && <span className="block text-xs text-muted-foreground truncate">{g.email}</span>}
+                  </span>
                   <span className="text-muted-foreground text-xs shrink-0">
                     {g.invited_by === 'system' ? 'system' : `by ${g.invited_by}`}
                   </span>
@@ -124,7 +192,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                     <Trash2 size={13} className="text-destructive" />
                   </Button>
                 </div>
-              ))}
+                );
+              })}
             </>
           )}
         </div>

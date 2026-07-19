@@ -26,6 +26,9 @@ class PlatformUserGroup(SQLModel, table=True):
     # group is renamed in AD, which is acceptable because it is never used for
     # access decisions (those key on group_id/DN) — only for display.
     group_name: str = Field(default="")
+    # Group email captured at invite time, shown as the row's secondary text under
+    # the group name. Display-only, may go stale — access keys on group_id/DN.
+    email: str = Field(default="")
     invited_by: str = Field(default="")
     created_at: datetime | None = Field(
         default=None,
@@ -33,8 +36,8 @@ class PlatformUserGroup(SQLModel, table=True):
     )
 
 
-async def add_platform_group(group_id: str, group_name: str, invited_by: str) -> PlatformUserGroup:
-    group = PlatformUserGroup(group_id=group_id, group_name=group_name, invited_by=invited_by)
+async def add_platform_group(group_id: str, group_name: str, invited_by: str, email: str = "") -> PlatformUserGroup:
+    group = PlatformUserGroup(group_id=group_id, group_name=group_name, invited_by=invited_by, email=email)
     async with database.async_session() as session:
         session.add(group)
         await session.commit()

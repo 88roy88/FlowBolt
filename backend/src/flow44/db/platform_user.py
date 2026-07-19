@@ -1,5 +1,6 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
+from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -9,12 +10,21 @@ class PlatformUser(SQLModel, table=True):
     __tablename__ = "platform_users"
 
     user_id: str = Field(primary_key=True)
+    # ADAPI displayName captured at invite time, shown as the row's primary text
+    # (the email in user_id is the secondary text). Display-only, may go stale.
+    display_name: str = Field(default="")
     invited_by: str = Field(default="")
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    # tz-aware timestamptz column with a DB server default, mirroring
+    # PlatformUserGroup — the actual column type, so ORM inserts/reads stay in
+    # sync (a plain ``str`` field binds as VARCHAR and mismatches the column).
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
 
 
-async def add_platform_user(user_id: str, invited_by: str) -> PlatformUser:
-    user = PlatformUser(user_id=user_id, invited_by=invited_by)
+async def add_platform_user(user_id: str, invited_by: str, display_name: str = "") -> PlatformUser:
+    user = PlatformUser(user_id=user_id, invited_by=invited_by, display_name=display_name)
     async with database.async_session() as session:
         session.add(user)
         await session.commit()

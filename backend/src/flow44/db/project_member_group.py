@@ -33,6 +33,9 @@ class ProjectMemberGroup(SQLModel, table=True):
     # if the group is renamed in AD, which is acceptable because it is never used
     # for access decisions (those key on group_id/DN) — only for display.
     group_name: str = Field(default="")
+    # Group email captured at invite time, shown as the row's secondary text under
+    # the group name. Display-only, may go stale — access keys on group_id/DN.
+    email: str = Field(default="")
     role: str = Field(default=Role.viewer.value)
     created_at: datetime | None = Field(
         default=None,
@@ -41,11 +44,14 @@ class ProjectMemberGroup(SQLModel, table=True):
     invited_by: str = Field(default="")
 
 
-async def add_group(project_id: str, group_id: str, group_name: str, role: Role, invited_by: str) -> ProjectMemberGroup:
+async def add_group(
+    project_id: str, group_id: str, group_name: str, role: Role, invited_by: str, email: str = ""
+) -> ProjectMemberGroup:
     grant = ProjectMemberGroup(
         project_id=project_id,
         group_id=group_id,
         group_name=group_name,
+        email=email,
         role=role.value,
         invited_by=invited_by,
     )

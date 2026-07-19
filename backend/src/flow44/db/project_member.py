@@ -1,7 +1,7 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
-from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.auth.permissions import Role
@@ -18,15 +18,25 @@ class ProjectMember(SQLModel, table=True):
         sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
     )
     user_id: str = Field(index=True)
+    # ADAPI displayName captured at invite time, shown as the row's primary text
+    # (the email in user_id is the secondary text). Denormalized for display only;
+    # may go stale if renamed in AD, which is fine — access keys on user_id.
+    display_name: str = Field(default="")
     role: str = Field(default=Role.viewer.value)
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
     invited_by: str = Field(default="")
 
 
-async def add_member(project_id: str, user_id: str, role: Role, invited_by: str) -> ProjectMember:
+async def add_member(
+    project_id: str, user_id: str, role: Role, invited_by: str, display_name: str = ""
+) -> ProjectMember:
     member = ProjectMember(
         project_id=project_id,
         user_id=user_id,
+        display_name=display_name,
         role=role.value,
         invited_by=invited_by,
     )

@@ -79,6 +79,8 @@ export interface Project {
 
 export interface ProjectMember {
   user_id: string;
+  // ADAPI displayName (primary text); user_id holds the email (secondary text).
+  display_name: string;
   role: AssignableRole;
   created_at: string;
   invited_by: string;
@@ -88,15 +90,28 @@ export interface ProjectMember {
 export interface ProjectGroupGrant {
   group_id: string;
   group_name: string;
+  // Group email (secondary text); group_name holds the displayName (primary text).
+  email: string;
   role: AssignableRole;
   created_at: string;
   invited_by: string;
+}
+
+// A user granted platform access (keyed on their email).
+export interface PlatformUser {
+  user_id: string;
+  // ADAPI displayName (primary text); user_id holds the email (secondary text).
+  display_name: string;
+  invited_by: string;
+  created_at: string;
 }
 
 // A directory group granted platform access (keyed on the AD distinguishedName).
 export interface PlatformGroup {
   group_id: string;
   group_name: string;
+  // Group email (secondary text); group_name holds the displayName (primary text).
+  email: string;
   invited_by: string;
   created_at: string;
 }

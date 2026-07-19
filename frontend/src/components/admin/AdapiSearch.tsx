@@ -17,6 +17,22 @@ interface AdapiSearchProps {
   onInviteUser?: (user: AdUser) => void;
   /** Invite the picked group (via the row's hover button). Omit to hide group results. */
   onInviteGroup?: (group: AdGroup) => void;
+  /**
+   * Lowercased user_ids (emails) already granted access. Matching users are
+   * lifted out of the result list — they already live in the parent's own list —
+   * and reported back through `onExistingUsersMatched` so the parent can
+   * highlight them there. Must be lowercased for case-insensitive matching.
+   */
+  existingUserIds?: Set<string>;
+  /** Emails of already-granted users matching the current query, for the parent to highlight in its own list. */
+  onExistingUsersMatched?: (userIds: string[]) => void;
+  /**
+   * Lowercased group ids (distinguishedNames) already granted access. Behaves
+   * exactly like `existingUserIds` but for groups. Must be lowercased.
+   */
+  existingGroupIds?: Set<string>;
+  /** distinguishedNames of already-granted groups matching the current query, for the parent to highlight. */
+  onExistingGroupsMatched?: (groupIds: string[]) => void;
 }
 
 /**
@@ -26,7 +42,14 @@ interface AdapiSearchProps {
  * (no filter chrome). Each row reveals an invite button on hover. Results match
  * on account name, display name or email.
  */
-export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
+export function AdapiSearch({
+  onInviteUser,
+  onInviteGroup,
+  existingUserIds,
+  onExistingUsersMatched,
+  existingGroupIds,
+  onExistingGroupsMatched,
+}: AdapiSearchProps) {
   const { t } = useTranslation();
   const canUsers = !!onInviteUser;
   const canGroups = !!onInviteGroup;
@@ -100,6 +123,44 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
   // refetch or result-clearing is needed.
   const handleFilterChange = (next: Filter) => setFilter(next);
 
+  // Split fetched users into those already granted access (matched existing) and
+  // the rest. Already-granted users are dropped from the result list — the parent
+  // surfaces them by highlighting its own members list — while brand-new users
+  // stay invitable here.
+  const { newUsers, matchedExistingIds } = useMemo(() => {
+    const fresh: AdUser[] = [];
+    const matched: string[] = [];
+    for (const u of users) {
+      if (u.mail && existingUserIds?.has(u.mail.toLowerCase())) matched.push(u.mail);
+      else fresh.push(u);
+    }
+    return { newUsers: fresh, matchedExistingIds: matched };
+  }, [users, existingUserIds]);
+
+  // Same split for groups, keyed on distinguishedName.
+  const { newGroups, matchedExistingGroupIds } = useMemo(() => {
+    const fresh: AdGroup[] = [];
+    const matched: string[] = [];
+    for (const g of groups) {
+      if (existingGroupIds?.has(g.distinguishedName.toLowerCase())) matched.push(g.distinguishedName);
+      else fresh.push(g);
+    }
+    return { newGroups: fresh, matchedExistingGroupIds: matched };
+  }, [groups, existingGroupIds]);
+
+  // Report matched existing entities to the parent for highlighting. Only report
+  // while that entity type is actually being shown, and key each effect on the id
+  // contents (not array identity) so it fires only when the matched set changes.
+  const matchedUserKey = (showUsers ? matchedExistingIds : []).join('\n');
+  useEffect(() => {
+    onExistingUsersMatched?.(matchedUserKey ? matchedUserKey.split('\n') : []);
+  }, [matchedUserKey, onExistingUsersMatched]);
+
+  const matchedGroupKey = (showGroups ? matchedExistingGroupIds : []).join('\n');
+  useEffect(() => {
+    onExistingGroupsMatched?.(matchedGroupKey ? matchedGroupKey.split('\n') : []);
+  }, [matchedGroupKey, onExistingGroupsMatched]);
+
   const placeholder = useMemo(() => {
     if (canUsers && canGroups) return t('admin.searchPlaceholder', 'Search users & groups by name or email…');
     if (canGroups) return t('admin.searchGroupsPlaceholder', 'Search groups by name or email…');
@@ -107,8 +168,9 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
   }, [canUsers, canGroups, t]);
 
   // Only the results the current filter displays count toward "empty"/"error".
-  const visibleUsers = showUsers ? users : [];
-  const visibleGroups = showGroups ? groups : [];
+  // Already-granted users are excluded (they live in the parent's list now).
+  const visibleUsers = showUsers ? newUsers : [];
+  const visibleGroups = showGroups ? newGroups : [];
   const isEmpty = visibleUsers.length === 0 && visibleGroups.length === 0;
   // Error only when every entity type currently shown failed. If either shown
   // type succeeded (even with no matches), we show results rather than an error.
@@ -168,7 +230,7 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
         ) : (
           <div className="space-y-0.5">
             {showUsers &&
-              users.map((u) => (
+              newUsers.map((u) => (
                 <ResultRow
                   key={`u:${u.distinguishedName}`}
                   icon={<User size={14} className="shrink-0 text-muted-foreground" />}
@@ -180,12 +242,12 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
                 />
               ))}
             {showGroups &&
-              groups.map((g) => (
+              newGroups.map((g) => (
                 <ResultRow
                   key={`g:${g.distinguishedName}`}
                   icon={<Users size={14} className="shrink-0 text-muted-foreground" />}
                   title={g.displayName}
-                  subtitle={g.description || g.mail}
+                  subtitle={g.mail}
                   inviteLabel={t('admin.searchInvite', 'Invite')}
                   onInvite={() => onInviteGroup?.(g)}
                 />

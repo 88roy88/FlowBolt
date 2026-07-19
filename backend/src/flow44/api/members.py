@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api/projects/{project_id}/members", tags=["members"]
 
 class AddMemberRequest(BaseModel):
     user_id: str
+    display_name: str = ""
     role: Role = Role.viewer
 
 
@@ -33,14 +34,16 @@ class UpdateMemberRoleRequest(BaseModel):
 
 class MemberResponse(BaseModel):
     user_id: str
+    display_name: str
     role: str
-    created_at: str
+    created_at: datetime | None
     invited_by: str
 
 
 class AddGroupRequest(BaseModel):
     group_id: str  # AD distinguishedName (DN)
     group_name: str = ""
+    email: str = ""
     role: Role = Role.viewer
 
 
@@ -51,6 +54,7 @@ class UpdateGroupRoleRequest(BaseModel):
 class GroupMemberResponse(BaseModel):
     group_id: str
     group_name: str
+    email: str
     role: str
     created_at: datetime | None
     invited_by: str
@@ -63,7 +67,13 @@ async def list_members(
 ) -> list[MemberResponse]:
     members = await list_project_members(project.id)
     return [
-        MemberResponse(user_id=m.user_id, role=m.role, created_at=m.created_at, invited_by=m.invited_by)
+        MemberResponse(
+            user_id=m.user_id,
+            display_name=m.display_name,
+            role=m.role,
+            created_at=m.created_at,
+            invited_by=m.invited_by,
+        )
         for m in members
     ]
 
@@ -84,11 +94,16 @@ async def add_project_member(
             user_id=body.user_id,
             role=body.role,
             invited_by=user_id,
+            display_name=body.display_name,
         )
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="User is already a member of this project") from exc
     return MemberResponse(
-        user_id=member.user_id, role=member.role, created_at=member.created_at, invited_by=member.invited_by
+        user_id=member.user_id,
+        display_name=member.display_name,
+        role=member.role,
+        created_at=member.created_at,
+        invited_by=member.invited_by,
     )
 
 
@@ -103,7 +118,11 @@ async def update_member(
     if member is None:
         raise HTTPException(status_code=404, detail="Member not found")
     return MemberResponse(
-        user_id=member.user_id, role=member.role, created_at=member.created_at, invited_by=member.invited_by
+        user_id=member.user_id,
+        display_name=member.display_name,
+        role=member.role,
+        created_at=member.created_at,
+        invited_by=member.invited_by,
     )
 
 
@@ -131,6 +150,7 @@ async def list_group_grants(
         GroupMemberResponse(
             group_id=g.group_id,
             group_name=g.group_name,
+            email=g.email,
             role=g.role,
             created_at=g.created_at,
             invited_by=g.invited_by,
@@ -153,12 +173,14 @@ async def add_group_grant(
             group_name=body.group_name,
             role=body.role,
             invited_by=user_id,
+            email=body.email,
         )
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="Group already has access to this project") from exc
     return GroupMemberResponse(
         group_id=grant.group_id,
         group_name=grant.group_name,
+        email=grant.email,
         role=grant.role,
         created_at=grant.created_at,
         invited_by=grant.invited_by,
@@ -178,6 +200,7 @@ async def update_group_grant(
     return GroupMemberResponse(
         group_id=grant.group_id,
         group_name=grant.group_name,
+        email=grant.email,
         role=grant.role,
         created_at=grant.created_at,
         invited_by=grant.invited_by,
