@@ -27,10 +27,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleInviteUser = async (samAccountName: string) => {
+  const handleInviteUser = async (email: string) => {
     setError('');
     try {
-      const user = await api.invitePlatformUser(samAccountName);
+      const user = await api.invitePlatformUser(email);
       setUsers((prev) => [user, ...prev.filter((u) => u.user_id !== user.user_id)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite user');
@@ -75,7 +75,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
         {/* Directory search — hover a result and invite the user or group */}
         <AdapiSearch
-          onInviteUser={(u) => handleInviteUser(u.sAMAccountName)}
+          onInviteUser={(u) => handleInviteUser(u.mail)}
           onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName)}
         />
 

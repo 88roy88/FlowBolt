@@ -76,13 +76,13 @@ class AdapiClient:
     async def get_user_group_ids(self, user_id: str) -> set[str]:
         """Return the DNs of every group ``user_id`` belongs to (transitive).
 
-        ``user_id`` is the identifier carried in the auth token's UniqueID claim,
-        which maps to the directory's ``sAMAccountName``. We look the user up via
-        the same search ADAPI exposes and read the ``memberOf`` (group DNs) off
-        the record whose ``sAMAccountName`` matches exactly — ADAPI carries the
-        group DNs on the user object, so no separate membership endpoint is
-        needed. Returns an empty set on any failure (unknown user, ADAPI down,
-        malformed response) so group-derived access is unavailable, never fatal.
+        ``user_id`` is the identifier carried in the auth token's emailaddress
+        claim, which maps to the directory's ``mail`` attribute. We look the user
+        up via the same search ADAPI exposes and read the ``memberOf`` (group DNs)
+        off the record whose ``mail`` matches exactly — ADAPI carries the group
+        DNs on the user object, so no separate membership endpoint is needed.
+        Returns an empty set on any failure (unknown user, ADAPI down, malformed
+        response) so group-derived access is unavailable, never fatal.
         """
         try:
             users = await self.search_users(user_id)
@@ -90,7 +90,7 @@ class AdapiClient:
             logger.warning("ADAPI group lookup failed for user %s: %s", user_id, exc)
             return set()
 
-        match = next((u for u in users if u.sAMAccountName.casefold() == user_id.casefold()), None)
+        match = next((u for u in users if u.mail.casefold() == user_id.casefold()), None)
         if match is None:
             logger.warning("ADAPI user not found for group lookup: %s", user_id)
             return set()

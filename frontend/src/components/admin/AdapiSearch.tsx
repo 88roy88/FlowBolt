@@ -173,9 +173,10 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
                   key={`u:${u.distinguishedName}`}
                   icon={<User size={14} className="shrink-0 text-muted-foreground" />}
                   title={u.displayName}
-                  subtitle={u.mail}
+                  subtitle={u.mail || t('admin.searchNoEmail', 'No email — cannot invite')}
                   inviteLabel={t('admin.searchInvite', 'Invite')}
                   onInvite={() => onInviteUser?.(u)}
+                  canInvite={!!u.mail}
                 />
               ))}
             {showGroups &&
@@ -213,12 +214,14 @@ function ResultRow({
   subtitle,
   inviteLabel,
   onInvite,
+  canInvite = true,
 }: {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
   inviteLabel: string;
   onInvite: () => void;
+  canInvite?: boolean;
 }) {
   return (
     <div className="group flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors">
@@ -227,16 +230,18 @@ function ResultRow({
         <span className="block text-[13px] truncate">{title}</span>
         {subtitle && <span className="block text-xs text-muted-foreground truncate">{subtitle}</span>}
       </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onInvite}
-        aria-label={inviteLabel}
-        className="shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        <UserPlus size={14} className="mr-1" />
-        {inviteLabel}
-      </Button>
+      {canInvite && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onInvite}
+          aria-label={inviteLabel}
+          className="shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <UserPlus size={14} className="mr-1" />
+          {inviteLabel}
+        </Button>
+      )}
     </div>
   );
 }

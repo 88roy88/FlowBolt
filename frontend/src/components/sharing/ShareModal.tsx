@@ -140,7 +140,7 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
 
         {/* Directory search — hover a result and invite the user or group */}
         <AdapiSearch
-          onInviteUser={(user) => handleInviteUser(user.sAMAccountName)}
+          onInviteUser={(user) => handleInviteUser(user.mail)}
           onInviteGroup={(group) => handleInviteGroup(group.distinguishedName, group.displayName)}
         />
 

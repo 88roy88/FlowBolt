@@ -33,7 +33,12 @@ logger = logging.getLogger(__name__)
 def _claim_with_suffix(payload: dict[str, object], suffix: str) -> str | None:
     """Return the first claim value whose key ends with ``suffix`` (e.g. ``/UniqueID``)."""
     for key, value in payload.items():
-        if isinstance(key, str) and key.endswith(suffix) and isinstance(value, str) and value.strip():
+        if (
+            isinstance(key, str)
+            and key.endswith(suffix)
+            and isinstance(value, str)
+            and value.strip()
+        ):
             return value.strip()
     return None
 
@@ -106,11 +111,18 @@ def validate_token(token: TokenDep) -> TokenPayload:
 def get_user_id(token: TokenDep) -> str:
     """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
     payload = validate_token(token)
-    if not payload.unique_id:
+    user_id = (
+        payload.model_extra[
+            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+        ]
+        if payload.model_extra
+        else None
+    )
+    if not user_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
 
-    _log_user_id.set(payload.unique_id)
-    return payload.unique_id
+    _log_user_id.set(user_id)
+    return user_id
 
 
 UserDep = Annotated[str, Depends(get_user_id)]
@@ -143,7 +155,9 @@ async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permis
     return permissions
 
 
-async def _resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
+async def _resolve_project_permissions(
+    project: Project, user_id: str
+) -> set[Permission]:
     """Full permission set for a user on a project, unioned across every source.
 
     Owner is the definitive maximum, so it returns early. Otherwise a user may
@@ -171,10 +185,14 @@ async def _resolve_project_permissions(project: Project, user_id: str) -> set[Pe
 # and — for group-shared projects — a second ADAPI round-trip. ContextVars are
 # per-task, so this never leaks across requests; the key guards against reuse for
 # a different project/user in the same task.
-_perm_cache: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar("_perm_cache", default=None)
+_perm_cache: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar(
+    "_perm_cache", default=None
+)
 
 
-async def resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
+async def resolve_project_permissions(
+    project: Project, user_id: str
+) -> set[Permission]:
     """Request-cached wrapper around :func:`_resolve_project_permissions`."""
     cached = _perm_cache.get()
     if cached is not None and cached[0] == (project.id, user_id):
@@ -203,7 +221,9 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
+async def get_user_permissions(
+    project: ProjectDep, user_id: UserDep
+) -> set[Permission]:
     """Resolve the current user's permissions on a project."""
     permissions = await resolve_project_permissions(project, user_id)
     if not permissions:
@@ -303,7 +323,9 @@ async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
+async def get_ws_permissions(
+    project: WsProjectDep, user_id: WsUserDep
+) -> set[Permission]:
     """WS variant of get_user_permissions."""
     permissions = await resolve_project_permissions(project, user_id)
     if not permissions:
@@ -332,7 +354,9 @@ async def get_sandbox(project: ProjectDep) -> PnpmSandbox:
     try:
         return await sandbox_manager.get_sandbox(project.id)
     except Exception as exc:
-        raise HTTPException(status_code=404, detail=f"No sandbox found for project {project.id}") from exc
+        raise HTTPException(
+            status_code=404, detail=f"No sandbox found for project {project.id}"
+        ) from exc
 
 
 SandboxDep = Annotated[PnpmSandbox, Depends(get_sandbox)]
