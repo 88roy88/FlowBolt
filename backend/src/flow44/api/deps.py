@@ -1,4 +1,5 @@
 import logging
+from contextvars import ContextVar
 from typing import Annotated, Any
 
 import jwt
@@ -32,12 +33,7 @@ logger = logging.getLogger(__name__)
 def _claim_with_suffix(payload: dict[str, object], suffix: str) -> str | None:
     """Return the first claim value whose key ends with ``suffix`` (e.g. ``/UniqueID``)."""
     for key, value in payload.items():
-        if (
-            isinstance(key, str)
-            and key.endswith(suffix)
-            and isinstance(value, str)
-            and value.strip()
-        ):
+        if isinstance(key, str) and key.endswith(suffix) and isinstance(value, str) and value.strip():
             return value.strip()
     return None
 
@@ -147,9 +143,7 @@ async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permis
     return permissions
 
 
-async def _resolve_project_permissions(
-    project: Project, user_id: str
-) -> set[Permission]:
+async def _resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
     """Full permission set for a user on a project, unioned across every source.
 
     Owner is the definitive maximum, so it returns early. Otherwise a user may
@@ -171,18 +165,35 @@ async def _resolve_project_permissions(
     return permissions
 
 
+# Per-request cache of the resolved permission set. Within one request the same
+# (project, user) permissions are needed by the access gate (get_project) and by
+# the permission dependencies; resolving once avoids repeating the member lookup
+# and — for group-shared projects — a second ADAPI round-trip. ContextVars are
+# per-task, so this never leaks across requests; the key guards against reuse for
+# a different project/user in the same task.
+_perm_cache: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar("_perm_cache", default=None)
+
+
+async def resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
+    """Request-cached wrapper around :func:`_resolve_project_permissions`."""
+    cached = _perm_cache.get()
+    if cached is not None and cached[0] == (project.id, user_id):
+        return cached[1]
+    permissions = await _resolve_project_permissions(project, user_id)
+    _perm_cache.set(((project.id, user_id), permissions))
+    return permissions
+
+
 async def get_project(project_id: str, user_id: UserDep) -> Project:
     project = await db_get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    has_access = (
-        project.user_id == user_id
-        or is_admin(user_id)
-        or await get_project_member(project_id, user_id) is not None
-        or bool(await resolve_group_permissions(project_id, user_id))
-    )
-    if not has_access:
+    # Access is exactly "has any permission" — the same rule the permission
+    # dependencies enforce — so gate on the resolved set rather than duplicating
+    # the owner/admin/member/group checks here. The result is cached for this
+    # request, so get_user_permissions reuses it instead of resolving again.
+    if not await resolve_project_permissions(project, user_id):
         raise HTTPException(status_code=404, detail="Project not found")
 
     _log_project_id.set(project.id)
@@ -192,11 +203,9 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_user_permissions(
-    project: ProjectDep, user_id: UserDep
-) -> set[Permission]:
+async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
     """Resolve the current user's permissions on a project."""
-    permissions = await _resolve_project_permissions(project, user_id)
+    permissions = await resolve_project_permissions(project, user_id)
     if not permissions:
         raise HTTPException(status_code=404, detail="Project not found")
     return permissions
@@ -221,7 +230,15 @@ async def _is_platform_group_member(user_id: str) -> bool:
 
     Short-circuits (no ADAPI call) when no group has been granted access, so only
     deployments that actually use group grants pay the directory round-trip.
-    if this becomes too heavy create an index on group id and use the user's group to search on the db
+
+    We fetch the (currently small) set of granted group DNs from the DB and
+    intersect it in memory against the user's ADAPI-reported groups. The
+    alternative — pushing the user's groups into a DB query keyed on group_id —
+    was deliberately not done: a user can belong to dozens or hundreds of groups,
+    and sending that whole list to the DB on every access check would be heavier,
+    not lighter. Revisit (e.g. index group_id and query by the user's groups) only
+    if the number of *granted* groups grows large enough that fetching them all
+    becomes the bottleneck.
     """
     group_ids = await platform_group_ids()
     if not group_ids:
@@ -286,11 +303,9 @@ async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-async def get_ws_permissions(
-    project: WsProjectDep, user_id: WsUserDep
-) -> set[Permission]:
+async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
     """WS variant of get_user_permissions."""
-    permissions = await _resolve_project_permissions(project, user_id)
+    permissions = await resolve_project_permissions(project, user_id)
     if not permissions:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
     return permissions
@@ -317,9 +332,7 @@ async def get_sandbox(project: ProjectDep) -> PnpmSandbox:
     try:
         return await sandbox_manager.get_sandbox(project.id)
     except Exception as exc:
-        raise HTTPException(
-            status_code=404, detail=f"No sandbox found for project {project.id}"
-        ) from exc
+        raise HTTPException(status_code=404, detail=f"No sandbox found for project {project.id}") from exc
 
 
 SandboxDep = Annotated[PnpmSandbox, Depends(get_sandbox)]

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -47,7 +48,7 @@ class PlatformGroupResponse(BaseModel):
     group_id: str
     group_name: str
     invited_by: str
-    created_at: str
+    created_at: datetime | None
 
 
 @router.get("/users")

@@ -66,8 +66,15 @@ class ProjectResponse(BaseModel):
 
 
 def _serialize_project(project: Project, role: str) -> ProjectResponse:
-    return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
+    return ProjectResponse.model_validate(
+        project.model_dump(exclude={"data_sources"}) | {"role": role}
+    )
 
+
+# Display-only role labels for the two authorization tiers that are not shareable
+# project roles (so have no Role enum member): the project creator and a system admin
+_OWNER_ROLE = "owner"
+_ADMIN_ROLE = "admin"
 
 # Display precedence when a project reaches a user through more than one source
 # (e.g. a direct share and a group grant). Higher wins; the label is cosmetic —
@@ -77,8 +84,8 @@ _ROLE_RANK: dict[str, int] = {
     Role.editor.value: 2,
     Role.publisher.value: 2,
     Role.maintainer.value: 3,
-    "admin": 4,
-    "owner": 5,
+    _ADMIN_ROLE: 4,
+    _OWNER_ROLE: 5,
 }
 
 
@@ -100,7 +107,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
         all_projects = await list_all_projects()
         result: list[ProjectResponse] = []
         for p in all_projects:
-            role = "owner" if p.user_id == user_id else "admin"
+            role = _OWNER_ROLE if p.user_id == user_id else _ADMIN_ROLE
             result.append(_serialize_project(p, role))
         return result
 
@@ -123,7 +130,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
             by_id[project.id] = (project, role)
 
     for p in owned:
-        _merge(p, "owner")
+        _merge(p, _OWNER_ROLE)
     for p, role in shared:
         _merge(p, role.value)
     for p, role in group_shared:
@@ -133,7 +140,9 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
 
 
 @router.post("", status_code=201)
-async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
+async def create_new_project(
+    body: CreateProjectRequest, user_id: PlatformUserDep
+) -> ProjectResponse:
     project = await create_project(body.name, user_id)
 
     async def _create() -> None:
@@ -142,11 +151,15 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
         try:
             await sandbox_manager.create_sandbox(project.id)
         except Exception:
-            logger.exception("[projects] Sandbox creation failed for project %s", project.id)
-            await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
+            logger.exception(
+                "[projects] Sandbox creation failed for project %s", project.id
+            )
+            await emit_event(
+                project.id, {"type": "error", "message": "Project setup failed"}
+            )
 
     asyncio.create_task(_create())
-    return _serialize_project(project, "owner")
+    return _serialize_project(project, _OWNER_ROLE)
 
 
 @router.patch("/{project_id}/name", status_code=200)

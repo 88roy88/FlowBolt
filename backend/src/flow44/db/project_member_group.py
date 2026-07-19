@@ -1,7 +1,7 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
-from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.auth.permissions import Role
@@ -29,16 +29,19 @@ class ProjectMemberGroup(SQLModel, table=True):
     # user's ``memberOf``, so access resolution intersects on it directly.
     group_id: str = Field(index=True)
     # Human-readable group name, cached for display so the members UI need not
-    # re-query ADAPI. Not used for access decisions.
+    # re-query ADAPI. A denormalized snapshot taken at invite time: it may go stale
+    # if the group is renamed in AD, which is acceptable because it is never used
+    # for access decisions (those key on group_id/DN) — only for display.
     group_name: str = Field(default="")
     role: str = Field(default=Role.viewer.value)
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
     invited_by: str = Field(default="")
 
 
-async def add_group(
-    project_id: str, group_id: str, group_name: str, role: Role, invited_by: str
-) -> ProjectMemberGroup:
+async def add_group(project_id: str, group_id: str, group_name: str, role: Role, invited_by: str) -> ProjectMemberGroup:
     grant = ProjectMemberGroup(
         project_id=project_id,
         group_id=group_id,

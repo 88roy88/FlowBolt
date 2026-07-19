@@ -44,19 +44,21 @@ class TestPlatformAccessGate:
 
     async def test_member_of_granted_group_gets_access(self, test_db):
         await add_platform_group(GUID, "Cloud Leads", "admin-user")
+        # A non-admin, non-platform user whose ADAPI groups include the granted one.
         with patch(
             "flow44.api.deps.adapi_client.get_user_group_ids",
             new=AsyncMock(return_value={GUID}),
         ):
-            assert await has_platform_access("someone") is True
+            assert await has_platform_access("group-member-user") is True
 
     async def test_non_member_is_denied(self, test_db):
         await add_platform_group(GUID, "Cloud Leads", "admin-user")
+        # A user whose ADAPI groups do not include any granted group.
         with patch(
             "flow44.api.deps.adapi_client.get_user_group_ids",
             new=AsyncMock(return_value={"other-guid"}),
         ):
-            assert await has_platform_access("someone") is False
+            assert await has_platform_access("non-member-user") is False
 
 
 class TestAdminGroupEndpoints:

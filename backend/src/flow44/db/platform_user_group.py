@@ -7,8 +7,9 @@ group — the same "verify by group membership" pattern the project-level
 :mod:`flow44.db.project_member_group` grants use.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime
 
+from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -21,10 +22,15 @@ class PlatformUserGroup(SQLModel, table=True):
     # user's ``memberOf``, so access resolution intersects on it directly.
     group_id: str = Field(primary_key=True)
     # Human-readable name, cached for display so the admin UI need not re-query
-    # ADAPI. Not used for access decisions.
+    # ADAPI. A denormalized snapshot taken at invite time: it may go stale if the
+    # group is renamed in AD, which is acceptable because it is never used for
+    # access decisions (those key on group_id/DN) — only for display.
     group_name: str = Field(default="")
     invited_by: str = Field(default="")
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
 
 
 async def add_platform_group(group_id: str, group_name: str, invited_by: str) -> PlatformUserGroup:
@@ -48,9 +54,7 @@ async def remove_platform_group(group_id: str) -> bool:
 
 async def list_platform_groups() -> list[PlatformUserGroup]:
     async with database.async_session() as session:
-        result = await session.execute(
-            select(PlatformUserGroup).order_by(col(PlatformUserGroup.created_at).desc())
-        )
+        result = await session.execute(select(PlatformUserGroup).order_by(col(PlatformUserGroup.created_at).desc()))
         return list(result.scalars().all())
 
 

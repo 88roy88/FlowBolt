@@ -53,13 +53,16 @@ class TestGroupSharedListingEndpoint:
         assert project.id in by_id
         assert by_id[project.id]["role"] == Role.editor.value
 
-    async def test_no_groups_omits_group_shared_projects(self, test_db):
+    async def test_non_matching_group_omits_group_shared_projects(self, test_db):
+        # The user belongs to GROUP_B but the project is shared with GROUP_A, so it
+        # must not appear. Exercises the group intersection filter itself, not the
+        # empty-set short-circuit (covered by TestListGroupSharedProjectsDB).
         project = await create_project(name="Team Project", user_id="owner")
         await add_group(project.id, GROUP_A, "Cloud Leads", Role.editor, "owner")
 
         with patch(
             "flow44.api.projects.adapi_client.get_user_group_ids",
-            new=AsyncMock(return_value=set()),
+            new=AsyncMock(return_value={GROUP_B}),
         ):
             resp = client.get("/api/projects")
 

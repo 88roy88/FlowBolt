@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
@@ -50,7 +52,7 @@ class GroupMemberResponse(BaseModel):
     group_id: str
     group_name: str
     role: str
-    created_at: str
+    created_at: datetime | None
     invited_by: str
 
 

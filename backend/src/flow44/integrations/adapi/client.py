@@ -20,6 +20,7 @@ silently showing an empty result set that looks like "no matches".
 """
 
 import logging
+from typing import Any
 from urllib.parse import quote, urlencode
 
 import httpx
@@ -117,7 +118,7 @@ class AdapiClient:
             "customFilter": f"(|(displayName={wrapped}) (mail={wrapped}))",
         }
 
-    async def _search(self, path: str, query: str) -> list[dict]:
+    async def _search(self, path: str, query: str) -> list[dict[str, Any]]:
         """GET ``path`` with the substring filter and return the raw list of records.
 
         The query string is pre-encoded and appended to the URL rather than passed
