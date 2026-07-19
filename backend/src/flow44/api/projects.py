@@ -66,9 +66,7 @@ class ProjectResponse(BaseModel):
 
 
 def _serialize_project(project: Project, role: str) -> ProjectResponse:
-    return ProjectResponse.model_validate(
-        project.model_dump(exclude={"data_sources"}) | {"role": role}
-    )
+    return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
 
 
 # Display-only role labels for the two authorization tiers that are not shareable
@@ -140,9 +138,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
 
 
 @router.post("", status_code=201)
-async def create_new_project(
-    body: CreateProjectRequest, user_id: PlatformUserDep
-) -> ProjectResponse:
+async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
     project = await create_project(body.name, user_id)
 
     async def _create() -> None:
@@ -151,12 +147,8 @@ async def create_new_project(
         try:
             await sandbox_manager.create_sandbox(project.id)
         except Exception:
-            logger.exception(
-                "[projects] Sandbox creation failed for project %s", project.id
-            )
-            await emit_event(
-                project.id, {"type": "error", "message": "Project setup failed"}
-            )
+            logger.exception("[projects] Sandbox creation failed for project %s", project.id)
+            await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_create())
     return _serialize_project(project, _OWNER_ROLE)
