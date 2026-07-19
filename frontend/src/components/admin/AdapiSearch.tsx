@@ -38,14 +38,16 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
   const [users, setUsers] = useState<AdUser[]>([]);
   const [groups, setGroups] = useState<AdGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(false);
+  // Per-entity failure, tracked separately so the error message can reflect only
+  // what the current filter actually shows (see `error` below).
+  const [usersError, setUsersError] = useState(false);
+  const [groupsError, setGroupsError] = useState(false);
 
   const showUsers = canUsers && filter !== 'groups';
   const showGroups = canGroups && filter !== 'users';
 
   const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS);
   const trimmed = debouncedQuery.trim();
-  const tooShort = trimmed.length > 0 && trimmed.length < MIN_QUERY_LENGTH;
   const hasQuery = trimmed.length >= MIN_QUERY_LENGTH;
 
   // Monotonic request counter. Every fired request captures a seq number; when a
@@ -62,22 +64,24 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
       setUsers([]);
       setGroups([]);
       setIsLoading(false);
-      setError(false);
+      setUsersError(false);
+      setGroupsError(false);
       return;
     }
 
     const seq = ++latestSeq.current;
     setIsLoading(true);
-    setError(false);
 
     (async () => {
-      // Settle each endpoint independently: in 'all' mode one entity type having
-      // no matches (which real ADAPI surfaces as an error, not an empty list)
-      // must not discard the other type's results. We only report an error when
-      // every endpoint we actually queried failed.
+      // Fetch every entity type the component can invite (canUsers/canGroups),
+      // not just the ones the current filter shows — the filter is a display
+      // toggle, so switching All → Users must not require a refetch. Each
+      // endpoint settles independently: in 'all' mode one type having no matches
+      // (which real ADAPI surfaces as an error, not an empty list) must not
+      // discard the other type's results.
       const [usersRes, groupsRes] = await Promise.allSettled([
-        showUsers ? searchAdUsers(trimmed) : Promise.resolve<AdUser[]>([]),
-        showGroups ? searchAdGroups(trimmed) : Promise.resolve<AdGroup[]>([]),
+        canUsers ? searchAdUsers(trimmed) : Promise.resolve<AdUser[]>([]),
+        canGroups ? searchAdGroups(trimmed) : Promise.resolve<AdGroup[]>([]),
       ]);
       if (seq !== latestSeq.current) return;
 
@@ -86,26 +90,15 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
 
       setUsers(usersRes.status === 'fulfilled' ? usersRes.value : []);
       setGroups(groupsRes.status === 'fulfilled' ? groupsRes.value : []);
-
-      // Error only when every entity type we queried failed. If either succeeds
-      // (even with no matches), we show its results instead of an error.
-      const usersFailed = showUsers && usersRes.status === 'rejected';
-      const groupsFailed = showGroups && groupsRes.status === 'rejected';
-      const allQueriedFailed =
-        (!showUsers || usersFailed) && (!showGroups || groupsFailed);
-      setError(allQueriedFailed);
+      setUsersError(usersRes.status === 'rejected');
+      setGroupsError(groupsRes.status === 'rejected');
       setIsLoading(false);
     })();
-  }, [trimmed, hasQuery, showUsers, showGroups]);
+  }, [trimmed, hasQuery, canUsers, canGroups]);
 
-  const handleFilterChange = (next: Filter) => {
-    if (next === filter) return;
-    // Invalidate in-flight requests and drop results that fall out of scope.
-    latestSeq.current += 1;
-    setUsers([]);
-    setGroups([]);
-    setFilter(next);
-  };
+  // The filter only changes which already-fetched results are displayed, so no
+  // refetch or result-clearing is needed.
+  const handleFilterChange = (next: Filter) => setFilter(next);
 
   const placeholder = useMemo(() => {
     if (canUsers && canGroups) return t('admin.searchPlaceholder', 'Search users & groups by name or email…');
@@ -113,7 +106,14 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
     return t('admin.searchUsersPlaceholder', 'Search users by name or email…');
   }, [canUsers, canGroups, t]);
 
-  const isEmpty = users.length === 0 && groups.length === 0;
+  // Only the results the current filter displays count toward "empty"/"error".
+  const visibleUsers = showUsers ? users : [];
+  const visibleGroups = showGroups ? groups : [];
+  const isEmpty = visibleUsers.length === 0 && visibleGroups.length === 0;
+  // Error only when every entity type currently shown failed. If either shown
+  // type succeeded (even with no matches), we show results rather than an error.
+  const error =
+    (!showUsers || usersError) && (!showGroups || groupsError);
 
   return (
     <div>
@@ -154,20 +154,17 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
         />
       </div>
 
-      {/* Results */}
-      <div className="mt-2 max-h-[360px] overflow-auto">
-        {tooShort ? (
-          <p className="text-muted-foreground text-xs text-center py-3">
-            {t('admin.searchMinChars', 'Type at least 3 characters to search')}
-          </p>
+      {/* Results — a fixed-height region reserved from the start so the modal
+          doesn't jump in height as results, loading and empty states swap in. */}
+      <div className="mt-2 h-[300px] overflow-auto">
+        {!hasQuery ? (
+          <StateMessage>{t('admin.searchMinChars', 'Type at least 3 characters to search')}</StateMessage>
         ) : isLoading ? (
-          <p className="text-muted-foreground text-xs text-center py-3">{t('common.loading', 'Loading...')}</p>
+          <StateMessage>{t('common.loading', 'Loading...')}</StateMessage>
         ) : error ? (
-          <p className="text-destructive text-xs text-center py-3">
-            {t('admin.searchUnavailable', 'Directory search is unavailable')}
-          </p>
-        ) : !hasQuery ? null : isEmpty ? (
-          <p className="text-muted-foreground text-xs text-center py-3">{t('admin.searchNoResults', 'No results')}</p>
+          <StateMessage tone="error">{t('admin.searchUnavailable', 'Directory search is unavailable')}</StateMessage>
+        ) : isEmpty ? (
+          <StateMessage>{t('admin.searchNoResults', 'No results')}</StateMessage>
         ) : (
           <div className="space-y-0.5">
             {showUsers &&
@@ -195,6 +192,17 @@ export function AdapiSearch({ onInviteUser, onInviteGroup }: AdapiSearchProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Centered placeholder (hint / loading / empty / error) filling the fixed-height results region. */
+function StateMessage({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'error' }) {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <p className={`text-xs text-center ${tone === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
+        {children}
+      </p>
     </div>
   );
 }
