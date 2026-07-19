@@ -99,7 +99,7 @@ export interface AIModel {
 export interface DataSourceSearchResult {
   id: number;
   name: string;
-  description: string | null;
+  description?: string | null;
 }
 
 // Agent types

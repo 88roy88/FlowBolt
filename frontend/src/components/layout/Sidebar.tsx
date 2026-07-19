@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, PanelLeftClose, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield } from 'lucide-react';
+import { Plus, PanelLeftClose, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield, Search } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
 import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
@@ -49,6 +49,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
+  const [searchQuery, setSearchQuery] = useState('');
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
@@ -146,6 +147,12 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
     }
   };
 
+  const canSearchProjects = projects.length > 10;
+  const normalizedSearch = canSearchProjects ? searchQuery.trim().toLowerCase() : '';
+  const visibleProjects = normalizedSearch
+    ? projects.filter((p) => p.name.toLowerCase().includes(normalizedSearch))
+    : projects;
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -200,9 +207,26 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
         </div>
       )}
 
+      {/* Project search */}
+      {canSearchProjects && (
+        <div className="px-3 mb-2">
+          <div className="flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-lg">
+            <Search size={14} className="shrink-0 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('sidebar.searchPlaceholder')}
+              data-testid="project-search"
+              className="flex-1 text-[13px] bg-transparent"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Project list */}
       <div className="flex-1 overflow-auto px-2">
-        {projects.map((project) => {
+        {visibleProjects.map((project) => {
           const isActive = currentProject?.id === project.id;
           const isMenuOpen = menuOpenId === project.id;
           const colorClass = getProjectColor(project.name);
@@ -322,6 +346,11 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
             </div>
           );
         })}
+        {normalizedSearch && visibleProjects.length === 0 && (
+          <div className="px-2 py-2 text-[13px] text-muted-foreground">
+            {t('sidebar.noProjectsMatch')}
+          </div>
+        )}
       </div>
 
       {/* Bottom: Settings + Admin */}

@@ -31,7 +31,9 @@
     "rename": "Rename",
     "summary": "Summary",
     "sleep": "Sleep",
-    "confirmDelete": "Confirm delete?"
+    "confirmDelete": "Confirm delete?",
+    "searchPlaceholder": "Search projects...",
+    "noProjectsMatch": "No projects match"
   },
   "settings": {
     "title": "Settings",
@@ -172,7 +174,8 @@
     },
     "dataSource": {
       "removeDataSource": "Remove data source",
-      "searchPlaceholder": "Search data sources (optional)"
+      "searchPlaceholder": "Search data sources (optional)",
+      "usedInProject": "Used in this project"
     }
   },
   "sharing": {

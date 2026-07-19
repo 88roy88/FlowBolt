@@ -31,7 +31,9 @@
     "rename": "שנה שם",
     "summary": "סיכום",
     "sleep": "השהה",
-    "confirmDelete": "אשר מחיקה?"
+    "confirmDelete": "אשר מחיקה?",
+    "searchPlaceholder": "חפש פרויקטים...",
+    "noProjectsMatch": "אין פרויקטים תואמים"
   },
   "settings": {
     "title": "הגדרות",
@@ -172,7 +174,8 @@
     },
     "dataSource": {
       "removeDataSource": "הסר מקור נתונים",
-      "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)"
+      "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)",
+      "usedInProject": "שימש בפרויקט זה"
     }
   },
   "sharing": {
