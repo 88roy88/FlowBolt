@@ -186,13 +186,15 @@ export function AppShell() {
         style={{ width: sidebarExpanded ? SIDEBAR_WIDTH : RAIL_WIDTH }}
       >
         <div
-          className={`absolute inset-y-0 start-0 transition-opacity duration-150 ${sidebarExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+          inert={sidebarExpanded}
+          className={`absolute inset-y-0 start-0 transition-opacity duration-150 ${sidebarExpanded ? 'opacity-0' : 'opacity-100'}`}
           style={{ width: RAIL_WIDTH }}
         >
           <IconRail />
         </div>
         <div
-          className={`absolute inset-y-0 start-0 transition-opacity duration-150 ${sidebarExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          inert={!sidebarExpanded}
+          className={`absolute inset-y-0 start-0 transition-opacity duration-150 ${sidebarExpanded ? 'opacity-100' : 'opacity-0'}`}
           style={{ width: SIDEBAR_WIDTH }}
         >
           <Sidebar onCollapse={() => toggleSidebar(false)} onOpenSettings={() => setShowSettings(true)} onOpenAdmin={() => setShowAdminPanel(true)} />
