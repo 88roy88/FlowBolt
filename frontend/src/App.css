@@ -352,6 +352,33 @@
   animation: cardFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.anchored-menu {
+  position-anchor: var(--anchor);
+  position-area: block-end span-inline-start;
+  position-try-fallbacks: flip-block;
+  inset: auto;
+  margin: 2px 0;
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    overlay 0.15s allow-discrete,
+    display 0.15s allow-discrete;
+}
+
+.anchored-menu:popover-open {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@starting-style {
+  .anchored-menu:popover-open {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
 /* Progress bar shimmer */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
