@@ -1,3 +1,4 @@
+import logging
 import traceback as traceback_module
 from typing import Any
 
@@ -6,6 +7,18 @@ from opik.types import ErrorInfoDict
 
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
+
+logger = logging.getLogger(__name__)
+
+
+class _NullSpan:
+    """No-op stand-in for an Opik span, used when span creation itself fails (e.g. Opik
+    unreachable) so the caller's actual work can still proceed uninterrupted."""
+
+    id: str | None = None
+
+    def end(self, **_kwargs: Any) -> None:
+        pass
 
 
 class BaseAgent:
@@ -42,6 +55,17 @@ class BaseAgent:
         """Record a summary on the top-level trace so its outcome is visible without opening spans."""
         if opik_context.get_current_trace_data() is not None:
             opik_context.update_current_trace(output=output)
+
+    @staticmethod
+    def _safe_span(opik_client: Any, **kwargs: Any) -> Any:
+        """Create a manual Opik span, tolerating failure in the creation call itself (e.g. Opik
+        unreachable) — returns a no-op span instead of raising, so the actual agent work isn't
+        aborted by an observability outage."""
+        try:
+            return opik_client.span(**kwargs)
+        except Exception:
+            logger.exception("Failed to create Opik span %r", kwargs.get("name"))
+            return _NullSpan()
 
     def _record_span_error(self, exc: Exception) -> None:
         """Mark the current @track-decorated span as failed, so a logged-and-swallowed
