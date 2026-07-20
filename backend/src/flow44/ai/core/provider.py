@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 import litellm
+import opik
 
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_failure_logger import FailureAwareOpikLogger
 from flow44.config import settings
 
 logger = logging.getLogger(__name__)
@@ -18,7 +21,20 @@ def _to_dicts(messages: list[dict[str, Any] | Message]) -> list[dict[str, Any]]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]
 
 
-# TODO: move llmlite langfuse code here?
+def setup_opik_tracing() -> None:
+    if not settings.OPIK_API_KEY:
+        logger.info("Opik tracing not enabled (missing API key)")
+        return
+    # Credentials already in os.environ via OpikSettings.model_post_init
+    litellm.callbacks = [FailureAwareOpikLogger()]
+    logger.info("Opik tracing enabled")
+
+
+async def flush_opik_traces() -> None:
+    if not settings.OPIK_API_KEY:
+        return
+    await asyncio.to_thread(opik.flush_tracker)
+    logger.info("Opik traces flushed.")
 
 
 @asynccontextmanager
