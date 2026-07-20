@@ -14,7 +14,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
-from flow44.db.chat import get_messages
+from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
@@ -173,11 +173,7 @@ class FollowUpAgent(ChatAgent):
             self._build_context(),
             get_messages(self.project_id),
         )
-        messages = [
-            Message(role=m.role, content=m.content)
-            for m in history
-            if m.role == "user" or (m.role == "assistant" and m.content.strip())
-        ]
+        messages = self._history_to_messages(history)
 
         system_prompt = render_followup(
             project_summary=context["summary"],
@@ -227,6 +223,27 @@ class FollowUpAgent(ChatAgent):
         for path, content in files.items():
             await self._write_file_and_emit_diff(self._diffs, path, content)
 
+    def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
+        messages: list[dict[str, Any] | Message] = []
+        pending_legacy_steps: list[str] = []
+
+        for m in history:
+            if m.role == ChatRole.user:
+                messages.append(Message.user(m.content))
+                pending_legacy_steps = []
+            elif m.raw_message is not None:
+                messages.append(m.raw_message)
+            elif m.role in (ChatRole.tool_call, ChatRole.tool_result, ChatRole.reasoning):
+                pending_legacy_steps.append(m.content)
+            elif m.role == ChatRole.assistant and m.content.strip():
+                content = m.content
+                if pending_legacy_steps:
+                    content = "\n".join(pending_legacy_steps) + "\n\n" + content
+                messages.append(Message.assistant(content))
+                pending_legacy_steps = []
+
+        return messages
+
     async def _persist_data_sources(
         self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]
     ) -> None:
@@ -259,13 +276,15 @@ class FollowUpAgent(ChatAgent):
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
         """Emit ReAct step events and track state for followup agent."""
-        if event["type"] == "react_reasoning":
+        if event["type"] == "react_assistant_turn":
+            # The real assistant message (content + reasoning_content + tool_calls) for this
+            # iteration — saved once so history replay can reconstruct the actual conversation.
             self._iteration = event["iteration"]
             self._steps.append(
                 {
                     "id": str(uuid.uuid4()),
-                    "type": "reasoning",
-                    "content": event["content"],
+                    "type": "assistant_turn",
+                    "raw_message": event["raw_message"],
                     "iteration": self._iteration,
                 }
             )
@@ -288,6 +307,7 @@ class FollowUpAgent(ChatAgent):
                         "result_preview": event.get("result_preview", ""),
                         "short_preview": event.get("short_preview", ""),
                         "iteration": self._iteration,
+                        "raw_message": event["raw_message"],
                     }
                 )
             await self.emit({"type": "followup_step", **step_data})

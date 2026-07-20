@@ -17,6 +17,20 @@ logger = logging.getLogger(__name__)
 
 StateT = TypeVar("StateT", bound=BaseModel)
 
+MAX_ARG_LENGTH = 500
+
+
+def _truncate_args(args: dict[str, Any]) -> dict[str, Any]:
+    """Truncate large string argument values (e.g. write_file's full file content) so replayed
+    history doesn't re-inject unbounded file content into every future follow-up's prompt."""
+    truncated: dict[str, Any] = {}
+    for key, value in args.items():
+        if isinstance(value, str) and len(value) > MAX_ARG_LENGTH:
+            truncated[key] = value[:MAX_ARG_LENGTH] + f"... ({len(value)} chars total)"
+        else:
+            truncated[key] = value
+    return truncated
+
 
 class ReActFlow(Flow[StateT], Generic[StateT]):
     """
@@ -44,7 +58,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
 
     async def react_loop(
         self,
-        messages: list[Message],
+        messages: list[dict[str, Any] | Message],
         system_prompt: str,
         tools: ToolExecutor,
         model: str | None = None,
@@ -55,7 +69,9 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         Run the ReAct loop: LLM → tools → LLM → tools → ... until done.
 
         Args:
-            messages: Conversation history
+            messages: Conversation history. Plain dicts (e.g. a real assistant message with a
+                `tool_calls` array, replayed verbatim from history) are passed through as-is;
+                `Message` instances are converted via `to_dict()`.
             system_prompt: System prompt for the LLM
             tools: ToolExecutor with available tools
             model: Model to use
@@ -65,7 +81,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         Returns:
             Final assistant response (when no tool calls remain)
         """
-        working_messages: list[dict[str, Any]] = [m.to_dict() for m in messages]
+        working_messages: list[dict[str, Any]] = [m.to_dict() if isinstance(m, Message) else m for m in messages]
         tool_schemas = tools.get_schemas()
         available_tools = [
             {"name": s["function"]["name"], "description": s["function"]["description"]} for s in tool_schemas
@@ -117,24 +133,37 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             choice = response.choices[0]
             message = choice.message
             last_content = message.content or ""
-            reasoning_content = getattr(message, "reasoning_content", None) or ""
 
             # No tool calls → we're done
             if not message.tool_calls:
                 return last_content
 
-            interim_reasoning = reasoning_content.strip()
-            if emit_fn and interim_reasoning:
+            # Add assistant message with tool calls
+            assistant_message = message.model_dump()
+            working_messages.append(assistant_message)
+
+            # The real assistant turn (content + reasoning_content + tool_calls), with any large
+            # tool-call argument values truncated — this is what gets replayed verbatim as history
+            # on future follow-ups, so it must not carry unbounded file content forever.
+            raw_assistant_message = dict(assistant_message)
+            raw_assistant_message["tool_calls"] = [
+                {
+                    **tc,
+                    "function": {
+                        **tc["function"],
+                        "arguments": json.dumps(_truncate_args(json.loads(tc["function"]["arguments"] or "{}"))),
+                    },
+                }
+                for tc in assistant_message.get("tool_calls") or []
+            ]
+            if emit_fn:
                 await emit_fn(
                     {
-                        "type": "react_reasoning",
-                        "content": interim_reasoning,
+                        "type": "react_assistant_turn",
+                        "raw_message": raw_assistant_message,
                         "iteration": iteration,
                     }
                 )
-
-            # Add assistant message with tool calls
-            working_messages.append(message.model_dump())
 
             last_tool_calls = {}
 
@@ -170,6 +199,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                         "status": "completed",
                         "result_preview": preview,
                         "iteration": iteration,
+                        "raw_message": {"role": "tool", "tool_call_id": tool_call.id, "content": preview},
                     }
                     if result.short_preview:
                         event["short_preview"] = result.short_preview
