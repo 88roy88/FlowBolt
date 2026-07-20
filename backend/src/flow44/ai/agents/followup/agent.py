@@ -225,22 +225,14 @@ class FollowUpAgent(ChatAgent):
 
     def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
         messages: list[dict[str, Any] | Message] = []
-        pending_legacy_steps: list[str] = []
 
         for m in history:
             if m.role == ChatRole.user:
                 messages.append(Message.user(m.content))
-                pending_legacy_steps = []
             elif m.raw_message is not None:
                 messages.append(m.raw_message)
-            elif m.role in (ChatRole.tool_call, ChatRole.tool_result, ChatRole.reasoning):
-                pending_legacy_steps.append(m.content)
             elif m.role == ChatRole.assistant and m.content.strip():
-                content = m.content
-                if pending_legacy_steps:
-                    content = "\n".join(pending_legacy_steps) + "\n\n" + content
-                messages.append(Message.assistant(content))
-                pending_legacy_steps = []
+                messages.append(Message.assistant(m.content))
 
         return messages
 
