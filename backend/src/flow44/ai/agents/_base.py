@@ -2,7 +2,7 @@ import logging
 import traceback as traceback_module
 from typing import Any
 
-from opik import opik_context
+from opik import get_global_client, opik_context
 from opik.types import ErrorInfoDict
 
 from flow44.db.events import emit_event
@@ -57,12 +57,12 @@ class BaseAgent:
             opik_context.update_current_trace(output=output)
 
     @staticmethod
-    def _safe_span(opik_client: Any, **kwargs: Any) -> Any:
+    def _safe_span(**kwargs: Any) -> Any:
         """Create a manual Opik span, tolerating failure in the creation call itself (e.g. Opik
         unreachable) — returns a no-op span instead of raising, so the actual agent work isn't
         aborted by an observability outage."""
         try:
-            return opik_client.span(**kwargs)
+            return get_global_client().span(**kwargs)
         except Exception:
             logger.exception("Failed to create Opik span %r", kwargs.get("name"))
             return _NullSpan()

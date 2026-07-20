@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Any
 
-from opik import get_global_client, opik_context, track
+from opik import opik_context, track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
@@ -92,7 +92,6 @@ class ExecuteAgent(BaseAgent):
             model=self.model,
             trace_id=self._trace_id,
             root_span_id=current_span.id if current_span else None,
-            opik_client=get_global_client(),
             llm_metadata_fn=self._llm_metadata,
         )
 
@@ -120,7 +119,6 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
         span = self._safe_span(
-            state.opik_client,
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="build-technical-plan",
@@ -158,7 +156,6 @@ class ExecuteAgent(BaseAgent):
             raise RuntimeError("No work plan available")
 
         span = self._safe_span(
-            state.opik_client,
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="execute-plan",
@@ -215,7 +212,6 @@ class ExecuteAgent(BaseAgent):
         state.fix_attempts += 1
 
         span = self._safe_span(
-            state.opik_client,
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="fix-errors",
@@ -261,7 +257,6 @@ class ExecuteAgent(BaseAgent):
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
 
         span = self._safe_span(
-            state.opik_client,
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="generate-summary",
@@ -373,7 +368,6 @@ class ExecuteAgent(BaseAgent):
             raise RuntimeError("No work plan available")
 
         span = self._safe_span(
-            state.opik_client,
             trace_id=state.trace_id,
             parent_span_id=state.observation_id,
             name=f"execute-task-{task.id}",
