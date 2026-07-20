@@ -1,3 +1,5 @@
+import json
+import uuid
 from typing import Any
 
 from flow44.ai.agents._base import BaseAgent
@@ -45,8 +47,23 @@ class ChatAgent(BaseAgent):
             args = step.get("args", {})
             primary_arg = next((v for k, v in args.items() if k not in ("content",)), "")
             call_content = f"{tool} on {primary_arg!r}" if primary_arg else tool
-            await save_message(self.project_id, ChatRole.tool_call, call_content)
-            await save_message(self.project_id, ChatRole.tool_result, result_short)
+
+            tool_call_id = str(uuid.uuid4())
+            call_raw_message = {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {"name": tool, "arguments": json.dumps(args)},
+                    }
+                ],
+            }
+            result_raw_message = {"role": "tool", "tool_call_id": tool_call_id, "content": result_short}
+
+            await save_message(self.project_id, ChatRole.tool_call, call_content, raw_message=call_raw_message)
+            await save_message(self.project_id, ChatRole.tool_result, result_short, raw_message=result_raw_message)
 
         if answer.strip():
             await save_message(self.project_id, ChatRole.assistant, answer)
