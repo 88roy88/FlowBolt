@@ -1,6 +1,8 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
+import { formatDayDivider, sameDay } from '../../utils/formatTime';
+import type { Message } from '../../types';
 import { useChatStore } from '../../stores/chat';
 import { isAgentAlive } from '../../stores/chatAgentState';
 import { ChatMessage } from './ChatMessage';
@@ -12,8 +14,29 @@ import { DesignProgress } from './DesignProgress';
 import { FixProgressCard } from './cards/FixProgressCard';
 import { FollowUpProgress } from './cards/FollowUpProgress';
 
+type DayGroup = { key: string; ts: number; msgs: Message[] };
+
+function groupMessagesByDay(messages: Message[]): DayGroup[] {
+  return messages.reduce<DayGroup[]>((groups, msg) => {
+    const last = groups.at(-1);
+    if (last && sameDay(last.ts, msg.timestamp)) last.msgs.push(msg);
+    else groups.push({ key: msg.id, ts: msg.timestamp, msgs: [msg] });
+    return groups;
+  }, []);
+}
+
+function DayDivider({ label }: { label: string }) {
+  return (
+    <div className="sticky top-0 z-10 flex justify-center pointer-events-none">
+      <span className="pointer-events-auto text-[11px] text-muted-foreground bg-surface border border-border rounded-full px-2.5 py-0.5 shadow-[var(--shadow-sm)] select-none">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export function ChatPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     messages, currentAssistantMessage, actions, error, clearError,
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
@@ -68,13 +91,20 @@ export function ChatPanel() {
   const showPhaseIndicator = agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
   const showTypingDots = agentActive && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
 
+  const dayGroups = groupMessagesByDay(messages);
+
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Messages */}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-auto p-4">
         <div ref={observeContentForPinning} className="flex flex-col gap-4">
-        {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
+        {dayGroups.map((group) => (
+          <div key={group.key} className="flex flex-col gap-4">
+            <DayDivider label={formatDayDivider(group.ts, i18n.language, t)} />
+            {group.msgs.map((msg) => (
+              <ChatMessage key={msg.id} message={msg} />
+            ))}
+          </div>
         ))}
 
         {showPhaseIndicator && <PhaseIndicator phase={agentPhase} />}

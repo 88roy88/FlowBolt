@@ -137,6 +137,8 @@
     "send": "שלח",
     "newLine": "שורה חדשה",
     "scrollToBottom": "גלול לתחתית",
+    "today": "היום",
+    "yesterday": "אתמול",
     "placeholder": {
       "selectProject": "בחר פרויקט תחילה",
       "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר או שנה",

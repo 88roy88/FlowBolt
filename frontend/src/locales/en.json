@@ -137,6 +137,8 @@
     "send": "send",
     "newLine": "new line",
     "scrollToBottom": "Scroll to bottom",
+    "today": "Today",
+    "yesterday": "Yesterday",
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept or modify",

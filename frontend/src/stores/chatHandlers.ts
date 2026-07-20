@@ -139,7 +139,7 @@ export function createFixErrorHandler(
   cleanup: () => void,
 ) {
   return (msg: WSMessage) => {
-    getTimestamp(msg as { _ts?: string });
+    getTimestamp(msg);
     switch (msg.type) {
       case 'phase':
         set({ agentPhase: msg.phase });
@@ -205,7 +205,7 @@ export function createSendMessageHandler(
 ) {
   _skipMessages = options?.replay ?? false;
   return (msg: WSMessage) => {
-    getTimestamp(msg as { _ts?: string });
+    getTimestamp(msg);
     switch (msg.type) {
       case 'phase':
         handlePhaseChange(msg, set, get);
