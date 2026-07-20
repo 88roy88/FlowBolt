@@ -1,6 +1,6 @@
 from typing import Any
 
-from flow44.ai.core.opik_failure_logger import llm_metadata, set_trace_output, setup_trace
+from flow44.ai.core.opik_failure_logger import llm_metadata, set_trace_input, set_trace_output, setup_trace
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
 
@@ -28,6 +28,9 @@ class BaseAgent:
 
     async def emit(self, event: dict[str, Any]) -> None:
         await emit_event(self.project_id, event)
+
+    def _set_trace_input(self, input_data: dict[str, Any]) -> None:
+        set_trace_input(input_data)
 
     def _set_trace_output(self, output: dict[str, Any]) -> None:
         set_trace_output(output)

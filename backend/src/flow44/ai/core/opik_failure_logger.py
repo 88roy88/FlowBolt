@@ -75,6 +75,11 @@ def setup_trace(project_id: str, user_id: str, model: str | None, tags: list[str
     return trace_data.id if trace_data else None
 
 
+def set_trace_input(input_data: dict[str, Any]) -> None:
+    if opik_context.get_current_trace_data() is not None:
+        opik_context.update_current_trace(input=input_data)
+
+
 def set_trace_output(output: dict[str, Any]) -> None:
     if opik_context.get_current_trace_data() is not None:
         opik_context.update_current_trace(output=output)

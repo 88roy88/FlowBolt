@@ -79,6 +79,12 @@ class ExecuteAgent(BaseAgent):
     async def run(self) -> None:
         """Run the execution flow."""
         self._setup_trace(["execute-agent"])
+        self._set_trace_input(
+            {
+                "user_request": self._build_state.user_content,
+                "user_overview": self._build_state.user_overview.model_dump(),
+            }
+        )
 
         # Emit plan accepted
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_overview.model_dump()})
