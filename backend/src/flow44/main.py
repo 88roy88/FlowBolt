@@ -1,15 +1,12 @@
-import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-import litellm
-import opik
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from flow44.ai.core.opik_failure_logger import FailureAwareOpikLogger
+from flow44.ai.core.provider import flush_opik_traces, setup_opik_tracing
 from flow44.api import (
     admin,
     chat,
@@ -44,12 +41,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    if settings.OPIK_API_KEY:
-        # Credentials already in os.environ via OpikSettings.model_post_init
-        litellm.callbacks = [FailureAwareOpikLogger()]
-        logger.info("Opik tracing enabled")
-    else:
-        logger.info("Opik tracing not enabled (missing API key)")
+    setup_opik_tracing()
 
     logger.info("Initialising database...")
     await init_db()
@@ -76,9 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await idle_reaper.stop()
     await heartbeat_reaper.stop()
     await sandbox_manager.suspend_all()
-    if settings.OPIK_API_KEY:
-        await asyncio.to_thread(opik.flush_tracker)
-        logger.info("Opik traces flushed.")
+    await flush_opik_traces()
     logger.info("Shutdown complete.")
 
 
