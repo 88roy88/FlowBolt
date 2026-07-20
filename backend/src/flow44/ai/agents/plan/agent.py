@@ -177,7 +177,7 @@ class PlanAgent(BaseAgent):
 
     # -- Rebuild --
 
-    @track(name="plan-agent-rebuild")  # type: ignore[untyped-decorator]
+    @track(name="plan-agent-rebuild", ignore_arguments=["state"])  # type: ignore[untyped-decorator]
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
