@@ -34,18 +34,6 @@ class _RecordingSandbox:
         self.written.append((path, content))
 
 
-class _FakeSpan:
-    id = "obs-1"
-
-    def end(self, **_kwargs: Any) -> None:
-        return None
-
-
-class _FakeOpik:
-    def span(self, **_kwargs: Any) -> _FakeSpan:
-        return _FakeSpan()
-
-
 async def _noop_emit(_event: dict[str, Any]) -> None:
     return None
 
@@ -64,7 +52,6 @@ def _make_state(task: Task, sandbox: _RecordingSandbox) -> ExecutionState:
         project_id="p",
         sandbox_ref=sandbox,
         emit_fn=_noop_emit,
-        opik_client=_FakeOpik(),
         llm_metadata_fn=lambda _name, **_kwargs: {},
     )
 

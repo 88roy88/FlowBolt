@@ -20,7 +20,6 @@ class ExecutionState(BaseModel):
     trace_id: str | None = None
     root_span_id: str | None = None  # The `run()` @track span — parent for top-level step spans
     observation_id: str | None = None
-    opik_client: Any = None  # Hold reference
     llm_metadata_fn: Any = None  # Function to generate metadata
 
     # Validation results

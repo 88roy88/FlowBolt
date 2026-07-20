@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Any
 
-from opik import get_global_client, opik_context, track
+from opik import opik_context, track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
@@ -17,6 +17,7 @@ from flow44.ai.agents.execute.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_failure_logger import create_span, error_info
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
@@ -92,7 +93,6 @@ class ExecuteAgent(BaseAgent):
             model=self.model,
             trace_id=self._trace_id,
             root_span_id=current_span.id if current_span else None,
-            opik_client=get_global_client(),
             llm_metadata_fn=self._llm_metadata,
         )
 
@@ -119,8 +119,7 @@ class ExecuteAgent(BaseAgent):
         """Step: Build technical plan from user overview."""
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
-        span = self._safe_span(
-            state.opik_client,
+        span = create_span(
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="build-technical-plan",
@@ -140,7 +139,7 @@ class ExecuteAgent(BaseAgent):
                 }
             )
         except Exception as exc:
-            span.end(error_info=self._error_info(exc))
+            span.end(error_info=error_info(exc))
             raise
         else:
             span.end(
@@ -157,8 +156,7 @@ class ExecuteAgent(BaseAgent):
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
-        span = self._safe_span(
-            state.opik_client,
+        span = create_span(
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="execute-plan",
@@ -180,7 +178,7 @@ class ExecuteAgent(BaseAgent):
             for layer in state.build_state.work_plan.execution_layers():
                 await asyncio.gather(*[self._execute_task(t, state) for t in layer])
         except Exception as exc:
-            span.end(error_info=self._error_info(exc))
+            span.end(error_info=error_info(exc))
             raise
         else:
             failed_tasks = [t.title for t in state.build_state.work_plan.tasks if t.status == "failed"]
@@ -214,8 +212,7 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
-        span = self._safe_span(
-            state.opik_client,
+        span = create_span(
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="fix-errors",
@@ -249,7 +246,7 @@ class ExecuteAgent(BaseAgent):
                     await state.emit_fn({"type": "file", "path": path, "content": content})
         except Exception as exc:
             logger.exception("[execute] Error fix pass failed")
-            span.end(error_info=self._error_info(exc))
+            span.end(error_info=error_info(exc))
         else:
             span.end(output={"files_fixed": [p for p, _ in generated]})
 
@@ -260,8 +257,7 @@ class ExecuteAgent(BaseAgent):
         if state.rejected_files:
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
 
-        span = self._safe_span(
-            state.opik_client,
+        span = create_span(
             trace_id=state.trace_id,
             parent_span_id=state.root_span_id,
             name="generate-summary",
@@ -296,7 +292,7 @@ class ExecuteAgent(BaseAgent):
                 await state.emit_fn({"type": "project_summary", "summary": summary_data})
         except Exception as exc:
             logger.exception("[execute] Summary generation failed")
-            span.end(error_info=self._error_info(exc))
+            span.end(error_info=error_info(exc))
         else:
             span.end(output=summary_data or {})
 
@@ -372,8 +368,7 @@ class ExecuteAgent(BaseAgent):
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
-        span = self._safe_span(
-            state.opik_client,
+        span = create_span(
             trace_id=state.trace_id,
             parent_span_id=state.observation_id,
             name=f"execute-task-{task.id}",
@@ -441,7 +436,7 @@ class ExecuteAgent(BaseAgent):
             task.status = "failed"
             task.error = str(exc)
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
-            span.end(error_info=self._error_info(exc))
+            span.end(error_info=error_info(exc))
 
     async def _typecheck(self, state: ExecutionState) -> str:
         """Run TypeScript typecheck."""

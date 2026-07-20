@@ -71,21 +71,11 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             {"name": s["function"]["name"], "description": s["function"]["description"]} for s in tool_schemas
         ]
         last_content = ""
-        # Tool calls executed in the previous iteration, keyed by call id — so the next LLM
-        # call's span metadata can show "which tool + args produced this result" instead of
-        # leaving the tool-role messages as bare, unlabeled `tool_call_id` references.
-        last_tool_calls: dict[str, dict[str, Any]] = {}
 
         for iteration in range(self.max_iterations):
             # Call LLM with tools
             metadata = (
-                metadata_fn(
-                    f"react-{iteration}",
-                    extra_metadata={
-                        "available_tools": available_tools,
-                        "previous_tool_calls": list(last_tool_calls.values()) or None,
-                    },
-                )
+                metadata_fn(f"react-{iteration}", extra_metadata={"available_tools": available_tools})
                 if metadata_fn
                 else None
             )
@@ -136,8 +126,6 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             # Add assistant message with tool calls
             working_messages.append(message.model_dump())
 
-            last_tool_calls = {}
-
             # Execute each tool call
             for tool_call in message.tool_calls:
                 tool_name = tool_call.function.name
@@ -183,14 +171,6 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                         "content": result_str,
                     }
                 )
-
-                # Track for the next LLM call's span metadata (see `previous_tool_calls` above)
-                last_tool_calls[tool_call.id] = {
-                    "tool": tool_name,
-                    "args": args,
-                    "is_error": result.is_error,
-                    "result_preview": result_str[:500],
-                }
 
         logger.warning("[%s] Hit max iterations (%d)", self.name, self.max_iterations)
         return last_content

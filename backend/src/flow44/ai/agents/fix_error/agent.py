@@ -9,6 +9,7 @@ from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_failure_logger import record_span_error
 from flow44.ai.core.provider import stream_chat
 from flow44.ai.file_safety import format_rejection_feedback, screen_generated_files
 from flow44.ai.helpers import format_agent_feedback
@@ -254,7 +255,7 @@ class FixErrorAgent(ChatAgent):
             )
         except Exception as exc:
             logger.exception("[fix-error] Retry fix failed")
-            self._record_span_error(exc)
+            record_span_error(exc)
             await state.emit_fn({"type": "fix_step", "step": "retry", "status": "failed", "message": "Auto-fix failed"})
 
         return state

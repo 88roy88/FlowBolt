@@ -15,6 +15,7 @@ from flow44.ai.agents.plan.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_failure_logger import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
@@ -225,7 +226,7 @@ class PlanAgent(BaseAgent):
             return ArchitectureDesign.model_validate(parse_json_response(raw))
         except Exception as exc:
             logger.exception("[plan] Architecture design failed")
-            self._record_span_error(exc)
+            record_span_error(exc)
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "failed"})
             return ArchitectureDesign()
 
@@ -242,7 +243,7 @@ class PlanAgent(BaseAgent):
             return UXDesign.model_validate(parse_json_response(raw))
         except Exception as exc:
             logger.exception("[plan] UX design failed")
-            self._record_span_error(exc)
+            record_span_error(exc)
             await self.emit({"type": "design_progress", "stream": "ux", "content": "failed"})
             return UXDesign()
 
