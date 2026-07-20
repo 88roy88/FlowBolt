@@ -4,8 +4,7 @@ import logging
 import uuid
 from typing import Any
 
-from langfuse import Langfuse
-from langfuse.decorators import observe
+from opik import Opik, opik_context, track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
@@ -75,7 +74,7 @@ class ExecuteAgent(BaseAgent):
 
         return "fix_errors"
 
-    @observe(name="execute-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="execute-agent-run")  # type: ignore[untyped-decorator]
     async def run(self) -> None:
         """Run the execution flow."""
         self._setup_trace(["execute-agent"])
@@ -84,6 +83,7 @@ class ExecuteAgent(BaseAgent):
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_overview.model_dump()})
 
         # Initialize execution state
+        current_span = opik_context.get_current_span_data()
         exec_state = ExecutionState(
             build_state=self._build_state,
             project_id=self.project_id,
@@ -91,12 +91,21 @@ class ExecuteAgent(BaseAgent):
             emit_fn=self.emit,
             model=self.model,
             trace_id=self._trace_id,
-            langfuse_client=Langfuse(),
+            root_span_id=current_span.id if current_span else None,
+            opik_client=Opik(),
             llm_metadata_fn=self._llm_metadata,
         )
 
         # Run the flow
         final_state = await self._flow.run(exec_state, start="build_plan")
+
+        self._set_trace_output(
+            {
+                "files_written": list(final_state.build_state.completed_files.keys()),
+                "fix_attempts": final_state.fix_attempts,
+                "rejected_files": [str(r) for r in final_state.rejected_files],
+            }
+        )
 
         # Final cleanup
         final_state.build_state.phase = "idle"
@@ -110,7 +119,12 @@ class ExecuteAgent(BaseAgent):
         """Step: Build technical plan from user overview."""
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
-        span = state.langfuse_client.span(trace_id=state.trace_id, name="build-technical-plan")
+        span = state.opik_client.span(
+            trace_id=state.trace_id,
+            parent_span_id=state.root_span_id,
+            name="build-technical-plan",
+            input={"user_request": state.build_state.user_content},
+        )
         state.observation_id = span.id
 
         try:
@@ -124,8 +138,16 @@ class ExecuteAgent(BaseAgent):
                     ],
                 }
             )
-        finally:
-            span.end()
+        except Exception as exc:
+            span.end(error_info=self._error_info(exc))
+            raise
+        else:
+            span.end(
+                output={
+                    "task_count": len(state.build_state.work_plan.tasks),
+                    "tasks": [t.title for t in state.build_state.work_plan.tasks],
+                }
+            )
 
         return state
 
@@ -134,9 +156,11 @@ class ExecuteAgent(BaseAgent):
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
-        span = state.langfuse_client.span(
+        span = state.opik_client.span(
             trace_id=state.trace_id,
+            parent_span_id=state.root_span_id,
             name="execute-plan",
+            input={"tasks": [t.title for t in state.build_state.work_plan.tasks]},
             metadata={
                 "total_tasks": len(state.build_state.work_plan.tasks),
                 "execution_layers": len(state.build_state.work_plan.execution_layers()),
@@ -153,8 +177,17 @@ class ExecuteAgent(BaseAgent):
 
             for layer in state.build_state.work_plan.execution_layers():
                 await asyncio.gather(*[self._execute_task(t, state) for t in layer])
-        finally:
-            span.end()
+        except Exception as exc:
+            span.end(error_info=self._error_info(exc))
+            raise
+        else:
+            failed_tasks = [t.title for t in state.build_state.work_plan.tasks if t.status == "failed"]
+            span.end(
+                output={
+                    "files_written": list(state.build_state.completed_files.keys()),
+                    "failed_tasks": failed_tasks,
+                }
+            )
 
         return state
 
@@ -179,6 +212,14 @@ class ExecuteAgent(BaseAgent):
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
 
+        span = state.opik_client.span(
+            trace_id=state.trace_id,
+            parent_span_id=state.root_span_id,
+            name="fix-errors",
+            input={"errors": state.all_errors, "fix_attempt": state.fix_attempts},
+        )
+        state.observation_id = span.id
+
         prompt = render_feedback(files=state.build_state.completed_files)
         messages: list[dict[str, Any] | Message] = [
             Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
@@ -192,7 +233,7 @@ class ExecuteAgent(BaseAgent):
                 messages,
                 prompt,
                 model=state.model,
-                metadata=state.llm_metadata_fn("fix_errors"),
+                metadata=state.llm_metadata_fn("fix_errors", parent_span_id=span.id),
             ):
                 parser.feed(chunk)
             parser.flush()
@@ -203,8 +244,11 @@ class ExecuteAgent(BaseAgent):
                     await state.sandbox_ref.write_file(path, content)
                     state.build_state.completed_files[path] = content
                     await state.emit_fn({"type": "file", "path": path, "content": content})
-        except Exception:
+        except Exception as exc:
             logger.exception("[execute] Error fix pass failed")
+            span.end(error_info=self._error_info(exc))
+        else:
+            span.end(output={"files_fixed": [p for p, _ in generated]})
 
         return state
 
@@ -213,9 +257,15 @@ class ExecuteAgent(BaseAgent):
         if state.rejected_files:
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
 
-        span = state.langfuse_client.span(trace_id=state.trace_id, name="generate-summary")
+        span = state.opik_client.span(
+            trace_id=state.trace_id,
+            parent_span_id=state.root_span_id,
+            name="generate-summary",
+            input={"files_created": list(state.build_state.completed_files.keys())},
+        )
         state.observation_id = span.id
 
+        summary_data = None
         try:
             summary_input = json.dumps(
                 {
@@ -229,7 +279,7 @@ class ExecuteAgent(BaseAgent):
                 [Message.user(summary_input)],
                 SUMMARY_PROMPT,
                 model=state.model,
-                metadata=state.llm_metadata_fn("generate_summary"),
+                metadata=state.llm_metadata_fn("generate_summary", parent_span_id=state.observation_id),
             )
             summary_data = parse_json_response(raw)
             if summary_data:
@@ -240,10 +290,11 @@ class ExecuteAgent(BaseAgent):
                     }
                 await update_project_summary(state.project_id, json.dumps(summary_data, ensure_ascii=False))
                 await state.emit_fn({"type": "project_summary", "summary": summary_data})
-        except Exception:
+        except Exception as exc:
             logger.exception("[execute] Summary generation failed")
-        finally:
-            span.end()
+            span.end(error_info=self._error_info(exc))
+        else:
+            span.end(output=summary_data or {})
 
         return state
 
@@ -277,7 +328,7 @@ class ExecuteAgent(BaseAgent):
             [Message.user(json.dumps(merge_data, indent=2))],
             render_merge(has_data_sources=bool(state.build_state.data_source_contexts)),
             model=state.model,
-            metadata=state.llm_metadata_fn("build_technical_plan"),
+            metadata=state.llm_metadata_fn("build_technical_plan", parent_span_id=state.observation_id),
         )
         plan_data = parse_json_response(raw)
 
@@ -313,14 +364,15 @@ class ExecuteAgent(BaseAgent):
         )
 
     async def _execute_task(self, task: Task, state: ExecutionState) -> None:
-        """Execute a single task with Langfuse span."""
+        """Execute a single task with an Opik span."""
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
-        span = state.langfuse_client.span(
+        span = state.opik_client.span(
             trace_id=state.trace_id,
-            parent_observation_id=state.observation_id,
+            parent_span_id=state.observation_id,
             name=f"execute-task-{task.id}",
+            input={"task_title": task.title, "task_description": task.description, "expected_files": task.files},
             metadata={"task_id": task.id, "task_title": task.title, "expected_files": len(task.files)},
         )
 
@@ -350,7 +402,7 @@ class ExecuteAgent(BaseAgent):
                 [Message.user("Generate the code.")],
                 prompt,
                 model=state.model,
-                metadata=state.llm_metadata_fn(f"execute_task_{task.id}"),
+                metadata=state.llm_metadata_fn(f"execute_task_{task.id}", parent_span_id=span.id),
             ):
                 parser.feed(chunk)
             parser.flush()
@@ -378,13 +430,13 @@ class ExecuteAgent(BaseAgent):
             state.build_state.task_files[task.id] = paths
             task.status = "completed"
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "completed"})
+            span.end(output={"files_written": paths, "rejected_files": [str(r) for r in rejections]})
         except Exception as exc:
             logger.exception("[execute] Task %s failed", task.id)
             task.status = "failed"
             task.error = str(exc)
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
-        finally:
-            span.end()
+            span.end(error_info=self._error_info(exc))
 
     async def _typecheck(self, state: ExecutionState) -> str:
         """Run TypeScript typecheck."""

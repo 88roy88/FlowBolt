@@ -256,24 +256,16 @@ async def _take_screenshot(html_path: Path, output_path: Path) -> None:
 
 
 def _init_env() -> None:
-    """Initialize Langfuse + litellm callbacks (same as main.py lifespan)."""
-    import os  # noqa: PLC0415
-
+    """Initialize Opik + litellm callbacks (same as main.py lifespan)."""
     import litellm as _litellm  # noqa: PLC0415
+    from litellm.integrations.opik.opik import OpikLogger  # noqa: PLC0415
 
-    if settings.LANGFUSE_PUBLIC_KEY:
-        os.environ["LANGFUSE_PUBLIC_KEY"] = settings.LANGFUSE_PUBLIC_KEY
-        os.environ["LANGFUSE_SECRET_KEY"] = settings.LANGFUSE_SECRET_KEY
-        os.environ["LANGFUSE_HOST"] = settings.LANGFUSE_HOST
-
-        from langfuse import Langfuse  # noqa: PLC0415
-
-        Langfuse()
-        _litellm.success_callback = ["langfuse"]
-        _litellm.failure_callback = ["langfuse"]
-        typer.echo(f"Langfuse: enabled ({settings.LANGFUSE_HOST})")
+    if settings.OPIK_API_KEY:
+        # Credentials already in os.environ via OpikSettings.model_post_init
+        _litellm.callbacks = [OpikLogger()]
+        typer.echo(f"Opik: enabled (project={settings.OPIK_PROJECT_NAME})")
     else:
-        typer.echo("Langfuse: disabled")
+        typer.echo("Opik: disabled")
 
 
 async def _run_all(config: dict[str, Any]) -> None:

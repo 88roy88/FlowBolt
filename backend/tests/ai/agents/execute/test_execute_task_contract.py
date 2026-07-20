@@ -37,11 +37,11 @@ class _RecordingSandbox:
 class _FakeSpan:
     id = "obs-1"
 
-    def end(self) -> None:
+    def end(self, **_kwargs: Any) -> None:
         return None
 
 
-class _FakeLangfuse:
+class _FakeOpik:
     def span(self, **_kwargs: Any) -> _FakeSpan:
         return _FakeSpan()
 
@@ -64,8 +64,8 @@ def _make_state(task: Task, sandbox: _RecordingSandbox) -> ExecutionState:
         project_id="p",
         sandbox_ref=sandbox,
         emit_fn=_noop_emit,
-        langfuse_client=_FakeLangfuse(),
-        llm_metadata_fn=lambda _name: {},
+        opik_client=_FakeOpik(),
+        llm_metadata_fn=lambda _name, **_kwargs: {},
     )
 
 

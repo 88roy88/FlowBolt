@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 import litellm
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from litellm.integrations.opik.opik import OpikLogger
 
 from flow44.api import (
     admin,
@@ -41,13 +42,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
-        # Credentials already in os.environ via LangfuseSettings.model_post_init
-        litellm.success_callback = ["langfuse"]
-        litellm.failure_callback = ["langfuse"]
-        logger.info("Langfuse tracing enabled")
+    if settings.OPIK_API_KEY:
+        # Credentials already in os.environ via OpikSettings.model_post_init
+        litellm.callbacks = [OpikLogger()]
+        logger.info("Opik tracing enabled")
     else:
-        logger.info("Langfuse tracing not enabled (missing keys)")
+        logger.info("Opik tracing not enabled (missing API key)")
 
     logger.info("Initialising database...")
     await init_db()

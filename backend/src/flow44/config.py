@@ -112,21 +112,22 @@ class LoggerSettings(Flow44BaseSettings):
     LOG_FILE_PATH: str | None = None
 
 
-class LangfuseSettings(Flow44BaseSettings):
-    # Langfuse (optional — set public/secret key to enable)
-    LANGFUSE_PUBLIC_KEY: str | None = None
-    LANGFUSE_SECRET_KEY: str | None = None
-    LANGFUSE_HOST: str = "https://cloud.langfuse.com"
-    LANGFUSE_TRACING_ENVIRONMENT: str | None = None
+class OpikSettings(Flow44BaseSettings):
+    # Opik (optional — set an API key to enable)
+    OPIK_API_KEY: str | None = None
+    OPIK_WORKSPACE: str | None = None
+    OPIK_PROJECT_NAME: str = "flow44"
+    OPIK_URL_OVERRIDE: str | None = None
 
     def model_post_init(self, __context: Any) -> None:
-        """Propagate Langfuse credentials to os.environ so the SDK can read them."""
-        if self.LANGFUSE_PUBLIC_KEY and self.LANGFUSE_SECRET_KEY:
-            os.environ["LANGFUSE_PUBLIC_KEY"] = self.LANGFUSE_PUBLIC_KEY
-            os.environ["LANGFUSE_SECRET_KEY"] = self.LANGFUSE_SECRET_KEY
-            os.environ["LANGFUSE_HOST"] = self.LANGFUSE_HOST
-            if self.LANGFUSE_TRACING_ENVIRONMENT:
-                os.environ["LANGFUSE_TRACING_ENVIRONMENT"] = self.LANGFUSE_TRACING_ENVIRONMENT
+        """Propagate Opik credentials to os.environ so the SDK can read them."""
+        if self.OPIK_API_KEY:
+            os.environ["OPIK_API_KEY"] = self.OPIK_API_KEY
+            if self.OPIK_WORKSPACE:
+                os.environ["OPIK_WORKSPACE"] = self.OPIK_WORKSPACE
+            os.environ["OPIK_PROJECT_NAME"] = self.OPIK_PROJECT_NAME
+            if self.OPIK_URL_OVERRIDE:
+                os.environ["OPIK_URL_OVERRIDE"] = self.OPIK_URL_OVERRIDE
 
 
 class Settings(
@@ -137,7 +138,7 @@ class Settings(
     AuthSettings,
     FlapiSettings,
     S3Settings,
-    LangfuseSettings,
+    OpikSettings,
     LoggerSettings,
     Flow44BaseSettings,
 ):

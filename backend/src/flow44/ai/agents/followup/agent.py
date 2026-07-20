@@ -3,7 +3,7 @@ import json
 import uuid
 from typing import Any
 
-from langfuse.decorators import observe
+from opik import track
 from pydantic import BaseModel
 
 from flow44.ai.agents._chat_agent import ChatAgent
@@ -145,7 +145,7 @@ class FollowUpAgent(ChatAgent):
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 
-    @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._setup_trace(["follow-up-agent"])
 
@@ -192,7 +192,7 @@ class FollowUpAgent(ChatAgent):
             system_prompt=system_prompt,
             tools=self._executor,
             model=self.model,
-            metadata_fn=lambda step: self._llm_metadata(f"followup-{step}"),
+            metadata_fn=lambda step, **kwargs: self._llm_metadata(f"followup-{step}", **kwargs),
             emit_fn=self._emit_react_step,
         )
 
@@ -202,6 +202,8 @@ class FollowUpAgent(ChatAgent):
         await self._save_response(answer or "", self._steps)
 
         await self._emit_file_diffs_summary(self._diffs)
+
+        self._set_trace_output({"answer": answer or "", "steps": len(self._steps)})
 
         # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})
