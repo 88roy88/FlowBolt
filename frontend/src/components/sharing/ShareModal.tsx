@@ -151,7 +151,7 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="w-[440px] flex flex-col overflow-hidden">
+      <DialogContent className="w-[440px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogClose onClose={onClose} />
 
         {/* Fixed header + search (the search has its own scrollable results). */}
@@ -194,7 +194,10 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
           )}
         </div>
 
-        {/* Members & group grants — its own scrollable region */}
+        {/* Members & group grants — its own scrollable region. min-h-0 lets it
+            shrink within the dialog's max-height so it scrolls (rather than
+            overflowing the modal); flex-auto makes it absorb all the vertical
+            space not taken by the header/search above. */}
         <div className="border-t border-border mt-3 pt-3 flex-auto min-h-0 overflow-auto space-y-1">
           {loading ? (
             <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>

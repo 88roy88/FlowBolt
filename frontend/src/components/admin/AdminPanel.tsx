@@ -98,7 +98,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="w-[440px] flex flex-col overflow-hidden">
+      <DialogContent className="w-[440px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogClose onClose={onClose} />
 
         {/* Fixed header + search (the search has its own scrollable results). */}

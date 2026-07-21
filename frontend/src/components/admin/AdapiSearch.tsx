@@ -217,8 +217,10 @@ export function AdapiSearch({
       </div>
 
       {/* Results — a fixed-height region reserved from the start so the modal
-          doesn't jump in height as results, loading and empty states swap in. */}
-      <div className="mt-2 h-[300px] overflow-auto">
+          doesn't jump in height as results, loading and empty states swap in.
+          Kept deliberately compact so the modal's existing-entities list (below
+          the search) gets the larger share of the dialog's vertical budget. */}
+      <div className="mt-2 h-[200px] overflow-auto">
         {!hasQuery ? (
           <StateMessage>{t('admin.searchMinChars', 'Type at least 3 characters to search')}</StateMessage>
         ) : isLoading ? (
