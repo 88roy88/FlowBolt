@@ -33,7 +33,6 @@ class ChatMessage(SQLModel, table=True):
 async def save_message(
     project_id: str, role: ChatRole, content: str, raw_message: dict[str, Any] | None = None
 ) -> ChatMessage:
-    """Persist a chat message and return it."""
     msg = ChatMessage(project_id=project_id, role=role, content=content, raw_message=raw_message)
     async with database.async_session() as session:
         session.add(msg)
@@ -43,7 +42,6 @@ async def save_message(
 
 
 async def get_messages(project_id: str) -> list[ChatMessage]:
-    """Return all messages for a project in chronological order."""
     async with database.async_session() as session:
         result = await session.execute(
             select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(col(ChatMessage.created_at).asc())

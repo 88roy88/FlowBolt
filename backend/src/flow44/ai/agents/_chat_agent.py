@@ -8,21 +8,11 @@ from flow44.db.chat import ChatRole, save_message
 
 
 class ChatAgent(BaseAgent):
-    """Base for agents that participate in the chat history (followup, fix_error)."""
-
     async def _save_response(
         self,
         answer: str,
         steps: list[dict[str, Any]],
     ) -> None:
-        """Persist the agent's turn to chat history: tool calls/results, and the final answer.
-
-        When a step carries `raw_message` (from `ReActFlow`'s real assistant/tool messages), it's
-        saved alongside the human-readable summary so history can be replayed as the literal
-        conversation later, instead of a paraphrase. Steps without it (e.g. FixErrorAgent's
-        synthetic pseudo-tool step, which never goes through `ReActFlow`) fall back to
-        summary-only, as before.
-        """
         for step in steps:
             if step.get("type") == "assistant_turn":
                 # The real assistant message for this iteration (content + tool_calls, covering
@@ -69,7 +59,6 @@ class ChatAgent(BaseAgent):
             await save_message(self.project_id, ChatRole.assistant, answer)
 
     async def _write_file_and_emit_diff(self, tracker: DiffTracker, path: str, content: str) -> None:
-        """Write a file to the sandbox, emit a live `file` event, and record the change in the tracker."""
         try:
             old_content = await self.sandbox.read_file(path)
             is_new = False
@@ -81,10 +70,6 @@ class ChatAgent(BaseAgent):
         await self.emit({"type": "file", "path": path, "content": content})
 
     async def _edit_file_and_emit_diff(self, tracker: DiffTracker, path: str, search: str, replace: str) -> None:
-        """Apply a search-and-replace edit in the sandbox, emit a live `file` event, and record the change.
-
-        Raises `FileNotFoundError` if the file doesn't exist and `ValueError` if `search` doesn't match.
-        """
         old_content = await self.sandbox.read_file(path)
         await self.sandbox.edit_file(path, search, replace)
         new_content = await self.sandbox.read_file(path)
@@ -92,7 +77,6 @@ class ChatAgent(BaseAgent):
         await self.emit({"type": "file", "path": path, "content": new_content})
 
     async def _emit_file_diffs_summary(self, tracker: DiffTracker) -> None:
-        """Emit a single `file_diffs` event with one combined diff per file changed during the run."""
         diffs = tracker.combined_diffs()
         if not diffs:
             return

@@ -36,8 +36,6 @@ MAX_FIX_ATTEMPTS = 10
 
 
 class ExecuteAgent(BaseAgent):
-    """Receives an approved plan and executes it using Flow orchestration."""
-
     def __init__(
         self,
         project_id: str,

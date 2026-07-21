@@ -225,14 +225,32 @@ class FollowUpAgent(ChatAgent):
 
     def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
         messages: list[dict[str, Any] | Message] = []
+        first_user: str | None = None
+        has_legacy = False
 
         for m in history:
             if m.role == ChatRole.user:
+                if first_user is None:
+                    first_user = m.content
                 messages.append(Message.user(m.content))
             elif m.raw_message is not None:
                 messages.append(m.raw_message)
             elif m.role == ChatRole.assistant and m.content.strip():
                 messages.append(Message.assistant(m.content))
+            else:
+                has_legacy = True
+
+        if has_legacy and first_user is not None:
+            # Old sessions without raw_message — compact all the unrecoverable tool_call/tool_result
+            # rows into a single synthetic assistant message so the LLM has minimal context.
+            messages = [
+                Message.user(first_user),
+                Message.assistant(
+                    "I made several tool calls and iterations to build and refine the project. "
+                    "The details have been compacted. Continuing from here."
+                ),
+                messages[-1] if messages else Message.user(first_user),
+            ]
 
         return messages
 
