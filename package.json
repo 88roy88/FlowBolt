@@ -1,0 +1,21 @@
+{
+  "name": "flowbolt-dev",
+  "private": true,
+  "description": "Root task runner: cross-platform dev scripts (macOS, Linux, Windows) mirroring the Makefile for machines without `make`.",
+  "scripts": {
+    "kill-ports": "node scripts/kill-ports.mjs 8000 5173 6001",
+    "predev": "node scripts/kill-ports.mjs 8000 5173 6001",
+    "dev": "concurrently -k -n backend,frontend,mocks -c blue,green,magenta \"pnpm dev-backend\" \"pnpm dev-frontend\" \"pnpm dev-mocks\"",
+    "dev-backend": "node scripts/kill-ports.mjs 8000 && cd backend && uv run --no-sync python -m uvicorn --app-dir src flow44.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src/flow44 --reload-exclude \"**/__pycache__/**\" --reload-exclude \"**/*.pyc\" --log-level info",
+    "dev-frontend": "node scripts/kill-ports.mjs 5173 && cd frontend && pnpm dev -- --port 5173",
+    "dev-mocks": "node scripts/kill-ports.mjs 6001 && cd mocks/flapi-mock && pnpm install && cross-env MOCK_PORT=6001 pnpm dev",
+    "install-all": "cd frontend && pnpm install && cd ../mocks/flapi-mock && pnpm clean --lockfile && pnpm install && cd ../../backend/pnpm-project-template && pnpm clean --lockfile && pnpm install && cd .. && uv sync",
+    "build": "docker compose build",
+    "run": "docker compose up -d",
+    "stop": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3"
+  }
+}
