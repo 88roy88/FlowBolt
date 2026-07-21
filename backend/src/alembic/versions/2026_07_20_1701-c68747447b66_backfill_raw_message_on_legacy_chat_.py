@@ -1,23 +1,7 @@
-"""backfill raw_message on legacy chat_messages and drop reasoning role
-
-Legacy rows only ever stored a human-readable summary (e.g. "read_file on
-'/src/App.tsx'" or an 80-char truncated result preview), never the literal
-LLM message. This reconstructs a best-effort raw_message for each role:
-
-- assistant: lossless — {"role": "assistant", "content": <content>}.
-- reasoning: not its own row — folded into the *next* tool_call row's
-  synthesized message as `reasoning_content` (this mirrors how it was
-  produced originally: reasoning_content always preceded that iteration's
-  tool_calls in the same LLM turn). The `reasoning` role itself is dropped.
-- tool_call: content only ever recorded one argument (picked positionally,
-  no key name). The key is recovered from the tool's real signature (stable
-  across the codebase's history); every other real argument is unknown and
-  filled with "[redacted]".
-- tool_result: content is an 80-char-truncated preview; there is no way to
-  recover the full original tool output.
+"""add raw_message column, backfill legacy rows, simplify ChatRole enum
 
 Revision ID: c68747447b66
-Revises: 7dcb5315f9e0
+Revises: a1b2c3d4e5f6
 Create Date: 2026-07-20 17:01:35.205162
 
 """
@@ -32,7 +16,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c68747447b66"
-down_revision: Union[str, Sequence[str], None] = "7dcb5315f9e0"
+down_revision: Union[str, Sequence[str], None] = "a1b2c3d4e5f6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -61,6 +45,8 @@ def _parse_tool_call_content(content: str) -> tuple[str, str | None]:
 
 
 def upgrade() -> None:
+    op.add_column("chat_messages", sa.Column("raw_message", sa.JSON(), nullable=True))
+
     conn = op.get_bind()
     rows = conn.execute(
         sa.text("SELECT id, project_id, role, content, raw_message FROM chat_messages ORDER BY project_id, created_at")
@@ -149,6 +135,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Restore old enum values and role assignments
+    op.execute(sa.text("ALTER TABLE chat_messages ALTER COLUMN role TYPE VARCHAR"))
+    op.execute(sa.text("DROP TYPE chatrole"))
+    op.execute(sa.text("CREATE TYPE chatrole AS ENUM ('user', 'assistant', 'tool_call', 'tool_result', 'reasoning')"))
     conn = op.get_bind()
     conn.execute(
         sa.text(
@@ -156,6 +146,5 @@ def downgrade() -> None:
         )
     )
     conn.execute(sa.text("UPDATE chat_messages SET role = 'tool_result' WHERE role = 'tool'"))
-    conn.execute(
-        sa.text("UPDATE chat_messages SET raw_message = NULL WHERE role IN ('assistant', 'tool_call', 'tool_result')")
-    )
+    op.execute(sa.text("ALTER TABLE chat_messages ALTER COLUMN role TYPE chatrole USING role::chatrole"))
+    op.drop_column("chat_messages", "raw_message")
