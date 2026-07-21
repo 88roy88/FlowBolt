@@ -133,13 +133,29 @@ def upgrade() -> None:
 
     op.execute(sa.text("DELETE FROM chat_messages WHERE role = 'reasoning'"))
 
+    # Add the new 'tool' value to the Postgres enum before renaming rows
+    op.execute(sa.text("ALTER TYPE chatrole ADD VALUE IF NOT EXISTS 'tool'"))
+    # Commit the enum change — ALTER TYPE ... ADD VALUE can't run inside a transaction in PG
+    op.execute(sa.text("COMMIT"))
+
+    op.execute(sa.text("UPDATE chat_messages SET role = 'assistant' WHERE role = 'tool_call'"))
+    op.execute(sa.text("UPDATE chat_messages SET role = 'tool' WHERE role = 'tool_result'"))
+
+    # Recreate the enum with only the valid values now that no rows use the old ones
+    op.execute(sa.text("ALTER TABLE chat_messages ALTER COLUMN role TYPE VARCHAR"))
+    op.execute(sa.text("DROP TYPE chatrole"))
+    op.execute(sa.text("CREATE TYPE chatrole AS ENUM ('user', 'assistant', 'tool')"))
+    op.execute(sa.text("ALTER TABLE chat_messages ALTER COLUMN role TYPE chatrole USING role::chatrole"))
+
 
 def downgrade() -> None:
-    # Only reverses the raw_message backfill on tool_call/tool_result/assistant rows this
-    # migration touched. `reasoning` rows are not resurrected — their original position
-    # relative to other rows can't be recovered, only the content folded into a tool_call's
-    # reasoning_content, which this intentionally discards on downgrade.
     conn = op.get_bind()
+    conn.execute(
+        sa.text(
+            "UPDATE chat_messages SET role = 'tool_call' WHERE role = 'assistant' AND raw_message LIKE '%tool_calls%'"
+        )
+    )
+    conn.execute(sa.text("UPDATE chat_messages SET role = 'tool_result' WHERE role = 'tool'"))
     conn.execute(
         sa.text("UPDATE chat_messages SET raw_message = NULL WHERE role IN ('assistant', 'tool_call', 'tool_result')")
     )

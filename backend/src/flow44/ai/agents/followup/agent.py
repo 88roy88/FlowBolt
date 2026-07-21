@@ -225,13 +225,10 @@ class FollowUpAgent(ChatAgent):
 
     def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
         messages: list[dict[str, Any] | Message] = []
-        first_user: str | None = None
         has_legacy = False
 
         for m in history:
             if m.role == ChatRole.user:
-                if first_user is None:
-                    first_user = m.content
                 messages.append(Message.user(m.content))
             elif m.raw_message is not None:
                 messages.append(m.raw_message)
@@ -240,19 +237,21 @@ class FollowUpAgent(ChatAgent):
             else:
                 has_legacy = True
 
-        if has_legacy and first_user is not None:
-            # Old sessions without raw_message — compact all the unrecoverable tool_call/tool_result
-            # rows into a single synthetic assistant message so the LLM has minimal context.
-            messages = [
-                Message.user(first_user),
-                Message.assistant(
-                    "I made several tool calls and iterations to build and refine the project. "
-                    "The details have been compacted. Continuing from here."
-                ),
-                messages[-1] if messages else Message.user(first_user),
-            ]
+        if not has_legacy or len(messages) < 2:
+            return messages
 
-        return messages
+        # Old sessions have rows without raw_message that we can't reconstruct.
+        # Keep only: first user message (the original build prompt), a synthetic
+        # compaction note, then everything from the current user message onward.
+        first_user_msg = messages[0]
+        current_user_msg = messages[-1]
+        compacted = Message.assistant(
+            "I made several tool calls and iterations to build and refine the project. "
+            "The details have been compacted. Continuing from here."
+        )
+        if first_user_msg == current_user_msg:
+            return [current_user_msg]
+        return [first_user_msg, compacted, current_user_msg]
 
     async def _persist_data_sources(
         self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]

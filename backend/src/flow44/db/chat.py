@@ -12,8 +12,7 @@ from flow44.db import database
 class ChatRole(StrEnum):
     user = "user"
     assistant = "assistant"
-    tool_call = "tool_call"
-    tool_result = "tool_result"
+    tool = "tool"
 
 
 class ChatMessage(SQLModel, table=True):
@@ -23,9 +22,6 @@ class ChatMessage(SQLModel, table=True):
     project_id: str = Field(sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False))
     role: ChatRole
     content: str
-    # The literal LLM message dict (role/content/tool_calls, or role="tool"/tool_call_id) for
-    # tool_call and tool_result rows — lets history be replayed as the real conversation instead
-    # of a paraphrased summary. None for user/assistant/reasoning rows.
     raw_message: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 

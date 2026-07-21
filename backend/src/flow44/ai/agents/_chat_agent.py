@@ -15,11 +15,8 @@ class ChatAgent(BaseAgent):
     ) -> None:
         for step in steps:
             if step.get("type") == "assistant_turn":
-                # The real assistant message for this iteration (content + tool_calls, covering
-                # every tool called in it) — the call side of every tool below is already fully
-                # represented here, so per-tool steps only ever add a matching tool_result row.
                 tools_label = ", ".join(tc["function"]["name"] for tc in step["raw_message"].get("tool_calls") or [])
-                await save_message(self.project_id, ChatRole.tool_call, tools_label, raw_message=step["raw_message"])
+                await save_message(self.project_id, ChatRole.assistant, tools_label, raw_message=step["raw_message"])
                 continue
 
             preview = step.get("short_preview") or step.get("result_preview", "")
@@ -28,11 +25,10 @@ class ChatAgent(BaseAgent):
                 result_short += "..."
 
             if step.get("raw_message") is not None:
-                # Came from ReActFlow: the matching assistant_turn row already recorded the call.
-                await save_message(self.project_id, ChatRole.tool_result, result_short, raw_message=step["raw_message"])
+                await save_message(self.project_id, ChatRole.tool, result_short, raw_message=step["raw_message"])
                 continue
 
-            # FixErrorAgent's synthetic pseudo-tool step: no ReActFlow, no assistant_turn row.
+            # FixErrorAgent's synthetic pseudo-tool step
             tool = step.get("tool", "?")
             args = step.get("args", {})
             primary_arg = next((v for k, v in args.items() if k not in ("content",)), "")
@@ -52,8 +48,8 @@ class ChatAgent(BaseAgent):
             }
             result_raw_message = {"role": "tool", "tool_call_id": tool_call_id, "content": result_short}
 
-            await save_message(self.project_id, ChatRole.tool_call, call_content, raw_message=call_raw_message)
-            await save_message(self.project_id, ChatRole.tool_result, result_short, raw_message=result_raw_message)
+            await save_message(self.project_id, ChatRole.assistant, call_content, raw_message=call_raw_message)
+            await save_message(self.project_id, ChatRole.tool, result_short, raw_message=result_raw_message)
 
         if answer.strip():
             await save_message(self.project_id, ChatRole.assistant, answer)
