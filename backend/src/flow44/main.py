@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from flow44.ai.core.provider import flush_opik_traces, setup_opik_tracing
+from flow44.ai.core.opik_utils import flush_opik_traces, setup_opik_tracing
 from flow44.api import (
     admin,
     chat,

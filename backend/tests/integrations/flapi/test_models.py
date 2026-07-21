@@ -1,4 +1,5 @@
 """Unit tests for flow44.integrations.flapi.models — no mock server required."""
+
 from __future__ import annotations
 
 import pytest

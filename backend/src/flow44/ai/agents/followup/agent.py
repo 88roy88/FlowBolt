@@ -225,33 +225,31 @@ class FollowUpAgent(ChatAgent):
 
     def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
         messages: list[dict[str, Any] | Message] = []
-        has_legacy = False
+        pending_legacy = False
 
         for m in history:
             if m.role == ChatRole.user:
+                if pending_legacy:
+                    messages.append(
+                        Message.assistant("I made several tool calls and iterations. The details have been compacted.")
+                    )
+                    pending_legacy = False
                 messages.append(Message.user(m.content))
             elif m.raw_message is not None:
+                pending_legacy = False
                 messages.append(m.raw_message)
             elif m.role == ChatRole.assistant and m.content.strip():
+                pending_legacy = False
                 messages.append(Message.assistant(m.content))
             else:
-                has_legacy = True
+                pending_legacy = True
 
-        if not has_legacy or len(messages) < 2:
-            return messages
+        if pending_legacy:
+            messages.append(
+                Message.assistant("I made several tool calls and iterations. The details have been compacted.")
+            )
 
-        # Old sessions have rows without raw_message that we can't reconstruct.
-        # Keep only: first user message (the original build prompt), a synthetic
-        # compaction note, then everything from the current user message onward.
-        first_user_msg = messages[0]
-        current_user_msg = messages[-1]
-        compacted = Message.assistant(
-            "I made several tool calls and iterations to build and refine the project. "
-            "The details have been compacted. Continuing from here."
-        )
-        if first_user_msg == current_user_msg:
-            return [current_user_msg]
-        return [first_user_msg, compacted, current_user_msg]
+        return messages
 
     async def _persist_data_sources(
         self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]
@@ -284,10 +282,7 @@ class FollowUpAgent(ChatAgent):
         return {"summary": summary, "file_tree": file_tree}
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
-        """Emit ReAct step events and track state for followup agent."""
         if event["type"] == "react_assistant_turn":
-            # The real assistant message (content + reasoning_content + tool_calls) for this
-            # iteration — saved once so history replay can reconstruct the actual conversation.
             self._iteration = event["iteration"]
             self._steps.append(
                 {

@@ -147,7 +147,13 @@ def test_search_entry_returns_matches(tmp_path: Path) -> None:
     try:
         response = client.post(
             f"/api/files/{PROJECT_ID}/search",
-            json={"query": "Todo", "case_sensitive": False, "word_match": False, "use_regex": False, "max_results": 100},
+            json={
+                "query": "Todo",
+                "case_sensitive": False,
+                "word_match": False,
+                "use_regex": False,
+                "max_results": 100,
+            },
         )
         assert response.status_code == 200
         payload = response.json()
@@ -169,7 +175,13 @@ def test_search_entry_returns_503_when_search_tool_is_unavailable(tmp_path: Path
     try:
         response = client.post(
             f"/api/files/{PROJECT_ID}/search",
-            json={"query": "Todo", "case_sensitive": False, "word_match": False, "use_regex": False, "max_results": 100},
+            json={
+                "query": "Todo",
+                "case_sensitive": False,
+                "word_match": False,
+                "use_regex": False,
+                "max_results": 100,
+            },
         )
         assert response.status_code == 503
         assert "ripgrep (rg) is required for search" in response.json()["detail"]

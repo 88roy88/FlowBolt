@@ -15,7 +15,7 @@ from flow44.ai.agents.plan.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_failure_logger import record_span_error
+from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState

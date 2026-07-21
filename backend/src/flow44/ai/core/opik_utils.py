@@ -1,12 +1,17 @@
+import asyncio
 import logging
 import traceback as traceback_module
 from datetime import datetime
 from typing import Any
 
+import litellm
+import opik
 from litellm.integrations.opik.opik import OpikLogger
 from litellm.integrations.opik.opik_payload_builder import extractors
 from opik import Span, get_global_client, opik_context
 from opik.types import ErrorInfoDict
+
+from flow44.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -121,3 +126,18 @@ def llm_metadata(
     if extra_metadata:
         opik_meta.update(extra_metadata)
     return {"opik": opik_meta}
+
+
+def setup_opik_tracing() -> None:
+    if not settings.OPIK_API_KEY:
+        logger.info("Opik tracing not enabled (missing API key)")
+        return
+    litellm.callbacks = [FailureAwareOpikLogger()]
+    logger.info("Opik tracing enabled")
+
+
+async def flush_opik_traces() -> None:
+    if not settings.OPIK_API_KEY:
+        return
+    await asyncio.to_thread(opik.flush_tracker)
+    logger.info("Opik traces flushed.")
