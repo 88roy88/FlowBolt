@@ -44,12 +44,8 @@ class AdapiClient:
         client_id: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.ADAPI_BASE_URL).rstrip("/")
-        self._timeout = (
-            timeout_s if timeout_s is not None else settings.ADAPI_TIMEOUT_SECONDS
-        )
-        self._headers = {
-            "ClientId": client_id if client_id is not None else settings.ADAPI_CLIENT_ID
-        }
+        self._timeout = timeout_s if timeout_s is not None else settings.ADAPI_TIMEOUT_SECONDS
+        self._headers = {"ClientId": client_id if client_id is not None else settings.ADAPI_CLIENT_ID}
 
     async def get_user_group_ids(self, user_id: str) -> set[str]:
         try:
@@ -58,9 +54,7 @@ class AdapiClient:
             logger.warning("ADAPI group lookup failed for user %s: %s", user_id, exc)
             return set()
 
-        match = next(
-            (u for u in users if u.mail.casefold() == user_id.casefold()), None
-        )
+        match = next((u for u in users if u.mail.casefold() == user_id.casefold()), None)
         if match is None:
             logger.warning("ADAPI user not found for group lookup: %s", user_id)
             return set()
@@ -73,10 +67,7 @@ class AdapiClient:
         return [AdUser.model_validate(r) for r in await self._search("/users", params)]
 
     async def search_groups(self, query: str) -> list[AdGroup]:
-        return [
-            AdGroup.model_validate(r)
-            for r in await self._search("/groups", self._fuzzy_params(query))
-        ]
+        return [AdGroup.model_validate(r) for r in await self._search("/groups", self._fuzzy_params(query))]
 
     @staticmethod
     def _fuzzy_params(query: str) -> dict[str, str]:
@@ -108,9 +99,7 @@ class AdapiClient:
             resp.raise_for_status()
             data = resp.json()
         except (httpx.HTTPError, ValueError) as exc:
-            logger.warning(
-                "ADAPI search failed for %s params=%r: %s", path, params, exc
-            )
+            logger.warning("ADAPI search failed for %s params=%r: %s", path, params, exc)
             raise AdapiError(str(exc)) from exc
         if not isinstance(data, list):
             logger.warning("ADAPI returned a non-list payload for %s", path)
