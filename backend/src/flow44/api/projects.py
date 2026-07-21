@@ -69,14 +69,12 @@ def _serialize_project(project: Project, role: str) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
 
 
-# Display-only role labels for the two authorization tiers that are not shareable
-# project roles (so have no Role enum member): the project creator and a system admin
+# Display-only role labels for the creator/admin tiers (no Role enum member).
 _OWNER_ROLE = "owner"
 _ADMIN_ROLE = "admin"
 
-# Display precedence when a project reaches a user through more than one source
-# (e.g. a direct share and a group grant). Higher wins; the label is cosmetic —
-# actual authorization unions permissions in deps._resolve_project_permissions.
+# Display precedence when a project reaches a user through several sources; higher
+# wins. Cosmetic only — authorization unions permissions in deps.
 _ROLE_RANK: dict[str, int] = {
     Role.viewer.value: 1,
     Role.editor.value: 2,
@@ -116,10 +114,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
     )
     group_shared = await list_group_shared_projects(user_group_ids)
 
-    # A project can reach a user through several sources (owned, a direct share,
-    # and one or more group grants). Collapse to one entry per project, keeping
-    # the highest-ranked role for display. Insertion order (owned, then direct,
-    # then group shares) is preserved by the dict.
+    # Collapse to one entry per project, keeping the highest-ranked role for display.
     by_id: dict[str, tuple[Project, str]] = {}
 
     def _merge(project: Project, role: str) -> None:

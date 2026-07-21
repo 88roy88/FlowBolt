@@ -1,4 +1,3 @@
-"""Tests for the /api/adapi search routes (backend proxy in front of ADAPI)."""
 
 from unittest.mock import AsyncMock, patch
 

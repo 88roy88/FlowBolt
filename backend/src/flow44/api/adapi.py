@@ -1,15 +1,3 @@
-"""ADAPI (Active Directory) search, proxied through the backend.
-
-The browser must not call ADAPI directly: in production ADAPI lives at an
-internal ``ADAPI_BASE_URL`` that isn't reachable from the browser and won't send
-CORS headers. Routing search through the backend keeps it a server-to-server
-call (no CORS), enforces auth, and gives us a single place to configure the
-ADAPI endpoint.
-
-Search is available to any authenticated user — it is how someone picks a person
-or group to share a project with; it grants no access on its own.
-"""
-
 from fastapi import APIRouter, HTTPException, Query
 
 from flow44.api.deps import UserDep

@@ -28,6 +28,7 @@ def upgrade() -> None:
     op.create_table('platform_user_groups',
     sa.Column('group_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('group_name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('email', sqlmodel.sql.sqltypes.AutoString(), nullable=False, server_default=''),
     sa.Column('invited_by', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('created_at', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.PrimaryKeyConstraint('group_id')

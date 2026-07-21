@@ -13,35 +13,16 @@ const MIN_QUERY_LENGTH = 3;
 const DEBOUNCE_MS = 300;
 
 interface AdapiSearchProps {
-  /** Invite the picked user (via the row's hover button). Omit to hide user results. */
   onInviteUser?: (user: AdUser) => void;
-  /** Invite the picked group (via the row's hover button). Omit to hide group results. */
   onInviteGroup?: (group: AdGroup) => void;
-  /**
-   * Lowercased user_ids (emails) already granted access. Matching users are
-   * lifted out of the result list — they already live in the parent's own list —
-   * and reported back through `onExistingUsersMatched` so the parent can
-   * highlight them there. Must be lowercased for case-insensitive matching.
-   */
+  // Lowercased ids already granted; matches are lifted out of results and reported
+  // back so the parent highlights them in its own list.
   existingUserIds?: Set<string>;
-  /** Emails of already-granted users matching the current query, for the parent to highlight in its own list. */
   onExistingUsersMatched?: (userIds: string[]) => void;
-  /**
-   * Lowercased group ids (distinguishedNames) already granted access. Behaves
-   * exactly like `existingUserIds` but for groups. Must be lowercased.
-   */
   existingGroupIds?: Set<string>;
-  /** distinguishedNames of already-granted groups matching the current query, for the parent to highlight. */
   onExistingGroupsMatched?: (groupIds: string[]) => void;
 }
 
-/**
- * Unified directory search over ADAPI users and groups. When both callbacks are
- * supplied it shows an All / Users / Groups filter and searches whichever the
- * filter selects; with a single callback it silently narrows to that entity type
- * (no filter chrome). Each row reveals an invite button on hover. Results match
- * on account name, display name or email.
- */
 export function AdapiSearch({
   onInviteUser,
   onInviteGroup,
@@ -54,15 +35,12 @@ export function AdapiSearch({
   const canUsers = !!onInviteUser;
   const canGroups = !!onInviteGroup;
 
-  // Filter defaults to the broadest actionable scope. With one capability there
-  // is nothing to filter, so we pin the filter and hide the toggle.
   const [filter, setFilter] = useState<Filter>(canUsers && canGroups ? 'all' : canUsers ? 'users' : 'groups');
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdUser[]>([]);
   const [groups, setGroups] = useState<AdGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  // Per-entity failure, tracked separately so the error message can reflect only
-  // what the current filter actually shows (see `error` below).
+  // Per-entity failure so the error message reflects only what the filter shows.
   const [usersError, setUsersError] = useState(false);
   const [groupsError, setGroupsError] = useState(false);
 
@@ -73,15 +51,12 @@ export function AdapiSearch({
   const trimmed = debouncedQuery.trim();
   const hasQuery = trimmed.length >= MIN_QUERY_LENGTH;
 
-  // Monotonic request counter. Every fired request captures a seq number; when a
-  // response resolves we only apply it if it is still the latest one. This
-  // discards out-of-order/stale responses (a slow earlier request landing after
-  // a faster later one) — the "only show the last request" guard, sans RxJS.
+  // Monotonic request counter: a response is applied only if its seq is still the
+  // latest, discarding out-of-order/stale responses. Bumping it also invalidates
+  // any in-flight request.
   const latestSeq = useRef(0);
 
   useEffect(() => {
-    // Below the threshold (including empty): clear everything, fire nothing.
-    // Bumping the seq also invalidates any in-flight request.
     if (!hasQuery) {
       latestSeq.current += 1;
       setUsers([]);
@@ -96,12 +71,9 @@ export function AdapiSearch({
     setIsLoading(true);
 
     (async () => {
-      // Fetch every entity type the component can invite (canUsers/canGroups),
-      // not just the ones the current filter shows — the filter is a display
-      // toggle, so switching All → Users must not require a refetch. Each
-      // endpoint settles independently: in 'all' mode one type having no matches
-      // (which real ADAPI surfaces as an error, not an empty list) must not
-      // discard the other type's results.
+      // Fetch both entity types the component can invite (not just the filtered
+      // one, so toggling the filter needs no refetch), settling independently so
+      // one type's failure doesn't discard the other's results.
       const [usersRes, groupsRes] = await Promise.allSettled([
         canUsers ? searchAdUsers(trimmed) : Promise.resolve<AdUser[]>([]),
         canGroups ? searchAdGroups(trimmed) : Promise.resolve<AdGroup[]>([]),
@@ -119,14 +91,10 @@ export function AdapiSearch({
     })();
   }, [trimmed, hasQuery, canUsers, canGroups]);
 
-  // The filter only changes which already-fetched results are displayed, so no
-  // refetch or result-clearing is needed.
   const handleFilterChange = (next: Filter) => setFilter(next);
 
-  // Split fetched users into those already granted access (matched existing) and
-  // the rest. Already-granted users are dropped from the result list — the parent
-  // surfaces them by highlighting its own members list — while brand-new users
-  // stay invitable here.
+  // Split fetched users into already-granted (dropped from results, surfaced by
+  // the parent) and the rest (still invitable here).
   const { newUsers, matchedExistingIds } = useMemo(() => {
     const fresh: AdUser[] = [];
     const matched: string[] = [];
@@ -137,7 +105,6 @@ export function AdapiSearch({
     return { newUsers: fresh, matchedExistingIds: matched };
   }, [users, existingUserIds]);
 
-  // Same split for groups, keyed on distinguishedName.
   const { newGroups, matchedExistingGroupIds } = useMemo(() => {
     const fresh: AdGroup[] = [];
     const matched: string[] = [];
@@ -148,9 +115,8 @@ export function AdapiSearch({
     return { newGroups: fresh, matchedExistingGroupIds: matched };
   }, [groups, existingGroupIds]);
 
-  // Report matched existing entities to the parent for highlighting. Only report
-  // while that entity type is actually being shown, and key each effect on the id
-  // contents (not array identity) so it fires only when the matched set changes.
+  // Key the effect on the id contents (not array identity) so it fires only when
+  // the matched set actually changes.
   const matchedUserKey = (showUsers ? matchedExistingIds : []).join('\n');
   useEffect(() => {
     onExistingUsersMatched?.(matchedUserKey ? matchedUserKey.split('\n') : []);
@@ -167,19 +133,15 @@ export function AdapiSearch({
     return t('admin.searchUsersPlaceholder', 'Search users by name or email…');
   }, [canUsers, canGroups, t]);
 
-  // Only the results the current filter displays count toward "empty"/"error".
-  // Already-granted users are excluded (they live in the parent's list now).
   const visibleUsers = showUsers ? newUsers : [];
   const visibleGroups = showGroups ? newGroups : [];
   const isEmpty = visibleUsers.length === 0 && visibleGroups.length === 0;
-  // Error only when every entity type currently shown failed. If either shown
-  // type succeeded (even with no matches), we show results rather than an error.
+  // Error only when every shown entity type failed.
   const error =
     (!showUsers || usersError) && (!showGroups || groupsError);
 
   return (
     <div>
-      {/* All / Users / Groups filter — only when both entity types are actionable */}
       {canUsers && canGroups && (
         <div className="flex items-center gap-1 p-0.5 mb-2 bg-muted/40 rounded-md w-fit">
           <FilterButton
@@ -202,7 +164,6 @@ export function AdapiSearch({
         </div>
       )}
 
-      {/* Search input */}
       <div className="relative">
         <Search
           size={14}
@@ -216,10 +177,7 @@ export function AdapiSearch({
         />
       </div>
 
-      {/* Results — a fixed-height region reserved from the start so the modal
-          doesn't jump in height as results, loading and empty states swap in.
-          Kept deliberately compact so the modal's existing-entities list (below
-          the search) gets the larger share of the dialog's vertical budget. */}
+      {/* Fixed-height region so the modal doesn't jump as loading/empty states swap in. */}
       <div className="mt-2 h-[200px] overflow-auto">
         {!hasQuery ? (
           <StateMessage>{t('admin.searchMinChars', 'Type at least 3 characters to search')}</StateMessage>
@@ -261,7 +219,6 @@ export function AdapiSearch({
   );
 }
 
-/** Centered placeholder (hint / loading / empty / error) filling the fixed-height results region. */
 function StateMessage({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'error' }) {
   return (
     <div className="h-full flex items-center justify-center">

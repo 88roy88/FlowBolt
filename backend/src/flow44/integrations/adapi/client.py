@@ -1,30 +1,9 @@
-"""Thin client for ADAPI (Active Directory API).
-
-Exposes what the backend needs from ADAPI: the set of groups a user belongs to
-(for project-access resolution) and free-text search over users and groups (for
-the "share a project with a person/group" UI).
-
-Group membership is read from the user record's ``memberOf`` attribute, which
-ADAPI returns as a list of group distinguished names (DNs). Those DNs are the
-identifier the backend stores when a project or the platform is shared with a
-group, so access resolution is a direct DN set-intersection — no objectGUID
-mapping. ADAPI resolves nested (transitive) membership, so ``memberOf`` already
-includes groups reached through nesting.
-
-The two use cases differ in how they treat failure. Group-access resolution is
-deliberately soft: if ADAPI is unreachable or errors, we log and return an empty
-set, so group-derived access is simply unavailable for that request (direct
-membership and ownership are unaffected). Interactive search instead raises
-``AdapiError`` so the caller can surface "ADAPI unavailable" rather than
-silently showing an empty result set that looks like "no matches".
-"""
-
 import logging
 from typing import Any
 from urllib.parse import quote, urlencode
 
 import httpx
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from flow44.config import settings
 
@@ -34,34 +13,26 @@ __all__ = ["AdGroup", "AdUser", "AdapiClient", "AdapiError", "adapi_client"]
 
 
 class AdapiError(Exception):
-    """Raised when an ADAPI search cannot be completed (ADAPI down or malformed)."""
+    pass
 
 
 class _AdRecord(BaseModel):
-    # ADAPI carries more fields than we model; ignore the rest rather than
-    # reject the record. Field names mirror the AD attribute names.
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     cn: str
-    displayName: str = ""  # noqa: N815 — mirrors the AD attribute name (wire contract)
-    distinguishedName: str = ""  # noqa: N815
+    display_name: str = Field(default="", alias="displayName")
+    distinguished_name: str = Field(default="", alias="distinguishedName")
     mail: str = ""
-    sAMAccountName: str = ""  # noqa: N815
+    sam_account_name: str = Field(default="", alias="sAMAccountName")
 
 
 class AdUser(_AdRecord):
-    # DNs of every group the user belongs to (transitive membership resolved by
-    # ADAPI). Group grants key on these DNs, so this is what drives group-based
-    # access resolution — see ``get_user_group_ids``.
-    memberOf: list[str] = []  # noqa: N815 — mirrors the AD attribute name (wire contract)
+    member_of: list[str] = Field(default=[], alias="memberOf")
 
 
 class AdGroup(_AdRecord):
     description: str = ""
-    # AD objectGUID — a stable directory id, kept for reference/display. The
-    # grant key is the group's ``distinguishedName`` (on ``_AdRecord``), which is
-    # what ADAPI reports in a user's ``memberOf``.
-    objectGUID: str = ""  # noqa: N815 — mirrors the AD attribute name (wire contract)
+    object_guid: str = Field(default="", alias="objectGUID")
 
 
 class AdapiClient:
@@ -70,20 +41,10 @@ class AdapiClient:
     ) -> None:
         self.base_url = (base_url or settings.ADAPI_BASE_URL).rstrip("/")
         self._timeout = timeout_s if timeout_s is not None else settings.ADAPI_TIMEOUT_SECONDS
-        # Sent as the ``ClientId`` header so ADAPI can attribute the call.
         self._headers = {"ClientId": client_id if client_id is not None else settings.ADAPI_CLIENT_ID}
 
     async def get_user_group_ids(self, user_id: str) -> set[str]:
-        """Return the DNs of every group ``user_id`` belongs to (transitive).
-
-        ``user_id`` is the identifier carried in the auth token's emailaddress
-        claim, which maps to the directory's ``mail`` attribute. We look the user
-        up via the same search ADAPI exposes and read the ``memberOf`` (group DNs)
-        off the record whose ``mail`` matches exactly — ADAPI carries the group
-        DNs on the user object, so no separate membership endpoint is needed.
-        Returns an empty set on any failure (unknown user, ADAPI down, malformed
-        response) so group-derived access is unavailable, never fatal.
-        """
+        # user_id is the caller's email (our user id), matched against ADAPI's mail.
         try:
             users = await self.search_users(user_id)
         except AdapiError as exc:
@@ -94,24 +55,16 @@ class AdapiClient:
         if match is None:
             logger.warning("ADAPI user not found for group lookup: %s", user_id)
             return set()
-        return {dn for dn in match.memberOf if dn}
+        return {dn for dn in match.member_of if dn}
 
     async def search_users(self, query: str) -> list[AdUser]:
-        """Search ADAPI for users matching ``query`` by account name, display name or email."""
         return [AdUser.model_validate(r) for r in await self._search("/users", query)]
 
     async def search_groups(self, query: str) -> list[AdGroup]:
-        """Search ADAPI for groups matching ``query`` by account name, display name or email."""
         return [AdGroup.model_validate(r) for r in await self._search("/groups", query)]
 
     @staticmethod
     def _search_params(query: str) -> dict[str, str]:
-        """Build the ADAPI search filter for ``query``.
-
-        Matches the term as a substring against ``sAMAccountName``, ``displayName``
-        or ``mail`` (ADAPI ORs ``samAccountName`` with ``customFilter``). The term
-        is wrapped in ``*…*`` LDAP wildcards so it matches anywhere in the value.
-        """
         wrapped = f"*{query}*"
         return {
             "samAccountName": wrapped,
@@ -119,18 +72,9 @@ class AdapiClient:
         }
 
     async def _search(self, path: str, query: str) -> list[dict[str, Any]]:
-        """GET ``path`` with the substring filter and return the raw list of records.
-
-        The query string is pre-encoded and appended to the URL rather than passed
-        via ``params=``: httpx would encode the space inside ``customFilter`` as
-        ``+``, which ADAPI reads literally and rejects. ``quote`` encodes it as
-        ``%20`` instead, and httpx preserves an already-encoded query verbatim (no
-        double-encoding).
-
-        Raises ``AdapiError`` on any transport/HTTP/decoding failure or an
-        unexpected (non-list) payload, so interactive callers can distinguish
-        "ADAPI unavailable" from "no matches".
-        """
+        # The query is pre-encoded and appended to the URL rather than passed via
+        # params=: httpx encodes the space inside customFilter as "+", which ADAPI
+        # rejects. quote encodes it as "%20", which httpx preserves verbatim.
         query_string = urlencode(self._search_params(query), quote_via=quote)
         try:
             async with httpx.AsyncClient(

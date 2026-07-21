@@ -32,6 +32,7 @@ def upgrade() -> None:
     sa.Column('project_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('group_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('group_name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('email', sqlmodel.sql.sqltypes.AutoString(), nullable=False, server_default=''),
     sa.Column('role', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('created_at', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('invited_by', sqlmodel.sql.sqltypes.AutoString(), nullable=False),

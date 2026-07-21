@@ -99,15 +99,11 @@ class FlapiSettings(Flow44BaseSettings):
 
 
 class DirectorySettings(Flow44BaseSettings):
-    # ADAPI (Active Directory API) base URL, used to resolve a user's group
-    # memberships when a project is shared with a group. In dev this points to
-    # the local adapi-mock (default).
+    # Defaults to the local adapi-mock in dev.
     ADAPI_BASE_URL: str = "http://localhost:6666"
     ADAPI_VERIFY_SSL: bool = True
-    # Per-request timeout (seconds) for ADAPI calls on the project-access path.
     ADAPI_TIMEOUT_SECONDS: float = 5.0
-    # Client identifier ADAPI uses to attribute/authorize calls. Sent as the
-    # ``ClientId`` header on every request; the local mock ignores it.
+    # Sent as the ClientId header; the local mock ignores it.
     ADAPI_CLIENT_ID: str = "default"
 
 

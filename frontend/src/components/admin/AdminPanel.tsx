@@ -7,8 +7,7 @@ import { AdapiSearch } from './AdapiSearch';
 import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
 
-// Sort comparator: rows whose id is in `hits` (case-insensitive) sort before
-// those that aren't; ties preserve input order under a stable sort.
+// Rows whose id is in `hits` sort first; ties preserve order under a stable sort.
 function rankHit(hits: Set<string>, a: string, b: string): number {
   const aHit = hits.has(a.toLowerCase());
   const bHit = hits.has(b.toLowerCase());
@@ -21,13 +20,11 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [groups, setGroups] = useState<PlatformGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  // Existing users/groups matched by the current directory search — highlighted
-  // and floated to the top of their list instead of shown again in the results.
   const [highlightedUserIds, setHighlightedUserIds] = useState<string[]>([]);
   const [highlightedGroupIds, setHighlightedGroupIds] = useState<string[]>([]);
 
-  // Lowercased for case-insensitive matching (stored user_id comes from a token
-  // email claim, whose casing can differ from the directory mail).
+  // Lowercased for case-insensitive matching: stored user_id comes from a token
+  // email claim, whose casing can differ from the directory mail.
   const memberIds = useMemo(() => new Set(users.map((u) => u.user_id.toLowerCase())), [users]);
   const groupIds = useMemo(() => new Set(groups.map((g) => g.group_id.toLowerCase())), [groups]);
   const highlightedUserSet = useMemo(
@@ -39,7 +36,6 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     [highlightedGroupIds],
   );
 
-  // Matched-existing rows float to the top. sort() is stable, so the rest keep order.
   const orderedUsers = useMemo(
     () => [...users].sort((a, b) => rankHit(highlightedUserSet, a.user_id, b.user_id)),
     [users, highlightedUserSet],
@@ -101,11 +97,9 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       <DialogContent className="w-[440px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogClose onClose={onClose} />
 
-        {/* Fixed header + search (the search has its own scrollable results). */}
         <div className="shrink-0">
           <DialogTitle className="mb-4">{t('admin.title', 'Platform Users')}</DialogTitle>
 
-          {/* Directory search — hover a result and invite the user or group */}
           <AdapiSearch
             onInviteUser={(u) => handleInviteUser(u.mail, u.displayName)}
             onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName, g.mail)}
@@ -120,7 +114,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Platform access list — its own scrollable region */}
+        {/* min-h-0 lets this scroll within the dialog's max-height instead of overflowing. */}
         <div className="border-t border-border mt-3 pt-3 flex-auto min-h-0 overflow-auto space-y-1">
           {loading ? (
             <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>

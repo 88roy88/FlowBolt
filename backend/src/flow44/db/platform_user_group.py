@@ -1,12 +1,3 @@
-"""Platform access granted to a whole directory group.
-
-Mirrors :class:`~flow44.db.platform_user.PlatformUser`, but the principal is a
-group (identified by its AD ``distinguishedName``) rather than an individual. A
-user gains platform access if ADAPI reports them as a member of any granted
-group — the same "verify by group membership" pattern the project-level
-:mod:`flow44.db.project_member_group` grants use.
-"""
-
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, func
@@ -18,16 +9,10 @@ from flow44.db import database
 class PlatformUserGroup(SQLModel, table=True):
     __tablename__ = "platform_user_groups"
 
-    # AD distinguishedName (DN) of the group — the identifier ADAPI reports in a
-    # user's ``memberOf``, so access resolution intersects on it directly.
+    # group's AD distinguishedName — the id ADAPI reports in a user's memberOf.
     group_id: str = Field(primary_key=True)
-    # Human-readable name, cached for display so the admin UI need not re-query
-    # ADAPI. A denormalized snapshot taken at invite time: it may go stale if the
-    # group is renamed in AD, which is acceptable because it is never used for
-    # access decisions (those key on group_id/DN) — only for display.
+    # display-only snapshots captured at invite time; never used for access decisions.
     group_name: str = Field(default="")
-    # Group email captured at invite time, shown as the row's secondary text under
-    # the group name. Display-only, may go stale — access keys on group_id/DN.
     email: str = Field(default="")
     invited_by: str = Field(default="")
     created_at: datetime | None = Field(

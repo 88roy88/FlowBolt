@@ -14,8 +14,7 @@ const ROLES: { value: AssignableRole; label: string }[] = [
   { value: 'maintainer', label: 'Maintainer' },
 ];
 
-// Sort comparator: rows whose id is in `hits` (case-insensitive) sort before
-// those that aren't; ties preserve input order under a stable sort.
+// Rows whose id is in `hits` sort first; ties preserve order under a stable sort.
 function rankHit(hits: Set<string>, a: string, b: string): number {
   const aHit = hits.has(a.toLowerCase());
   const bHit = hits.has(b.toLowerCase());
@@ -50,18 +49,13 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [groups, setGroups] = useState<ProjectGroupGrant[]>([]);
   const [loading, setLoading] = useState(true);
-  // Role applied to the next invite made from the search below.
   const [newRole, setNewRole] = useState<AssignableRole>('viewer');
   const [error, setError] = useState('');
-  // Existing members/groups whose row should be highlighted because the current
-  // directory search matched them (they're already granted, so the search hides
-  // them from its own results and points here instead).
   const [highlightedUserIds, setHighlightedUserIds] = useState<string[]>([]);
   const [highlightedGroupIds, setHighlightedGroupIds] = useState<string[]>([]);
 
-  // Ids already granted — lowercased for case-insensitive matching (the stored
-  // user_id comes from a token email claim, whose casing can differ from the
-  // directory's mail) and memoized so AdapiSearch's effects don't churn.
+  // Lowercased for case-insensitive matching: stored user_id comes from a token
+  // email claim, whose casing can differ from the directory's mail.
   const memberIds = useMemo(() => new Set(members.map((m) => m.user_id.toLowerCase())), [members]);
   const groupIds = useMemo(() => new Set(groups.map((g) => g.group_id.toLowerCase())), [groups]);
   const highlightedUserSet = useMemo(
@@ -73,8 +67,6 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
     [highlightedGroupIds],
   );
 
-  // Matched-existing rows float to the top of their list. sort() is stable, so
-  // everyone else keeps their original order.
   const orderedMembers = useMemo(
     () => [...members].sort((a, b) => rankHit(highlightedUserSet, a.user_id, b.user_id)),
     [members, highlightedUserSet],
@@ -154,13 +146,11 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
       <DialogContent className="w-[440px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogClose onClose={onClose} />
 
-        {/* Fixed header + search (the search has its own scrollable results). */}
         <div className="shrink-0">
           <DialogTitle className="mb-4">
             {t('sharing.title', 'Share')} — {projectName}
           </DialogTitle>
 
-          {/* Owner display */}
           {ownerUserId && (
             <div className="flex items-center gap-2 px-2 py-1.5 mb-3 rounded-md bg-muted/30 text-[13px]">
               <Crown size={13} className="text-warning shrink-0" />
@@ -169,7 +159,6 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
             </div>
           )}
 
-          {/* Role applied to invites made from the search */}
           <div className="flex items-center justify-end gap-2 mb-2 text-xs text-muted-foreground">
             <span>{t('sharing.inviteAs', 'Invite as')}</span>
             <RoleSelect
@@ -179,7 +168,6 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
             />
           </div>
 
-          {/* Directory search — hover a result and invite the user or group */}
           <AdapiSearch
             onInviteUser={(user) => handleInviteUser(user.mail, user.displayName)}
             onInviteGroup={(group) => handleInviteGroup(group.distinguishedName, group.displayName, group.mail)}
@@ -194,10 +182,7 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
           )}
         </div>
 
-        {/* Members & group grants — its own scrollable region. min-h-0 lets it
-            shrink within the dialog's max-height so it scrolls (rather than
-            overflowing the modal); flex-auto makes it absorb all the vertical
-            space not taken by the header/search above. */}
+        {/* min-h-0 lets this scroll within the dialog's max-height instead of overflowing. */}
         <div className="border-t border-border mt-3 pt-3 flex-auto min-h-0 overflow-auto space-y-1">
           {loading ? (
             <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>

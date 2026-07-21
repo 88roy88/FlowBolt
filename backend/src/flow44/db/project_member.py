@@ -18,9 +18,7 @@ class ProjectMember(SQLModel, table=True):
         sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
     )
     user_id: str = Field(index=True)
-    # ADAPI displayName captured at invite time, shown as the row's primary text
-    # (the email in user_id is the secondary text). Denormalized for display only;
-    # may go stale if renamed in AD, which is fine — access keys on user_id.
+    # display-only snapshot captured at invite time; never used for access decisions.
     display_name: str = Field(default="")
     role: str = Field(default=Role.viewer.value)
     created_at: datetime | None = Field(

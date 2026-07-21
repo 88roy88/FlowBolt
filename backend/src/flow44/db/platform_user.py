@@ -10,13 +10,9 @@ class PlatformUser(SQLModel, table=True):
     __tablename__ = "platform_users"
 
     user_id: str = Field(primary_key=True)
-    # ADAPI displayName captured at invite time, shown as the row's primary text
-    # (the email in user_id is the secondary text). Display-only, may go stale.
+    # display-only snapshot captured at invite time; never used for access decisions.
     display_name: str = Field(default="")
     invited_by: str = Field(default="")
-    # tz-aware timestamptz column with a DB server default, mirroring
-    # PlatformUserGroup — the actual column type, so ORM inserts/reads stay in
-    # sync (a plain ``str`` field binds as VARCHAR and mismatches the column).
     created_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),

@@ -1,6 +1,3 @@
-"""Tests for platform group grants: the DB layer, the admin endpoints, and the
-project-creation gate honouring group membership."""
-
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient

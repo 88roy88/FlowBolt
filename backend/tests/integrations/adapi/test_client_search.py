@@ -1,10 +1,3 @@
-"""Tests for AdapiClient search.
-
-The key behaviour under test is the error-vs-empty distinction: unlike group
-resolution (which soft-fails to an empty set), search raises ``AdapiError`` on
-failure so the UI can say "ADAPI unavailable" instead of "no matches".
-"""
-
 from unittest.mock import patch
 
 import httpx
@@ -46,7 +39,7 @@ class TestSearchUsers:
         assert "+" not in requested_url
         assert len(users) == 1
         assert users[0].cn == "djenkins"
-        assert users[0].displayName == "Dana Jenkins"
+        assert users[0].display_name == "Dana Jenkins"
 
     def test_sends_client_id_header(self):
         # Explicit override wins; otherwise it falls back to the configured default.
@@ -103,16 +96,10 @@ class TestSearchGroups:
         assert groups[0].cn == "Legal"
         assert groups[0].description == "Legal department"
         # objectGUID is surfaced as a stable directory id, alongside the DN used for grants.
-        assert groups[0].objectGUID == "82e16f20-f05e-6d5c-3589-79cd6b398160"
+        assert groups[0].object_guid == "82e16f20-f05e-6d5c-3589-79cd6b398160"
 
 
 class TestGetUserGroupIds:
-    """``get_user_group_ids`` reads the group DNs off the matching user's ``memberOf``.
-
-    Unlike search it soft-fails to an empty set, so a directory outage or an
-    unknown user simply yields no group-derived access rather than an error.
-    """
-
     @staticmethod
     def _user(sam: str, member_of: list[str]) -> dict:
         return {

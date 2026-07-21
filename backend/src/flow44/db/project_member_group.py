@@ -10,14 +10,6 @@ from flow44.db.project import Project
 
 
 class ProjectMemberGroup(SQLModel, table=True):
-    """A directory group granted access to a project (a "group invite").
-
-    Mirrors :class:`~flow44.db.project_member.ProjectMember`, but the principal
-    is a group (identified by its AD ``distinguishedName``) rather than a user.
-    A user gains the group's role on the project if ADAPI reports them as a
-    member of ``group_id``.
-    """
-
     __tablename__ = "project_member_groups"
     __table_args__ = (UniqueConstraint("project_id", "group_id", name="uq_project_member_group"),)
 
@@ -25,16 +17,10 @@ class ProjectMemberGroup(SQLModel, table=True):
     project_id: str = Field(
         sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
     )
-    # AD distinguishedName (DN) of the group — the identifier ADAPI reports in a
-    # user's ``memberOf``, so access resolution intersects on it directly.
+    # group's AD distinguishedName — the id ADAPI reports in a user's memberOf.
     group_id: str = Field(index=True)
-    # Human-readable group name, cached for display so the members UI need not
-    # re-query ADAPI. A denormalized snapshot taken at invite time: it may go stale
-    # if the group is renamed in AD, which is acceptable because it is never used
-    # for access decisions (those key on group_id/DN) — only for display.
+    # display-only snapshots captured at invite time; never used for access decisions.
     group_name: str = Field(default="")
-    # Group email captured at invite time, shown as the row's secondary text under
-    # the group name. Display-only, may go stale — access keys on group_id/DN.
     email: str = Field(default="")
     role: str = Field(default=Role.viewer.value)
     created_at: datetime | None = Field(
@@ -97,14 +83,6 @@ async def update_group_role(project_id: str, group_id: str, role: Role) -> Proje
 
 
 async def list_group_shared_projects(group_ids: set[str]) -> list[tuple[Project, Role]]:
-    """Projects shared with the user via directory-group grants, and the group's role.
-
-    ``group_ids`` is the user's (transitive) group membership, as resolved by
-    ADAPI. A project may be granted to several of the user's groups; each matching
-    grant is returned as its own ``(project, role)`` row, so the caller unions the
-    roles across sources. Short-circuits without a query when the user is in no
-    groups.
-    """
     if not group_ids:
         return []
     async with database.async_session() as session:

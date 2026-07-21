@@ -124,13 +124,6 @@ def is_admin(user_id: str) -> bool:
 
 
 async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permission]:
-    """Permissions the user gains via directory groups the project is shared with.
-
-    Short-circuits to an empty set (no ADAPI call) when the project has no group
-    grants, so only projects actually shared with a group pay the directory
-    round-trip. The user's group membership — including nesting — is resolved by
-    ADAPI; we just intersect it with the project's grants and union the roles.
-    """
     grants = await list_project_groups(project_id)
     if not grants:
         return set()
@@ -147,12 +140,6 @@ async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permis
 
 
 async def _resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
-    """Full permission set for a user on a project, unioned across every source.
-
-    Owner is the definitive maximum, so it returns early. Otherwise a user may
-    accumulate permissions from being a system admin, a direct member, and/or a
-    member of one or more granted groups. An empty result means no access.
-    """
     if project.user_id == user_id:
         return get_owner_permissions()
 
@@ -168,17 +155,14 @@ async def _resolve_project_permissions(project: Project, user_id: str) -> set[Pe
     return permissions
 
 
-# Per-request cache of the resolved permission set. Within one request the same
-# (project, user) permissions are needed by the access gate (get_project) and by
-# the permission dependencies; resolving once avoids repeating the member lookup
-# and — for group-shared projects — a second ADAPI round-trip. ContextVars are
-# per-task, so this never leaks across requests; the key guards against reuse for
-# a different project/user in the same task.
+# Per-request cache: get_project and the permission dependencies both resolve the
+# same (project, user) set, so resolving once avoids a second member lookup and
+# ADAPI round-trip. ContextVars are per-task, so this never leaks across requests;
+# the key guards against reuse for a different project/user in the same task.
 _perm_cache: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar("_perm_cache", default=None)
 
 
 async def resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
-    """Request-cached wrapper around :func:`_resolve_project_permissions`."""
     cached = _perm_cache.get()
     if cached is not None and cached[0] == (project.id, user_id):
         return cached[1]
@@ -192,10 +176,6 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Access is exactly "has any permission" — the same rule the permission
-    # dependencies enforce — so gate on the resolved set rather than duplicating
-    # the owner/admin/member/group checks here. The result is cached for this
-    # request, so get_user_permissions reuses it instead of resolving again.
     if not await resolve_project_permissions(project, user_id):
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -207,7 +187,6 @@ ProjectDep = Annotated[Project, Depends(get_project)]
 
 
 async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
-    """Resolve the current user's permissions on a project."""
     permissions = await resolve_project_permissions(project, user_id)
     if not permissions:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -218,8 +197,6 @@ PermissionsDep = Annotated[set[Permission], Depends(get_user_permissions)]
 
 
 def require_permission(permission: Permission) -> Any:
-    """Dependency factory: raises 403 if the user lacks the required permission."""
-
     async def _check(user_permissions: PermissionsDep) -> set[Permission]:
         if not has_permission(user_permissions, permission):
             raise HTTPException(status_code=403, detail="Insufficient permissions")
@@ -229,20 +206,10 @@ def require_permission(permission: Permission) -> Any:
 
 
 async def _is_platform_group_member(user_id: str) -> bool:
-    """Whether the user belongs to any directory group granted platform access.
-
-    Short-circuits (no ADAPI call) when no group has been granted access, so only
-    deployments that actually use group grants pay the directory round-trip.
-
-    We fetch the (currently small) set of granted group DNs from the DB and
-    intersect it in memory against the user's ADAPI-reported groups. The
-    alternative — pushing the user's groups into a DB query keyed on group_id —
-    was deliberately not done: a user can belong to dozens or hundreds of groups,
-    and sending that whole list to the DB on every access check would be heavier,
-    not lighter. Revisit (e.g. index group_id and query by the user's groups) only
-    if the number of *granted* groups grows large enough that fetching them all
-    becomes the bottleneck.
-    """
+    # Fetch the (small) set of granted group DNs and intersect in memory against
+    # the user's ADAPI groups, rather than pushing the user's groups into a DB
+    # query: a user can be in hundreds of groups, so that would be heavier. Revisit
+    # only if the number of *granted* groups grows large.
     group_ids = await platform_group_ids()
     if not group_ids:
         return False
@@ -251,19 +218,12 @@ async def _is_platform_group_member(user_id: str) -> bool:
 
 
 async def has_platform_access(user_id: str) -> bool:
-    """Whether the user may create projects.
-
-    Access is granted by being a system admin, a direct platform user
-    (``platform_users``), or a member of a directory group granted access
-    (``platform_user_groups``).
-    """
     if is_admin(user_id) or await db_is_platform_user(user_id):
         return True
     return await _is_platform_group_member(user_id)
 
 
 async def require_platform_user(user_id: UserDep) -> str:
-    """Gate: only platform users and admins can create projects."""
     if await has_platform_access(user_id):
         return user_id
     raise HTTPException(status_code=403, detail="Platform access required")
@@ -307,7 +267,6 @@ WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
 async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
-    """WS variant of get_user_permissions."""
     permissions = await resolve_project_permissions(project, user_id)
     if not permissions:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
@@ -318,8 +277,6 @@ WsPermissionsDep = Annotated[set[Permission], Depends(get_ws_permissions)]
 
 
 def require_ws_permission(permission: Permission) -> Any:
-    """WS dependency factory: rejects handshake if the user lacks the required permission."""
-
     async def _check(user_permissions: WsPermissionsDep) -> set[Permission]:
         if not has_permission(user_permissions, permission):
             raise WebSocketException(code=4403, reason="Insufficient permissions")

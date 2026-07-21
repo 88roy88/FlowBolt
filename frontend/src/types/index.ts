@@ -79,38 +79,31 @@ export interface Project {
 
 export interface ProjectMember {
   user_id: string;
-  // ADAPI displayName (primary text); user_id holds the email (secondary text).
   display_name: string;
   role: AssignableRole;
   created_at: string;
   invited_by: string;
 }
 
-// A directory group granted access to a project (keyed on the AD distinguishedName).
 export interface ProjectGroupGrant {
   group_id: string;
   group_name: string;
-  // Group email (secondary text); group_name holds the displayName (primary text).
   email: string;
   role: AssignableRole;
   created_at: string;
   invited_by: string;
 }
 
-// A user granted platform access (keyed on their email).
 export interface PlatformUser {
   user_id: string;
-  // ADAPI displayName (primary text); user_id holds the email (secondary text).
   display_name: string;
   invited_by: string;
   created_at: string;
 }
 
-// A directory group granted platform access (keyed on the AD distinguishedName).
 export interface PlatformGroup {
   group_id: string;
   group_name: string;
-  // Group email (secondary text); group_name holds the displayName (primary text).
   email: string;
   invited_by: string;
   created_at: string;
@@ -134,7 +127,6 @@ export interface DataSourceSearchResult {
   description: string | null;
 }
 
-// ADAPI search results (see mocks/adapi-mock).
 export interface AdUser {
   cn: string;
   displayName: string;
@@ -150,8 +142,6 @@ export interface AdGroup {
   description: string;
   mail: string;
   sAMAccountName: string;
-  // Stable directory id (kept for reference/display). Group access is granted
-  // by distinguishedName — the id ADAPI reports in a user's memberOf.
   objectGUID: string;
 }
 

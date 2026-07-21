@@ -1,8 +1,3 @@
-"""The project list must surface projects shared with the user via a directory
-group, not only owned and directly-shared ones. Covers the DB helper, the
-endpoint, and role precedence when a project reaches the user by several paths.
-"""
-
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
