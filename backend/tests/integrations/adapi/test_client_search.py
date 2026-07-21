@@ -53,6 +53,14 @@ class TestSearchUsers:
             assert await client.search_users("nobody") == []
 
     @pytest.mark.asyncio
+    async def test_not_found_is_no_results_not_an_error(self):
+        # ADAPI returns 404 when a query matches nothing. That's an empty result
+        # set, not a failure — it must not surface as a directory-unavailable error.
+        client = AdapiClient(base_url="http://adapi.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(404, {"error": "not found"})):
+            assert await client.search_users("ghost") == []
+
+    @pytest.mark.asyncio
     async def test_http_error_raises_adapi_error(self):
         client = AdapiClient(base_url="http://adapi.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(500, {"error": "boom"})), \
@@ -110,6 +118,20 @@ class TestGetUserGroupIds:
             "sAMAccountName": sam,
             "memberOf": member_of,
         }
+
+    @pytest.mark.asyncio
+    async def test_queries_by_exact_mail_only(self):
+        # The auth path must not reuse the fuzzy samAccountName search — it looks the
+        # user up by an exact (mail=…) filter, so the query works regardless of how
+        # ADAPI combines the samAccountName param with customFilter.
+        client = AdapiClient(base_url="http://adapi.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
+            await client.get_user_group_ids("djenkins@corp.local")
+
+        url = mock_get.call_args.args[0]
+        assert url.startswith("/users?customFilter=")
+        assert "samAccountName" not in url
+        assert "mail%3Ddjenkins%40corp.local" in url
 
     @pytest.mark.asyncio
     async def test_returns_member_of_dns_for_exact_match(self):

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { User, Users, Search, UserPlus } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { LoadingDots } from '../ui/loading-dots';
 import { useDebouncedValue } from '../../hooks/useDebounce';
 import { searchAdUsers, searchAdGroups } from '../../services/api';
 import type { AdUser, AdGroup } from '../../types';
@@ -182,7 +183,7 @@ export function AdapiSearch({
         {!hasQuery ? (
           <StateMessage>{t('admin.searchMinChars', 'Type at least 3 characters to search')}</StateMessage>
         ) : isLoading ? (
-          <StateMessage>{t('common.loading', 'Loading...')}</StateMessage>
+          <StateMessage><LoadingDots /></StateMessage>
         ) : error ? (
           <StateMessage tone="error">{t('admin.searchUnavailable', 'Directory search is unavailable')}</StateMessage>
         ) : isEmpty ? (

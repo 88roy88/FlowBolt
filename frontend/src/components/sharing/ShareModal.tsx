@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2, Crown, User, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
+import { LoadingDots } from '../ui/loading-dots';
 import { AdapiSearch } from '../admin/AdapiSearch';
 import type { AssignableRole, ProjectMember, ProjectGroupGrant } from '../../types';
 import * as api from '../../services/api';
@@ -185,7 +186,7 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
         {/* min-h-0 lets this scroll within the dialog's max-height instead of overflowing. */}
         <div className="border-t border-border mt-3 pt-3 flex-auto min-h-0 overflow-auto space-y-1">
           {loading ? (
-            <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>
+            <p className="text-muted-foreground text-xs text-center py-4"><LoadingDots /></p>
           ) : isEmpty ? (
             <p className="text-muted-foreground text-xs text-center py-4">{t('sharing.noMembers', 'No members yet')}</p>
           ) : (

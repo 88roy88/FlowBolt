@@ -6,6 +6,11 @@ import type { AdGroup, AdUser } from "./types";
 
 const PORT = Number(process.env.MOCK_PORT) || 6666;
 
+// Artificial latency so local dev exercises the UI's loading states — real ADAPI
+// is noticeably slow. Override with MOCK_DELAY_MS=0 to disable.
+const DELAY_MS = process.env.MOCK_DELAY_MS !== undefined ? Number(process.env.MOCK_DELAY_MS) : 2000;
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const usersFile = fileURLToPath(
   new URL("./mock-data/users.json", import.meta.url),
 );
@@ -25,15 +30,25 @@ const [users, groups] = await Promise.all([
 ]);
 
 /**
- * The backend queries with `?samAccountName=*term*&customFilter=(|(displayName=*term*)
- * (mail=*term*))`. All three carry the same wildcard-wrapped term, so we recover
- * it from `samAccountName` and match it (case-insensitively) as a substring
- * against `sAMAccountName`, `displayName` and `mail` — mirroring the OR that real
- * ADAPI applies. An empty/missing filter returns every record.
+ * The share/admin free-text search queries with `?samAccountName=*term*&customFilter=
+ * (|(displayName=*term*) (mail=*term*))`. All three carry the same wildcard-wrapped
+ * term, so we recover it from `samAccountName` and match it (case-insensitively) as a
+ * substring against `sAMAccountName`, `displayName` and `mail` — mirroring the OR that
+ * real ADAPI applies. An empty/missing filter returns every record.
  */
 function searchTerm(samAccountName?: string): string {
   // Strip the surrounding LDAP `*` wildcards the backend adds.
   return (samAccountName ?? "").replace(/^\*|\*$/g, "").toLowerCase();
+}
+
+/**
+ * The auth path resolves a single user's groups with an exact `?customFilter=(mail=email)`
+ * lookup (no `samAccountName` param). Pull the value of an `attr=value` clause out of a
+ * customFilter, case-folded, or undefined if absent.
+ */
+function filterValue(customFilter: string | undefined, attr: string): string | undefined {
+  const match = customFilter?.match(new RegExp(`${attr}=([^()*]+)`, "i"));
+  return match ? match[1].toLowerCase() : undefined;
 }
 
 function matchesTerm(
@@ -86,16 +101,25 @@ await server.register(cors);
 server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
   "/users",
   async (request) => {
-    const term = searchTerm(request.query.samAccountName);
-    return users
-      .filter((u) => matchesTerm(u, term))
-      .map((u) => ({ ...u, memberOf: resolveUserGroupDns(u, groups) }));
+    await delay(DELAY_MS);
+    const { samAccountName, customFilter } = request.query;
+    // Auth path: an exact `(mail=…)` lookup with no `samAccountName` param — mirror
+    // how the backend resolves a single user's groups. Otherwise fall back to the
+    // free-text substring OR used by the share/admin UI.
+    const mail =
+      samAccountName === undefined ? filterValue(customFilter, "mail") : undefined;
+    const filtered =
+      mail !== undefined
+        ? users.filter((u) => u.mail.toLowerCase() === mail)
+        : users.filter((u) => matchesTerm(u, searchTerm(samAccountName)));
+    return filtered.map((u) => ({ ...u, memberOf: resolveUserGroupDns(u, groups) }));
   },
 );
 
 server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
   "/groups",
   async (request) => {
+    await delay(DELAY_MS);
     const term = searchTerm(request.query.samAccountName);
     return groups.filter((g) => matchesTerm(g, term));
   },
