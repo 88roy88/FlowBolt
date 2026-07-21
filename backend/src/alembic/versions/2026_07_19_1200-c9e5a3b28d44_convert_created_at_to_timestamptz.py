@@ -1,4 +1,4 @@
-"""convert created_at to timestamptz for the group tables
+"""convert created_at to timestamptz for the user/group tables
 
 Revision ID: c9e5a3b28d44
 Revises: b8d4f2a19c33
@@ -11,9 +11,10 @@ because their SQLModel field was annotated ``str``. This converts each to a real
 agent_events conversion (f550c1c17fde). Existing string values are cast via
 ``created_at::timestamptz``.
 
-The pre-existing platform_users and project_members tables (created by the RBAC
-work, not this branch) are intentionally left as VARCHAR — we don't convert
-columns this branch didn't introduce.
+The platform_users and project_members tables (created by the RBAC work as
+VARCHAR) are converted here too: this branch switched their SQLModel fields to
+``datetime``/``DateTime(timezone=True)``, so their storage type must follow to
+keep the models and schema in sync.
 
 """
 from typing import Sequence, Union
@@ -32,6 +33,8 @@ depends_on: Union[str, Sequence[str], None] = None
 _TABLES = (
     'project_member_groups',
     'platform_user_groups',
+    'platform_users',
+    'project_members',
 )
 
 

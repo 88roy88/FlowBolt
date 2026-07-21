@@ -1,6 +1,6 @@
 """Tests for get_user_id, decode_token, and TokenPayload.
 
-A valid signed JWT carrying a ``/UniqueID`` claim is always required — there is no
+A valid signed JWT carrying an ``/emailaddress`` claim is always required — there is no
 anonymous or opaque-token fallback. Tokens are signed/verified with RS256 (as in
 production) using a keypair generated for the test session.
 """
@@ -41,8 +41,11 @@ def _gen_keypair() -> tuple[str, str]:
 PRIVATE_KEY, PUBLIC_KEY = _gen_keypair()
 WRONG_PRIVATE_KEY, _ = _gen_keypair()
 
-# Claim key must end with ``/UniqueID`` (case-sensitive).
+# Claim keys are matched by URL suffix (case-sensitive). ``get_user_id`` resolves
+# identity from the ``/emailaddress`` claim; ``/UniqueID`` still surfaces on the
+# payload as ``unique_id``.
 CLAIM_PREFIX = "https://issuer.example/v1/claims/"
+CLAIM_EMAIL_URL = CLAIM_PREFIX + "emailaddress"
 CLAIM_UNIQUE_ID_URL = CLAIM_PREFIX + "UniqueID"
 
 
@@ -77,21 +80,21 @@ class TestNoToken:
 
 
 class TestJwt:
-    def test_url_unique_id_claim_returned(self):
-        token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-123"})
-        assert get_user_id(token) == "user-123"
+    def test_url_email_claim_returned(self):
+        token = _make_jwt({CLAIM_EMAIL_URL: "user-123@corp.local"})
+        assert get_user_id(token) == "user-123@corp.local"
 
     def test_first_matching_url_claim_wins(self):
         token = _make_jwt(
             {
-                "https://other.example/claims/UniqueID": "first",
-                CLAIM_UNIQUE_ID_URL: "second",
+                "https://other.example/claims/emailaddress": "first@corp.local",
+                CLAIM_EMAIL_URL: "second@corp.local",
             }
         )
-        assert get_user_id(token) == "first"
+        assert get_user_id(token) == "first@corp.local"
 
-    def test_no_unique_id_claim_rejected(self):
-        """Signed, unexpired token without a UniqueID claim → 401 missing identification."""
+    def test_no_email_claim_rejected(self):
+        """Signed, unexpired token without an emailaddress claim → 401 missing identification."""
         token = _make_jwt({"sub": "ignored", "role": "admin"})
         with pytest.raises(HTTPException) as exc:
             get_user_id(token)
@@ -106,8 +109,8 @@ class TestJwt:
         assert "invalid or expired" in exc.value.detail.lower()
 
     def test_unexpired_token_accepted(self):
-        token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-y"})
-        assert get_user_id(token) == "user-y"
+        token = _make_jwt({CLAIM_EMAIL_URL: "user-y@corp.local"})
+        assert get_user_id(token) == "user-y@corp.local"
 
     def test_malformed_token_rejected(self):
         # Exactly two dots; payload segment decodes to non-JSON bytes.

@@ -127,18 +127,19 @@ class TestGetUserGroupIds:
     @pytest.mark.asyncio
     async def test_returns_member_of_dns_for_exact_match(self):
         dns = ["CN=Legal,OU=Groups,DC=corp", "CN=Engineering,OU=Groups,DC=corp"]
-        # A substring search can return several users; only the exact sAMAccountName counts.
+        # A substring search can return several users; only the exact mail counts.
         payload = [self._user("djenkins", dns), self._user("djenkinson", ["CN=Other,OU=Groups,DC=corp"])]
         client = AdapiClient(base_url="http://adapi.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
-            assert await client.get_user_group_ids("djenkins") == set(dns)
+            assert await client.get_user_group_ids("djenkins@corp.local") == set(dns)
 
     @pytest.mark.asyncio
     async def test_match_is_case_insensitive(self):
         client = AdapiClient(base_url="http://adapi.local")
+        # Stored mail is DJenkins@corp.local; query with a different case must still match.
         payload = [self._user("DJenkins", ["CN=Legal,OU=Groups,DC=corp"])]
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
-            assert await client.get_user_group_ids("djenkins") == {"CN=Legal,OU=Groups,DC=corp"}
+            assert await client.get_user_group_ids("djenkins@corp.local") == {"CN=Legal,OU=Groups,DC=corp"}
 
     @pytest.mark.asyncio
     async def test_no_exact_match_returns_empty_set(self):
@@ -146,13 +147,13 @@ class TestGetUserGroupIds:
         # A substring hit that is not the requested account must not leak its groups.
         payload = [self._user("djenkinson", ["CN=Legal,OU=Groups,DC=corp"])]
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
-            assert await client.get_user_group_ids("djenkins") == set()
+            assert await client.get_user_group_ids("djenkins@corp.local") == set()
 
     @pytest.mark.asyncio
     async def test_user_without_groups_returns_empty_set(self):
         client = AdapiClient(base_url="http://adapi.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, [self._user("djenkins", [])])):
-            assert await client.get_user_group_ids("djenkins") == set()
+            assert await client.get_user_group_ids("djenkins@corp.local") == set()
 
     @pytest.mark.asyncio
     async def test_adapi_failure_soft_fails_to_empty_set(self):
