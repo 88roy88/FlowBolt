@@ -1,14 +1,14 @@
 import logging
 from pathlib import PurePosixPath
-from typing import Any
 
 from opik import track
+from pydantic_ai.messages import ModelMessage
 
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
-from flow44.ai.core.messages import Message
+from flow44.ai.core.msg import user_msg
 from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import stream_chat
 from flow44.ai.file_safety import format_rejection_feedback, screen_generated_files
@@ -131,10 +131,9 @@ class FixErrorAgent(ChatAgent):
 
         try:
             async for chunk in stream_chat(
-                [Message.user("Fix the error.")],
+                [user_msg("Fix the error.")],
                 prompt,
-                model=state.model,
-                metadata=state.llm_metadata_fn("fix_error_direct"),
+                model_name=state.model,
             ):
                 full_text.append(chunk)
                 parser.feed(chunk)
@@ -227,8 +226,8 @@ class FixErrorAgent(ChatAgent):
         )
 
         prompt = render_feedback(files=dict(state.generated_files))
-        messages: list[dict[str, Any] | Message] = [
-            Message.user(format_agent_feedback(state.validation_errors, state.rejected_files))
+        messages: list[ModelMessage] = [
+            user_msg(format_agent_feedback(state.validation_errors, state.rejected_files))
         ]
 
         generated: list[tuple[str, str]] = []
@@ -238,8 +237,7 @@ class FixErrorAgent(ChatAgent):
             async for chunk in stream_chat(
                 messages,
                 prompt,
-                model=state.model,
-                metadata=state.llm_metadata_fn("fix_error_retry"),
+                model_name=state.model,
             ):
                 parser.feed(chunk)
             parser.flush()

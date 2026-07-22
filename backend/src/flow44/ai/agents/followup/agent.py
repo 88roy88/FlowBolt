@@ -4,13 +4,21 @@ import uuid
 from typing import Any
 
 from opik import track
-from pydantic import BaseModel
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    ToolCallPart,
+    ToolReturnPart,
+)
 
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.agents.followup.prompts import render_followup
-from flow44.ai.core.messages import Message
+from flow44.ai.core.msg import assistant_msg, user_msg
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
@@ -25,6 +33,41 @@ MAX_READ_LINES = 1000
 
 def _format_file_safety_error(exc: FileSafetyError) -> str:
     return f"Generated app contract violation: {exc}\nPick an editable app source file."
+
+
+def _deserialize_raw_message(raw: Any) -> list[ModelMessage]:
+    if isinstance(raw, str):
+        try:
+            return ModelMessagesTypeAdapter.validate_json(raw)
+        except Exception:
+            pass
+
+    if isinstance(raw, dict):
+        role = raw.get("role")
+        if role == "assistant":
+            parts = []
+            if raw.get("content"):
+                parts.append(TextPart(content=raw["content"]))
+            for tc in raw.get("tool_calls") or []:
+                func = tc.get("function", {})
+                args = func.get("arguments", "{}")
+                parts.append(ToolCallPart(
+                    tool_name=func.get("name", "unknown"),
+                    args=json.loads(args) if isinstance(args, str) else args,
+                    tool_call_id=tc.get("id", ""),
+                ))
+            if parts:
+                return [ModelResponse(parts=parts)]
+        elif role == "tool":
+            return [ModelRequest(parts=[
+                ToolReturnPart(
+                    tool_name="tool",
+                    content=raw.get("content", ""),
+                    tool_call_id=raw.get("tool_call_id", ""),
+                )
+            ])]
+
+    return []
 
 
 class FollowUpAgent(ChatAgent):
@@ -182,13 +225,12 @@ class FollowUpAgent(ChatAgent):
             existing_data_source_contexts=existing_data_source_contexts or None,
         )
 
-        react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
+        react_flow = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
         answer = await react_flow.react_loop(
             messages=messages,
             system_prompt=system_prompt,
             tools=self._executor,
-            model=self.model,
-            metadata_fn=lambda step, **kwargs: self._llm_metadata(f"followup-{step}", **kwargs),
+            model_name=self.model,
             emit_fn=self._emit_react_step,
         )
 
@@ -211,7 +253,6 @@ class FollowUpAgent(ChatAgent):
             user_content,
             self._data_source_authorization,
             self.model,
-            self._llm_metadata,
         )
         await self._write_data_source_module(ctx)
         return ctx
@@ -223,30 +264,31 @@ class FollowUpAgent(ChatAgent):
         for path, content in files.items():
             await self._write_file_and_emit_diff(self._diffs, path, content)
 
-    def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
-        messages: list[dict[str, Any] | Message] = []
+    def _history_to_messages(self, history: list[ChatMessage]) -> list[ModelMessage]:
+        messages: list[ModelMessage] = []
         pending_legacy = False
 
         for m in history:
             if m.role == ChatRole.user:
                 if pending_legacy:
                     messages.append(
-                        Message.assistant("I made several tool calls and iterations. The details have been compacted.")
+                        assistant_msg("I made several tool calls and iterations. The details have been compacted.")
                     )
                     pending_legacy = False
-                messages.append(Message.user(m.content))
+                messages.append(user_msg(m.content))
             elif m.raw_message is not None:
                 pending_legacy = False
-                messages.append(m.raw_message)
+                loaded = _deserialize_raw_message(m.raw_message)
+                messages.extend(loaded)
             elif m.role == ChatRole.assistant and m.content.strip():
                 pending_legacy = False
-                messages.append(Message.assistant(m.content))
+                messages.append(assistant_msg(m.content))
             else:
                 pending_legacy = True
 
         if pending_legacy:
             messages.append(
-                Message.assistant("I made several tool calls and iterations. The details have been compacted.")
+                assistant_msg("I made several tool calls and iterations. The details have been compacted.")
             )
 
         return messages
@@ -288,7 +330,7 @@ class FollowUpAgent(ChatAgent):
                 {
                     "id": str(uuid.uuid4()),
                     "type": "assistant_turn",
-                    "raw_message": event["raw_message"],
+                    "response": event["response"],
                     "iteration": self._iteration,
                 }
             )
@@ -311,7 +353,7 @@ class FollowUpAgent(ChatAgent):
                         "result_preview": event.get("result_preview", ""),
                         "short_preview": event.get("short_preview", ""),
                         "iteration": self._iteration,
-                        "raw_message": event["raw_message"],
+                        "tool_return": event.get("tool_return"),
                     }
                 )
             await self.emit({"type": "followup_step", **step_data})

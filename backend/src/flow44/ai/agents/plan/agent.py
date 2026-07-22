@@ -14,7 +14,7 @@ from flow44.ai.agents.plan.prompts import (
     render_user_plan,
 )
 from flow44.ai.core.flow import Flow
-from flow44.ai.core.messages import Message
+from flow44.ai.core.msg import user_msg
 from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
@@ -92,7 +92,6 @@ class PlanAgent(BaseAgent):
                         self._state.user_content,
                         self._data_source_authorization,
                         self.model,
-                        self._llm_metadata,
                     )
                     for sid in state.build_state.data_source_ids
                 ]
@@ -196,10 +195,9 @@ class PlanAgent(BaseAgent):
             indent=2,
         )
         raw = await complete_chat(
-            [Message.user(plan_input)],
+            [user_msg(plan_input)],
             render_user_plan(has_feedback=True),
-            model=self.model,
-            metadata=self._llm_metadata("rebuild_user_plan"),
+            model_name=self.model,
         )
         self._state.user_overview = UserPlanOverview.model_validate(parse_json_response(raw))
 
@@ -217,10 +215,9 @@ class PlanAgent(BaseAgent):
         prompt = render_architecture(data_source_contexts=self._state.data_source_contexts or None)
         try:
             raw = await complete_chat(
-                [Message.user(self._state.user_content)],
+                [user_msg(self._state.user_content)],
                 prompt,
-                model=self.model,
-                metadata=self._llm_metadata("design_architecture"),
+                model_name=self.model,
             )
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "complete"})
             return ArchitectureDesign.model_validate(parse_json_response(raw))
@@ -234,10 +231,9 @@ class PlanAgent(BaseAgent):
     async def _design_ux(self) -> UXDesign:
         try:
             raw = await complete_chat(
-                [Message.user(self._state.user_content)],
+                [user_msg(self._state.user_content)],
                 UX_DESIGN_PROMPT,
-                model=self.model,
-                metadata=self._llm_metadata("design_ux"),
+                model_name=self.model,
             )
             await self.emit({"type": "design_progress", "stream": "ux", "content": "complete"})
             return UXDesign.model_validate(parse_json_response(raw))
@@ -258,9 +254,8 @@ class PlanAgent(BaseAgent):
             indent=2,
         )
         raw = await complete_chat(
-            [Message.user(plan_input)],
+            [user_msg(plan_input)],
             render_user_plan(has_feedback=False),
-            model=self.model,
-            metadata=self._llm_metadata("build_user_plan"),
+            model_name=self.model,
         )
         return UserPlanOverview.model_validate(parse_json_response(raw))

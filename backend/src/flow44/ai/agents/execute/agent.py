@@ -2,9 +2,9 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
 
 from opik import opik_context, track
+from pydantic_ai.messages import ModelMessage
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
@@ -16,7 +16,7 @@ from flow44.ai.agents.execute.prompts import (
     render_merge,
 )
 from flow44.ai.core.flow import Flow
-from flow44.ai.core.messages import Message
+from flow44.ai.core.msg import user_msg
 from flow44.ai.core.opik_utils import create_span, error_info, record_span_error
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
@@ -201,8 +201,8 @@ class ExecuteAgent(BaseAgent):
         )
 
         prompt = render_feedback(files=state.build_state.completed_files)
-        messages: list[dict[str, Any] | Message] = [
-            Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
+        messages: list[ModelMessage] = [
+            user_msg(format_agent_feedback(state.all_errors, state.rejected_files))
         ]
 
         generated: list[tuple[str, str]] = []
@@ -212,8 +212,7 @@ class ExecuteAgent(BaseAgent):
             async for chunk in stream_chat(
                 messages,
                 prompt,
-                model=state.model,
-                metadata=state.llm_metadata_fn("fix_errors", parent_span_id=state.observation_id),
+                model_name=state.model,
             ):
                 parser.feed(chunk)
             parser.flush()
@@ -253,10 +252,9 @@ class ExecuteAgent(BaseAgent):
                 indent=2,
             )
             raw = await complete_chat(
-                [Message.user(summary_input)],
+                [user_msg(summary_input)],
                 SUMMARY_PROMPT,
-                model=state.model,
-                metadata=state.llm_metadata_fn("generate_summary", parent_span_id=state.observation_id),
+                model_name=state.model,
             )
             summary_data = parse_json_response(raw)
             if summary_data:
@@ -300,10 +298,9 @@ class ExecuteAgent(BaseAgent):
             ]
 
         raw = await complete_chat(
-            [Message.user(json.dumps(merge_data, indent=2))],
+            [user_msg(json.dumps(merge_data, indent=2))],
             render_merge(has_data_sources=bool(state.build_state.data_source_contexts)),
-            model=state.model,
-            metadata=state.llm_metadata_fn("build_technical_plan", parent_span_id=state.observation_id),
+            model_name=state.model,
         )
         plan_data = parse_json_response(raw)
 
@@ -375,10 +372,9 @@ class ExecuteAgent(BaseAgent):
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
             async for chunk in stream_chat(
-                [Message.user("Generate the code.")],
+                [user_msg("Generate the code.")],
                 prompt,
-                model=state.model,
-                metadata=state.llm_metadata_fn(f"execute_task_{task.id}", parent_span_id=span.id),
+                model_name=state.model,
             ):
                 parser.feed(chunk)
             parser.flush()

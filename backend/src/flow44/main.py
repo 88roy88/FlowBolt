@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from flow44.ai.core.opik_utils import flush_opik_traces, setup_opik_tracing
+from flow44.ai.core.opik_utils import flush_opik_traces, setup_tracing
 from flow44.api import (
     admin,
     chat,
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    setup_opik_tracing()
+    setup_tracing()
 
     logger.info("Initialising database...")
     await init_db()

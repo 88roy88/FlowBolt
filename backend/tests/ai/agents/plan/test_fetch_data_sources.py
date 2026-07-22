@@ -68,7 +68,7 @@ class TestFetchAndAnalyze:
         monkeypatch.setattr(ads_module, "complete_chat", _complete_chat)
         monkeypatch.setattr(ads_module, "parse_json_response", lambda _: analysis)
 
-        ctx = await fetch_and_analyze_data_source("42", "", None, None, lambda _: {})
+        ctx = await fetch_and_analyze_data_source("42", "", None, None)
 
         assert ctx.data_source_id == "42"
         assert ctx.data_source_name == "Weather"
@@ -113,7 +113,7 @@ class TestFetchAndAnalyze:
         monkeypatch.setattr(ads_module, "complete_chat", _complete_chat)
         monkeypatch.setattr(ads_module, "parse_json_response", lambda _: analysis)
 
-        ctx = await fetch_and_analyze_data_source("7", "", None, None, lambda _: {})
+        ctx = await fetch_and_analyze_data_source("7", "", None, None)
 
         assert ctx.can_run_without_input is False
         assert ctx.sample_data is None

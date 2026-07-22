@@ -1,6 +1,14 @@
-import json
 import uuid
 from typing import Any
+
+from pydantic_ai.messages import (
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    ToolCallPart,
+    ToolReturnPart,
+)
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.file_diffs import DiffTracker
@@ -15,8 +23,12 @@ class ChatAgent(BaseAgent):
     ) -> None:
         for step in steps:
             if step.get("type") == "assistant_turn":
-                tools_label = ", ".join(tc["function"]["name"] for tc in step["raw_message"].get("tool_calls") or [])
-                await save_message(self.project_id, ChatRole.assistant, tools_label, raw_message=step["raw_message"])
+                response: ModelResponse = step["response"]
+                tool_names = ", ".join(
+                    p.tool_name for p in response.parts if isinstance(p, ToolCallPart)
+                )
+                serialized = ModelMessagesTypeAdapter.dump_json([response]).decode()
+                await save_message(self.project_id, ChatRole.assistant, tool_names, raw_message=serialized)
                 continue
 
             preview = step.get("short_preview") or step.get("result_preview", "")
@@ -24,8 +36,12 @@ class ChatAgent(BaseAgent):
             if len(preview) > 80:
                 result_short += "..."
 
-            if step.get("raw_message") is not None:
-                await save_message(self.project_id, ChatRole.tool, result_short, raw_message=step["raw_message"])
+            if step.get("tool_return") is not None:
+                tool_return: ToolReturnPart = step["tool_return"]
+                serialized = ModelMessagesTypeAdapter.dump_json(
+                    [ModelRequest(parts=[tool_return])]
+                ).decode()
+                await save_message(self.project_id, ChatRole.tool, result_short, raw_message=serialized)
                 continue
 
             # FixErrorAgent's synthetic pseudo-tool step
@@ -35,24 +51,28 @@ class ChatAgent(BaseAgent):
             call_content = f"{tool} on {primary_arg!r}" if primary_arg else tool
 
             tool_call_id = str(uuid.uuid4())
-            call_raw_message = {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [
-                    {
-                        "id": tool_call_id,
-                        "type": "function",
-                        "function": {"name": tool, "arguments": json.dumps(args)},
-                    }
-                ],
-            }
-            result_raw_message = {"role": "tool", "tool_call_id": tool_call_id, "content": result_short}
+            call_response = ModelResponse(parts=[
+                ToolCallPart(tool_name=tool, args=args, tool_call_id=tool_call_id)
+            ])
+            result_request = ModelRequest(parts=[
+                ToolReturnPart(tool_name=tool, content=result_short, tool_call_id=tool_call_id)
+            ])
 
-            await save_message(self.project_id, ChatRole.assistant, call_content, raw_message=call_raw_message)
-            await save_message(self.project_id, ChatRole.tool, result_short, raw_message=result_raw_message)
+            await save_message(
+                self.project_id, ChatRole.assistant, call_content,
+                raw_message=ModelMessagesTypeAdapter.dump_json([call_response]).decode(),
+            )
+            await save_message(
+                self.project_id, ChatRole.tool, result_short,
+                raw_message=ModelMessagesTypeAdapter.dump_json([result_request]).decode(),
+            )
 
         if answer.strip():
-            await save_message(self.project_id, ChatRole.assistant, answer)
+            final = ModelResponse(parts=[TextPart(content=answer)])
+            await save_message(
+                self.project_id, ChatRole.assistant, answer,
+                raw_message=ModelMessagesTypeAdapter.dump_json([final]).decode(),
+            )
 
     async def _write_file_and_emit_diff(self, tracker: DiffTracker, path: str, content: str) -> None:
         try:
