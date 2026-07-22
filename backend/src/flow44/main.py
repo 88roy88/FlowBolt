@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await idle_reaper.stop()
     await heartbeat_reaper.stop()
     await sandbox_manager.suspend_all()
-    await flush_opik_traces()
+    flush_opik_traces()
     logger.info("Shutdown complete.")
 
 

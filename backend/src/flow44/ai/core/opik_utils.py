@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import traceback as traceback_module
 from datetime import datetime
@@ -136,8 +135,8 @@ def setup_opik_tracing() -> None:
     logger.info("Opik tracing enabled")
 
 
-async def flush_opik_traces() -> None:
+def flush_opik_traces() -> None:
     if not settings.OPIK_API_KEY:
         return
-    await asyncio.to_thread(opik.flush_tracker)
+    opik.flush_tracker()
     logger.info("Opik traces flushed.")
