@@ -41,15 +41,14 @@ class ToolSchema:
         self.description = description
         self.input_schema = input_schema
 
-    def to_litellm_dict(self) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.input_schema,
-            },
-        }
+    def to_tool_definition(self) -> Any:
+        from pydantic_ai.tools import ToolDefinition
+
+        return ToolDefinition(
+            name=self.name,
+            description=self.description,
+            parameters_json_schema=self.input_schema,
+        )
 
 
 class Tool(ABC):
@@ -156,8 +155,8 @@ class ToolExecutor:
     def __init__(self, tools: Sequence[Tool]) -> None:
         self._tools = {t.schema.name: t for t in tools}
 
-    def get_schemas(self) -> list[dict[str, Any]]:
-        return [t.schema.to_litellm_dict() for t in self._tools.values()]
+    def get_tool_definitions(self) -> list[Any]:
+        return [t.schema.to_tool_definition() for t in self._tools.values()]
 
     async def execute(self, tool_name: str, tool_use_id: str | None = None, **kwargs: Any) -> ToolResult:
         t = self._tools.get(tool_name)

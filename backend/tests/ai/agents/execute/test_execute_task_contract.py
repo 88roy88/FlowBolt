@@ -125,7 +125,7 @@ async def test_step_fix_errors_delivers_rejection_notes_as_message(monkeypatch: 
 
     assert len(captured) == 1
     assert len(captured[0]) == 1
-    message = captured[0][0].content
+    message = captured[0][0].parts[0].content
     assert "boom" in message
     assert "Changes that could not be applied" in message
     assert "rejected" in message
@@ -156,7 +156,7 @@ async def test_step_fix_errors_sends_single_message_without_notes(monkeypatch: p
 
     assert len(captured) == 1
     assert len(captured[0]) == 1
-    message = captured[0][0].content
+    message = captured[0][0].parts[0].content
     assert "## Build errors" in message
     assert "boom" in message
     assert "Changes that could not be applied" not in message
@@ -199,7 +199,7 @@ async def test_step_fix_errors_rejection_only_composes_single_message(monkeypatc
 
     assert len(captured) == 1
     assert len(captured[0]) == 1
-    message = captured[0][0].content
+    message = captured[0][0].parts[0].content
     assert "## Build errors" not in message
     assert "Changes that could not be applied" in message
     assert "rejected" in message

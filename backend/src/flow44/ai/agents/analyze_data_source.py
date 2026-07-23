@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +9,7 @@ from jinja2 import Environment, FileSystemLoader
 from flow44.ai.agents.plan.prompts import render_data_source_analysis
 from flow44.ai.codegen.data_source_module import generate_data_source_module
 from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
-from flow44.ai.core.messages import Message
+from flow44.ai.core.msg import user_msg
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.db.project_data_source import DataSourceContext
@@ -31,7 +30,6 @@ async def fetch_and_analyze_data_source(
     user_content: str,
     authorization: str | None,
     model: str | None,
-    llm_metadata_fn: Callable[[str], dict[str, Any]],
 ) -> DataSourceContext:
     ds_name, usage = await asyncio.gather(
         ds_logic.get_display_name(data_source_id, authorization=authorization),
@@ -47,10 +45,9 @@ async def fetch_and_analyze_data_source(
     )
     try:
         raw = await complete_chat(
-            [Message.user("Analyze this data source.")],
+            [user_msg("Analyze this data source.")],
             prompt,
-            model=model,
-            metadata=llm_metadata_fn("data_source_analysis"),
+            model_name=model,
         )
         analysis: dict[str, Any] = parse_json_response(raw)
     except Exception:
@@ -101,7 +98,6 @@ _TYPE_PLACEHOLDERS = {bool: "<bool>", int: "<int>", float: "<number>"}
 
 
 def _redact_sample_data(sample: dict[str, Any] | None) -> str | None:
-    """Redact actual values from sample data, preserving structure and types."""
     if sample is None:
         return None
 
