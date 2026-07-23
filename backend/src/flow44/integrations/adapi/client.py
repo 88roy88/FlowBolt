@@ -60,8 +60,8 @@ class AdapiClient:
             return set()
         return {dn for dn in match.member_of if dn}
 
-    async def search_users(self, query: str) -> list[AdUser]:
-        return await self._search_users(self._fuzzy_params(query))
+    async def search_users(self, accountOrEmailOrName: str) -> list[AdUser]:
+        return await self._search_users(self._fuzzy_params(accountOrEmailOrName))
 
     async def _search_users(self, params: dict[str, str]) -> list[AdUser]:
         return [AdUser.model_validate(r) for r in await self._search("/users", params)]

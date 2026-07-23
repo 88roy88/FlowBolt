@@ -206,10 +206,6 @@ def require_permission(permission: Permission) -> Any:
 
 
 async def _is_platform_group_member(user_id: str) -> bool:
-    # Fetch the (small) set of granted group DNs and intersect in memory against
-    # the user's ADAPI groups, rather than pushing the user's groups into a DB
-    # query: a user can be in hundreds of groups, so that would be heavier. Revisit
-    # only if the number of *granted* groups grows large.
     group_ids = await platform_group_ids()
     if not group_ids:
         return False
