@@ -1,51 +1,29 @@
 import logging
-import re
-from enum import StrEnum
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import Permission, ProjectDep, require_permission
-from flow44.db.project import is_handle_taken, update_project_published_url
-from flow44.integrations.s3 import s3_storage
-from flow44.sandbox.operations import BuildError, build_single_html
+from flow44.sandbox.operations import BuildError
+from flow44.services.publish_service import SlugStatus, publish_project, resolve_slug_status
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/export/{project_id}", tags=["publish"])
-
-# Authoritative slug rule — mirrored by SLUG_RE in frontend stores/publish.ts.
-_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$")
 
 
 class PublishRequest(BaseModel):
     slug: str | None = None
 
 
-class SlugStatus(StrEnum):
-    available = "available"
-    invalid = "invalid"
-    taken = "taken"
-
-
-async def _slug_status(slug: str, project_id: str) -> SlugStatus:
-    """Single source of truth for whether a slug may be used by this project."""
-    if not _SLUG_RE.match(slug):
-        return SlugStatus.invalid
-    if await is_handle_taken(slug, exclude_project_id=project_id):
-        return SlugStatus.taken
-    return SlugStatus.available
-
-
 @router.get("/slug/check")
 async def check_slug(project_id: str, slug: str = Query(...)) -> dict[str, bool]:
-    """Return whether a slug is available for this project."""
-    return {"available": await _slug_status(slug, project_id) == SlugStatus.available}
+    return {"available": await resolve_slug_status(slug, project_id) == SlugStatus.available}
 
 
 async def _validate_slug(slug: str, project_id: str) -> None:
-    status = await _slug_status(slug, project_id)
+    status = await resolve_slug_status(slug, project_id)
     if status == SlugStatus.invalid:
         raise HTTPException(
             status_code=400,
@@ -64,36 +42,22 @@ async def publish_to_s3(
     body: PublishRequest = PublishRequest(),
     _perms: set[Permission] = require_permission(Permission.publish),
 ) -> dict[str, str]:
-    """Build the project and deploy to S3, returning the public URL."""
-
     slug = body.slug or None
     if slug:
         await _validate_slug(slug, project.id)
 
-    # Build a single HTML string containing the entire app with inline assets
     try:
-        html_content = await build_single_html(project.id)
+        handle = await publish_project(project.id, slug)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except BuildError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    try:
-        await s3_storage.deploy_single_html(html_content, project.id)
-    except Exception as exc:
-        logger.exception("S3 deployment failed for project %s", project.id)
-        raise HTTPException(status_code=502, detail=f"S3 deployment failed: {exc}") from exc
-
-    handle = slug or project.id
-    try:
-        await update_project_published_url(project.id, handle)
     except IntegrityError as exc:
-        logger.warning("Handle collision for project %s with handle %s: %s", project.id, handle, exc)
-        raise HTTPException(
-            status_code=409, detail=f"The handle '{handle}' was just claimed by another project."
-        ) from exc
+        logger.warning("Handle collision for project %s: %s", project.id, exc)
+        raise HTTPException(status_code=409, detail=f"The handle '{slug or project.id}' was just claimed.") from exc
+    except Exception as exc:
+        logger.exception("Publish failed for project %s", project.id)
+        raise HTTPException(status_code=502, detail=f"Publish failed: {exc}") from exc
 
-    public_path = f"/shared/{handle}"
-    logger.info("Published project %s (handle: %s, public: %s)", project.id, handle, public_path)
-
-    return {"url": public_path, "handle": handle}
+    logger.info("Published project %s (handle: %s)", project.id, handle)
+    return {"url": f"/shared/{handle}", "handle": handle}

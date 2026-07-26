@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import zipfile
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -19,6 +20,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/export/{project_id}", tags=["export"])
 
 EXCLUDED_DIRS = {"node_modules", ".git", "dist", ".cache"}
+
+
+def _download_as(filename: str) -> str:
+    ascii_fallback = re.sub(r"[^A-Za-z0-9\-. ]", "_", filename).strip("_ ")
+    if not ascii_fallback or ascii_fallback.startswith("."):
+        ascii_fallback = f"export{ascii_fallback}"
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
 
 @router.get("/zip")
@@ -45,11 +53,10 @@ async def export_zip(project: ProjectDep, sandbox: SandboxDep) -> Response:
 
     content = buf.getvalue()
 
-    safe_name = re.sub(r"[^\w\-. ]", "_", project_name)
     return Response(
         content=content,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
+        headers={"Content-Disposition": _download_as(f"{project_name}.zip")},
     )
 
 
@@ -63,11 +70,8 @@ async def export_html(project: ProjectDep) -> Response:
     except BuildError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    project_name = project.name
-    safe_name = re.sub(r"[^\w\-. ]", "_", project_name)
-
     return Response(
         content=html,
         media_type="text/html",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.html"'},
+        headers={"Content-Disposition": _download_as(f"{project.name}.html")},
     )
