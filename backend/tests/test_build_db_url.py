@@ -7,7 +7,7 @@ from flow44.db.database import build_db_url
 
 
 class TestBuildDbUrlPostgres:
-    def test_postgres_async_with_db_name(self) -> None:
+    def test_postgres_with_db_name(self) -> None:
         config = Settings(
             DB_NAME="testdb",
             DB_USER="user",
@@ -15,19 +15,8 @@ class TestBuildDbUrlPostgres:
             DB_HOST="localhost",
             DB_PORT=5432,
         )
-        result = build_db_url(config, async_db=True)
+        result = build_db_url(config)
         assert result == "postgresql+asyncpg://user:pass@localhost:5432/testdb"
-
-    def test_postgres_sync_with_db_name(self) -> None:
-        config = Settings(
-            DB_NAME="testdb",
-            DB_USER="user",
-            DB_PASSWORD="pass",
-            DB_HOST="localhost",
-            DB_PORT=5432,
-        )
-        result = build_db_url(config, async_db=False)
-        assert result == "postgresql://user:pass@localhost:5432/testdb"
 
     def test_postgres_without_db_name(self) -> None:
         config = Settings(
@@ -37,7 +26,7 @@ class TestBuildDbUrlPostgres:
             DB_HOST="localhost",
             DB_PORT=5432,
         )
-        result = build_db_url(config, async_db=True)
+        result = build_db_url(config)
         assert result == "postgresql+asyncpg://user:pass@localhost:5432"
 
     def test_postgres_custom_port(self) -> None:
@@ -48,7 +37,7 @@ class TestBuildDbUrlPostgres:
             DB_HOST="db.example.com",
             DB_PORT=5433,
         )
-        result = build_db_url(config, async_db=True)
+        result = build_db_url(config)
         assert result == "postgresql+asyncpg://user:pass@db.example.com:5433/testdb"
 
     def test_postgres_special_chars_in_password(self) -> None:
@@ -59,5 +48,5 @@ class TestBuildDbUrlPostgres:
             DB_HOST="localhost",
             DB_PORT=5432,
         )
-        result = build_db_url(config, async_db=True)
+        result = build_db_url(config)
         assert result == "postgresql+asyncpg://user:p@ss:word!@localhost:5432/testdb"

@@ -6,10 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 import flow44.config
 
 
-def build_db_url(config: flow44.config.Settings, async_db: bool) -> str:
+def build_db_url(config: flow44.config.Settings) -> str:
     """Builds a Postgres database URL string from components."""
-    db_adapter = "postgresql+asyncpg" if async_db else "postgresql"
-    url = f"{db_adapter}://{config.DB_USER}:{config.DB_PASSWORD}@{config.DB_HOST}:{config.DB_PORT}"
+    url = f"postgresql+asyncpg://{config.DB_USER}:{config.DB_PASSWORD}@{config.DB_HOST}:{config.DB_PORT}"
     if config.DB_NAME:
         url += f"/{config.DB_NAME}"
     return url
@@ -17,7 +16,7 @@ def build_db_url(config: flow44.config.Settings, async_db: bool) -> str:
 
 def _get_async_url() -> str:
     """Provides the asynchronous database connection string for engines."""
-    return build_db_url(flow44.config.settings, async_db=True)
+    return build_db_url(flow44.config.settings)
 
 
 @functools.lru_cache

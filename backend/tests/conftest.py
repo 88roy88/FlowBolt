@@ -23,7 +23,7 @@ from flow44.main import app  # noqa: E402
 def get_engine(url: str | None = None) -> AsyncEngine:
     # asyncpg connections can't be reused across pytest's per-test event loops,
     # so tests use NullPool instead of the production QueuePool.
-    async_url = url or build_db_url(flow44.config.settings, async_db=True)
+    async_url = url or build_db_url(flow44.config.settings)
     return create_async_engine(async_url, echo=False, poolclass=NullPool)
 
 
