@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, delete, func
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Field, SQLModel, col
 
 from flow44.config import settings
@@ -39,7 +39,7 @@ async def _commit(stmt: Any) -> Any:
 async def touch_heartbeat(project_id: str) -> datetime:
     now = datetime.now(UTC)
     await _commit(
-        pg_insert(AgentRunHeartbeat)
+        insert(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
         .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now})
     )
@@ -49,7 +49,7 @@ async def touch_heartbeat(project_id: str) -> datetime:
 async def try_claim_run(project_id: str) -> datetime | None:
     now = datetime.now(UTC)
     stmt = (
-        pg_insert(AgentRunHeartbeat)
+        insert(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
         .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now}, where=_stale())
         .returning(col(AgentRunHeartbeat.project_id))
