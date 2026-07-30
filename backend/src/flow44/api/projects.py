@@ -18,7 +18,7 @@ from flow44.api.deps import (
     is_admin,
     require_permission,
 )
-from flow44.auth.permissions import Role, get_admin_permissions, has_permission
+from flow44.auth.permissions import ADMIN_ROLE, OWNER_ROLE, ROLE_RANK, get_admin_permissions, has_permission
 from flow44.db.project import (
     Project,
     create_project,
@@ -69,22 +69,6 @@ def _serialize_project(project: Project, role: str) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
 
 
-# Display-only role labels for the creator/admin tiers (no Role enum member).
-_OWNER_ROLE = "owner"
-_ADMIN_ROLE = "admin"
-
-# Display precedence when a project reaches a user through several sources; higher
-# wins. Cosmetic only — authorization unions permissions in deps.
-_ROLE_RANK: dict[str, int] = {
-    Role.viewer.value: 1,
-    Role.editor.value: 2,
-    Role.publisher.value: 2,
-    Role.maintainer.value: 3,
-    _ADMIN_ROLE: 4,
-    _OWNER_ROLE: 5,
-}
-
-
 @router.get("/me")
 async def get_current_user(user_id: UserDep) -> dict[str, Any]:
     return {
@@ -103,7 +87,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
         all_projects = await list_all_projects()
         result: list[ProjectResponse] = []
         for p in all_projects:
-            role = _OWNER_ROLE if p.user_id == user_id else _ADMIN_ROLE
+            role = OWNER_ROLE if p.user_id == user_id else ADMIN_ROLE
             result.append(_serialize_project(p, role))
         return result
 
@@ -119,11 +103,11 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
 
     def _merge(project: Project, role: str) -> None:
         existing = by_id.get(project.id)
-        if existing is None or _ROLE_RANK.get(role, 0) > _ROLE_RANK.get(existing[1], 0):
+        if existing is None or ROLE_RANK.get(role, 0) > ROLE_RANK.get(existing[1], 0):
             by_id[project.id] = (project, role)
 
     for p in owned:
-        _merge(p, _OWNER_ROLE)
+        _merge(p, OWNER_ROLE)
     for p, role in shared:
         _merge(p, role.value)
     for p, role in group_shared:
@@ -146,7 +130,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_create())
-    return _serialize_project(project, _OWNER_ROLE)
+    return _serialize_project(project, OWNER_ROLE)
 
 
 @router.patch("/{project_id}/name", status_code=200)

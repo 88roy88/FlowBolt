@@ -159,15 +159,17 @@ async def _resolve_project_permissions(project: Project, user_id: str) -> set[Pe
 # same (project, user) set, so resolving once avoids a second member lookup and
 # ADAPI round-trip. ContextVars are per-task, so this never leaks across requests;
 # the key guards against reuse for a different project/user in the same task.
-_perm_cache: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar("_perm_cache", default=None)
+_perm_cache_per_request: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar(
+    "_perm_cache_per_request", default=None
+)
 
 
 async def resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
-    cached = _perm_cache.get()
+    cached = _perm_cache_per_request.get()
     if cached is not None and cached[0] == (project.id, user_id):
         return cached[1]
     permissions = await _resolve_project_permissions(project, user_id)
-    _perm_cache.set(((project.id, user_id), permissions))
+    _perm_cache_per_request.set(((project.id, user_id), permissions))
     return permissions
 
 
