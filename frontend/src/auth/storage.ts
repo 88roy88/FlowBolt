@@ -26,8 +26,20 @@ function parseStoredCredentials(raw: string): AuthCredentials | null {
   }
 }
 
+const EXPIRY_MARGIN_MS = 5_000;
+
 function isExpired(creds: AuthCredentials): boolean {
-  return creds.exp * 1000 <= Date.now();
+  return creds.exp * 1000 - EXPIRY_MARGIN_MS <= Date.now();
+}
+
+function readOrClearCredentials(): AuthCredentials | null {
+  const creds = credentialsStore.read();
+  if (!creds?.auth_token?.trim()) return null;
+  if (isExpired(creds)) {
+    credentialsStore.clear();
+    return null;
+  }
+  return creds;
 }
 
 export const credentialsStore = {
@@ -75,25 +87,16 @@ export const credentialsStore = {
   },
 
   ensureCookie(): void {
-    if (Cookies.get(authConfig.cookieName)) return;
-    const creds = this.read();
-    if (creds && !isExpired(creds)) setAuthCookie(creds);
+    const creds = readOrClearCredentials();
+    if (creds) setAuthCookie(creds);
   },
 
   getValidToken(): string | undefined {
-    if (typeof window === 'undefined') return undefined;
     try {
-      const creds = this.read();
-      const token = creds?.auth_token?.trim();
-      if (!token) return undefined;
-
-      if (creds && isExpired(creds)) {
-        this.clear();
-        return undefined;
-      }
-
-      this.ensureCookie();
-      return token;
+      const creds = readOrClearCredentials();
+      if (!creds) return undefined;
+      setAuthCookie(creds);
+      return creds.auth_token.trim();
     } catch {
       return undefined;
     }
