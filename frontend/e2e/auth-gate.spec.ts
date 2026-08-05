@@ -113,19 +113,14 @@ test.describe('Auth gate — authenticated state (mock mode)', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText('Sign in to continue')).not.toBeVisible({ timeout: 10_000 });
-    // App shell is up when at least one of its core landmarks appears
-    await expect(
-      page.getByRole('button', { name: /new project/i }).or(page.getByText('Test Model')),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 15_000 });
   });
 
   test('clearing credentials transitions back to sign-in gate', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
     // Wait until app shell is rendered (gate is in ready state)
-    await expect(
-      page.getByRole('button', { name: /new project/i }).or(page.getByText('Test Model')),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 15_000 });
 
     // Simulate token expiry/logout: clear storage and fire the event AuthGate listens for
     await page.evaluate(({ key }: { key: string }) => {
