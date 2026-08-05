@@ -1,4 +1,4 @@
-"""Tests for db/ CRUD operations using real temporary SQLite."""
+"""Tests for db/ CRUD operations using a real temporary Postgres database."""
 
 from __future__ import annotations
 
