@@ -15,9 +15,10 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DataSourceSearchResult[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
+  const messages = useChatStore((s) => s.messages);
   const addDataSource = useChatStore((s) => s.addDataSource);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,16 +26,18 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setShowDropdown(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsDropdownOpen(false);
     };
-    if (showDropdown) {
+    if (isDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showDropdown]);
+  }, [isDropdownOpen]);
 
   useEffect(() => {
-    if (isOpen && inputRef.current) inputRef.current.focus();
+    if (!isOpen) return;
+    inputRef.current?.focus();
+    setIsDropdownOpen(true);
   }, [isOpen]);
 
   const debouncedQuery = useDebouncedValue(query, 300);
@@ -42,14 +45,13 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
   useEffect(() => {
     if (!debouncedQuery.trim()) {
       setResults([]);
-      setShowDropdown(false);
       setIsLoading(false);
       return;
     }
 
     let ignore = false;
     setIsLoading(true);
-    setShowDropdown(true);
+    setIsDropdownOpen(true);
 
     (async () => {
       try {
@@ -63,18 +65,23 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
       }
     })();
 
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [debouncedQuery]);
 
   if (!isOpen) return null;
 
-  const handleSelect = (pkg: DataSourceSearchResult) => {
-    addDataSource({ id: pkg.id, name: pkg.name });
+  const dataSourceHistory = messages.flatMap((m) => m.dataSources ?? []);
+  const uniqueDataSources = dataSourceHistory.filter(
+    (ds, i) => dataSourceHistory.findIndex((d) => d.id === ds.id) === i,
+  );
+  const isShowingSuggestions = !debouncedQuery.trim();
+  const visibleDataSources: DataSourceSearchResult[] = isShowingSuggestions ? uniqueDataSources : results;
+
+  const handleSelect = (dataSource: DataSourceSearchResult) => {
+    addDataSource({ id: dataSource.id, name: dataSource.name });
     setQuery('');
     setResults([]);
-    setShowDropdown(false);
+    setIsDropdownOpen(false);
   };
 
   const selectedIds = new Set(selectedDataSources.map((c) => c.id));
@@ -96,45 +103,47 @@ export function DataSourceSelector({ isOpen }: DataSourceSelectorProps) {
       )}
 
       {/* Search input */}
-      <div className={`flex items-center gap-2 px-3 py-2 bg-background border rounded-lg transition-colors ${showDropdown ? 'border-primary' : 'border-border'}`}>
-        <Search size={14} className={`shrink-0 transition-colors ${showDropdown ? 'text-primary' : 'text-muted-foreground'}`} />
+      <div className={`flex items-center gap-2 px-3 py-2 bg-background border rounded-lg transition-colors ${isDropdownOpen ? 'border-primary' : 'border-border'}`}>
+        <Search size={14} className={`shrink-0 transition-colors ${isDropdownOpen ? 'text-primary' : 'text-muted-foreground'}`} />
         <input
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
+          onFocus={() => setIsDropdownOpen(true)}
           placeholder={t('chat.dataSource.searchPlaceholder')}
           className="flex-1 text-[13px] bg-transparent"
         />
       </div>
 
       {/* Dropdown results */}
-      {showDropdown && (
+      {isDropdownOpen && (isLoading || visibleDataSources.length > 0 || !isShowingSuggestions) && (
         <div className="absolute bottom-full start-0 end-0 mb-1 max-h-60 overflow-y-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-md)] z-[1000]">
           {isLoading ? (
             <div className="p-3 text-center text-[13px] text-muted-foreground">Searching...</div>
-          ) : results.length === 0 ? (
+          ) : visibleDataSources.length === 0 ? (
             <div className="p-3 text-center text-[13px] text-muted-foreground">No data sources found</div>
           ) : (
-            results.map((pkg) => {
-              const alreadySelected = selectedIds.has(pkg.id);
+            visibleDataSources.map((dataSource) => {
+              const alreadySelected = selectedIds.has(dataSource.id);
               return (
                 <button
-                  key={pkg.id}
-                  onClick={() => !alreadySelected && handleSelect(pkg)}
+                  key={dataSource.id}
+                  onClick={() => !alreadySelected && handleSelect(dataSource)}
                   disabled={alreadySelected}
                   className={`w-full px-3 py-2.5 text-left border-b border-border transition-colors ${
                     alreadySelected ? 'opacity-50 cursor-default' : 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--primary)_8%,transparent)]'
                   }`}
                 >
                   <div className="text-[13px] font-medium mb-0.5">
-                    {pkg.name}
+                    {dataSource.name}
                     {alreadySelected && <span className="text-muted-foreground font-normal"> (selected)</span>}
                   </div>
-                  {pkg.description && (
-                    <div className="text-xs text-muted-foreground truncate">{pkg.description}</div>
-                  )}
+                  {isShowingSuggestions ? (
+                    <div className="text-xs text-muted-foreground">{t('chat.dataSource.usedInProject')}</div>
+                  ) : dataSource.description ? (
+                    <div className="text-xs text-muted-foreground truncate">{dataSource.description}</div>
+                  ) : null}
                 </button>
               );
             })
