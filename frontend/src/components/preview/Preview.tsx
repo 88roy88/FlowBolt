@@ -97,7 +97,7 @@ export function Preview() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { credentialsStore.ensureCookie(); window.open(liveUrl, '_blank'); }}
+              onClick={() => window.open(liveUrl, '_blank')}
               title={t('preview.viewPublishedApp')}
             >
               <ExternalLink size={14} className="text-primary/70" />
