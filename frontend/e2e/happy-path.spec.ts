@@ -28,9 +28,9 @@ async function gotoHomeReady(page: import('@playwright/test').Page) {
 /** Wait for projects to load, expand sidebar if collapsed. */
 async function ensureSidebar(page: import('@playwright/test').Page) {
   // Icon rail uses a button with initials; full sidebar uses a non-button row.
-  const rail = page.getByRole('button', { name: 'ET' });
+  const rail = page.getByRole('button', { name: 'ET', exact: true });
   const row = page.getByTestId(`project-item-${MOCK_PROJECT.id}`);
-  await expect(rail.or(row)).toBeVisible({ timeout: 30_000 });
+  await expect(rail.or(row).first()).toBeVisible({ timeout: 30_000 });
   // Expand if collapsed
   const expandBtn = page.getByRole('button', { name: 'Expand sidebar' });
   if (await expandBtn.isVisible()) {
