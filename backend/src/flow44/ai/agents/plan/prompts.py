@@ -35,6 +35,10 @@ def render(template_name: Literal["ux_design.jinja2"]) -> str: ...
 
 
 @overload
+def render(template_name: Literal["interview.jinja2"], *, data_source_contexts: list[dict[str, Any]] | None) -> str: ...
+
+
+@overload
 def render(template_name: Literal["user_plan.jinja2"], *, has_feedback: bool) -> str: ...
 
 
@@ -70,6 +74,11 @@ def render_ux_design() -> str:
 
 def render_user_plan(*, has_feedback: bool = False) -> str:
     return render("user_plan.jinja2", has_feedback=has_feedback)
+
+
+def render_interview(*, data_source_contexts: list[DataSourceContext] | None = None) -> str:
+    prepared = [ctx.to_prompt_context() for ctx in data_source_contexts] if data_source_contexts else None
+    return render("interview.jinja2", data_source_contexts=prepared)
 
 
 def render_data_source_analysis(

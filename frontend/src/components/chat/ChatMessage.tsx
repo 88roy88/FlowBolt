@@ -14,6 +14,7 @@ import {
   ErrorFixRequestCard,
   FixProgressCard,
   FollowUpProgress,
+  InterviewAnsweredCard,
 } from './cards';
 
 interface ChatMessageProps {
@@ -51,6 +52,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
         filesChanged={card.filesChanged}
         diffs={card.diffs}
       />;
+    case 'interview_answered':
+      return <InterviewAnsweredCard questions={card.questions} answers={card.answers} />;
     default:
       return null;
   }

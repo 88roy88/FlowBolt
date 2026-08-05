@@ -3,7 +3,13 @@
 from pydantic import BaseModel, Field
 
 from flow44.ai.agents.execute.models import WorkPlan
-from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
+from flow44.ai.agents.plan.models import (
+    ArchitectureDesign,
+    InterviewAnswer,
+    InterviewQuestion,
+    UserPlanOverview,
+    UXDesign,
+)
 from flow44.db.project_data_source import DataSourceContext
 
 __all__ = ["BuildState"]
@@ -21,6 +27,8 @@ class BuildState(BaseModel):
     architecture: ArchitectureDesign = Field(default_factory=ArchitectureDesign)
     ux_design: UXDesign = Field(default_factory=UXDesign)
     user_plan_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)
+    interview_questions: list[InterviewQuestion] = Field(default_factory=list)
+    interview_answers: list[InterviewAnswer] = Field(default_factory=list)
     work_plan: WorkPlan | None = None
     completed_files: dict[str, str] = Field(default_factory=dict)
     task_files: dict[str, list[str]] = Field(default_factory=dict)

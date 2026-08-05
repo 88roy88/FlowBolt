@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
-import { isAgentAlive, isAwaitingPlanApproval } from '../../stores/chatAgentState';
+import { isAgentAlive, isAwaitingPlanApproval, isAwaitingInterview } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
+import { ModeSelector } from './ModeSelector';
 import { Badge } from '../ui/badge';
 
 import { WRITE_ROLES } from '../../types';
@@ -20,13 +21,14 @@ export function PromptInput() {
   const agentPhase = useChatStore((s) => s.agentPhase);
   const agentAlive = useChatStore(isAgentAlive);
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
+  const awaitingInterview = useChatStore(isAwaitingInterview);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const projectRole = currentProject?.role;
   const canWrite = !projectRole || WRITE_ROLES.has(projectRole);
-  const inputBlocked = agentAlive || awaitingPlan || !canWrite;
+  const inputBlocked = agentAlive || awaitingPlan || awaitingInterview || !canWrite;
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -71,6 +73,7 @@ export function PromptInput() {
     if (!projectId) return t('chat.placeholder.selectProject');
     if (!canWrite) return t('chat.placeholder.readOnly');
     if (awaitingPlan) return t('chat.placeholder.reviewPlan');
+    if (awaitingInterview) return t('chat.placeholder.reviewInterview');
     if (inputBlocked) return t('chat.placeholder.working');
     return t('chat.placeholder.default');
   };
@@ -78,6 +81,7 @@ export function PromptInput() {
 
   const busyLabel =
     agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
+    agentPhase === 'interviewing' ? t('chat.phase.interviewing') :
     agentPhase === 'designing' ? t('chat.phase.designing') :
     agentPhase === 'planning' ? t('chat.phase.planning') :
     agentPhase === 'executing' ? t('chat.phase.building') :
@@ -166,6 +170,7 @@ export function PromptInput() {
           )}
 
           <div className="flex items-center gap-1 ms-auto min-w-0">
+            <ModeSelector />
             <ModelSelector />
           </div>
 

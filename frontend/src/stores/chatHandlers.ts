@@ -228,6 +228,35 @@ export function createSendMessageHandler(
         }
         break;
 
+      case 'interview_questions':
+        set({
+          ...getTransientReset(),
+          interviewQuestions: msg.questions,
+          agentPhase: AGENT_PHASE.awaiting_interview,
+        });
+        if (!_skipMessages) {
+          notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
+        }
+        break;
+
+      case 'interview_answered': {
+        const answeredMsg: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: '',
+          timestamp: getTimestamp(),
+          agentCard: { type: 'interview_answered', questions: msg.questions, answers: msg.answers },
+        };
+        set((s) => ({
+          messages: _skipMessages ? s.messages : [...s.messages, answeredMsg],
+          isStreaming: true,
+          agentAlive: true,
+          agentPhase: AGENT_PHASE.interviewing,
+          interviewQuestions: null,
+        }));
+        break;
+      }
+
       case 'plan_accepted': {
         const acceptedMsg: Message = {
           id: generateId(),

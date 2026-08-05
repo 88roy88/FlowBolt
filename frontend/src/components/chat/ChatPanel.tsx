@@ -8,6 +8,7 @@ import { isAgentAlive } from '../../stores/chatAgentState';
 import { ChatMessage } from './ChatMessage';
 import { PromptInput } from './PromptInput';
 import { WorkPlanView } from './WorkPlanView';
+import { InterviewCard } from './InterviewCard';
 import { TaskProgress } from './TaskProgress';
 import { PhaseIndicator } from './PhaseIndicator';
 import { DesignProgress } from './DesignProgress';
@@ -39,7 +40,7 @@ export function ChatPanel() {
   const { t, i18n } = useTranslation();
   const {
     messages, currentAssistantMessage, actions, error, clearError,
-    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
+    agentPhase, planOverview, interviewQuestions, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
   } = useChatStore();
   const agentActive = useChatStore(isAgentAlive);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -84,12 +85,14 @@ export function ChatPanel() {
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
+  const showInterview = agentPhase === 'awaiting_interview' && interviewQuestions && interviewQuestions.length > 0;
   const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
   const showFixProgress = fixSteps.length > 0 && agentActive;
   const showFollowUpProgress = followUpSteps.length > 0 && agentActive;
-  const showStreamingMessage = agentActive && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
-  const showPhaseIndicator = agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
-  const showTypingDots = agentActive && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
+  const showAgentCard = showDesignProgress || showOverview || showInterview || showTaskProgress || showFixProgress || showFollowUpProgress;
+  const showStreamingMessage = agentActive && currentAssistantMessage && !showAgentCard;
+  const showPhaseIndicator = agentPhase === 'planning' || agentPhase === 'interviewing' || (agentPhase === 'exploring' && followUpSteps.length === 0);
+  const showTypingDots = agentActive && !currentAssistantMessage && !showAgentCard && !showPhaseIndicator;
 
   const dayGroups = groupMessagesByDay(messages);
 
@@ -110,6 +113,7 @@ export function ChatPanel() {
         {showPhaseIndicator && <PhaseIndicator phase={agentPhase} />}
         {showDesignProgress && <DesignProgress designProgress={designProgress} />}
         {showOverview && planOverview && <WorkPlanView overview={planOverview} />}
+        {showInterview && interviewQuestions && <InterviewCard questions={interviewQuestions} />}
         {showTaskProgress && <TaskProgress tasks={executionTasks} />}
         {showFixProgress && <FixProgressCard steps={fixSteps} content={currentAssistantMessage} diffs={fileDiffs} isLive />}
         {showFollowUpProgress && (

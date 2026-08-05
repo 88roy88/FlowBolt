@@ -223,14 +223,13 @@ export function AppShell() {
                 </div>
               </div>
               <p className="text-base text-muted-foreground max-w-md text-center leading-relaxed">
-                Describe what you want to build and the AI will design, plan,
-                and code it for you.
+                {t('app.tagline')}
               </p>
               <div className="w-full">
                 <PromptInput />
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
-                {['A dashboard with charts', 'A todo app with drag & drop', 'A landing page with animations'].map((hint) => (
+                {[t('app.hints.dashboard'), t('app.hints.todo'), t('app.hints.landing')].map((hint) => (
                   <button
                     key={hint}
                     onClick={() => useChatStore.getState().sendMessage(hint)}

@@ -12,10 +12,11 @@ import {
   isAgentAlive,
   isAgentWorking,
   isAwaitingPlanApproval,
+  isAwaitingInterview,
   isHistoryRunComplete,
 } from '../chatAgentState';
 import type { ChatState } from '../chat';
-import type { WSMessage, PlanOverview, ProjectSummary } from '../../types';
+import type { WSMessage, PlanOverview, ProjectSummary, InterviewQuestion } from '../../types';
 
 // Mock external stores — we don't want real file fetches or session lookups
 vi.mock('../files', () => ({
@@ -64,6 +65,8 @@ const INITIAL_STATE: ChatState = {
   agentPhase: 'idle',
   designProgress: { architecture: null, ux: null },
   planOverview: null,
+  interviewQuestions: null,
+  interviewMode: 'interview',
   executionTasks: [],
   error: null,
   buildCompleted: false,
@@ -80,6 +83,8 @@ const INITIAL_STATE: ChatState = {
   sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
   sendFixError: vi.fn() as unknown as ChatState['sendFixError'],
   respondToPlan: vi.fn() as unknown as ChatState['respondToPlan'],
+  respondToInterview: vi.fn() as unknown as ChatState['respondToInterview'],
+  setInterviewMode: vi.fn() as unknown as ChatState['setInterviewMode'],
   addMessage: vi.fn() as unknown as ChatState['addMessage'],
   loadHistory: vi.fn() as unknown as ChatState['loadHistory'],
   clearMessages: vi.fn() as unknown as ChatState['clearMessages'],
@@ -243,6 +248,63 @@ describe('createSendMessageHandler — build flow', () => {
   });
 });
 
+describe('createSendMessageHandler — interview flow', () => {
+  let store: ReturnType<typeof createTestStore>;
+  let handler: (msg: WSMessage) => void;
+
+  const QUESTIONS: InterviewQuestion[] = [
+    {
+      id: 'q-1',
+      header: 'Audience',
+      question: 'Who is this for?',
+      options: [{ label: 'Me', description: 'Personal use' }],
+      multi_select: false,
+    },
+  ];
+
+  beforeEach(() => {
+    store = createTestStore();
+    setReplayMode(false);
+    handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void);
+  });
+
+  it('interview_questions sets phase and stores questions', () => {
+    handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
+    expect(store.state().agentPhase).toBe('awaiting_interview');
+    expect(store.state().interviewQuestions).toEqual(QUESTIONS);
+    expect(store.state().isStreaming).toBe(false);
+  });
+
+  it('interview_answered adds a historical card and resumes planning', () => {
+    handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
+    handler(msg({
+      type: 'interview_answered',
+      questions: QUESTIONS,
+      answers: [{ question_id: 'q-1', values: ['Me'] }],
+    }));
+
+    expect(store.state().interviewQuestions).toBeNull();
+    expect(store.state().agentPhase).toBe('interviewing');
+    const found = store.state().messages.find((m) => m.agentCard?.type === 'interview_answered');
+    expect(found).toBeDefined();
+    const card = found!.agentCard as { type: 'interview_answered'; answers: { values: string[] }[] };
+    expect(card.answers[0].values).toEqual(['Me']);
+  });
+
+  it('interview_questions is replay-safe (no card added, state set)', () => {
+    const replayStore = createTestStore();
+    const replayHandler = createSendMessageHandler(
+      replayStore.set,
+      replayStore.get,
+      vi.fn() as unknown as () => void,
+      { replay: true },
+    );
+    replayHandler(msg({ type: 'interview_questions', questions: QUESTIONS, _ts: '2026-01-15T10:30:00Z' }));
+    expect(replayStore.state().agentPhase).toBe('awaiting_interview');
+    expect(replayStore.state().interviewQuestions).toEqual(QUESTIONS);
+  });
+});
+
 describe('createSendMessageHandler — followup flow', () => {
   let store: ReturnType<typeof createTestStore>;
   let handler: (msg: WSMessage) => void;
@@ -380,6 +442,15 @@ describe('chatAgentState helpers', () => {
     expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: MOCK_PLAN_OVERVIEW })).toBe(true);
     expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: null })).toBe(false);
     expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.planning, planOverview: MOCK_PLAN_OVERVIEW })).toBe(false);
+  });
+
+  it('isAwaitingInterview requires phase and questions', () => {
+    expect(isAwaitingInterview({
+      agentPhase: AGENT_PHASE.awaiting_interview,
+      interviewQuestions: [{ id: 'q-1', header: 'A', question: 'Q?', options: [], multi_select: false }],
+    })).toBe(true);
+    expect(isAwaitingInterview({ agentPhase: AGENT_PHASE.awaiting_interview, interviewQuestions: null })).toBe(false);
+    expect(isAwaitingInterview({ agentPhase: AGENT_PHASE.planning, interviewQuestions: [] })).toBe(false);
   });
 
   it('isAgentAlive uses poll when known and WS while unknown', () => {

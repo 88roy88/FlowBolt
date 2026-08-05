@@ -6,11 +6,19 @@ from opik import track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
-from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
+from flow44.ai.agents.plan.models import (
+    ArchitectureDesign,
+    InterviewAnswer,
+    InterviewQuestion,
+    InterviewQuestionsPayload,
+    UserPlanOverview,
+    UXDesign,
+)
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
     UX_DESIGN_PROMPT,
     render_architecture,
+    render_interview,
     render_user_plan,
 )
 from flow44.ai.core.flow import Flow
@@ -54,14 +62,8 @@ class PlanAgent(BaseAgent):
 
         return flow
 
-    @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
-    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
-        self._state.user_content = content
-        self._state.data_source_ids = data_source_ids or []
-        self._setup_trace(["plan-agent"])
-
-        # Initialize plan state for Flow
-        plan_state = PlanState(
+    def _make_plan_state(self) -> PlanState:
+        return PlanState(
             build_state=self._state,
             project_id=self.project_id,
             sandbox_ref=self.sandbox,
@@ -72,11 +74,93 @@ class PlanAgent(BaseAgent):
             data_source_authorization=self._data_source_authorization,
         )
 
-        # Run the flow
-        start_step = "fetch_data_sources" if self._state.data_source_ids else "design"
-        await self._flow.run(plan_state, start=start_step)
-
+    async def _run_flow(self, start: str | None = None) -> None:
+        start_step = start or ("fetch_data_sources" if self._state.data_source_ids else "design")
+        await self._flow.run(self._make_plan_state(), start=start_step)
         self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
+
+    def _begin(self, content: str, data_source_ids: list[str] | None, tags: list[str]) -> None:
+        self._state.user_content = content
+        self._state.data_source_ids = data_source_ids or []
+        self._setup_trace(tags)
+
+    @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
+    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
+        self._begin(content, data_source_ids, ["plan-agent"])
+        await self._run_flow()
+
+    @track(name="plan-agent-interview")  # type: ignore[untyped-decorator]
+    async def run_interview(self, content: str, data_source_ids: list[str] | None = None) -> None:
+        self._begin(content, data_source_ids, ["plan-agent", "interview"])
+
+        if self._state.data_source_ids:
+            await self._step_fetch_data_sources(self._make_plan_state())
+
+        await self.emit({"type": "phase", "phase": "interviewing"})
+        questions = await self._generate_interview_questions()
+
+        if not questions:
+            await self._run_flow(start="design")
+            return
+
+        self._state.interview_questions = questions
+        self._state.phase = "awaiting_interview"
+        await save_pending_plan(self.project_id, self._state.model_dump_json())
+        await self.emit({"type": "phase", "phase": "awaiting_interview"})
+        await self.emit({"type": "interview_questions", "questions": [q.model_dump() for q in questions]})
+
+    @track(name="plan-agent-resume-interview")  # type: ignore[untyped-decorator]
+    async def resume_after_interview(self, state: BuildState, answers: list[InterviewAnswer]) -> None:
+        self._state = state
+        self._state.model = self.model
+        self._state.interview_answers = answers
+        self._setup_trace(["plan-agent", "resume-interview"])
+
+        clarifications = self._format_clarifications(answers)
+        if clarifications:
+            self._state.user_content = f"{self._state.user_content}\n\n{clarifications}"
+
+        await self.emit(
+            {
+                "type": "interview_answered",
+                "questions": [q.model_dump() for q in self._state.interview_questions],
+                "answers": [a.model_dump() for a in answers],
+            }
+        )
+
+        await self._run_flow(start="design")
+
+    def _format_clarifications(self, answers: list[InterviewAnswer]) -> str:
+        chosen = {a.question_id: a.values for a in answers if a.values}
+        if not chosen:
+            return ""
+        lines = [
+            f"- {q.question}: {self._describe_values(q, chosen[q.id])}"
+            if q.id in chosen
+            else f"- {q.question}: no preference given — pick a sensible default"
+            for q in self._state.interview_questions
+        ]
+        return "Clarifications from the user:\n" + "\n".join(lines)
+
+    @staticmethod
+    def _describe_values(question: InterviewQuestion, values: list[str]) -> str:
+        described = {o.label: f"{o.label} ({o.description})" for o in question.options if o.description}
+        return ", ".join(described.get(value, value) for value in values)
+
+    @track(name="generate-interview")  # type: ignore[untyped-decorator]
+    async def _generate_interview_questions(self) -> list[InterviewQuestion]:
+        try:
+            raw = await complete_chat(
+                [Message.user(self._state.user_content)],
+                render_interview(data_source_contexts=self._state.data_source_contexts or None),
+                model=self.model,
+                metadata=self._llm_metadata("generate_interview"),
+            )
+            payload = InterviewQuestionsPayload.model_validate(parse_json_response(raw))
+        except Exception:
+            logger.exception("[plan] Interview question generation failed")
+            return []
+        return payload.questions
 
     # -- Flow Steps --
 
@@ -181,6 +265,7 @@ class PlanAgent(BaseAgent):
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
+        self._state.model = self.model
         self._setup_trace(["plan-agent", "rebuild"])
 
         await self.emit({"type": "phase", "phase": "planning"})

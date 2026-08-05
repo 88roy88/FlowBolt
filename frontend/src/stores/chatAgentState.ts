@@ -5,6 +5,8 @@ import type { ChatState } from './chat';
 export const AGENT_PHASE = {
   idle: 'idle',
   fetching_data_sources: 'fetching_data_sources',
+  interviewing: 'interviewing',
+  awaiting_interview: 'awaiting_interview',
   designing: 'designing',
   planning: 'planning',
   awaiting_approval: 'awaiting_approval',
@@ -21,10 +23,12 @@ export const TERMINAL_EVENT_TYPES = [
   'error',
   'plan_rejected',
   'plan_overview',
+  'interview_questions',
 ] as const;
 
 export const ACTIVE_AGENT_PHASES: AgentPhase[] = [
   AGENT_PHASE.fetching_data_sources,
+  AGENT_PHASE.interviewing,
   AGENT_PHASE.designing,
   AGENT_PHASE.planning,
   AGENT_PHASE.executing,
@@ -42,10 +46,12 @@ export const TRANSIENT_RESET: Partial<ChatState> = {
   fixSteps: [],
   executionTasks: [],
   designProgress: { architecture: null, ux: null },
+  interviewQuestions: null,
 };
 
 export type AgentActivityState = Pick<ChatState, 'isStreaming' | 'agentPhase'>;
 export type AwaitingPlanState = Pick<ChatState, 'agentPhase' | 'planOverview'>;
+export type AwaitingInterviewState = Pick<ChatState, 'agentPhase' | 'interviewQuestions'>;
 
 export function isHistoryRunComplete(events: Array<{ type?: string }>): boolean {
   if (events.length === 0) return true;
@@ -58,6 +64,13 @@ export function isAwaitingPlanApproval(state: AwaitingPlanState): boolean {
   return (
     state.agentPhase === AGENT_PHASE.awaiting_approval &&
     state.planOverview != null
+  );
+}
+
+export function isAwaitingInterview(state: AwaitingInterviewState): boolean {
+  return (
+    state.agentPhase === AGENT_PHASE.awaiting_interview &&
+    state.interviewQuestions != null
   );
 }
 

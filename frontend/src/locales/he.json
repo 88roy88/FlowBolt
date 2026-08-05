@@ -21,7 +21,13 @@
     "cannotConnect": "לא ניתן להתחבר לשרת. אנא ודא שהשרת פועל ונסה לרענן את הדף.",
     "retryConnection": "נסה להתחבר שוב",
     "createFirstProject": "צור את הפרויקט הראשון שלך כדי להתחיל",
-    "noAccessMessage": "אין לך הרשאה ליצור פרויקטים. פנה למנהל המערכת לקבלת הזמנה."
+    "noAccessMessage": "אין לך הרשאה ליצור פרויקטים. פנה למנהל המערכת לקבלת הזמנה.",
+    "tagline": "תאר את מה שברצונך לבנות והבינה המלאכותית תעצב, תתכנן ותכתוב עבורך את הקוד.",
+    "hints": {
+      "dashboard": "דשבורד עם גרפים",
+      "todo": "אפליקציית משימות עם גרירה ושחרור",
+      "landing": "עמוד נחיתה עם אנימציות"
+    }
   },
   "sidebar": {
     "collapseSidebar": "כווץ סרגל צד",
@@ -134,8 +140,7 @@
   },
   "chat": {
     "chat": "צ'אט",
-    "send": "שלח",
-    "newLine": "שורה חדשה",
+    "model": "מודל",
     "scrollToBottom": "גלול לתחתית",
     "today": "היום",
     "yesterday": "אתמול",
@@ -143,6 +148,7 @@
     "placeholder": {
       "selectProject": "בחר פרויקט תחילה",
       "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר או שנה",
+      "reviewInterview": "ענה על השאלות למעלה, או דלג",
       "working": "הבינה המלאכותית עובדת...",
       "readOnly": "גישת צפייה בלבד",
       "default": "תאר מה תרצה לבנות..."
@@ -150,6 +156,7 @@
     "phase": {
       "analyzing": "מנתח",
       "fetchingDataSources": "מביא מקורות נתונים",
+      "interviewing": "מכין שאלות",
       "designing": "מעצב",
       "planning": "מתכנן",
       "building": "בונה",
@@ -170,8 +177,24 @@
       "changeSomething": "שנה משהו",
       "sendFeedback": "שלח משוב"
     },
+    "interview": {
+      "title": "כמה שאלות קצרות לפני שאבנה",
+      "other": "משהו אחר",
+      "submit": "המשך",
+      "skip": "דלג",
+      "skipAll": "דלג על הכול",
+      "next": "הבא",
+      "back": "חזרה",
+      "progress": "שאלה {{current}} מתוך {{total}}",
+      "selectHint": "בחר כל מה שמתאים",
+      "modePlan": "תכנון",
+      "modeBuild": "בנייה",
+      "modePlanHint": "כמה שאלות לפני הבנייה",
+      "modeBuildHint": "דלג על השאלות ותכנן מיד"
+    },
     "design": {
       "designComplete": "עיצוב הושלם",
+      "designing": "מתכנן...",
       "architecture": "ארכיטקטורה",
       "uiux": "ממשק משתמש/חווית משתמש"
     },
