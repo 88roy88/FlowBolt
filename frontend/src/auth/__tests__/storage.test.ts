@@ -42,6 +42,18 @@ function installDom(protocol = 'http:') {
   return win;
 }
 
+function currentCookieToken(): string | undefined {
+  const prefix = `${authConfig.cookieName}=`;
+  const last = cookieWrites.filter((w) => w.startsWith(prefix)).at(-1);
+  const value = last?.slice(prefix.length).split(';')[0];
+  return value ? decodeURIComponent(value) : undefined;
+}
+
+function storedToken(): string | undefined {
+  const raw = window.localStorage.getItem(authConfig.storageKey);
+  return raw ? (JSON.parse(raw) as AuthCredentials).auth_token : undefined;
+}
+
 const future = Math.floor(Date.now() / 1000) + 3600;
 const past = Math.floor(Date.now() / 1000) - 3600;
 
@@ -150,11 +162,16 @@ describe('credentialsStore.ensureCookie', () => {
     expect(cookieWrites.at(-1)!).toContain(`${authConfig.cookieName}=`);
   });
 
-  it('is a no-op when the stored credential is expired', () => {
+  it('clears the dead session instead of planting a cookie when the credential is expired', () => {
+    const win = installDom();
     const expiredToken = fakeJwt({ userId: 'user-42', exp: past });
     window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds({ auth_token: expiredToken, exp: past })));
+
     credentialsStore.ensureCookie();
-    expect(cookieWrites).toHaveLength(0);
+
+    expect(window.localStorage.getItem(authConfig.storageKey)).toBeNull();
+    expect(cookieWrites.every((w) => w.startsWith(`${authConfig.cookieName}=;`))).toBe(true);
+    expect(win.dispatchEvent).toHaveBeenCalledOnce();
   });
 
   it('is a no-op when nothing is stored', () => {
@@ -162,11 +179,63 @@ describe('credentialsStore.ensureCookie', () => {
     expect(cookieWrites).toHaveLength(0);
   });
 
-  it('does not re-write the cookie when one is already present', () => {
+  it('re-writes the cookie when one is already present, so a stale token cannot survive', () => {
     credentialsStore.save(creds());
     const writesBefore = cookieWrites.length;
     credentialsStore.ensureCookie();
-    expect(cookieWrites).toHaveLength(writesBefore);
+    expect(cookieWrites.length).toBeGreaterThan(writesBefore);
+  });
+
+  it('plants no cookie for a token that expires inside the expiry margin', () => {
+    const soon = Math.floor(Date.now() / 1000) + 2;
+    window.localStorage.setItem(
+      authConfig.storageKey,
+      JSON.stringify(creds({ auth_token: fakeJwt({ userId: 'user-42', exp: soon }), exp: soon })),
+    );
+    credentialsStore.ensureCookie();
+    expect(cookieWrites.every((w) => w.startsWith(`${authConfig.cookieName}=;`))).toBe(true);
+  });
+
+  it('still plants a cookie for a token that outlives the expiry margin', () => {
+    const later = Math.floor(Date.now() / 1000) + 30;
+    window.localStorage.setItem(
+      authConfig.storageKey,
+      JSON.stringify(creds({ auth_token: fakeJwt({ userId: 'user-42', exp: later }), exp: later })),
+    );
+    credentialsStore.ensureCookie();
+    expect(currentCookieToken()).toBeDefined();
+  });
+});
+
+describe('cookie / localStorage sync', () => {
+  beforeEach(() => installDom());
+
+  it('heals a stale cookie so it matches the stored credentials', () => {
+    window.localStorage.setItem(authConfig.storageKey, JSON.stringify(creds()));
+    cookieWrites.push(`${authConfig.cookieName}=stale-token-from-an-older-session`);
+
+    credentialsStore.ensureCookie();
+
+    expect(currentCookieToken()).toBe(VALID_TOKEN);
+    expect(storedToken()).toBe(VALID_TOKEN);
+  });
+
+  it('hydrates localStorage from the cookie when only the cookie survives', () => {
+    const token = fakeJwt({ userId: 'cookie-user', exp: future });
+    cookieWrites.push(`${authConfig.cookieName}=${token}`);
+
+    credentialsStore.read();
+
+    expect(storedToken()).toBe(token);
+    expect(currentCookieToken()).toBe(token);
+  });
+
+  it('leaves neither store holding a token after clear', () => {
+    credentialsStore.save(creds());
+    credentialsStore.clear();
+
+    expect(storedToken()).toBeUndefined();
+    expect(currentCookieToken()).toBeUndefined();
   });
 });
 

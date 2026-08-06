@@ -71,7 +71,11 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
 
         for iteration in range(self.max_iterations):
             # Call LLM with tools
-            metadata = metadata_fn(f"react-{iteration}") if metadata_fn else None
+            metadata = (
+                metadata_fn(f"react-{iteration}", extra_metadata={"available_tools": tool_schemas})
+                if metadata_fn
+                else None
+            )
 
             try:
                 logger.info(

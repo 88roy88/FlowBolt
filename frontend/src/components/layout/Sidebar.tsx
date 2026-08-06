@@ -1,14 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
-import { Plus, Pin, PinOff, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield } from 'lucide-react';
+import { Plus, PanelLeftClose, Loader2, MoreHorizontal, Trash2, Info, Settings, Pencil, Moon, Share2, Shield, Search } from 'lucide-react';
 import { FlowBrand } from '../ui/flow-logo';
 import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { ShareModal } from '../sharing/ShareModal';
-import { AdminPanel } from '../admin/AdminPanel';
 import { reapProject } from '../../services/api';
 import { isSpecialUser } from '../../utils/easterEgg';
 import { pollFileTree } from '../../utils/pollFileTree';
@@ -16,11 +15,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 type SidebarProps = {
-  onCloseSidebar?: () => void;
-  isPinned?: boolean;
-  onPin?: () => void;
+  onCollapse?: () => void;
   onOpenSettings?: () => void;
-  onBusyChange?: (busy: boolean) => void;
+  onOpenAdmin?: () => void;
 };
 
 // Stable color per project based on name hash
@@ -41,47 +38,33 @@ function getProjectColor(name: string) {
   return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
 }
 
+const anchorName = (id: string) => `--a${id.replace(/-/g, '')}`;
+
 function getInitials(name: string) {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
 }
 
-export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBusyChange }: SidebarProps) {
+export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProps) {
   const { t } = useTranslation();
   const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
+  const [searchQuery, setSearchQuery] = useState('');
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
   const [shareModal, setShareModal] = useState<{ projectId: string; projectName: string; ownerUserId?: string } | null>(null);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const canCreate = userStatus?.is_platform_user || userStatus?.is_admin;
 
-  // Notify parent when user is busy with an action
-  useEffect(() => {
-    const isBusy = showInput || !!menuOpenId || !!renamingId || !!pendingDeleteId;
-    onBusyChange?.(isBusy);
-  }, [showInput, menuOpenId, renamingId, pendingDeleteId, onBusyChange]);
-
-  useEffect(() => {
-    if (!menuOpenId) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpenId(null);
-        setPendingDeleteId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [menuOpenId]);
+  const closeMenu = () => menuRef.current?.hidePopover();
 
   const handleCreate = async () => {
     const name = newName.trim() || 'New Project';
@@ -111,7 +94,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
       return;
     }
     setPendingDeleteId(null);
-    setMenuOpenId(null);
+    closeMenu();
     const wasSelected = currentProject?.id === id;
     await deleteProject(id);
     if (wasSelected) {
@@ -131,7 +114,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
   };
 
   const startRename = (project: typeof projects[number]) => {
-    setMenuOpenId(null);
+    closeMenu();
     setRenamingId(project.id);
     setRenameValue(project.name);
   };
@@ -146,7 +129,7 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
   };
 
   const handleShowSummary = (project: typeof projects[number]) => {
-    setMenuOpenId(null);
+    closeMenu();
     if (!project.summary) return;
     try {
       const parsedSummary = JSON.parse(project.summary) as ProjectSummary;
@@ -156,20 +139,22 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
     }
   };
 
+  const menuProject = projects.find((p) => p.id === menuProjectId);
+  const canSearchProjects = projects.length > 10;
+  const normalizedSearch = canSearchProjects ? searchQuery.trim().toLowerCase() : '';
+  const visibleProjects = normalizedSearch
+    ? projects.filter((p) => p.name.toLowerCase().includes(normalizedSearch))
+    : projects;
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-3">
         <FlowBrand size="sm" />
         <div className="flex items-center gap-0.5">
-          {onPin && !isPinned && (
-            <Button variant="ghost" size="icon-sm" onClick={onPin} title={t('sidebar.pinSidebar')}>
-              <Pin size={14} className="text-primary/60" />
-            </Button>
-          )}
-          {isPinned && onCloseSidebar && (
-            <Button variant="ghost" size="icon-sm" onClick={onCloseSidebar} title={t('sidebar.unpinSidebar')}>
-              <PinOff size={14} className="text-primary/60" />
+          {onCollapse && (
+            <Button variant="ghost" size="icon-sm" onClick={onCollapse} title={t('sidebar.collapseSidebar')}>
+              <PanelLeftClose size={14} className="text-primary/60" />
             </Button>
           )}
         </div>
@@ -215,14 +200,30 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
         </div>
       )}
 
+      {/* Project search */}
+      {canSearchProjects && (
+        <div className="px-3 mb-2">
+          <div className="flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-lg">
+            <Search size={14} className="shrink-0 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('sidebar.searchPlaceholder')}
+              data-testid="project-search"
+              className="flex-1 text-[13px] bg-transparent"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Project list */}
       <div className="flex-1 overflow-auto px-2">
-        {projects.map((project) => {
+        {visibleProjects.map((project) => {
           const isActive = currentProject?.id === project.id;
-          const isMenuOpen = menuOpenId === project.id;
           const colorClass = getProjectColor(project.name);
           return (
-            <div key={project.id} className="relative">
+            <div key={project.id}>
               <div
                 onClick={() => handleSelect(project)}
                 data-testid={`project-item-${project.id}`}
@@ -259,90 +260,107 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  popoverTarget="project-menu"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setMenuOpenId(isMenuOpen ? null : project.id);
-                    setPendingDeleteId(null);
+                    if (menuProjectId !== project.id && menuRef.current?.matches(':popover-open')) {
+                      e.preventDefault();
+                    }
+                    setMenuProjectId(project.id);
                   }}
+                  style={{ anchorName: anchorName(project.id) } as CSSProperties}
                   className="opacity-0 group-hover:opacity-40 hover:!opacity-100 shrink-0"
                 >
                   <MoreHorizontal size={14} />
                 </Button>
               </div>
-
-              {isMenuOpen && (
-                <div
-                  ref={menuRef}
-                  className="absolute end-2 top-full z-50 mt-0.5 min-w-[140px] bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1 animate-card-in"
-                >
-                  {(!project.role || MANAGE_ROLES.has(project.role)) && (
-                    <button
-                      onClick={() => startRename(project)}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <Pencil size={13} className="text-muted-foreground" />
-                      {t('sidebar.rename')}
-                    </button>
-                  )}
-                  {project.summary && (
-                    <button
-                      onClick={() => handleShowSummary(project)}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <Info size={13} className="text-muted-foreground" />
-                      {t('sidebar.summary')}
-                    </button>
-                  )}
-                  {(!project.role || MANAGE_ROLES.has(project.role)) && (
-                    <button
-                      onClick={() => {
-                        setMenuOpenId(null);
-                        setShareModal({ projectId: project.id, projectName: project.name, ownerUserId: project.user_id });
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <Share2 size={13} className="text-muted-foreground" />
-                      {t('sharing.share', 'Share')}
-                    </button>
-                  )}
-                  {isSpecialUser() && (
-                    <button
-                      onClick={async () => {
-                        setMenuOpenId(null);
-                        try {
-                          await reapProject(project.id);
-                        } catch { /* sandbox may already be reaped */ }
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <Moon size={13} className="text-muted-foreground" />
-                      {t('sidebar.sleep', 'Sleep')}
-                    </button>
-                  )}
-                  {(!project.role || DELETE_ROLES.has(project.role)) && (
-                    <button
-                      onClick={() => handleDelete(project.id)}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
-                        pendingDeleteId === project.id
-                          ? 'text-destructive bg-destructive/10'
-                          : 'text-foreground hover:bg-muted/50'
-                      }`}
-                    >
-                      <Trash2 size={13} className={pendingDeleteId === project.id ? 'text-destructive' : 'text-muted-foreground'} />
-                      {pendingDeleteId === project.id ? t('sidebar.confirmDelete') : t('common.delete')}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}
+        {normalizedSearch && visibleProjects.length === 0 && (
+          <div className="px-2 py-2 text-[13px] text-muted-foreground">
+            {t('sidebar.noProjectsMatch')}
+          </div>
+        )}
+      </div>
+
+      <div
+        ref={menuRef}
+        id="project-menu"
+        popover="auto"
+        onToggle={(e) => {
+          if ((e as unknown as ToggleEvent).newState === 'closed') setPendingDeleteId(null);
+        }}
+        style={menuProject ? ({ positionAnchor: anchorName(menuProject.id) } as CSSProperties) : undefined}
+        className="anchored-menu min-w-35 bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1"
+      >
+        {menuProject && (
+          <>
+            {(!menuProject.role || MANAGE_ROLES.has(menuProject.role)) && (
+              <button
+                onClick={() => startRename(menuProject)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+              >
+                <Pencil size={13} className="text-muted-foreground" />
+                {t('sidebar.rename')}
+              </button>
+            )}
+            {menuProject.summary && (
+              <button
+                onClick={() => handleShowSummary(menuProject)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+              >
+                <Info size={13} className="text-muted-foreground" />
+                {t('sidebar.summary')}
+              </button>
+            )}
+            {(!menuProject.role || MANAGE_ROLES.has(menuProject.role)) && (
+              <button
+                onClick={() => {
+                  closeMenu();
+                  setShareModal({ projectId: menuProject.id, projectName: menuProject.name, ownerUserId: menuProject.user_id });
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+              >
+                <Share2 size={13} className="text-muted-foreground" />
+                {t('sharing.share', 'Share')}
+              </button>
+            )}
+            {isSpecialUser() && (
+              <button
+                onClick={async () => {
+                  closeMenu();
+                  try {
+                    await reapProject(menuProject.id);
+                  } catch { /* sandbox may already be reaped */ }
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+              >
+                <Moon size={13} className="text-muted-foreground" />
+                {t('sidebar.sleep', 'Sleep')}
+              </button>
+            )}
+            {(!menuProject.role || DELETE_ROLES.has(menuProject.role)) && (
+              <button
+                onClick={() => handleDelete(menuProject.id)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
+                  pendingDeleteId === menuProject.id
+                    ? 'text-destructive bg-destructive/10'
+                    : 'text-foreground hover:bg-muted/50'
+                }`}
+              >
+                <Trash2 size={13} className={pendingDeleteId === menuProject.id ? 'text-destructive' : 'text-muted-foreground'} />
+                {pendingDeleteId === menuProject.id ? t('sidebar.confirmDelete') : t('common.delete')}
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       {/* Bottom: Settings + Admin */}
       <div className="border-t border-border px-3 py-2 space-y-0.5">
         {userStatus?.is_admin && (
-          <Button variant="ghost" size="sm" onClick={() => setShowAdminPanel(true)} className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="sm" onClick={onOpenAdmin} className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
             <Shield size={14} className="text-warning/70" />
             <span className="text-[13px]">{t('admin.title', 'Platform Users')}</span>
           </Button>
@@ -368,10 +386,6 @@ export function Sidebar({ onCloseSidebar, isPinned, onPin, onOpenSettings, onBus
           ownerUserId={shareModal.ownerUserId}
           onClose={() => setShareModal(null)}
         />
-      )}
-
-      {showAdminPanel && (
-        <AdminPanel onClose={() => setShowAdminPanel(false)} />
       )}
     </div>
   );
