@@ -76,7 +76,7 @@ class PlanAgent(BaseAgent):
         start_step = "fetch_data_sources" if self._state.data_source_ids else "design"
         await self._flow.run(plan_state, start=start_step)
 
-        self._set_trace_output({"user_overview": self._state.user_overview.model_dump()})
+        self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
 
     # -- Flow Steps --
 
@@ -162,7 +162,7 @@ class PlanAgent(BaseAgent):
         """Step: Build user overview from designs."""
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
-        state.build_state.user_overview = await self._build_user_overview()
+        state.build_state.user_plan_overview = await self._build_user_overview()
 
         return state
 
@@ -171,7 +171,7 @@ class PlanAgent(BaseAgent):
         state.build_state.phase = "awaiting_approval"
         await save_pending_plan(state.project_id, state.build_state.model_dump_json())
         await state.emit_fn({"type": "phase", "phase": "awaiting_approval"})
-        await state.emit_fn({"type": "plan_overview", "overview": state.build_state.user_overview.model_dump()})
+        await state.emit_fn({"type": "plan_overview", "overview": state.build_state.user_plan_overview.model_dump()})
 
         return state
 
@@ -190,7 +190,7 @@ class PlanAgent(BaseAgent):
                 "user_request": self._state.user_content,
                 "architecture": self._state.architecture.model_dump(),
                 "ux_design": self._state.ux_design.model_dump(),
-                "previous_overview": self._state.user_overview.model_dump(),
+                "previous_overview": self._state.user_plan_overview.model_dump(),
                 "user_feedback": feedback,
             },
             indent=2,
@@ -201,14 +201,14 @@ class PlanAgent(BaseAgent):
             model=self.model,
             metadata=self._llm_metadata("rebuild_user_plan"),
         )
-        self._state.user_overview = UserPlanOverview.model_validate(parse_json_response(raw))
+        self._state.user_plan_overview = UserPlanOverview.model_validate(parse_json_response(raw))
 
         self._state.phase = "awaiting_approval"
         await save_pending_plan(self.project_id, self._state.model_dump_json())
         await self.emit({"type": "phase", "phase": "awaiting_approval"})
-        await self.emit({"type": "plan_overview", "overview": self._state.user_overview.model_dump()})
+        await self.emit({"type": "plan_overview", "overview": self._state.user_plan_overview.model_dump()})
 
-        self._set_trace_output({"user_overview": self._state.user_overview.model_dump()})
+        self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
 
     # -- Design --
 
