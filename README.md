@@ -205,12 +205,10 @@ Edit `AIB_AI_MODEL` and `AIB_AI_BASE_URL` in `backend/.env` to switch providers:
 
 ## Observability (optional)
 
-Set the following in `backend/.env` to enable Langfuse tracing:
+Set the following in `backend/.env` to enable Opik tracing:
 
 ```env
-AIB_LANGFUSE_PUBLIC_KEY=pk-lf-...
-AIB_LANGFUSE_SECRET_KEY=sk-lf-...
-AIB_LANGFUSE_HOST=https://cloud.langfuse.com
+AIB_OPIK_API_KEY=...
+AIB_OPIK_WORKSPACE=your-workspace
+AIB_OPIK_PROJECT_NAME=flow44
 ```
-
-A self-hosted Langfuse stack is available under `mocks/langfuse/docker-compose.yaml`.
