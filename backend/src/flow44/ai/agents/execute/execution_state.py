@@ -18,8 +18,8 @@ class ExecutionState(BaseModel):
     emit_fn: Any = None  # Can't serialize function
     model: str | None = None
     trace_id: str | None = None
+    root_span_id: str | None = None  # The `run()` @track span — parent for top-level step spans
     observation_id: str | None = None
-    langfuse_client: Any = None  # Hold reference
     llm_metadata_fn: Any = None  # Function to generate metadata
 
     # Validation results

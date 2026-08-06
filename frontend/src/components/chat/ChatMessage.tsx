@@ -87,7 +87,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   // Agent card messages
   if (message.agentCard) {
     return (
-      <div className={`group flex flex-col w-full ${isUser ? 'items-start' : 'items-end'} animate-message-in`}>
+      <div className={`group flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} animate-message-in`}>
         <AgentCardRenderer message={message} />
         {message.agentCard.type === 'error_fix_request' && timestamp}
       </div>
@@ -95,7 +95,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   }
 
   return (
-    <div className={`group flex flex-col w-full ${isUser ? 'items-start' : 'items-end'} animate-message-in`}>
+    <div className={`group flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} animate-message-in`}>
       <div
         className={`min-w-0 max-w-[85%] overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
           isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
