@@ -162,7 +162,7 @@ class PlanAgent(BaseAgent):
         """Step: Build user overview from designs."""
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
-        state.build_state.user_plan_overview = await self._build_user_overview()
+        state.build_state.user_plan_overview = await self._build_user_plan_overview()
 
         return state
 
@@ -247,8 +247,8 @@ class PlanAgent(BaseAgent):
             await self.emit({"type": "design_progress", "stream": "ux", "content": "failed"})
             return UXDesign()
 
-    @track(name="build-user-overview")  # type: ignore[untyped-decorator]
-    async def _build_user_overview(self) -> UserPlanOverview:
+    @track(name="build-user-plan-overview")  # type: ignore[untyped-decorator]
+    async def _build_user_plan_overview(self) -> UserPlanOverview:
         plan_input = json.dumps(
             {
                 "user_request": self._state.user_content,
