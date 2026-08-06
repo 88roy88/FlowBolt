@@ -28,7 +28,3 @@ async def publish_project(project_id: str, slug: str | None) -> str:
     handle = slug or project_id
     await update_project_published_url(project_id, handle)
     return handle
-
-
-async def delete_published_project(project_id: str) -> None:
-    await s3_storage.delete_published_prefix(project_id)

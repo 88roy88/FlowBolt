@@ -7,8 +7,6 @@ import os
 import re
 from pathlib import Path
 
-from langfuse.decorators import observe
-
 from flow44.config import settings
 from flow44.sandbox.manager import sandbox_manager
 
@@ -141,7 +139,6 @@ async def _build_dist_dir(project_id: str, vite_base: str) -> str:
     return dist_dir
 
 
-@observe(name="build-dist")  # type: ignore[untyped-decorator]
 async def build_dist(project_id: str) -> list[tuple[str, bytes]]:
     dist_dir = Path(await _build_dist_dir(project_id, vite_base="./"))
     return [
@@ -151,7 +148,6 @@ async def build_dist(project_id: str) -> list[tuple[str, bytes]]:
     ]
 
 
-@observe(name="build-single-html")  # type: ignore[untyped-decorator]
 async def build_single_html(project_id: str) -> str:
     """Build the project and return a single self-contained HTML string."""
     dist_dir = await _build_dist_dir(project_id, vite_base="/")

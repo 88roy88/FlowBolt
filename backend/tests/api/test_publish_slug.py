@@ -23,14 +23,14 @@ class TestSlugCheck:
 
     @pytest.mark.asyncio
     async def test_taken_slug_returns_unavailable(self):
-        with patch("flow44.services.publish_service.is_handle_taken", AsyncMock(return_value=True)):
+        with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=True)):
             response = client.get("/api/export/proj-1/slug/check?slug=taken-slug")
             assert response.status_code == 200
             assert response.json() == {"available": False}
 
     @pytest.mark.asyncio
     async def test_free_slug_returns_available(self):
-        with patch("flow44.services.publish_service.is_handle_taken", AsyncMock(return_value=False)):
+        with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=False)):
             response = client.get("/api/export/proj-1/slug/check?slug=free-slug")
             assert response.status_code == 200
             assert response.json() == {"available": True}
@@ -49,7 +49,7 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_with_slug(self):
         with (
-            patch("flow44.services.publish_service.is_handle_taken", AsyncMock(return_value=False)),
+            patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=False)),
             patch("flow44.api.publish.publish_project", AsyncMock(return_value="my-cool-app")) as mock_publish,
         ):
             response = client.post("/api/export/proj-1/publish", json={"slug": "my-cool-app"})
@@ -67,7 +67,7 @@ class TestPublish:
 
     @pytest.mark.asyncio
     async def test_publish_with_taken_slug_returns_409(self):
-        with patch("flow44.services.publish_service.is_handle_taken", AsyncMock(return_value=True)):
+        with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=True)):
             response = client.post("/api/export/proj-1/publish", json={"slug": "taken-slug"})
             assert response.status_code == 409
             assert "already taken" in response.json()["detail"]
@@ -81,7 +81,7 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_collision_returns_409(self):
         with (
-            patch("flow44.services.publish_service.is_handle_taken", AsyncMock(return_value=False)),
+            patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=False)),
             patch(
                 "flow44.api.publish.publish_project",
                 AsyncMock(side_effect=IntegrityError(None, None, Exception("collision"))),

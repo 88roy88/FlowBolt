@@ -22,11 +22,19 @@ router = APIRouter(prefix="/api/export/{project_id}", tags=["export"])
 EXCLUDED_DIRS = {"node_modules", ".git", "dist", ".cache"}
 
 
-def _download_as(filename: str) -> str:
+def _attachment(filename: str) -> str:
     ascii_fallback = re.sub(r"[^A-Za-z0-9\-. ]", "_", filename).strip("_ ")
     if not ascii_fallback or ascii_fallback.startswith("."):
         ascii_fallback = f"export{ascii_fallback}"
     return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"
+
+
+def _download_response(content: bytes | str, filename: str, media_type: str) -> Response:
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": _attachment(filename)},
+    )
 
 
 @router.get("/zip")
@@ -51,13 +59,7 @@ async def export_zip(project: ProjectDep, sandbox: SandboxDep) -> Response:
                 except (PermissionError, OSError) as exc:
                     logger.warning("Skipping file %s: %s", arc_name, exc)
 
-    content = buf.getvalue()
-
-    return Response(
-        content=content,
-        media_type="application/zip",
-        headers={"Content-Disposition": _download_as(f"{project_name}.zip")},
-    )
+    return _download_response(buf.getvalue(), f"{project_name}.zip", "application/zip")
 
 
 @router.get("/html")
@@ -70,8 +72,4 @@ async def export_html(project: ProjectDep) -> Response:
     except BuildError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return Response(
-        content=html,
-        media_type="text/html",
-        headers={"Content-Disposition": _download_as(f"{project.name}.html")},
-    )
+    return _download_response(html, f"{project.name}.html", "text/html")

@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import Permission, ProjectDep, require_permission
+from flow44.logic.publish import SlugStatus, publish_project, resolve_slug_status
 from flow44.sandbox.operations import BuildError
-from flow44.services.publish_service import SlugStatus, publish_project, resolve_slug_status
 
 logger = logging.getLogger(__name__)
 
