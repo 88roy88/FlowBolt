@@ -1,10 +1,10 @@
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { useTranslation } from "react-i18next";
-import { FileText, TerminalSquare } from "lucide-react";
-import type { Message } from "../../types";
-import { formatClock } from "../../utils/formatTime";
-import { Badge } from "../ui/badge";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useTranslation } from 'react-i18next';
+import { FileText, TerminalSquare } from 'lucide-react';
+import type { Message } from '../../types';
+import { formatClock } from '../../utils/formatTime';
+import { Badge } from '../ui/badge';
 import {
   DataSourcesFetchedCard,
   DesignCompleteCard,
@@ -14,7 +14,7 @@ import {
   ErrorFixRequestCard,
   FixProgressCard,
   FollowUpProgress,
-} from "./cards";
+} from './cards';
 
 interface ChatMessageProps {
   message: Message;
@@ -25,54 +25,38 @@ function AgentCardRenderer({ message }: { message: Message }) {
   const card = message.agentCard!;
 
   switch (card.type) {
-    case "data_sources_fetched":
+    case 'data_sources_fetched':
       return <DataSourcesFetchedCard dataSources={card.dataSources} />;
-    case "design_complete":
-      return (
-        <DesignCompleteCard architecture={card.architecture} ux={card.ux} />
-      );
-    case "plan_overview":
+    case 'design_complete':
+      return <DesignCompleteCard architecture={card.architecture} ux={card.ux} />;
+    case 'plan_overview':
       return <PlanOverviewCard overview={card.overview} />;
-    case "task_progress":
+    case 'task_progress':
       return <TaskProgressCard tasks={card.tasks} />;
-    case "project_summary":
+    case 'project_summary':
       return <ProjectSummaryCard summary={card.summary} />;
-    case "error_fix_request":
-      return (
-        <ErrorFixRequestCard
-          errorMessage={card.errorMessage}
-          errorFile={card.errorFile}
-          errorLine={card.errorLine}
-          errorStack={card.errorStack}
-        />
-      );
-    case "fix_progress":
-      return (
-        <FixProgressCard
-          steps={card.steps}
-          content={message.content}
-          diffs={card.diffs}
-        />
-      );
-    case "followup_progress":
-      return (
-        <FollowUpProgress
-          steps={card.steps}
-          answer={card.answer}
-          filesChanged={card.filesChanged}
-          diffs={card.diffs}
-        />
-      );
+    case 'error_fix_request':
+      return <ErrorFixRequestCard
+        errorMessage={card.errorMessage}
+        errorFile={card.errorFile}
+        errorLine={card.errorLine}
+        errorStack={card.errorStack}
+      />;
+    case 'fix_progress':
+      return <FixProgressCard steps={card.steps} content={message.content} diffs={card.diffs} />;
+    case 'followup_progress':
+      return <FollowUpProgress
+        steps={card.steps}
+        answer={card.answer}
+        filesChanged={card.filesChanged}
+        diffs={card.diffs}
+      />;
     default:
       return null;
   }
 }
 
-function DataSourceBadges({
-  dataSources,
-}: {
-  dataSources: { id: number; name: string }[];
-}) {
+function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: string }[] }) {
   return (
     <div className="flex flex-wrap gap-1 mb-1.5">
       {dataSources.map((ds) => (
@@ -88,14 +72,9 @@ function DataSourceBadges({
 
 export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   const { i18n } = useTranslation();
-  const isUser = message.role === "user";
+  const isUser = message.role === 'user';
 
-  if (
-    !message.content &&
-    !message.agentCard &&
-    !message.actions?.length &&
-    !isStreaming
-  ) {
+  if (!message.content && !message.agentCard && !message.actions?.length && !isStreaming) {
     return null;
   }
 
@@ -108,24 +87,18 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   // Agent card messages
   if (message.agentCard) {
     return (
-      <div
-        className={`group flex flex-col w-full ${isUser ? "justify-end" : "justify-start"} animate-message-in`}
-      >
+      <div className={`group flex flex-col w-full ${isUser ? 'items-start' : 'items-end'} animate-message-in`}>
         <AgentCardRenderer message={message} />
-        {message.agentCard.type === "error_fix_request" && timestamp}
+        {message.agentCard.type === 'error_fix_request' && timestamp}
       </div>
     );
   }
 
   return (
-    <div
-      className={`flex w-full ${isUser ? "justify-end" : "justify-start"} animate-message-in`}
-    >
+    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} animate-message-in`}>
       <div
         className={`min-w-0 max-w-[85%] overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
-          isUser
-            ? "bg-user-bubble border border-primary/30"
-            : "bg-assistant-bubble border border-border"
+          isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
         }`}
       >
         {isUser && message.dataSources && message.dataSources.length > 0 && (
@@ -142,10 +115,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
                   const isInline = !className;
                   if (isInline) {
                     return (
-                      <code
-                        className="bg-background px-1.5 py-0.5 rounded text-[13px] font-mono break-all"
-                        {...props}
-                      >
+                      <code className="bg-background px-1.5 py-0.5 rounded text-[13px] font-mono break-all" {...props}>
                         {children}
                       </code>
                     );
@@ -170,21 +140,15 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         {message.actions && message.actions.length > 0 && (
           <div className="mt-2 flex flex-col gap-1">
             {message.actions.map((action, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 bg-background rounded"
-              >
-                {action.type === "file" ? (
+              <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 bg-background rounded">
+                {action.type === 'file' ? (
                   <>
                     <FileText size={14} className="text-primary shrink-0" />
                     <span className="truncate">{action.path}</span>
                   </>
                 ) : (
                   <>
-                    <TerminalSquare
-                      size={14}
-                      className="text-success shrink-0"
-                    />
+                    <TerminalSquare size={14} className="text-success shrink-0" />
                     <span className="truncate">{action.command}</span>
                   </>
                 )}
