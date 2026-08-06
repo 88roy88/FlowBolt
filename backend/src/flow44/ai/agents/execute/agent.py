@@ -76,7 +76,7 @@ class ExecuteAgent(BaseAgent):
         self._setup_trace(["execute-agent"])
         self._set_trace_input({"action": "plan_approved"})
 
-        await self.emit({"type": "plan_accepted", "overview": self._build_state.user_overview.model_dump()})
+        await self.emit({"type": "plan_accepted", "overview": self._build_state.user_plan_overview.model_dump()})
 
         current_span = opik_context.get_current_span_data()
         exec_state = ExecutionState(
@@ -281,7 +281,7 @@ class ExecuteAgent(BaseAgent):
             "user_request": state.build_state.user_content,
             "architecture": state.build_state.architecture.model_dump(),
             "ux_design": state.build_state.ux_design.model_dump(),
-            "user_preferences": [d.model_dump() for d in state.build_state.user_overview.decisions],
+            "user_preferences": [d.model_dump() for d in state.build_state.user_plan_overview.decisions],
         }
         if state.build_state.data_source_contexts:
             merge_data["data_source_integrations"] = [
