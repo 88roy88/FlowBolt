@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, func
@@ -67,6 +67,7 @@ class AgentEvent(SQLModel, table=True):
 
 async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
     event_type = event.get("type", "unknown")
+    event.setdefault("_ts", datetime.now(UTC).isoformat())
 
     async with database.async_session() as session:
         row = AgentEvent(project_id=project_id, event_type=event_type, payload=event)

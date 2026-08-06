@@ -11,8 +11,8 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <CardWrapper accent="destructive">
-      <div className="flex items-center gap-1.5 mb-2 text-xs text-destructive">
+    <CardWrapper accent="warning">
+      <div className="flex items-center gap-1.5 mb-2 text-xs text-warning">
         <AlertTriangle size={14} />
         Fix error request
       </div>
@@ -36,7 +36,7 @@ export function ErrorFixRequestCard({ errorMessage, errorFile, errorLine, errorS
       {isExpanded && (
         <div className="p-2 bg-background rounded-md text-xs leading-normal">
           <div className={errorStack ? 'mb-2' : ''}>
-            <strong className="text-destructive">Message:</strong>
+            <strong className="text-warning">Message:</strong>
             <div className="mt-1">{errorMessage}</div>
           </div>
 

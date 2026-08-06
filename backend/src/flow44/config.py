@@ -45,7 +45,6 @@ class SandboxSettings(Flow44BaseSettings):
 
 
 class DatabaseSettings(Flow44BaseSettings):
-    DB_SCHEME: str
     DB_USER: str
     DB_PASSWORD: str
     DB_HOST: str

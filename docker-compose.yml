@@ -4,7 +4,6 @@ x-db-shared: &db-shared
   POSTGRES_DB: &db-name flow44
   DB_HOST: &db-host postgres
   DB_PORT: &db-port 5432
-  DB_SCHEME: &db-scheme postgresql
 
 x-minio-shared: &minio-shared
   MINIO_ROOT_USER: &s3-user minioadmin
@@ -28,7 +27,6 @@ services:
       AIB_DB_NAME: *db-name
       AIB_DB_HOST: *db-host
       AIB_DB_PORT: *db-port
-      AIB_DB_SCHEME: *db-scheme
     networks:
       - internal
     depends_on:
@@ -55,7 +53,6 @@ services:
       AIB_DB_NAME: *db-name
       AIB_DB_HOST: *db-host
       AIB_DB_PORT: *db-port
-      AIB_DB_SCHEME: *db-scheme
       AIB_WORKSPACE_BASE_DIR: /var/lib/flow-44/workspaces
       AIB_FLAPI_BASE_URL: http://flapi-mock:6001
       S3_ENDPOINT_URL: *s3-url
