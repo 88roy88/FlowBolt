@@ -188,10 +188,13 @@
     "noMembers": "No members yet"
   },
   "admin": {
-    "title": "Platform Users",
+    "title": "Admin",
+    "usersTab": "Platform Users",
+    "publishedTab": "Published Apps",
     "userIdPlaceholder": "User ID to invite",
     "invite": "Invite",
-    "noUsers": "No platform users yet"
+    "noUsers": "No platform users yet",
+    "noPublished": "No published apps yet"
   },
   "publish": {
     "publishFailed": "Publish Failed",
