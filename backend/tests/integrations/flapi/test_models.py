@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+
 from flow44.integrations.flapi.models import PackageMetadata, QuickParamsInfo
 
 # ---------------------------------------------------------------------------

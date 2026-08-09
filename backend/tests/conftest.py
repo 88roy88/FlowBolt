@@ -1,11 +1,13 @@
+import contextlib
 import functools
 import os
 from pathlib import Path
 
-import pytest  # noqa: E402
+import psycopg
+import pytest
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
-from sqlalchemy.pool import NullPool  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 # Load test.env to satisfy required environment variables in tests
 # Must happen before importing flow44.config (which reads env vars)
@@ -13,7 +15,13 @@ load_dotenv(Path(__file__).parent / "test.env")
 
 import flow44.config  # noqa: E402
 import flow44.db.database  # noqa: E402
-from flow44.api.deps import TokenPayload, get_user_id, get_user_permissions, validate_token, validate_ws_token  # noqa: E402
+from flow44.api.deps import (  # noqa: E402
+    TokenPayload,
+    get_user_id,
+    get_user_permissions,
+    validate_token,
+    validate_ws_token,
+)
 from flow44.auth.permissions import get_owner_permissions  # noqa: E402
 from flow44.db.database import build_db_url, init_db, reset  # noqa: E402
 from flow44.main import app  # noqa: E402
@@ -60,14 +68,19 @@ async def setup_test_db():
     worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
     dbname = f"test_flow44_{worker}"
 
-    with DatabaseJanitor(
+    janitor = DatabaseJanitor(
         user=settings.DB_USER,
         host=settings.DB_HOST,
         port=settings.DB_PORT,
         dbname=dbname,
         version="16",
         password=settings.DB_PASSWORD,
-    ):
+    )
+    # An aborted run never reaches __exit__, and init() has no IF NOT EXISTS
+    with contextlib.suppress(psycopg.errors.InvalidCatalogName):
+        janitor.drop()
+
+    with janitor:
         settings.DB_NAME = dbname
         await reset()
         await init_db()
