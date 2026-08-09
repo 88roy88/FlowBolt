@@ -26,12 +26,21 @@ BAR
 </flowArtifact>"""
 
 
+class _BuildResult:
+    def __init__(self, errors: str) -> None:
+        self.errors = errors
+
+
 class _RecordingSandbox:
-    def __init__(self) -> None:
+    def __init__(self, errors: str = "") -> None:
         self.written: list[tuple[str, str]] = []
+        self._errors = errors
 
     async def write_file(self, path: str, content: str) -> None:
         self.written.append((path, content))
+
+    async def run_build_command(self, _command: str) -> _BuildResult:
+        return _BuildResult(self._errors)
 
 
 async def _noop_emit(_event: dict[str, Any]) -> None:
@@ -63,6 +72,23 @@ def _stream_artifact(artifact: str) -> Any:
     return _fake_stream
 
 
+class _StubStream:
+    """Yields the next artifact per call, repeating the last one, and records the messages sent."""
+
+    def __init__(self, *artifacts: str) -> None:
+        self._artifacts = artifacts
+        self.calls: list[list[Any]] = []
+
+    def __call__(self, messages: list[Any], *_args: Any, **_kwargs: Any) -> AsyncIterator[str]:
+        artifact = self._artifacts[min(len(self.calls), len(self._artifacts) - 1)]
+        self.calls.append(messages)
+
+        async def _gen() -> AsyncIterator[str]:
+            yield artifact
+
+        return _gen()
+
+
 async def test_execute_task_drops_unexpected_file_but_writes_expected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(execute_agent, "stream_chat", _stream_artifact(_ARTIFACT))
 
@@ -78,6 +104,115 @@ async def test_execute_task_drops_unexpected_file_but_writes_expected(monkeypatc
     assert task.status == "completed"
     assert len(state.rejected_files) == 1
     assert str(state.rejected_files[0]) == "File is outside the task contract: src/components/Bar.tsx"
+
+
+async def test_execute_task_retry_narrows_contract_and_names_missing_files(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stream = _StubStream(_ARTIFACT)
+    monkeypatch.setattr(execute_agent, "stream_chat", stream)
+
+    sandbox = _RecordingSandbox()
+    task = Task(id="t1", title="A", description="", files=["src/components/Foo.tsx", "src/components/Bar.tsx"])
+    state = _make_state(task, sandbox)
+
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+    await agent._execute_task(task, state, retry_files=["src/components/Bar.tsx"])
+
+    assert sandbox.written == [("src/components/Bar.tsx", "BAR")]
+    message = stream.calls[0][0].content
+    assert "did not produce" in message
+    assert "src/components/Bar.tsx" in message
+
+
+async def test_execute_task_retry_accumulates_task_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    foo_only = """<flowArtifact id="a" title="t">
+<flowAction type="file" filePath="src/components/Foo.tsx">
+FOO
+</flowAction>
+</flowArtifact>"""
+    bar_only = """<flowArtifact id="a" title="t">
+<flowAction type="file" filePath="src/components/Bar.tsx">
+BAR
+</flowAction>
+</flowArtifact>"""
+    monkeypatch.setattr(execute_agent, "stream_chat", _StubStream(foo_only, bar_only))
+
+    task = Task(id="t1", title="A", description="", files=["src/components/Foo.tsx", "src/components/Bar.tsx"])
+    state = _make_state(task, _RecordingSandbox())
+
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+    await agent._execute_task(task, state)
+    await agent._execute_task(task, state, retry_files=["src/components/Bar.tsx"])
+
+    assert state.build_state.task_files["t1"] == ["src/components/Foo.tsx", "src/components/Bar.tsx"]
+    assert agent._unfulfilled(state) == []
+
+
+async def test_step_execute_tasks_skips_retry_when_contract_fulfilled(monkeypatch: pytest.MonkeyPatch) -> None:
+    stream = _StubStream(_ARTIFACT)
+    monkeypatch.setattr(execute_agent, "stream_chat", stream)
+
+    task = Task(id="t1", title="A", description="", files=["src/components/Foo.tsx", "src/components/Bar.tsx"])
+    state = _make_state(task, _RecordingSandbox())
+
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+    await agent._step_execute_tasks(state)
+
+    assert len(stream.calls) == 1
+    assert task.status == "completed"
+    assert state.unfulfilled_files == {}
+
+
+async def test_step_execute_tasks_retries_once_then_marks_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+    stream = _StubStream("""<flowArtifact id="a" title="t"></flowArtifact>""")
+    monkeypatch.setattr(execute_agent, "stream_chat", stream)
+
+    events: list[dict[str, Any]] = []
+
+    async def _recording_emit(event: dict[str, Any]) -> None:
+        events.append(event)
+
+    task = Task(id="t1", title="A", description="build the nav", files=["src/components/Foo.tsx"])
+    state = _make_state(task, _RecordingSandbox())
+    state.emit_fn = _recording_emit
+
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+    await agent._step_execute_tasks(state)
+
+    assert len(stream.calls) == 2
+    assert "did not produce" in stream.calls[1][0].content
+    assert task.status == "failed"
+    assert state.unfulfilled_files == {"src/components/Foo.tsx": "A: build the nav"}
+    assert {"type": "task_update", "taskId": "t1", "status": "failed"} in events
+
+
+async def test_step_validate_names_missing_files_alongside_errors() -> None:
+    task = Task(id="t1", title="A", description="build the nav", files=["src/components/Foo.tsx"])
+    state = _make_state(task, _RecordingSandbox(errors="boom"))
+    state.unfulfilled_files = {"src/components/Foo.tsx": "A: build the nav"}
+
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+    await agent._step_validate(state)
+
+    assert "Files a task failed to produce" in state.all_errors
+    assert "src/components/Foo.tsx — A: build the nav" in state.all_errors
+
+
+async def test_step_validate_omits_missing_files_without_errors_or_once_written() -> None:
+    task = Task(id="t1", title="A", description="build the nav", files=["src/components/Foo.tsx"])
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+
+    clean = _make_state(task, _RecordingSandbox())
+    clean.unfulfilled_files = {"src/components/Foo.tsx": "A: build the nav"}
+    await agent._step_validate(clean)
+    assert clean.all_errors == ""
+
+    written = _make_state(task, _RecordingSandbox(errors="boom"))
+    written.unfulfilled_files = {"src/components/Foo.tsx": "A: build the nav"}
+    written.build_state.completed_files = {"src/components/Foo.tsx": "FOO"}
+    await agent._step_validate(written)
+    assert "Files a task failed to produce" not in written.all_errors
 
 
 async def test_execute_task_records_note_for_unsafe_path(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -162,7 +297,7 @@ async def test_step_fix_errors_sends_single_message_without_notes(monkeypatch: p
     assert "Changes that could not be applied" not in message
 
 
-def test_route_after_validate_treats_rejections_like_errors() -> None:
+def test_route_after_validate_ignores_rejections_on_a_green_build() -> None:
     task = Task(id="t1", title="A", description="", files=["src/components/Foo.tsx"])
     state = _make_state(task, _RecordingSandbox())
     agent = ExecuteAgent.__new__(ExecuteAgent)
@@ -170,6 +305,9 @@ def test_route_after_validate_treats_rejections_like_errors() -> None:
     assert agent._route_after_validate(state) == "summarize"
 
     state.rejected_files = [FileSafetyError("something rejected")]
+    assert agent._route_after_validate(state) == "summarize"
+
+    state.all_errors = "## Build Errors\nboom"
     assert agent._route_after_validate(state) == "fix_errors"
 
     state.fix_attempts = 10

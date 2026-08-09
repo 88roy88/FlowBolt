@@ -121,5 +121,6 @@ placeholders or ellipses.
 6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
 7. Import from already-completed files using their exact export names.
 8. Do NOT include shell actions — only file actions.
+9. A `.ts` file must not contain JSX. If a file assigned to you would need to render markup, restructure it — return refs, handlers, and state for a component to render. Do not rename the file; the path is fixed by the contract.
 
 {% include "_file_safety_rules.jinja2" %}

@@ -50,7 +50,7 @@ class FixErrorAgent(ChatAgent):
 
     def _route_after_validate(self, state: FixErrorState) -> str | None:
         """Route after validation: retry, or complete."""
-        if not state.validation_errors and not state.rejected_files:
+        if not state.validation_errors:
             return "complete"
 
         if state.retry_count >= MAX_RETRY_ATTEMPTS:

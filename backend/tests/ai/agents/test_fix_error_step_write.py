@@ -71,13 +71,16 @@ async def test_step_write_drops_protected_file_and_records_rejection() -> None:
     assert len(result.rejected_files) == 1
 
 
-def test_route_after_validate_treats_rejections_like_errors() -> None:
+def test_route_after_validate_ignores_rejections_on_a_green_build() -> None:
     state = _make_state(_RecordingSandbox())
     agent = FixErrorAgent.__new__(FixErrorAgent)
 
     assert agent._route_after_validate(state) == "complete"
 
     state.rejected_files = [FileSafetyError("something rejected")]
+    assert agent._route_after_validate(state) == "complete"
+
+    state.validation_errors = "boom"
     assert agent._route_after_validate(state) == "retry"
 
     state.retry_count = fix_error_agent.MAX_RETRY_ATTEMPTS

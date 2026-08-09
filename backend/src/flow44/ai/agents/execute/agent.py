@@ -64,7 +64,7 @@ class ExecuteAgent(BaseAgent):
         return flow
 
     def _route_after_validate(self, state: ExecutionState) -> str | None:
-        if not state.all_errors and not state.rejected_files:
+        if not state.all_errors:
             return "summarize"
 
         if state.fix_attempts >= MAX_FIX_ATTEMPTS:
@@ -163,6 +163,16 @@ class ExecuteAgent(BaseAgent):
 
             for layer in state.build_state.work_plan.execution_layers():
                 await asyncio.gather(*[self._execute_task(t, state) for t in layer])
+
+            for task, missing in self._unfulfilled(state):
+                logger.warning("[execute] Task %s did not deliver %s, retrying", task.id, missing)
+                await self._execute_task(task, state, retry_files=missing)
+
+            for task, missing in self._unfulfilled(state):
+                task.status = "failed"
+                await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
+                for path in missing:
+                    state.unfulfilled_files[path] = f"{task.title}: {task.description}"
         except Exception as exc:
             record_span_error(exc)
             raise
@@ -172,6 +182,7 @@ class ExecuteAgent(BaseAgent):
             output={
                 "files_written": list(state.build_state.completed_files.keys()),
                 "failed_tasks": failed_tasks,
+                "unfulfilled_files": list(state.unfulfilled_files),
             }
         )
         return state
@@ -187,6 +198,14 @@ class ExecuteAgent(BaseAgent):
             all_errors.append("## TypeScript Errors\n" + state.typecheck_errors)
         if state.build_errors:
             all_errors.append("## Build Errors\n" + state.build_errors)
+
+        missing = [
+            f"- {path} — {desc}"
+            for path, desc in state.unfulfilled_files.items()
+            if path not in state.build_state.completed_files
+        ]
+        if all_errors and missing:
+            all_errors.append("## Files a task failed to produce (create them)\n" + "\n".join(missing))
 
         state.all_errors = "\n\n".join(all_errors)
         return state
@@ -278,6 +297,12 @@ class ExecuteAgent(BaseAgent):
 
     # -- Helper Methods --
 
+    def _unfulfilled(self, state: ExecutionState) -> list[tuple[Task, list[str]]]:
+        delivered = state.build_state.task_files
+        tasks = state.build_state.work_plan.tasks if state.build_state.work_plan else []
+        gaps = ((t, sorted(set(t.files) - set(delivered.get(t.id, [])))) for t in tasks)
+        return [(t, missing) for t, missing in gaps if missing]
+
     async def _build_technical_plan(self, state: ExecutionState) -> WorkPlan:
         merge_data: dict[str, object] = {
             "user_request": state.build_state.user_content,
@@ -342,16 +367,22 @@ class ExecuteAgent(BaseAgent):
 
     # Stays manual — runs in parallel via asyncio.gather, contextvar parent tracking
     # doesn't work with multiple concurrent invocations of the same method.
-    async def _execute_task(self, task: Task, state: ExecutionState) -> None:
+    async def _execute_task(self, task: Task, state: ExecutionState, retry_files: list[str] | None = None) -> None:
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
+        files = retry_files or task.files
         span = create_span(
             trace_id=state.trace_id,
             parent_span_id=state.observation_id,
             name=f"execute-task-{task.id}",
-            input={"task_title": task.title, "task_description": task.description, "expected_files": task.files},
-            metadata={"task_id": task.id, "task_title": task.title, "expected_files": len(task.files)},
+            input={"task_title": task.title, "task_description": task.description, "expected_files": files},
+            metadata={
+                "task_id": task.id,
+                "task_title": task.title,
+                "expected_files": len(files),
+                "retry": bool(retry_files),
+            },
         )
 
         try:
@@ -365,7 +396,7 @@ class ExecuteAgent(BaseAgent):
             prompt = render_codegen(
                 task_title=task.title,
                 task_description=task.description,
-                task_files=task.files,
+                task_files=files,
                 architecture=state.build_state.work_plan.architecture.model_dump(),
                 ux_design=state.build_state.work_plan.ux_design.model_dump(),
                 dependency_files={p: c for p, c in state.build_state.completed_files.items() if p in dep_paths} or None,
@@ -374,10 +405,16 @@ class ExecuteAgent(BaseAgent):
                 data_source_contexts=state.build_state.data_source_contexts or None,
             )
 
+            instruction = "Generate the code."
+            if retry_files:
+                instruction = "A previous attempt did not produce these files. Generate them now: " + ", ".join(
+                    retry_files
+                )
+
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
             async for chunk in stream_chat(
-                [Message.user("Generate the code.")],
+                [Message.user(instruction)],
                 prompt,
                 model=state.model,
                 metadata=state.llm_metadata_fn(f"execute_task_{task.id}", parent_span_id=span.id),
@@ -385,7 +422,7 @@ class ExecuteAgent(BaseAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            expected_paths = set(task.files)
+            expected_paths = set(files)
             safe, rejections = screen_generated_files(generated)
             validated: list[tuple[str, str]] = []
             for path, content in safe:
@@ -405,7 +442,7 @@ class ExecuteAgent(BaseAgent):
                 await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "running", "file": path})
                 await state.emit_fn({"type": "file", "path": path, "content": content})
 
-            state.build_state.task_files[task.id] = paths
+            state.build_state.task_files.setdefault(task.id, []).extend(paths)
             task.status = "completed"
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "completed"})
             span.end(output={"files_written": paths, "rejected_files": [str(r) for r in rejections]})

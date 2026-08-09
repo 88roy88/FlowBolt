@@ -28,6 +28,7 @@ class ExecutionState(BaseModel):
     all_errors: str = ""
     fix_attempts: int = 0
     rejected_files: list[FileSafetyError] = Field(default_factory=list)
+    unfulfilled_files: dict[str, str] = Field(default_factory=dict)
 
     class Config:
         arbitrary_types_allowed = True
