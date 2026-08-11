@@ -21,7 +21,7 @@ class BuildState(BaseModel):
     selected_packages: list[str] = Field(default_factory=list)
     architecture: ArchitectureDesign = Field(default_factory=ArchitectureDesign)
     ux_design: UXDesign = Field(default_factory=UXDesign)
-    user_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)
+    user_plan_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)
     work_plan: WorkPlan | None = None
     completed_files: dict[str, str] = Field(default_factory=dict)
     task_files: dict[str, list[str]] = Field(default_factory=dict)

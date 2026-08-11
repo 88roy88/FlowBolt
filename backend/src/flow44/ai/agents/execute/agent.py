@@ -4,8 +4,7 @@ import logging
 import uuid
 from typing import Any
 
-from langfuse import Langfuse
-from langfuse.decorators import observe
+from opik import opik_context, track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
@@ -19,6 +18,7 @@ from flow44.ai.agents.execute.prompts import (
 from flow44.ai.agents.optional_packages import npm_dependencies
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_failure_logger import create_span, error_info, record_span_error
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
@@ -54,7 +54,6 @@ class ExecuteAgent(BaseAgent):
         self._flow = self._build_flow()
 
     def _build_flow(self) -> Flow[ExecutionState]:
-        """Build the execution flow with explicit steps and routing."""
         flow = Flow[ExecutionState]("execute")
 
         flow.add_step("build_plan", self._step_build_plan, next_step="execute_tasks")
@@ -66,7 +65,6 @@ class ExecuteAgent(BaseAgent):
         return flow
 
     def _route_after_validate(self, state: ExecutionState) -> str | None:
-        """Route after validation: fix_errors, summarize, or give up."""
         if not state.all_errors and not state.rejected_files:
             return "summarize"
 
@@ -76,18 +74,18 @@ class ExecuteAgent(BaseAgent):
 
         return "fix_errors"
 
-    @observe(name="execute-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="execute-agent-run")  # type: ignore[untyped-decorator]
     async def run(self) -> None:
-        """Run the execution flow."""
         self._setup_trace(["execute-agent"])
+        self._set_trace_input({"action": "plan_approved"})
 
-        # Emit plan accepted
-        await self.emit({"type": "plan_accepted", "overview": self._build_state.user_overview.model_dump()})
+        await self.emit({"type": "plan_accepted", "overview": self._build_state.user_plan_overview.model_dump()})
 
         # Install optional packages selected during planning (no-op when none)
         await self.sandbox.install_optional_packages(npm_dependencies(self._build_state.selected_packages))
 
         # Initialize execution state
+        current_span = opik_context.get_current_span_data()
         exec_state = ExecutionState(
             build_state=self._build_state,
             project_id=self.project_id,
@@ -95,27 +93,34 @@ class ExecuteAgent(BaseAgent):
             emit_fn=self.emit,
             model=self.model,
             trace_id=self._trace_id,
-            langfuse_client=Langfuse(),
+            root_span_id=current_span.id if current_span else None,
             llm_metadata_fn=self._llm_metadata,
         )
 
-        # Run the flow
         final_state = await self._flow.run(exec_state, start="build_plan")
 
-        # Final cleanup
+        self._set_trace_output(
+            {
+                "files_written": list(final_state.build_state.completed_files.keys()),
+                "fix_attempts": final_state.fix_attempts,
+                "rejected_files": [str(r) for r in final_state.rejected_files],
+            }
+        )
+
         final_state.build_state.phase = "idle"
         final_state.build_state.work_plan = None
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
-    # -- Flow Steps --
+    # -- Flow Steps (sequential — use @track for automatic span lifecycle) --
 
+    @track(name="build-technical-plan")  # type: ignore[untyped-decorator]
     async def _step_build_plan(self, state: ExecutionState) -> ExecutionState:
-        """Step: Build technical plan from user overview."""
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
-        span = state.langfuse_client.span(trace_id=state.trace_id, name="build-technical-plan")
-        state.observation_id = span.id
+        span_data = opik_context.get_current_span_data()
+        state.observation_id = span_data.id if span_data else None
+        opik_context.update_current_span(input={"user_request": state.build_state.user_content})
 
         try:
             state.build_state.work_plan = await self._build_technical_plan(state)
@@ -128,42 +133,55 @@ class ExecuteAgent(BaseAgent):
                     ],
                 }
             )
-        finally:
-            span.end()
+        except Exception as exc:
+            record_span_error(exc)
+            raise
 
+        opik_context.update_current_span(
+            output={
+                "task_count": len(state.build_state.work_plan.tasks),
+                "tasks": [t.title for t in state.build_state.work_plan.tasks],
+            }
+        )
         return state
 
+    @track(name="execute-plan")  # type: ignore[untyped-decorator]
     async def _step_execute_tasks(self, state: ExecutionState) -> ExecutionState:
-        """Step: Execute all tasks in parallel layers."""
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
-        span = state.langfuse_client.span(
-            trace_id=state.trace_id,
-            name="execute-plan",
+        span_data = opik_context.get_current_span_data()
+        state.observation_id = span_data.id if span_data else None
+        opik_context.update_current_span(
+            input={"tasks": [t.title for t in state.build_state.work_plan.tasks]},
             metadata={
                 "total_tasks": len(state.build_state.work_plan.tasks),
                 "execution_layers": len(state.build_state.work_plan.execution_layers()),
             },
         )
-        state.observation_id = span.id
 
         try:
             await state.emit_fn({"type": "phase", "phase": "executing"})
 
-            # Pre-populate with deterministically generated data source files
             state.build_state.completed_files = dict(state.build_state.generated_data_source_files)
             state.build_state.task_files = {}
 
             for layer in state.build_state.work_plan.execution_layers():
                 await asyncio.gather(*[self._execute_task(t, state) for t in layer])
-        finally:
-            span.end()
+        except Exception as exc:
+            record_span_error(exc)
+            raise
 
+        failed_tasks = [t.title for t in state.build_state.work_plan.tasks if t.status == "failed"]
+        opik_context.update_current_span(
+            output={
+                "files_written": list(state.build_state.completed_files.keys()),
+                "failed_tasks": failed_tasks,
+            }
+        )
         return state
 
     async def _step_validate(self, state: ExecutionState) -> ExecutionState:
-        """Step: Validate with typecheck and build."""
         state.typecheck_errors, state.build_errors = await asyncio.gather(
             self._typecheck(state),
             self._build(state),
@@ -178,10 +196,16 @@ class ExecuteAgent(BaseAgent):
         state.all_errors = "\n\n".join(all_errors)
         return state
 
+    @track(name="fix-errors")  # type: ignore[untyped-decorator]
     async def _step_fix_errors(self, state: ExecutionState) -> ExecutionState:
-        """Step: Auto-fix validation errors."""
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
+
+        span_data = opik_context.get_current_span_data()
+        state.observation_id = span_data.id if span_data else None
+        opik_context.update_current_span(
+            input={"errors": state.all_errors, "fix_attempt": state.fix_attempts},
+        )
 
         prompt = render_feedback(
             files=state.build_state.completed_files,
@@ -191,15 +215,15 @@ class ExecuteAgent(BaseAgent):
             Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
         ]
 
+        generated: list[tuple[str, str]] = []
         try:
-            generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
 
             async for chunk in stream_chat(
                 messages,
                 prompt,
                 model=state.model,
-                metadata=state.llm_metadata_fn("fix_errors"),
+                metadata=state.llm_metadata_fn("fix_errors", parent_span_id=state.observation_id),
             ):
                 parser.feed(chunk)
             parser.flush()
@@ -210,19 +234,25 @@ class ExecuteAgent(BaseAgent):
                     await state.sandbox_ref.write_file(path, content)
                     state.build_state.completed_files[path] = content
                     await state.emit_fn({"type": "file", "path": path, "content": content})
-        except Exception:
+        except Exception as exc:
             logger.exception("[execute] Error fix pass failed")
+            record_span_error(exc)
 
+        opik_context.update_current_span(output={"files_fixed": [p for p, _ in generated]})
         return state
 
+    @track(name="generate-summary")  # type: ignore[untyped-decorator]
     async def _step_summarize(self, state: ExecutionState) -> ExecutionState:
-        """Step: Generate project summary."""
         if state.rejected_files:
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
 
-        span = state.langfuse_client.span(trace_id=state.trace_id, name="generate-summary")
-        state.observation_id = span.id
+        span_data = opik_context.get_current_span_data()
+        state.observation_id = span_data.id if span_data else None
+        opik_context.update_current_span(
+            input={"files_created": list(state.build_state.completed_files.keys())},
+        )
 
+        summary_data = None
         try:
             summary_input = json.dumps(
                 {
@@ -236,7 +266,7 @@ class ExecuteAgent(BaseAgent):
                 [Message.user(summary_input)],
                 SUMMARY_PROMPT,
                 model=state.model,
-                metadata=state.llm_metadata_fn("generate_summary"),
+                metadata=state.llm_metadata_fn("generate_summary", parent_span_id=state.observation_id),
             )
             summary_data = parse_json_response(raw)
             if summary_data:
@@ -247,22 +277,21 @@ class ExecuteAgent(BaseAgent):
                     }
                 await update_project_summary(state.project_id, json.dumps(summary_data, ensure_ascii=False))
                 await state.emit_fn({"type": "project_summary", "summary": summary_data})
-        except Exception:
+        except Exception as exc:
             logger.exception("[execute] Summary generation failed")
-        finally:
-            span.end()
+            record_span_error(exc)
 
+        opik_context.update_current_span(output=summary_data or {})
         return state
 
     # -- Helper Methods --
 
     async def _build_technical_plan(self, state: ExecutionState) -> WorkPlan:
-        """Build technical task plan from user overview."""
         merge_data: dict[str, object] = {
             "user_request": state.build_state.user_content,
             "architecture": state.build_state.architecture.model_dump(),
             "ux_design": state.build_state.ux_design.model_dump(),
-            "user_preferences": [d.model_dump() for d in state.build_state.user_overview.decisions],
+            "user_preferences": [d.model_dump() for d in state.build_state.user_plan_overview.decisions],
         }
         if state.build_state.data_source_contexts:
             merge_data["data_source_integrations"] = [
@@ -287,7 +316,7 @@ class ExecuteAgent(BaseAgent):
                 selected_packages=state.build_state.selected_packages,
             ),
             model=state.model,
-            metadata=state.llm_metadata_fn("build_technical_plan"),
+            metadata=state.llm_metadata_fn("build_technical_plan", parent_span_id=state.observation_id),
         )
         plan_data = parse_json_response(raw)
 
@@ -322,15 +351,17 @@ class ExecuteAgent(BaseAgent):
             tasks=tasks,
         )
 
+    # Stays manual — runs in parallel via asyncio.gather, contextvar parent tracking
+    # doesn't work with multiple concurrent invocations of the same method.
     async def _execute_task(self, task: Task, state: ExecutionState) -> None:
-        """Execute a single task with Langfuse span."""
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
 
-        span = state.langfuse_client.span(
+        span = create_span(
             trace_id=state.trace_id,
-            parent_observation_id=state.observation_id,
+            parent_span_id=state.observation_id,
             name=f"execute-task-{task.id}",
+            input={"task_title": task.title, "task_description": task.description, "expected_files": task.files},
             metadata={"task_id": task.id, "task_title": task.title, "expected_files": len(task.files)},
         )
 
@@ -361,7 +392,7 @@ class ExecuteAgent(BaseAgent):
                 [Message.user("Generate the code.")],
                 prompt,
                 model=state.model,
-                metadata=state.llm_metadata_fn(f"execute_task_{task.id}"),
+                metadata=state.llm_metadata_fn(f"execute_task_{task.id}", parent_span_id=span.id),
             ):
                 parser.feed(chunk)
             parser.flush()
@@ -389,20 +420,18 @@ class ExecuteAgent(BaseAgent):
             state.build_state.task_files[task.id] = paths
             task.status = "completed"
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "completed"})
+            span.end(output={"files_written": paths, "rejected_files": [str(r) for r in rejections]})
         except Exception as exc:
             logger.exception("[execute] Task %s failed", task.id)
             task.status = "failed"
             task.error = str(exc)
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
-        finally:
-            span.end()
+            span.end(error_info=error_info(exc))
 
     async def _typecheck(self, state: ExecutionState) -> str:
-        """Run TypeScript typecheck."""
         result = await state.sandbox_ref.run_build_command("npx tsc --noEmit")
         return str(result.errors)
 
     async def _build(self, state: ExecutionState) -> str:
-        """Run build command."""
         result = await state.sandbox_ref.run_build_command("pnpm build")
         return str(result.errors)

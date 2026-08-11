@@ -5,7 +5,6 @@ description = "AI Web App Builder - Backend"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "aioboto3>=15.5.0",
-    "aiosqlite>=0.20.0",
     "alembic>=1.18.4",
     "alembic-postgresql-enum>=1.10.0",
     "asyncpg>=0.31.0",
@@ -14,8 +13,8 @@ dependencies = [
     "greenlet>=3.3.2",
     "httpx>=0.28.0",
     "jinja2>=3.1.0",
-    "langfuse==2.59.7",     # using langfuse 2.59.7 compatible with litellm
-    "litellm>=1.55.10,<1.82.3",
+    "litellm>=1.55.10",
+    "opik>=2.1.32",
     "pydantic-settings>=2.7.1",
     "pyjwt>=2.12.1",
     "python-json-logger>=4.1.0",
@@ -43,6 +42,8 @@ dev = [
     "pytest-asyncio>=0.23.7,<0.24",
     "pytest-cov>=5.0.0,<6",
     "pytest-xdist>=3.6.1,<4",
+    "pytest-postgresql>=6.0.0",
+    "psycopg[binary]>=3.2.0",
 ]
 
 [project.scripts]
