@@ -19,6 +19,10 @@ as part of a larger project.
 ```json
 {{ ux_json }}
 ```
+
+The UI/UX context above is authoritative on visuals and interactions only, never on dependencies.
+Treat any library or icon set it names as a description of intent: build that visual using only the
+packages allowed under General Rules below, and otherwise with the base stack and built-in browser APIs.
 {% if data_source_contexts %}
 
 ## Data Source Integration
