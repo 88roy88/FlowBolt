@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import logging
 import pkgutil
+from collections.abc import Iterable
 
 import flow44.ai.agents.optional_packages as _pkg
 from flow44.ai.agents.optional_packages.base import OptionalPackage, PackageRuleset
@@ -10,15 +11,22 @@ from flow44.ai.agents.optional_packages.base import OptionalPackage, PackageRule
 logger = logging.getLogger(__name__)
 
 
+def _resolve_module_package(module_name: str) -> OptionalPackage | None:
+    module = importlib.import_module(module_name)
+    package = getattr(module, "PACKAGE", None)
+    return package if isinstance(package, OptionalPackage) else None
+
+
 def _discover() -> dict[str, OptionalPackage]:
     found: dict[str, OptionalPackage] = {}
     for info in pkgutil.iter_modules(_pkg.__path__):
         if not info.ispkg:
             continue
-        module = importlib.import_module(f"{_pkg.__name__}.{info.name}")
-        package = getattr(module, "PACKAGE", None)
-        if isinstance(package, OptionalPackage):
-            found[package.name] = package
+        package = _resolve_module_package(f"{_pkg.__name__}.{info.name}")
+        if package is None:
+            logger.warning("Skipping optional-package directory with no valid PACKAGE: %s", info.name)
+            continue
+        found[package.name] = package
     return dict(sorted(found.items()))
 
 
@@ -36,6 +44,11 @@ def validate_selection(names: list[str]) -> list[str]:
 def resolve_packages(names: list[str]) -> list[OptionalPackage]:
     unique = list(dict.fromkeys(names))
     return [package for name in unique if (package := OPTIONAL_PACKAGES.get(name))]
+
+
+def installed_packages(dependencies: Iterable[str]) -> list[OptionalPackage]:
+    present = set(dependencies)
+    return [pkg for pkg in OPTIONAL_PACKAGES.values() if present.issuperset(pkg.packages)]
 
 
 def npm_dependencies(names: list[str]) -> list[str]:

@@ -95,6 +95,7 @@ class FixErrorAgent(ChatAgent):
         )
 
         state.discovered_files = await self._discover_files(state.error_file)
+        state.installed_packages = await self._installed_optional_packages()
 
         if not state.discovered_files:
             await state.emit_fn({"type": "error", "message": "Could not read source files to fix error"})
@@ -124,6 +125,7 @@ class FixErrorAgent(ChatAgent):
             error_line=state.error_line,
             error_stack=state.error_stack,
             files=state.discovered_files,
+            installed_packages=state.installed_packages,
         )
 
         parser = ActionParser(on_file_action=lambda p, c: state.generated_files.append((p, c)))
@@ -226,7 +228,7 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."}
         )
 
-        prompt = render_feedback(files=dict(state.generated_files))
+        prompt = render_feedback(files=dict(state.generated_files), installed_packages=state.installed_packages)
         messages: list[dict[str, Any] | Message] = [
             Message.user(format_agent_feedback(state.validation_errors, state.rejected_files))
         ]

@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 from flow44.ai.agents import optional_packages as op
 from flow44.ai.agents.execute.prompts import render_codegen, render_feedback, render_merge
+from flow44.ai.agents.fix_error.agent import FixErrorAgent
+from flow44.ai.agents.fix_error.prompts import render_feedback as render_fix_feedback
+from flow44.ai.agents.fix_error.prompts import render_fix_error_direct
+from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.agents.optional_packages import (
     OPTIONAL_PACKAGES,
     OptionalPackage,
     PackageRuleset,
+    installed_packages,
     npm_dependencies,
     render_package_rules,
     resolve_packages,
     validate_selection,
 )
+from flow44.ai.agents.optional_packages import registry as op_registry
 from flow44.ai.agents.plan import agent as plan_agent
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import render_package_decision
@@ -24,13 +33,14 @@ from flow44.ai.state import BuildState
 
 SEED = {"date-fns", "lucide-react", "react-hook-form", "recharts"}
 
-
-class _NoTemplatePackage(OptionalPackage):
-    name = "no-template"
-    capability = "none"
-    packages = ("no-template",)
-    use_when = "never"
-    avoid_when = "always"
+_NO_TEMPLATE_PACKAGE = OptionalPackage(
+    name="no-template",
+    capability="none",
+    packages=("no-template",),
+    templates_dir=Path(__file__).parent / "does-not-exist",
+    use_when="never",
+    avoid_when="always",
+)
 
 
 class TestRegistry:
@@ -66,7 +76,25 @@ class TestRegistry:
 
     def test_missing_template_is_skipped_not_error(self) -> None:
         # A package that ships no templates dir -> render_prompt returns None, not an error.
-        assert _NoTemplatePackage().render_prompt(PackageRuleset.CODEGEN) is None
+        assert _NO_TEMPLATE_PACKAGE.render_prompt(PackageRuleset.CODEGEN) is None
+
+    def test_every_package_ships_every_ruleset(self) -> None:
+        for pkg in OPTIONAL_PACKAGES.values():
+            for ruleset in PackageRuleset:
+                block = pkg.render_prompt(ruleset)
+                assert block, f"{pkg.name} is missing {ruleset.value}.md"
+
+    def test_every_fragment_starts_with_an_attributing_heading(self) -> None:
+        # Blocks from several packages get concatenated; each must name its own package.
+        for pkg in OPTIONAL_PACKAGES.values():
+            for ruleset in PackageRuleset:
+                block = pkg.render_prompt(ruleset) or ""
+                assert block.startswith(f"### {pkg.name} — "), f"{pkg.name}/{ruleset.value}.md"
+
+    def test_followup_fragments_carry_no_code_fence(self) -> None:
+        # The follow-up agent reads the app's real usage; a sample would get copied instead.
+        for pkg in OPTIONAL_PACKAGES.values():
+            assert "```" not in (pkg.render_prompt(PackageRuleset.FOLLOWUP) or "")
 
     def test_recharts_codegen_mentions_responsive_container(self) -> None:
         blocks = render_package_rules(["recharts"], PackageRuleset.CODEGEN)
@@ -77,6 +105,57 @@ class TestRegistry:
         for name in SEED:
             blocks = render_package_rules([name], PackageRuleset.CODEGEN)
             assert blocks and "import {" in blocks[0]
+
+
+class TestInstalledPackages:
+    def test_maps_dependencies_back_to_packages(self) -> None:
+        deps = {"react": "^18", "react-dom": "^18", "recharts": "^2", "date-fns": "^3"}
+        assert [p.name for p in installed_packages(deps)] == ["date-fns", "recharts"]
+
+    def test_ignores_unrelated_deps(self) -> None:
+        # The base template ships these; none is an optional package.
+        assert installed_packages({"jose": "^5", "react": "^18", "react-dom": "^18"}) == []
+
+    def test_empty_dependencies(self) -> None:
+        assert installed_packages({}) == []
+
+    def test_requires_every_npm_dep_of_a_package(self) -> None:
+        multi = OptionalPackage(
+            name="multi",
+            capability="none",
+            packages=("alpha", "beta"),
+            templates_dir=Path(__file__).parent,
+            use_when="",
+            avoid_when="",
+        )
+        assert not {"alpha"} >= set(multi.packages)
+        assert {"alpha", "beta"} >= set(multi.packages)
+
+
+class TestDiscovery:
+    def test_resolve_returns_package_for_real_module(self) -> None:
+        pkg = op_registry._resolve_module_package("flow44.ai.agents.optional_packages.recharts")
+        assert pkg is not None and pkg.name == "recharts"
+
+    def test_resolve_returns_none_without_valid_package(self) -> None:
+        # A module that exists but declares no PACKAGE attribute.
+        assert op_registry._resolve_module_package("flow44.ai.agents.optional_packages.base") is None
+
+    def test_discover_warns_and_keeps_the_rest(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        real = op_registry._resolve_module_package
+
+        def _flaky(module_name: str) -> OptionalPackage | None:
+            return None if module_name.endswith("recharts") else real(module_name)
+
+        monkeypatch.setattr(op_registry, "_resolve_module_package", _flaky)
+        with caplog.at_level("WARNING"):
+            found = op_registry._discover()
+
+        assert "recharts" not in found
+        assert set(found) >= SEED - {"recharts"}
+        assert sum("recharts" in r.message for r in caplog.records) == 1
 
 
 class TestPromptInjection:
@@ -122,6 +201,93 @@ class TestPromptInjection:
         with_rules = render_feedback(files={"a.tsx": "x"}, selected_packages=names)
         assert "Package usage rules" in with_rules
         assert "Package usage rules" not in render_feedback(files={})
+
+
+class TestPostBuildPromptInjection:
+    """The follow-up and fix-error agents must state the app's real dependency set."""
+
+    def test_followup_lists_installed_and_injects_rules(self) -> None:
+        prompt = render_followup(project_summary="s", file_tree="src/App.tsx", installed_packages=["recharts"])
+        assert "`recharts`" in prompt
+        assert "Package usage rules" in prompt
+        assert "ResponsiveContainer" in prompt
+        assert "date-fns" not in prompt
+
+    def test_followup_without_packages_keeps_strict_rule(self) -> None:
+        prompt = render_followup(project_summary="s", file_tree="src/App.tsx")
+        assert "no axios, lodash" in prompt
+        assert "Package usage rules" not in prompt
+
+    def test_followup_renders_file_safety_once(self) -> None:
+        prompt = render_followup(project_summary="s", file_tree="t", installed_packages=["date-fns"])
+        assert prompt.count("## File Safety Rules") == 1
+
+    def test_fix_error_direct_no_longer_forbids_an_installed_package(self) -> None:
+        prompt = render_fix_error_direct(error_message="boom", files={"a.tsx": "x"}, installed_packages=["recharts"])
+        assert "`recharts`" in prompt
+        assert "Only use pre-installed packages" not in prompt
+        assert "Package usage rules" in prompt
+
+    def test_fix_error_direct_without_packages_keeps_original_rule(self) -> None:
+        prompt = render_fix_error_direct(error_message="boom", files={"a.tsx": "x"})
+        assert "Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS)" in prompt
+        assert "Package usage rules" not in prompt
+
+    def test_fix_error_feedback_injects_rules_only_when_present(self) -> None:
+        with_rules = render_fix_feedback(files={"a.tsx": "x"}, installed_packages=["date-fns"])
+        assert "Package usage rules" in with_rules
+        assert "date-fns" in with_rules
+        assert "Package usage rules" not in render_fix_feedback(files={"a.tsx": "x"})
+
+
+class _ManifestSandbox:
+    """Duck-typed sandbox returning a canned package.json (or raising)."""
+
+    def __init__(self, payload: str | Exception) -> None:
+        self._payload = payload
+
+    async def read_file(self, path: str) -> str:
+        assert path == "package.json"
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+def _chat_agent(payload: str | Exception) -> FixErrorAgent:
+    agent = FixErrorAgent.__new__(FixErrorAgent)
+    agent.sandbox = _ManifestSandbox(payload)  # type: ignore[assignment]
+    agent.project_id = "p"
+    return agent
+
+
+class TestInstalledOptionalPackagesHelper:
+    async def test_reads_dependencies_and_dev_dependencies(self) -> None:
+        manifest: dict[str, Any] = {
+            "dependencies": {"react": "^18", "recharts": "^2"},
+            "devDependencies": {"lucide-react": "^0.3", "typescript": "^5"},
+        }
+        agent = _chat_agent(json.dumps(manifest))
+        assert await agent._installed_optional_packages() == ["lucide-react", "recharts"]
+
+    async def test_missing_manifest_returns_empty(self) -> None:
+        agent = _chat_agent(FileNotFoundError("package.json"))
+        assert await agent._installed_optional_packages() == []
+
+    async def test_malformed_json_returns_empty(self) -> None:
+        agent = _chat_agent("{not json")
+        assert await agent._installed_optional_packages() == []
+
+    async def test_non_object_manifest_returns_empty(self) -> None:
+        agent = _chat_agent("[1, 2, 3]")
+        assert await agent._installed_optional_packages() == []
+
+    async def test_non_mapping_dependencies_returns_empty(self) -> None:
+        agent = _chat_agent(json.dumps({"dependencies": ["recharts"]}))
+        assert await agent._installed_optional_packages() == []
+
+    async def test_manifest_without_dependencies_returns_empty(self) -> None:
+        agent = _chat_agent(json.dumps({"name": "project"}))
+        assert await agent._installed_optional_packages() == []
 
 
 def _make_agent() -> plan_agent.PlanAgent:

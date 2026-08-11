@@ -42,6 +42,11 @@ Rules:
 3. Do NOT refactor unrelated code
 4. Output complete file contents, not patches
 5. Do NOT include shell actions
+{% if installed_packages %}
+6. **CRITICAL**: The available packages are React, react-dom, Tailwind CSS, and {% for name in installed_packages %}`{{ name }}`{% if not loop.last %}, {% endif %}{% endfor %}. Do NOT import any package outside this list.
+{% else %}
 6. **CRITICAL**: Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS). Do NOT import other npm packages.
+{% endif %}
 
+{% include "_package_rules.jinja2" %}
 {% include "_file_safety_rules.jinja2" %}
