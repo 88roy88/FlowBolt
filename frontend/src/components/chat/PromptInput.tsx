@@ -6,6 +6,8 @@ import { useSessionStore } from '../../stores/session';
 import { ArrowUp, Loader2, Database, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
+import { EnhanceRow } from './enhance/EnhanceRow';
+import { useEnhancePrompt } from './enhance/useEnhancePrompt';
 import { Badge } from '../ui/badge';
 
 import { WRITE_ROLES } from '../../types';
@@ -36,15 +38,46 @@ export function PromptInput() {
     }
   }, []);
 
+  const applyToTextarea = useCallback(
+    (text: string) => {
+      adjustHeight();
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+      el.scrollTop = 0;
+    },
+    [adjustHeight]
+  );
+
+  const enhance = useEnhancePrompt(projectId, value, setValue, applyToTextarea);
+
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || inputBlocked || !projectId) return;
+    enhance.reset();
     sendMessage(trimmed);
     setValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    enhance.reset();
+    setValue(e.target.value);
+    adjustHeight();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      if (showEnhance && !enhance.isEnhancing) enhance.enhance();
+      return;
+    }
+    if (e.key === 'Escape' && enhance.canUndo) {
+      e.preventDefault();
+      enhance.undo();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -54,6 +87,7 @@ export function PromptInput() {
   const disabled = inputBlocked || !projectId;
   const canSend = !!value.trim() && !disabled;
   const dsOpen = showDsSelector && !disabled;
+  const showEnhance = !!value.trim() && !disabled;
 
   // Global keyboard shortcut: Cmd+K to focus chat
   useEffect(() => {
@@ -134,7 +168,7 @@ export function PromptInput() {
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => { setValue(e.target.value); adjustHeight(); }}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -144,6 +178,15 @@ export function PromptInput() {
           data-testid="chat-input"
           className="w-full resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
         />
+
+        {showEnhance && (
+          <EnhanceRow
+            isEnhancing={enhance.isEnhancing}
+            canUndo={enhance.canUndo}
+            onEnhance={() => enhance.enhance()}
+            onUndo={enhance.undo}
+          />
+        )}
 
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}

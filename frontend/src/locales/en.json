@@ -140,6 +140,15 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "model": "Model",
+    "enhance": {
+      "action": "Enhance prompt",
+      "actionTitle": "Enhance prompt (Ctrl+E)",
+      "enhancing": "Enhancing...",
+      "enhanced": "Enhanced",
+      "undo": "Undo",
+      "undoTitle": "Undo (Esc)",
+      "failed": "Could not enhance the prompt. Your text is unchanged."
+    },
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept or modify",

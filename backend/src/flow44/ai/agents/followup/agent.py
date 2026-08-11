@@ -1,5 +1,4 @@
 import asyncio
-import json
 import uuid
 from typing import Any
 
@@ -14,6 +13,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
+from flow44.ai.helpers import format_summary
 from flow44.db.chat import get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
@@ -237,17 +237,7 @@ class FollowUpAgent(ChatAgent):
 
     async def _build_context(self) -> dict[str, Any]:
         project = await get_project(self.project_id)
-        summary = ""
-        if project and project.summary:
-            try:
-                data = json.loads(project.summary)
-                summary = (
-                    f"{data.get('summary', '')}\n"
-                    f"Tech stack: {', '.join(data.get('tech_stack', []))}\n"
-                    f"Features: {', '.join(data.get('features', []))}\n"
-                )
-            except (json.JSONDecodeError, AttributeError):
-                summary = "(no project summary available)"
+        summary = format_summary(project.summary) if project else ""
 
         try:
             file_entries = await self.sandbox.list_files()

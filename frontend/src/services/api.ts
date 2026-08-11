@@ -158,6 +158,25 @@ export async function fetchAgentEvents(projectId: string): Promise<Record<string
   return request(`/chat/${projectId}/events`);
 }
 
+export type EnhancePromptRequest = {
+  content: string;
+  model: string | null;
+  dataSourceNames: string[];
+};
+
+export async function enhancePrompt(
+  projectId: string,
+  req: EnhancePromptRequest,
+  signal?: AbortSignal
+): Promise<string> {
+  const data = await request<{ enhanced: string }>(`/chat/${projectId}/enhance`, {
+    method: 'POST',
+    body: JSON.stringify({ content: req.content, model: req.model, data_source_names: req.dataSourceNames }),
+    signal,
+  });
+  return data.enhanced;
+}
+
 export type AgentAliveResponse = {
   alive: boolean;
   phase: string | null;

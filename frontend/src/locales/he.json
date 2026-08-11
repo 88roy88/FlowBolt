@@ -140,6 +140,15 @@
     "today": "היום",
     "yesterday": "אתמול",
     "model": "מודל",
+    "enhance": {
+      "action": "שפר את הבקשה",
+      "actionTitle": "שפר את הבקשה (Ctrl+E)",
+      "enhancing": "משפר...",
+      "enhanced": "שופר",
+      "undo": "בטל",
+      "undoTitle": "בטל (Esc)",
+      "failed": "לא הצלחנו לשפר את הבקשה. הטקסט שלך נשאר כפי שהוא."
+    },
     "placeholder": {
       "selectProject": "בחר פרויקט תחילה",
       "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר או שנה",
