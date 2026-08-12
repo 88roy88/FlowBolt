@@ -50,7 +50,7 @@ def render(
     dependency_files: dict[str, str] | None,
     other_completed_exports: dict[str, str] | None,
     data_source_contexts: list[dict[str, Any]] | None,
-    selected_packages: list[str] | None,
+    available_packages: list[str] | None,
     package_rules: list[str] | None,
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -130,7 +130,7 @@ def render_codegen(  # noqa: PLR0913
         dependency_files=dependency_files,
         other_completed_exports=other_exports,
         data_source_contexts=prepared_sources,
-        selected_packages=selected_packages or None,
+        available_packages=selected_packages or None,
         package_rules=render_package_rules(selected_packages or [], PackageRuleset.CODEGEN) or None,
         file_safety=protected_file_rules(),
     )

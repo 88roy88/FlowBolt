@@ -13,12 +13,11 @@ Return JSON only.
 {% endfor %}
 
 ## Selection rules
-- Select every listed package that is clearly useful for the requested app — zero, one, or several.
-- Use more than one when the app clearly needs multiple capabilities.
-- Understand the user's intent even when the request is written in another language.
-- Do not select a package only because it is available.
-- Do not select a package for something simple to build with React and browser APIs.
-- If no package is clearly useful, return an empty list.
+- Select a package only when the requested app clearly needs its capability — zero is a common, correct answer.
+- Select several when the app genuinely needs several capabilities.
+- Reach for React and browser APIs first; add a package only when it removes real work.
+- Read the user's intent in whatever language the request is written in.
+- Return an empty list when the base stack already covers the request.
 
 ## Output
 Return exactly this JSON shape, with a short reason per pick tied to the request:

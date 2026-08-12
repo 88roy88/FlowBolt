@@ -6,7 +6,7 @@ from typing import Any, Literal, overload
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 
-from flow44.ai.agents.optional_packages import OPTIONAL_PACKAGES, OptionalPackage, resolve_packages
+from flow44.ai.agents.optional_packages import OPTIONAL_PACKAGES, OptionalPackage, packages_by_name
 from flow44.ai.agents.template_paths import TEMPLATE_PROMPTS_PATH
 from flow44.ai.file_safety import (
     ProtectedFileRules,
@@ -74,7 +74,7 @@ def render_architecture(
     return render(
         "architecture.jinja2",
         data_source_contexts=prepared,
-        selected_packages=resolve_packages(selected_package_names or []),
+        selected_packages=packages_by_name(selected_package_names or []),
         file_safety=protected_file_rules(),
     )
 

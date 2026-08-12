@@ -259,7 +259,7 @@ class FollowUpAgent(ChatAgent):
         return {
             "summary": summary,
             "file_tree": file_tree,
-            "installed_packages": await self._installed_optional_packages(),
+            "installed_packages": await self._installed_optional_package_names(),
         }
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:

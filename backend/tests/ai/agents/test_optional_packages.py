@@ -1,5 +1,3 @@
-"""Tests for the optional-packages registry, prompt injection, and selection step."""
-
 from __future__ import annotations
 
 import json
@@ -21,8 +19,8 @@ from flow44.ai.agents.optional_packages import (
     PackageRuleset,
     installed_packages,
     npm_dependencies,
+    packages_by_name,
     render_package_rules,
-    resolve_packages,
     validate_selection,
 )
 from flow44.ai.agents.optional_packages import registry as op_registry
@@ -166,7 +164,7 @@ class TestPromptInjection:
 
     def test_decision_prompt_guards_over_selection_and_has_no_followup(self) -> None:
         prompt = render_package_decision()
-        assert "only because it is available" in prompt
+        assert "zero is a common, correct answer" in prompt
         assert "follow-up" not in prompt.lower() and "followup" not in prompt.lower()
 
     def test_codegen_includes_selected_excludes_others(self) -> None:
@@ -228,10 +226,24 @@ class TestPostBuildPromptInjection:
         assert "Only use pre-installed packages" not in prompt
         assert "Package usage rules" in prompt
 
-    def test_fix_error_direct_without_packages_keeps_original_rule(self) -> None:
+    def test_fix_error_direct_without_packages_keeps_strict_rule(self) -> None:
         prompt = render_fix_error_direct(error_message="boom", files={"a.tsx": "x"})
-        assert "Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS)" in prompt
+        assert "no axios, lodash" in prompt
         assert "Package usage rules" not in prompt
+
+    def test_available_packages_block_renders_once_per_prompt(self) -> None:
+        names = ["recharts"]
+        assert render_followup(project_summary="s", file_tree="t", installed_packages=names).count("**CRITICAL**") == 1
+        assert render_fix_error_direct(error_message="boom", files={"a.tsx": "x"}).count("**CRITICAL**") == 1
+        codegen = render_codegen(
+            task_title="t",
+            task_description="d",
+            task_files=["a.tsx"],
+            architecture={},
+            ux_design={},
+            selected_packages=names,
+        )
+        assert codegen.count("**CRITICAL**") == 1
 
     def test_fix_error_feedback_injects_rules_only_when_present(self) -> None:
         with_rules = render_fix_feedback(files={"a.tsx": "x"}, installed_packages=["date-fns"])
@@ -267,27 +279,27 @@ class TestInstalledOptionalPackagesHelper:
             "devDependencies": {"lucide-react": "^0.3", "typescript": "^5"},
         }
         agent = _chat_agent(json.dumps(manifest))
-        assert await agent._installed_optional_packages() == ["lucide-react", "recharts"]
+        assert await agent._installed_optional_package_names() == ["lucide-react", "recharts"]
 
     async def test_missing_manifest_returns_empty(self) -> None:
         agent = _chat_agent(FileNotFoundError("package.json"))
-        assert await agent._installed_optional_packages() == []
+        assert await agent._installed_optional_package_names() == []
 
     async def test_malformed_json_returns_empty(self) -> None:
         agent = _chat_agent("{not json")
-        assert await agent._installed_optional_packages() == []
+        assert await agent._installed_optional_package_names() == []
 
     async def test_non_object_manifest_returns_empty(self) -> None:
         agent = _chat_agent("[1, 2, 3]")
-        assert await agent._installed_optional_packages() == []
+        assert await agent._installed_optional_package_names() == []
 
     async def test_non_mapping_dependencies_returns_empty(self) -> None:
         agent = _chat_agent(json.dumps({"dependencies": ["recharts"]}))
-        assert await agent._installed_optional_packages() == []
+        assert await agent._installed_optional_package_names() == []
 
     async def test_manifest_without_dependencies_returns_empty(self) -> None:
         agent = _chat_agent(json.dumps({"name": "project"}))
-        assert await agent._installed_optional_packages() == []
+        assert await agent._installed_optional_package_names() == []
 
 
 def _make_agent() -> plan_agent.PlanAgent:
@@ -326,12 +338,12 @@ class TestDecidePackagesStep:
         assert state.build_state.selected_packages == []
 
 
-def test_resolve_packages_filters_unknown() -> None:
-    assert [p.name for p in resolve_packages(["date-fns", "bogus"])] == ["date-fns"]
+def test_packages_by_name_filters_unknown() -> None:
+    assert [p.name for p in packages_by_name(["date-fns", "bogus"])] == ["date-fns"]
 
 
-def test_resolve_packages_dedupes() -> None:
-    assert [p.name for p in resolve_packages(["date-fns", "date-fns"])] == ["date-fns"]
+def test_packages_by_name_dedupes() -> None:
+    assert [p.name for p in packages_by_name(["date-fns", "date-fns"])] == ["date-fns"]
 
 
 def test_build_state_roundtrips_selection() -> None:

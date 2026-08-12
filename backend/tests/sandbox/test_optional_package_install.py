@@ -1,5 +1,3 @@
-"""Tests for PnpmMixin.install_optional_packages command construction."""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator

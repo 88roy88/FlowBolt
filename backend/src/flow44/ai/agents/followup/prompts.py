@@ -30,7 +30,7 @@ def render(
     file_safety: ProtectedFileRules,
     new_data_source_contexts: list[DataSourceContext] | None,
     existing_data_source_contexts: list[DataSourceContext] | None,
-    installed_packages: list[str] | None,
+    available_packages: list[str] | None,
     package_rules: list[str] | None,
 ) -> str: ...
 
@@ -58,6 +58,6 @@ def render_followup(
         file_safety=protected_file_rules(),
         new_data_source_contexts=new_data_source_contexts,
         existing_data_source_contexts=existing_data_source_contexts,
-        installed_packages=installed_packages or None,
+        available_packages=installed_packages or None,
         package_rules=render_package_rules(installed_packages or [], PackageRuleset.FOLLOWUP) or None,
     )

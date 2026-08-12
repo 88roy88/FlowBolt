@@ -25,7 +25,6 @@ def render(
     template_name: Literal["feedback.jinja2"],
     *,
     files: dict[str, str],
-    installed_packages: list[str] | None,
     package_rules: list[str] | None,
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -40,7 +39,7 @@ def render(
     error_line: int | None,
     error_stack: str | None,
     files: dict[str, str],
-    installed_packages: list[str] | None,
+    available_packages: list[str] | None,
     package_rules: list[str] | None,
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -58,7 +57,6 @@ def render_feedback(*, files: dict[str, str], installed_packages: list[str] | No
     return render(
         "feedback.jinja2",
         files=files,
-        installed_packages=installed_packages or None,
         package_rules=render_package_rules(installed_packages or [], PackageRuleset.FIX_ERRORS) or None,
         file_safety=protected_file_rules(),
     )
@@ -80,7 +78,7 @@ def render_fix_error_direct(
         error_line=error_line,
         error_stack=error_stack,
         files=files,
-        installed_packages=installed_packages or None,
+        available_packages=installed_packages or None,
         package_rules=render_package_rules(installed_packages or [], PackageRuleset.FIX_ERRORS) or None,
         file_safety=protected_file_rules(),
     )

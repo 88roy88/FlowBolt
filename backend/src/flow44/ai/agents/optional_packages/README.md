@@ -6,7 +6,7 @@ selected packages are installed at execute start and their rule fragments are in
 build prompts.
 
 The follow-up and fix-error agents run long after planning, when `BuildState.selected_packages` is
-gone. They recover the list from the sandbox `package.json` via `ChatAgent._installed_optional_packages()`,
+gone. They recover the list from the sandbox `package.json` via `ChatAgent._installed_optional_package_names()`,
 which maps installed npm deps back to registry names with `installed_packages()`. That keeps their
 prompts honest about what the app actually has.
 

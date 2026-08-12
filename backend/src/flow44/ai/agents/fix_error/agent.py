@@ -95,7 +95,7 @@ class FixErrorAgent(ChatAgent):
         )
 
         state.discovered_files = await self._discover_files(state.error_file)
-        state.installed_packages = await self._installed_optional_packages()
+        state.installed_packages = await self._installed_optional_package_names()
 
         if not state.discovered_files:
             await state.emit_fn({"type": "error", "message": "Could not read source files to fix error"})

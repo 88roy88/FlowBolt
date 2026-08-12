@@ -81,7 +81,6 @@ class ExecuteAgent(BaseAgent):
 
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_plan_overview.model_dump()})
 
-        # Install optional packages selected during planning (no-op when none)
         await self.sandbox.install_optional_packages(npm_dependencies(self._build_state.selected_packages))
 
         # Initialize execution state

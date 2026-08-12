@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 class ChatAgent(BaseAgent):
     """Base for agents that participate in the chat history (followup, fix_error)."""
 
-    async def _installed_optional_packages(self) -> list[str]:
-        """Registry names of optional packages present in the app's package.json."""
+    async def _installed_optional_package_names(self) -> list[str]:
         try:
             manifest = json.loads(await self.sandbox.read_file("package.json"))
             deps = {**manifest.get("dependencies", {}), **manifest.get("devDependencies", {})}

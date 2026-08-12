@@ -38,11 +38,7 @@ Based on the user's request, you may also need to build new UI around them (new 
 {{ file_tree }}
 
 ## Installed packages
-{% if installed_packages %}
-**CRITICAL**: The available packages are React, react-dom, Tailwind CSS, and {% for name in installed_packages %}`{{ name }}`{% if not loop.last %}, {% endif %}{% endfor %}. Do NOT import any package outside this list — implement everything else with built-in browser APIs.
-{% else %}
-**CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
-{% endif %}
+{% include "_available_packages.jinja2" %}
 
 {% include "_package_rules.jinja2" %}
 ## How to Work
