@@ -40,8 +40,8 @@ from flow44.services.heartbeat_reaper import heartbeat_reaper
 
 if os.name == "posix":
     # Sandbox workspaces live on an NFS-backed PVC written by pods with varying uids; the
-    # default umask (022) strips write permission from files this process creates so other pod
-    # can't rewrite them.
+    # default umask (022) strips write permission from files this process creates so other
+    # pods can't rewrite them.
     os.umask(0)
 
 setup_logging(settings.LOG_FILE_PATH)
