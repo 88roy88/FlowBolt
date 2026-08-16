@@ -9,14 +9,24 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel, Field
 
+from flow44.ai.agents.enhance.agent import enhance_prompt
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
-from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
+from flow44.api.deps import (
+    Permission,
+    ProjectDep,
+    TokenDep,
+    WsProjectDep,
+    WsUserDep,
+    require_permission,
+    require_ws_permission,
+)
 from flow44.config import settings
 from flow44.db.chat import ChatRole, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
@@ -130,6 +140,37 @@ async def chat_history(project: ProjectDep) -> list[dict[str, Any]]:
 async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
     events = await get_events(project.id)
     return [{**evt.payload, "_ts": evt.created_at} for evt in events]
+
+
+class EnhanceRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=10_000)
+    model: str | None = None
+    data_source_names: list[str] = Field(default_factory=list, max_length=20)
+
+
+class EnhanceResponse(BaseModel):
+    enhanced: str
+
+
+@http_router.post("/{project_id}/enhance")
+async def enhance(
+    project: ProjectDep,
+    body: EnhanceRequest,
+    _perms: set[Permission] = require_permission(Permission.write),
+) -> EnhanceResponse:
+    try:
+        enhanced = await enhance_prompt(
+            body.content,
+            is_new=await _is_new_project(project.id),
+            summary=project.summary,
+            model=body.model,
+            data_source_names=body.data_source_names,
+        )
+    except Exception:
+        logger.exception("[chat] Prompt enhancement failed for session %s", project.id)
+        raise HTTPException(status_code=502, detail="Prompt enhancement failed") from None
+
+    return EnhanceResponse(enhanced=enhanced)
 
 
 @ws_router.websocket("/ws/chat/{project_id}")

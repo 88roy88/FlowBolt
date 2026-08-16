@@ -84,6 +84,7 @@ const INITIAL_STATE: ChatState = {
   loadHistory: vi.fn() as unknown as ChatState['loadHistory'],
   clearMessages: vi.fn() as unknown as ChatState['clearMessages'],
   clearError: vi.fn() as unknown as ChatState['clearError'],
+  setError: vi.fn() as unknown as ChatState['setError'],
   setStreaming: vi.fn() as unknown as ChatState['setStreaming'],
   setSelectedModel: vi.fn() as unknown as ChatState['setSelectedModel'],
   addDataSource: vi.fn() as unknown as ChatState['addDataSource'],
