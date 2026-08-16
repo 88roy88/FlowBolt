@@ -210,5 +210,5 @@ Set the following in `backend/.env` to enable Opik tracing:
 ```env
 AIB_OPIK_API_KEY=...
 AIB_OPIK_WORKSPACE=your-workspace
-AIB_OPIK_PROJECT_NAME=flow44
+AIB_OPIK_PROJECT_NAME=buildapp-dev
 ```
