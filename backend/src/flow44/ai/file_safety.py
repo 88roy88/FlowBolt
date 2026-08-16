@@ -47,7 +47,7 @@ _SYNC_EXCLUDED_PATTERNS: frozenset[str] = frozenset(
         "**/pnpm-lock.yaml",
         "**/.env*",
         "**/vite.config.*",  # configured per project with stamp_vite.config.
-        "src/main.tsx",  # can potentially contain package context tags
+        "src/main.tsx",  # can potentially contain package context tags.
         "src/config.ts",  # debatable, but people might be tempted to put consts here manually.
     }
 )
