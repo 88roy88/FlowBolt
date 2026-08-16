@@ -9,50 +9,44 @@ def sync_protected_template_files(workspace_dir: str, template_dir: str) -> str:
     if not os.path.isdir(workspace_dir):
         return "workspace not present on this pod, skipped"
 
-    updated: list[str] = []
-    created: list[str] = []
-    already_synced: list[str] = []
-    failed: list[str] = []
+    groups: dict[str, list[str]] = {"updated": [], "created": [], "already in sync": [], "failed": []}
     for rel_path in _get_template_files_to_sync(template_dir):
         template_path = os.path.join(template_dir, rel_path)
         project_path = os.path.join(workspace_dir, rel_path)
-        try:
-            with open(template_path, "rb") as f:
-                template_content = f.read()
-        except OSError:
-            failed.append(rel_path)
-            continue
+        status = _sync_file(template_path, project_path)
+        groups[status].append(rel_path)
 
-        try:
-            with open(project_path, "rb") as f:
-                project_content = f.read()
-        except FileNotFoundError:
-            project_content = None
-        except OSError:
-            failed.append(rel_path)
-            continue
-
-        if project_content == template_content:
-            already_synced.append(rel_path)
-            continue
-
-        try:
-            os.makedirs(os.path.dirname(project_path), exist_ok=True)
-            with open(project_path, "wb") as out:
-                out.write(template_content)
-        except OSError:
-            failed.append(rel_path)
-            continue
-
-        if project_content is None:
-            created.append(rel_path)
-        else:
-            updated.append(rel_path)
-
-    groups = {"updated": updated, "created": created, "already in sync": already_synced, "failed": failed}
     summary = ", ".join(f"{label} {len(paths)}" for label, paths in groups.items())
     details = ", ".join(f"{label} [{', '.join(paths)}]" for label, paths in groups.items() if paths)
     return f"{summary} -- {details}" if details else summary
+
+
+def _sync_file(template_path: str, project_path: str) -> str:
+    try:
+        with open(template_path, "rb") as f:
+            template_content = f.read()
+    except OSError:
+        return "failed"
+
+    try:
+        with open(project_path, "rb") as f:
+            project_content = f.read()
+    except FileNotFoundError:
+        project_content = None
+    except OSError:
+        return "failed"
+
+    if project_content == template_content:
+        return "already in sync"
+
+    try:
+        os.makedirs(os.path.dirname(project_path), exist_ok=True)
+        with open(project_path, "wb") as out:
+            out.write(template_content)
+    except OSError:
+        return "failed"
+
+    return "created" if project_content is None else "updated"
 
 
 def _get_template_files_to_sync(template_dir: str) -> list[str]:
