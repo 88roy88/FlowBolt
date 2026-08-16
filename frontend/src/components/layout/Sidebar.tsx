@@ -9,6 +9,7 @@ import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { ShareModal } from '../sharing/ShareModal';
 import { pollFileTree } from '../../utils/pollFileTree';
+import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
@@ -321,6 +322,20 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
               >
                 <Share2 size={13} className="text-muted-foreground" />
                 {t('sharing.share', 'Share')}
+              </button>
+            )}
+            {userStatus?.is_admin && (
+              <button
+                onClick={async () => {
+                  closeMenu();
+                  try {
+                    await reapProject(menuProject.id);
+                  } catch { /* sandbox may already be reaped */ }
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors text-left"
+              >
+                <Moon size={13} className="text-muted-foreground" />
+                {t('sidebar.sleep', 'Sleep')}
               </button>
             )}
             {(!menuProject.role || DELETE_ROLES.has(menuProject.role)) && (
