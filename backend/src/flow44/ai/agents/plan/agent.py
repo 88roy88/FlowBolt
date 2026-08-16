@@ -210,8 +210,6 @@ class PlanAgent(BaseAgent):
 
         self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
 
-        self._set_trace_output({"user_overview": self._state.user_overview.model_dump()})
-
     # -- Design --
 
     @track(name="design-architecture")  # type: ignore[untyped-decorator]
