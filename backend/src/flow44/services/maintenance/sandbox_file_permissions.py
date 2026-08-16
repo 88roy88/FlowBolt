@@ -14,12 +14,12 @@ def fix_file_permissions(workspace_dir: str) -> str:
         for name in files:
             path = os.path.join(root, name)
             if not os.path.islink(path):
-                counts[_ensure_writable(path)] += 1
+                counts[_make_writable(path)] += 1
 
     return ", ".join(f"{label} {count}" for label, count in counts.items())
 
 
-def _ensure_writable(path: str) -> str:
+def _make_writable(path: str) -> str:
     try:
         mode = stat.S_IMODE(os.stat(path).st_mode)
     except OSError:
