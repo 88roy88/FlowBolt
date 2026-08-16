@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from flow44.api.admin import AdminDep
 from flow44.config import settings
 from flow44.db.project import Project, list_all_projects
-from flow44.services.maintenance_utils import fix_file_permissions, sync_protected_template_files
+from flow44.services.maintenance.sandbox_file_permissions import fix_file_permissions
+from flow44.services.maintenance.template_sync import sync_protected_template_files
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ async def sync_protected_files(_admin: AdminDep) -> list[ProjectMaintenanceResul
     - files the AI is already forbidden from editing (see flow44.ai.file_safety),
     so any drift means the project predates a template fix, not an intentional
     customization. Templated files like vite.config.ts, and per-project files
-    like package.json/lockfiles/.env, are excluded - see maintenance_utils.
+    like package.json/lockfiles/.env, are excluded - see flow44.services.maintenance.template_sync.
     """
 
     async def op(project: Project) -> str:
