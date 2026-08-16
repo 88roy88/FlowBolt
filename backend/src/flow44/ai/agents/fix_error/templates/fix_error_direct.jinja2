@@ -42,6 +42,7 @@ Rules:
 3. Do NOT refactor unrelated code
 4. Output complete file contents, not patches
 5. Do NOT include shell actions
-6. **CRITICAL**: Only use pre-installed packages (React, TypeScript, Vite, Tailwind CSS). Do NOT import other npm packages.
+6. {% include "_available_packages.jinja2" %}
 
+{% include "_package_rules.jinja2" %}
 {% include "_file_safety_rules.jinja2" %}

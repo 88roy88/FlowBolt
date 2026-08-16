@@ -6,11 +6,13 @@ from opik import track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
+from flow44.ai.agents.optional_packages import validate_selection
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
     UX_DESIGN_PROMPT,
     render_architecture,
+    render_package_decision,
     render_user_plan,
 )
 from flow44.ai.core.flow import Flow
@@ -47,7 +49,8 @@ class PlanAgent(BaseAgent):
         """Build the planning flow with explicit steps."""
         flow = Flow[PlanState]("plan")
 
-        flow.add_step("fetch_data_sources", self._step_fetch_data_sources, next_step="design")
+        flow.add_step("fetch_data_sources", self._step_fetch_data_sources, next_step="decide_packages")
+        flow.add_step("decide_packages", self._step_decide_packages, next_step="design")
         flow.add_step("design", self._step_design, next_step="build_overview")
         flow.add_step("build_overview", self._step_build_overview, next_step="persist")
         flow.add_step("persist", self._step_persist, next_step=None)
@@ -73,7 +76,7 @@ class PlanAgent(BaseAgent):
         )
 
         # Run the flow
-        start_step = "fetch_data_sources" if self._state.data_source_ids else "design"
+        start_step = "fetch_data_sources" if self._state.data_source_ids else "decide_packages"
         await self._flow.run(plan_state, start=start_step)
 
         self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
@@ -147,6 +150,24 @@ class PlanAgent(BaseAgent):
 
         return state
 
+    async def _step_decide_packages(self, state: PlanState) -> PlanState:
+        """Step: Let the model select optional npm packages for the app."""
+        try:
+            raw = await complete_chat(
+                [Message.user(self._state.user_content)],
+                render_package_decision(),
+                model=self.model,
+                metadata=self._llm_metadata("decide_packages"),
+            )
+            selected = parse_json_response(raw).get("selected", [])
+            raw_names = [item["name"] for item in selected if item.get("name")]
+            state.build_state.selected_packages = validate_selection(raw_names)
+        except Exception:
+            logger.exception("[plan] Optional package decision failed")
+            state.build_state.selected_packages = []
+
+        return state
+
     async def _step_design(self, state: PlanState) -> PlanState:
         """Step: Design architecture and UX in parallel."""
         await state.emit_fn({"type": "phase", "phase": "designing"})
@@ -214,7 +235,10 @@ class PlanAgent(BaseAgent):
 
     @track(name="design-architecture")  # type: ignore[untyped-decorator]
     async def _design_architecture(self) -> ArchitectureDesign:
-        prompt = render_architecture(data_source_contexts=self._state.data_source_contexts or None)
+        prompt = render_architecture(
+            data_source_contexts=self._state.data_source_contexts or None,
+            selected_package_names=self._state.selected_packages,
+        )
         try:
             raw = await complete_chat(
                 [Message.user(self._state.user_content)],

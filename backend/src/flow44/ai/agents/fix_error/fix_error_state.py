@@ -26,6 +26,7 @@ class FixErrorState(BaseModel):
 
     # Working state
     discovered_files: dict[str, str] = Field(default_factory=dict)
+    installed_packages: list[str] = Field(default_factory=list)
     generated_files: list[tuple[str, str]] = Field(default_factory=list)
     diffs: DiffTracker = Field(default_factory=DiffTracker)
     full_response: str = ""

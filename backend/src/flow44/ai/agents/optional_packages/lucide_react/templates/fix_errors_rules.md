@@ -1,0 +1,3 @@
+### lucide-react — icons
+- Keep lucide-react imports as named icon imports.
+- "has no exported member 'X'": use the exact PascalCase Lucide name (e.g. Trash2), or the closest existing icon.

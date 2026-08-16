@@ -15,6 +15,7 @@ from flow44.ai.agents.execute.prompts import (
     render_feedback,
     render_merge,
 )
+from flow44.ai.agents.optional_packages import npm_dependencies
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.opik_failure_logger import create_span, error_info, record_span_error
@@ -80,6 +81,9 @@ class ExecuteAgent(BaseAgent):
 
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_plan_overview.model_dump()})
 
+        await self.sandbox.install_optional_packages(npm_dependencies(self._build_state.selected_packages))
+
+        # Initialize execution state
         current_span = opik_context.get_current_span_data()
         exec_state = ExecutionState(
             build_state=self._build_state,
@@ -202,7 +206,10 @@ class ExecuteAgent(BaseAgent):
             input={"errors": state.all_errors, "fix_attempt": state.fix_attempts},
         )
 
-        prompt = render_feedback(files=state.build_state.completed_files)
+        prompt = render_feedback(
+            files=state.build_state.completed_files,
+            selected_packages=state.build_state.selected_packages,
+        )
         messages: list[dict[str, Any] | Message] = [
             Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
         ]
@@ -303,7 +310,10 @@ class ExecuteAgent(BaseAgent):
 
         raw = await complete_chat(
             [Message.user(json.dumps(merge_data, indent=2))],
-            render_merge(has_data_sources=bool(state.build_state.data_source_contexts)),
+            render_merge(
+                has_data_sources=bool(state.build_state.data_source_contexts),
+                selected_packages=state.build_state.selected_packages,
+            ),
             model=state.model,
             metadata=state.llm_metadata_fn("build_technical_plan", parent_span_id=state.observation_id),
         )
@@ -372,6 +382,7 @@ class ExecuteAgent(BaseAgent):
                 other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
+                selected_packages=state.build_state.selected_packages,
             )
 
             generated: list[tuple[str, str]] = []

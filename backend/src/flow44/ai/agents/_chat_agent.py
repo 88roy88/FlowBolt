@@ -1,12 +1,26 @@
+import json
+import logging
 from typing import Any
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.file_diffs import DiffTracker
+from flow44.ai.agents.optional_packages import installed_packages
 from flow44.db.chat import ChatRole, save_message
+
+logger = logging.getLogger(__name__)
 
 
 class ChatAgent(BaseAgent):
     """Base for agents that participate in the chat history (followup, fix_error)."""
+
+    async def _installed_optional_package_names(self) -> list[str]:
+        try:
+            manifest = json.loads(await self.sandbox.read_file("package.json"))
+            deps = {**manifest.get("dependencies", {}), **manifest.get("devDependencies", {})}
+        except (OSError, ValueError, AttributeError, TypeError):
+            logger.warning("[chat-agent] Could not read package.json for %s", self.project_id)
+            return []
+        return [pkg.name for pkg in installed_packages(deps)]
 
     async def _save_response(
         self,

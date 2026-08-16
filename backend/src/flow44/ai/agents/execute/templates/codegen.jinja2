@@ -19,6 +19,9 @@ as part of a larger project.
 ```json
 {{ ux_json }}
 ```
+
+The UI/UX context is authoritative on visuals only: if it names a library or icon set, treat that as
+intent and build the visual with the packages allowed under General Rules below.
 {% if data_source_contexts %}
 
 ## Data Source Integration
@@ -97,6 +100,14 @@ When implementing components that use data source data:
 ```
 {% endfor %}
 {% endif %}
+{% if package_rules %}
+
+## Selected Package Rules
+{% for rule_block in package_rules %}
+
+{{ rule_block }}
+{% endfor %}
+{% endif %}
 
 ## Output Format
 
@@ -118,7 +129,7 @@ placeholders or ellipses.
 3. Tailwind CSS is pre-configured - use utility classes extensively for styling.
 4. Write clean, production-quality code with modern, polished UI/UX.
 5. Only output the files listed above — do not create extra files.
-6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
+6. {% include "_available_packages.jinja2" %}
 7. Import from already-completed files using their exact export names.
 8. Do NOT include shell actions — only file actions.
 
