@@ -13,10 +13,10 @@ def sync_protected_template_files(workspace_dir: str, template_dir: str) -> str:
     if not os.path.isdir(workspace_dir):
         return "workspace not present on this pod, skipped"
 
-    updated = 0
-    created = 0
-    already_synced = 0
-    failed = 0
+    updated: list[str] = []
+    created: list[str] = []
+    already_synced: list[str] = []
+    failed: list[str] = []
     for rel_path in _get_template_files_to_sync(template_dir):
         template_path = os.path.join(template_dir, rel_path)
         project_path = os.path.join(workspace_dir, rel_path)
@@ -24,7 +24,7 @@ def sync_protected_template_files(workspace_dir: str, template_dir: str) -> str:
             with open(template_path, "rb") as f:
                 template_content = f.read()
         except OSError:
-            failed += 1
+            failed.append(rel_path)
             continue
 
         try:
@@ -33,11 +33,11 @@ def sync_protected_template_files(workspace_dir: str, template_dir: str) -> str:
         except FileNotFoundError:
             project_content = None
         except OSError:
-            failed += 1
+            failed.append(rel_path)
             continue
 
         if project_content == template_content:
-            already_synced += 1
+            already_synced.append(rel_path)
             continue
 
         try:
@@ -45,15 +45,18 @@ def sync_protected_template_files(workspace_dir: str, template_dir: str) -> str:
             with open(project_path, "wb") as out:
                 out.write(template_content)
         except OSError:
-            failed += 1
+            failed.append(rel_path)
             continue
 
         if project_content is None:
-            created += 1
+            created.append(rel_path)
         else:
-            updated += 1
+            updated.append(rel_path)
 
-    return f"updated {updated}, created {created}, already in sync {already_synced}, failed {failed}"
+    groups = {"updated": updated, "created": created, "already in sync": already_synced, "failed": failed}
+    summary = ", ".join(f"{label} {len(paths)}" for label, paths in groups.items())
+    details = ", ".join(f"{label} [{', '.join(paths)}]" for label, paths in groups.items() if paths)
+    return f"{summary} -- {details}" if details else summary
 
 
 def _get_template_files_to_sync(template_dir: str) -> list[str]:
