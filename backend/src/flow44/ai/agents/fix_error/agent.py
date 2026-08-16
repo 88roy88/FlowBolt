@@ -2,13 +2,14 @@ import logging
 from pathlib import PurePosixPath
 from typing import Any
 
-from langfuse.decorators import observe
+from opik import track
 
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import stream_chat
 from flow44.ai.file_safety import format_rejection_feedback, screen_generated_files
 from flow44.ai.helpers import format_agent_feedback
@@ -58,7 +59,7 @@ class FixErrorAgent(ChatAgent):
 
         return "retry"
 
-    @observe(name="fix-error-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="fix-error-agent-run")  # type: ignore[untyped-decorator]
     async def run(
         self,
         error_message: str,
@@ -252,8 +253,9 @@ class FixErrorAgent(ChatAgent):
             await state.emit_fn(
                 {"type": "fix_step", "step": "retry", "status": "completed", "message": "Auto-fix applied"}
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("[fix-error] Retry fix failed")
+            record_span_error(exc)
             await state.emit_fn({"type": "fix_step", "step": "retry", "status": "failed", "message": "Auto-fix failed"})
 
         return state
@@ -274,6 +276,16 @@ class FixErrorAgent(ChatAgent):
         await self._save_response(state.explanation, steps)
 
         await self._emit_file_diffs_summary(state.diffs)
+
+        self._set_trace_output(
+            {
+                "explanation": state.explanation,
+                "files_fixed": files,
+                "retry_count": state.retry_count,
+                "validated": not state.validation_errors,
+            }
+        )
+
         await state.emit_fn({"type": "action_complete"})
         await state.emit_fn({"type": "phase", "phase": "idle"})
         return state

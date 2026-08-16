@@ -2,13 +2,15 @@
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from flow44.ai.state import BuildState
 
 
 class PlanState(BaseModel):
     """State that flows through PlanAgent's Flow steps."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Input
     build_state: BuildState
@@ -22,6 +24,3 @@ class PlanState(BaseModel):
 
     # For rebuild_with_feedback
     feedback: str | None = None
-
-    class Config:
-        arbitrary_types_allowed = True
