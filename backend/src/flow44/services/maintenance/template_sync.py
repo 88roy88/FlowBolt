@@ -10,7 +10,7 @@ def sync_protected_template_files(workspace_dir: str, template_dir: str) -> str:
         return "workspace not present on this pod, skipped"
 
     groups: dict[str, list[str]] = {"updated": [], "created": [], "already in sync": [], "failed": []}
-    for rel_path in _get_template_files_to_sync(template_dir):
+    for rel_path in _get_template_file_paths_to_sync(template_dir):
         template_path = os.path.join(template_dir, rel_path)
         project_path = os.path.join(workspace_dir, rel_path)
         status = _sync_file(template_path, project_path)
@@ -49,7 +49,7 @@ def _sync_file(template_path: str, project_path: str) -> str:
     return "created" if project_content is None else "updated"
 
 
-def _get_template_files_to_sync(template_dir: str) -> list[str]:
+def _get_template_file_paths_to_sync(template_dir: str) -> list[str]:
     result: list[str] = []
     for root, dirs, files in os.walk(template_dir):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
