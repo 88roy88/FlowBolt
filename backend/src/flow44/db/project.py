@@ -50,11 +50,7 @@ async def list_all_projects() -> list[Project]:
 
 async def list_published_projects() -> list[Project]:
     async with database.async_session() as session:
-        query = (
-            select(Project)
-            .where(col(Project.published_at).is_not(None))
-            .order_by(col(Project.published_at).desc())
-        )
+        query = select(Project).where(col(Project.published_at).is_not(None)).order_by(col(Project.published_at).desc())
         result = await session.execute(query)
         return list(result.scalars().all())
 
