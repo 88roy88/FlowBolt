@@ -32,14 +32,30 @@ _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
     "**/package.json",
     "**/package-lock.json",
     "**/pnpm-lock.yaml",
-    "**/yarn.lock",
-    "**/uv.lock",
     "**/index.html",
     "**/.env*",
     "**/vite.config.*",
     "**/*template-guard*",
     "**/*template_guard*",
 )
+
+# Protected paths that can diverge per project.
+_SYNC_EXCLUDED_PATTERNS: frozenset[str] = frozenset(
+    {
+        "**/index.html",
+        "**/package.json",
+        "**/pnpm-lock.yaml",
+        "**/.env*",
+        "**/vite.config.*",  # configured per project with stamp_vite.config.
+        "src/main.tsx",  # can potentially contain package context tags.
+        "src/config.ts",  # debatable, but people might be tempted to put consts here manually.
+    }
+)
+
+# Protected paths that are safe to overwrite verbatim from the template.
+SYNCABLE_TEMPLATE_FILE_PATTERNS: frozenset[str] = (
+    frozenset(_PROTECTED_APP_FILE_PATHS) | frozenset(_PROTECTED_APP_FILE_PATTERNS)
+) - _SYNC_EXCLUDED_PATTERNS
 
 
 def _is_protected(normalized_path: str) -> bool:
