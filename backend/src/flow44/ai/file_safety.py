@@ -42,6 +42,7 @@ _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
 # Protected patterns that can diverge per project.
 _SYNC_EXCLUDED_PATTERNS: frozenset[str] = frozenset(
     {
+        "**/index.html",
         "**/package.json",
         "**/pnpm-lock.yaml",
         "**/.env*",
