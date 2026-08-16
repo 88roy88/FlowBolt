@@ -15,8 +15,9 @@ from pydantic import ValidationError
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
+from flow44.ai.agents.interview.agent import InterviewAgent
+from flow44.ai.agents.interview.models import InterviewAnswer
 from flow44.ai.agents.plan.agent import PlanAgent
-from flow44.ai.agents.plan.models import InterviewAnswer
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
@@ -216,11 +217,21 @@ async def chat_ws(  # noqa: C901, PLR0915
                             user_id=user_id,
                         )
                         plan_ds_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
-                        plan_coro = (
-                            plan_agent.run(user_content, data_source_ids=plan_ds_ids)
-                            if mode == "build"
-                            else plan_agent.run_interview(user_content, data_source_ids=plan_ds_ids)
-                        )
+                        if mode == "build":
+                            plan_coro = plan_agent.run(user_content, data_source_ids=plan_ds_ids)
+                        else:
+                            interview_agent = InterviewAgent(
+                                project_id=project.id,
+                                sandbox=sandbox,
+                                model=selected_model,
+                                user_id=user_id,
+                            )
+                            plan_coro = interview_agent.run(
+                                user_content,
+                                plan_ds_ids,
+                                gather_context=plan_agent.prefetch_data_sources,
+                                continue_with=plan_agent.run_from_design,
+                            )
                         await _start_agent(project.id, plan_coro)
                     else:
                         followup_agent = FollowUpAgent(
@@ -301,7 +312,16 @@ async def chat_ws(  # noqa: C901, PLR0915
                         user_id=user_id,
                         data_source_authorization=data_source_authorization,
                     )
-                    await _start_agent(project.id, plan_agent.resume_after_interview(state, answers))
+                    interview_agent = InterviewAgent(
+                        project_id=project.id,
+                        sandbox=sandbox,
+                        model=selected_model or state.model,
+                        user_id=user_id,
+                    )
+                    await _start_agent(
+                        project.id,
+                        interview_agent.resume(state, answers, continue_with=plan_agent.run_from_design),
+                    )
 
                 elif msg_type == "fix_error":
                     error_message = data.get("error_message", "")

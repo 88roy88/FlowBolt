@@ -3,13 +3,8 @@
 from pydantic import BaseModel, Field
 
 from flow44.ai.agents.execute.models import WorkPlan
-from flow44.ai.agents.plan.models import (
-    ArchitectureDesign,
-    InterviewAnswer,
-    InterviewQuestion,
-    UserPlanOverview,
-    UXDesign,
-)
+from flow44.ai.agents.interview.models import InterviewAnswer, InterviewQuestion
+from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.db.project_data_source import DataSourceContext
 
 __all__ = ["BuildState"]

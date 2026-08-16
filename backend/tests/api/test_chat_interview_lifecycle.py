@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from flow44.ai.agents.plan.models import InterviewQuestion
+from flow44.ai.agents.interview.models import InterviewOption, InterviewQuestion
 from flow44.ai.state import BuildState
 from flow44.main import app
 
@@ -25,8 +25,8 @@ def _base_interview_question() -> InterviewQuestion:
         header="Audience",
         question="Who is this for?",
         options=[
-            {"label": "Me", "description": "Personal use"},
-            {"label": "Team", "description": "Internal users"},
+            InterviewOption(label="Me", description="Personal use"),
+            InterviewOption(label="Team", description="Internal users"),
         ],
         multi_select=False,
     )

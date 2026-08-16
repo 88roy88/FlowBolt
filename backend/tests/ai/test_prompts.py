@@ -5,7 +5,8 @@ from __future__ import annotations
 from flow44.ai.agents.execute.prompts import render_codegen, render_feedback, render_merge, render_summary
 from flow44.ai.agents.fix_error.prompts import render_fix_error_direct
 from flow44.ai.agents.followup.prompts import render_followup
-from flow44.ai.agents.plan.prompts import render_architecture, render_interview, render_user_plan
+from flow44.ai.agents.interview.prompts import render_interview
+from flow44.ai.agents.plan.prompts import render_architecture, render_user_plan
 from flow44.ai.file_safety import protected_file_rules
 from flow44.db.project_data_source import DataSourceContext
 
