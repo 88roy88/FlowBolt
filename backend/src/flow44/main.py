@@ -19,7 +19,6 @@ from flow44.api import (
     export,
     files,
     iaagent,
-    maintenance,
     members,
     models,
     preview,
@@ -40,12 +39,9 @@ from flow44.sandbox.manager import sandbox_manager
 from flow44.services.heartbeat_reaper import heartbeat_reaper
 
 if os.name == "posix":
-    # Sandbox workspaces live on an NFS-backed PVC written by pods with varying
-    # uids; the default umask (022) strips group/other write from files this
-    # process creates directly (like the .log and some file-editing tools), so
-    # a later pod can't rewrite them. Clearing the umask here means every file
-    # we create is world-writable from the start.
-    # A maintenance script for already-created files exists at api/maintenance.
+    # Sandbox workspaces live on an NFS-backed PVC written by pods with varying uids; the
+    # default umask (022) strips write permission from files this process creates so other pod
+    # can't rewrite them.
     os.umask(0)
 
 setup_logging(settings.LOG_FILE_PATH)
@@ -130,7 +126,6 @@ auth_routes.include_router(chat.http_router)
 auth_routes.include_router(iaagent.router)
 auth_routes.include_router(members.router)
 auth_routes.include_router(admin.router)
-auth_routes.include_router(maintenance.router)
 app.include_router(auth_routes)
 
 # Public HTTP routes
