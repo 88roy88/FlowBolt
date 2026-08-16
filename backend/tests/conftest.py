@@ -76,7 +76,7 @@ async def setup_test_db():
         version="16",
         password=settings.DB_PASSWORD,
     )
-    # An aborted run never reaches __exit__, and init() has no IF NOT EXISTS
+    # Pre-drop the DB if it exists from prior aborted runs (suppresses error if it doesn't exist yet).
     with contextlib.suppress(psycopg.errors.InvalidCatalogName):
         janitor.drop()
 
