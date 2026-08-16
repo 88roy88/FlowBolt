@@ -18,9 +18,6 @@ def _to_dicts(messages: list[dict[str, Any] | Message]) -> list[dict[str, Any]]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]
 
 
-# TODO: move llmlite langfuse code here?
-
-
 @asynccontextmanager
 async def _handle_litellm_errors(model: str | None = None) -> AsyncIterator[None]:
     resolved_model = model or settings.AI_MODEL

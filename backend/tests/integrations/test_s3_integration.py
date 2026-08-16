@@ -140,9 +140,7 @@ async def test_delete_published_html(storage):
     with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
         await storage.delete_published_html(project_id)
 
-        client.delete_object.assert_awaited_once_with(
-            Bucket="my-bucket", Key=f"published/{project_id}.html"
-        )
+        client.delete_object.assert_awaited_once_with(Bucket="my-bucket", Key=f"published/{project_id}.html")
 
 
 @pytest.mark.asyncio

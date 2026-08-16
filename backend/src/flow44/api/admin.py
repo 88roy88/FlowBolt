@@ -13,7 +13,7 @@ from flow44.db.platform_user import (
     list_platform_users,
     remove_platform_user,
 )
-from flow44.db.project import Project
+from flow44.db.project import Project, list_published_projects
 from flow44.services.maintenance.runner import ProjectMaintenanceResult, run_over_projects
 from flow44.services.maintenance.sandbox_file_permissions import fix_file_permissions
 from flow44.services.maintenance.template_sync import sync_protected_template_files
@@ -40,6 +40,15 @@ class PlatformUserResponse(BaseModel):
     created_at: str
 
 
+class PublishedAppResponse(BaseModel):
+    project_id: str
+    name: str
+    owner_id: str
+    project_url: str  # projects.published_url — the slug, or the project id if none was chosen
+    public_path: str
+    published_at: str
+
+
 @router.get("/users")
 async def list_users(user_id: AdminDep) -> list[PlatformUserResponse]:
     users = await list_platform_users()
@@ -53,6 +62,26 @@ async def invite_user(user_id: AdminDep, body: InviteUserRequest) -> PlatformUse
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="User already has platform access") from exc
     return PlatformUserResponse(user_id=user.user_id, invited_by=user.invited_by, created_at=user.created_at)
+
+
+@router.get("/published-apps")
+async def list_published_apps(user_id: AdminDep) -> list[PublishedAppResponse]:
+    """List every published project across the platform."""
+    projects = await list_published_projects()
+    return [
+        PublishedAppResponse(
+            project_id=p.id,
+            name=p.name,
+            owner_id=p.user_id,
+            project_url=handle,
+            public_path=f"/shared/{handle}",
+            published_at=published_at,
+        )
+        # published_url/published_at are non-null for every row the query returns;
+        # the walrus bindings narrow them for the type checker.
+        for p in projects
+        if (handle := p.published_url) is not None and (published_at := p.published_at) is not None
+    ]
 
 
 @router.delete("/users/{target_user_id}", status_code=204)
