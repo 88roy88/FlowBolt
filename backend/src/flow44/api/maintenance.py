@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from flow44.api.admin import AdminDep
 from flow44.config import settings
 from flow44.db.project import Project, list_all_projects
-from flow44.services.maintenance_utils import fix_file_permissions
+from flow44.services.maintenance_utils import fix_file_permissions, sync_protected_template_files
 
 logger = logging.getLogger(__name__)
 
@@ -59,5 +59,23 @@ async def fix_workspace_file_permissions(_admin: AdminDep) -> list[ProjectMainte
     async def op(project: Project) -> str:
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project.id)
         return await asyncio.to_thread(fix_file_permissions, workspace_dir)
+
+    return await _run_over_projects(op)
+
+
+@router.post("/sync-protected-files")
+async def sync_protected_files(_admin: AdminDep) -> list[ProjectMaintenanceResult]:
+    """Overwrite each project's framework/auth files with the current template version if they differ.
+
+    Scope is src/main.tsx, src/config.ts, index.html, src/auth/**, and src/api/**
+    - files the AI is already forbidden from editing (see flow44.ai.file_safety),
+    so any drift means the project predates a template fix, not an intentional
+    customization. Templated files like vite.config.ts, and per-project files
+    like package.json/lockfiles/.env, are excluded - see maintenance_utils.
+    """
+
+    async def op(project: Project) -> str:
+        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project.id)
+        return await asyncio.to_thread(sync_protected_template_files, workspace_dir, settings.TEMPLATE_DIR)
 
     return await _run_over_projects(op)
