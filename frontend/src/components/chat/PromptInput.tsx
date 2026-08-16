@@ -131,41 +131,40 @@ export function PromptInput() {
           </div>
         )}
 
-        <div className="flex items-start gap-1.5">
-          {/* Data source selector toggle - plus button to the left of the textbox */}
-          {!inputBlocked && projectId && (
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => { setValue(e.target.value); adjustHeight(); }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={1}
+          data-testid="chat-input"
+          className="w-full resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
+        />
+
+        <div className="flex items-center gap-2">
+          {/* Data source selector toggle */}
+          {projectId && (
             <button
               onClick={() => setShowDsSelector((v) => !v)}
-              className={`relative flex items-center justify-center p-1 mt-0.5 rounded-lg shrink-0 transition-all duration-150 hover:scale-105 hover:shadow-[0_0_6px_color-mix(in_srgb,var(--primary)_20%,transparent)] active:scale-95 ${
-                showDsSelector ? 'bg-primary/15' : ''
+              disabled={disabled}
+              className={`relative w-7 h-7 flex items-center justify-center rounded-full shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default ${
+                dsOpen ? 'bg-primary/15' : 'enabled:hover:bg-muted/50'
               } ${selectedDataSources.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
-              title={showDsSelector ? 'Hide data source selector' : 'Attach data sources'}
+              title={dsOpen ? 'Hide data source selector' : 'Attach data sources'}
             >
               <CirclePlus size={18} />
               {selectedDataSources.length > 0 && (
-                <span className="absolute top-0.5 end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
+                <span className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
                   {selectedDataSources.length}
                 </span>
               )}
             </button>
           )}
 
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => { setValue(e.target.value); adjustHeight(); }}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder={placeholder}
-            disabled={disabled}
-            rows={1}
-            data-testid="chat-input"
-            className="flex-1 min-w-0 resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 ms-auto min-w-0">
             <ModelSelector />
           </div>
