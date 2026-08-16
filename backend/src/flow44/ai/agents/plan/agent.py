@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from langfuse.decorators import observe
+from opik import track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
@@ -15,6 +15,7 @@ from flow44.ai.agents.plan.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
@@ -53,7 +54,7 @@ class PlanAgent(BaseAgent):
 
         return flow
 
-    @observe(name="plan-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
@@ -74,6 +75,8 @@ class PlanAgent(BaseAgent):
         # Run the flow
         start_step = "fetch_data_sources" if self._state.data_source_ids else "design"
         await self._flow.run(plan_state, start=start_step)
+
+        self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
 
     # -- Flow Steps --
 
@@ -159,7 +162,7 @@ class PlanAgent(BaseAgent):
         """Step: Build user overview from designs."""
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
-        state.build_state.user_overview = await self._build_user_overview()
+        state.build_state.user_plan_overview = await self._build_user_plan_overview()
 
         return state
 
@@ -168,13 +171,13 @@ class PlanAgent(BaseAgent):
         state.build_state.phase = "awaiting_approval"
         await save_pending_plan(state.project_id, state.build_state.model_dump_json())
         await state.emit_fn({"type": "phase", "phase": "awaiting_approval"})
-        await state.emit_fn({"type": "plan_overview", "overview": state.build_state.user_overview.model_dump()})
+        await state.emit_fn({"type": "plan_overview", "overview": state.build_state.user_plan_overview.model_dump()})
 
         return state
 
     # -- Rebuild --
 
-    @observe(name="plan-agent-rebuild")  # type: ignore[untyped-decorator]
+    @track(name="plan-agent-rebuild", ignore_arguments=["state"])  # type: ignore[untyped-decorator]
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
@@ -187,7 +190,7 @@ class PlanAgent(BaseAgent):
                 "user_request": self._state.user_content,
                 "architecture": self._state.architecture.model_dump(),
                 "ux_design": self._state.ux_design.model_dump(),
-                "previous_overview": self._state.user_overview.model_dump(),
+                "previous_overview": self._state.user_plan_overview.model_dump(),
                 "user_feedback": feedback,
             },
             indent=2,
@@ -198,16 +201,18 @@ class PlanAgent(BaseAgent):
             model=self.model,
             metadata=self._llm_metadata("rebuild_user_plan"),
         )
-        self._state.user_overview = UserPlanOverview.model_validate(parse_json_response(raw))
+        self._state.user_plan_overview = UserPlanOverview.model_validate(parse_json_response(raw))
 
         self._state.phase = "awaiting_approval"
         await save_pending_plan(self.project_id, self._state.model_dump_json())
         await self.emit({"type": "phase", "phase": "awaiting_approval"})
-        await self.emit({"type": "plan_overview", "overview": self._state.user_overview.model_dump()})
+        await self.emit({"type": "plan_overview", "overview": self._state.user_plan_overview.model_dump()})
+
+        self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
 
     # -- Design --
 
-    @observe(name="design-architecture")  # type: ignore[untyped-decorator]
+    @track(name="design-architecture")  # type: ignore[untyped-decorator]
     async def _design_architecture(self) -> ArchitectureDesign:
         prompt = render_architecture(data_source_contexts=self._state.data_source_contexts or None)
         try:
@@ -219,12 +224,13 @@ class PlanAgent(BaseAgent):
             )
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "complete"})
             return ArchitectureDesign.model_validate(parse_json_response(raw))
-        except Exception:
+        except Exception as exc:
             logger.exception("[plan] Architecture design failed")
+            record_span_error(exc)
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "failed"})
             return ArchitectureDesign()
 
-    @observe(name="design-ux")  # type: ignore[untyped-decorator]
+    @track(name="design-ux")  # type: ignore[untyped-decorator]
     async def _design_ux(self) -> UXDesign:
         try:
             raw = await complete_chat(
@@ -235,13 +241,14 @@ class PlanAgent(BaseAgent):
             )
             await self.emit({"type": "design_progress", "stream": "ux", "content": "complete"})
             return UXDesign.model_validate(parse_json_response(raw))
-        except Exception:
+        except Exception as exc:
             logger.exception("[plan] UX design failed")
+            record_span_error(exc)
             await self.emit({"type": "design_progress", "stream": "ux", "content": "failed"})
             return UXDesign()
 
-    @observe(name="build-user-overview")  # type: ignore[untyped-decorator]
-    async def _build_user_overview(self) -> UserPlanOverview:
+    @track(name="build-user-plan-overview")  # type: ignore[untyped-decorator]
+    async def _build_user_plan_overview(self) -> UserPlanOverview:
         plan_input = json.dumps(
             {
                 "user_request": self._state.user_content,
