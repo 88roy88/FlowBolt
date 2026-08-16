@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import { isAgentAlive, isAwaitingPlanApproval } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
-import { ArrowUp, Loader2, Database, X } from 'lucide-react';
+import { ArrowUp, CirclePlus, Loader2, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
@@ -156,7 +156,7 @@ export function PromptInput() {
               } ${selectedDataSources.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
               title={dsOpen ? 'Hide data source selector' : 'Attach data sources'}
             >
-              <Database size={15} />
+              <CirclePlus size={18} />
               {selectedDataSources.length > 0 && (
                 <span className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
                   {selectedDataSources.length}

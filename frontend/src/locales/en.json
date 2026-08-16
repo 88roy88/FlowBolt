@@ -145,7 +145,7 @@
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
       "readOnly": "View-only access",
-      "default": "Describe what you want to build..."
+      "default": "What do you want to build? Click on + to add flow packages."
     },
     "phase": {
       "analyzing": "Analyzing",
