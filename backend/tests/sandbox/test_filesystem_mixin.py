@@ -47,7 +47,9 @@ class TestDeleteFile:
             await sandbox.delete_file("../../etc/passwd")
 
     async def test_removes_non_empty_directory_recursively(
-        self, sandbox: DummySandbox, tmp_path  # type: ignore[type-arg]
+        self,
+        sandbox: DummySandbox,
+        tmp_path,  # type: ignore[type-arg]
     ) -> None:
         await sandbox.write_file("src/assets/logo.svg", "<svg></svg>")
         await sandbox.delete_file("src")

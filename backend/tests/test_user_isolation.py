@@ -21,6 +21,7 @@ async def test_project_user_isolation(test_db):
     assert exc.value.status_code == 404
     assert exc.value.detail == "Project not found"
 
+
 @pytest.mark.asyncio
 async def test_list_projects_isolation(test_db):
     await create_project(name="A1", user_id="user_a")

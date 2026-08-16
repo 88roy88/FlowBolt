@@ -1,6 +1,6 @@
 from typing import Any
 
-from flow44.ai.core.opik_failure_logger import llm_metadata, set_trace_input, set_trace_output, setup_trace
+from flow44.ai.core.opik_utils import llm_metadata, set_trace_input, set_trace_output, setup_trace
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
 

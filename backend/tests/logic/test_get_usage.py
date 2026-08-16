@@ -10,26 +10,30 @@ from flow44.logic.models import DataSourceParamsInfo
 
 
 def _metadata(*, queries: list[flapi_models.Query]) -> flapi_models.PackageMetadata:
-    return flapi_models.PackageMetadata.model_validate({
-        "Id": 1,
-        "Name": "test",
-        "Description": "",
-        "OutputQueriesId": [],
-        "Queries": [q.model_dump(by_alias=True) for q in queries],
-    })
+    return flapi_models.PackageMetadata.model_validate(
+        {
+            "Id": 1,
+            "Name": "test",
+            "Description": "",
+            "OutputQueriesId": [],
+            "Queries": [q.model_dump(by_alias=True) for q in queries],
+        }
+    )
 
 
 def _query(name: str = "q") -> flapi_models.Query:
-    return flapi_models.Query.model_validate({
-        "uniqueName": f"unique-{name}",
-        "originalName": name,
-        "Name": name,
-        "ResultsLimit": 1000,
-        "DataSourceName": "test",
-        "Description": "",
-        "id": f"id-{name}",
-        "Fields": [],
-    })
+    return flapi_models.Query.model_validate(
+        {
+            "uniqueName": f"unique-{name}",
+            "originalName": name,
+            "Name": name,
+            "ResultsLimit": 1000,
+            "DataSourceName": "test",
+            "Description": "",
+            "id": f"id-{name}",
+            "Fields": [],
+        }
+    )
 
 
 class TestGetUsage:
@@ -55,7 +59,7 @@ class TestGetUsage:
             AsyncMock(return_value=_metadata(queries=[_query("persons")])),
         )
 
-        async def _fake_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_params(*_a, **_kw):
             return DataSourceParamsInfo(parameters=[], require_any=False)
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_params)
@@ -74,9 +78,7 @@ class TestGetUsage:
             "get_metadata",
             AsyncMock(return_value=_metadata(queries=[_query()])),
         )
-        params_mock = AsyncMock(
-            return_value=DataSourceParamsInfo(parameters=[], require_any=False)
-        )
+        params_mock = AsyncMock(return_value=DataSourceParamsInfo(parameters=[], require_any=False))
         monkeypatch.setattr(ds_logic, "get_params_info", params_mock)
 
         await ds_logic.get_usage("1")
