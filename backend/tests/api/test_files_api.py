@@ -138,7 +138,7 @@ def test_upload_entry_writes_binary_and_conflict(tmp_path: Path) -> None:
 
 def test_search_entry_returns_matches(tmp_path: Path) -> None:
     class SearchSandbox(APITestSandbox):
-        async def grep(self, *args, **kwargs):  # type: ignore[override]  # noqa: ANN002, ANN003
+        async def grep(self, *args, **kwargs):  # type: ignore[override]
             return [GrepMatch(file="/src/types.ts", line=1, column=18, content="export interface Todo {")]
 
     info = SandboxInfo(project_id=PROJECT_ID, workspace_dir=str(tmp_path), port=0)
@@ -166,7 +166,7 @@ def test_search_entry_returns_matches(tmp_path: Path) -> None:
 
 def test_search_entry_returns_503_when_search_tool_is_unavailable(tmp_path: Path) -> None:
     class SearchUnavailableSandbox(APITestSandbox):
-        async def grep(self, *args, **kwargs):  # type: ignore[override]  # noqa: ANN002, ANN003
+        async def grep(self, *args, **kwargs):  # type: ignore[override]
             raise SearchToolError("ripgrep (rg) is required for search but was not found in PATH")
 
     info = SandboxInfo(project_id=PROJECT_ID, workspace_dir=str(tmp_path), port=0)
