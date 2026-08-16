@@ -189,10 +189,13 @@
     "noMembers": "אין חברים עדיין"
   },
   "admin": {
-    "title": "משתמשי פלטפורמה",
+    "title": "ניהול",
+    "usersTab": "משתמשי פלטפורמה",
+    "publishedTab": "אפליקציות שפורסמו",
     "userIdPlaceholder": "מזהה משתמש להזמנה",
     "invite": "הזמן",
-    "noUsers": "אין משתמשי פלטפורמה עדיין"
+    "noUsers": "אין משתמשי פלטפורמה עדיין",
+    "noPublished": "אין אפליקציות שפורסמו עדיין"
   },
   "publish": {
     "publishFailed": "הפרסום נכשל",
