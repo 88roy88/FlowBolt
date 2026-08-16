@@ -55,7 +55,7 @@ class TestGetUsage:
             AsyncMock(return_value=_metadata(queries=[_query("persons")])),
         )
 
-        async def _fake_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_params(*_a, **_kw):
             return DataSourceParamsInfo(parameters=[], require_any=False)
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_params)
