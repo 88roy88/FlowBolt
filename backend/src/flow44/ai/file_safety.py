@@ -39,7 +39,7 @@ _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
     "**/*template_guard*",
 )
 
-# Protected patterns that can diverge per project.
+# Protected paths that can diverge per project.
 _SYNC_EXCLUDED_PATTERNS: frozenset[str] = frozenset(
     {
         "**/index.html",
@@ -52,7 +52,7 @@ _SYNC_EXCLUDED_PATTERNS: frozenset[str] = frozenset(
     }
 )
 
-# Protected paths/patterns that are safe to overwrite verbatim from the template.
+# Protected paths that are safe to overwrite verbatim from the template.
 SYNCABLE_TEMPLATE_FILE_PATTERNS: frozenset[str] = (
     frozenset(_PROTECTED_APP_FILE_PATHS) | frozenset(_PROTECTED_APP_FILE_PATTERNS)
 ) - _SYNC_EXCLUDED_PATTERNS
