@@ -12,11 +12,11 @@ _DEFAULT_WORKSPACE = str(_BACKEND_ROOT / "data" / "workspaces")
 _DEFAULT_TEMPLATE = str(_BACKEND_ROOT / "pnpm-project-template")
 
 
-class Flow44BaseSettings(BaseSettings):
+class BuildAppSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AIB_", env_file=".env", extra="ignore")
 
 
-class SandboxSettings(Flow44BaseSettings):
+class SandboxSettings(BuildAppSettings):
     WORKSPACE_BASE_DIR: str = _DEFAULT_WORKSPACE
     TEMPLATE_DIR: str = _DEFAULT_TEMPLATE
     SANDBOX_PORT_RANGE_START: int = 3501
@@ -44,7 +44,7 @@ class SandboxSettings(Flow44BaseSettings):
     SANDBOX_AUTH_POST_MESSAGE_TARGET: str = "*"
 
 
-class DatabaseSettings(Flow44BaseSettings):
+class DatabaseSettings(BuildAppSettings):
     DB_USER: str
     DB_PASSWORD: str
     DB_HOST: str
@@ -56,7 +56,7 @@ class DatabaseSettings(Flow44BaseSettings):
     DB_POOL_PRE_PING: bool = True
 
 
-class AIModelSettings(Flow44BaseSettings):
+class AIModelSettings(BuildAppSettings):
     AI_MODEL: str = "qwen/qwen3-coder-30b-a3b-instruct"
     # Base URL for OpenAI-compatible endpoints (vLLM, Ollama, OpenRouter, etc.)
     AI_BASE_URL: str | None = "http://flow-44-models.com/openai/v1"
@@ -74,13 +74,13 @@ class AIModelSettings(Flow44BaseSettings):
         return values
 
 
-class SearchIndexSettings(Flow44BaseSettings):
+class SearchIndexSettings(BuildAppSettings):
     SEARCH_INDEX_MAX_FILE_SIZE_MB: int = 1  # Max size per file to index (MB)
     SEARCH_INDEX_MAX_TOTAL_SIZE_MB: int = 20  # Max total indexed content per project (MB)
     SEARCH_INDEX_CACHE_TTL_SECONDS: int = 5  # How long to cache index before rebuilding
 
 
-class AuthSettings(Flow44BaseSettings):
+class AuthSettings(BuildAppSettings):
     # JWT public key / HMAC secret for verifying token signatures (required)
     AUTH_JWT_PUBLIC_KEY: str
     # JWT algorithm (default: HS256 for HMAC, use RS256 for RSA)
@@ -91,13 +91,13 @@ class AuthSettings(Flow44BaseSettings):
     SYSTEM_ADMIN_IDS: list[str] = []
 
 
-class FlapiSettings(Flow44BaseSettings):
+class FlapiSettings(BuildAppSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
     FLAPI_BASE_URL: str = "http://localhost:6001"
     FLAPI_VERIFY_SSL: bool = True
 
 
-class S3Settings(Flow44BaseSettings):
+class S3Settings(BuildAppSettings):
     S3_ENDPOINT_URL: str
     S3_USE_SSL: bool = True
     S3_ACCESS_KEY: str
@@ -107,11 +107,11 @@ class S3Settings(Flow44BaseSettings):
     S3_STORAGE_CLASS: str = "STANDARD_IA"
 
 
-class LoggerSettings(Flow44BaseSettings):
+class LoggerSettings(BuildAppSettings):
     LOG_FILE_PATH: str | None = None
 
 
-class OpikSettings(Flow44BaseSettings):
+class OpikSettings(BuildAppSettings):
     # Opik (optional — set an API key to enable)
     OPIK_API_KEY: str | None = None
     OPIK_WORKSPACE: str | None = None
@@ -139,7 +139,7 @@ class Settings(
     S3Settings,
     OpikSettings,
     LoggerSettings,
-    Flow44BaseSettings,
+    BuildAppSettings,
 ):
     pass
 
