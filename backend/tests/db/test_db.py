@@ -24,6 +24,7 @@ from flow44.db.project import (
     delete_project,
     get_project,
     list_all_projects,
+    list_published_projects,
     rename_project,
     update_project_model,
     update_project_published_url,
@@ -125,6 +126,23 @@ class TestProjectCRUD:
         assert fetched.published_url == handle
         assert fetched.published_at is not None
         assert fetched.updated_at > project.updated_at
+
+    async def test_list_published_projects_excludes_unpublished(self, test_db):
+        published = await create_project("Published", user_id="test-user")
+        await create_project("Draft", user_id="test-user")
+        await update_project_published_url(published.id, "published-slug")
+
+        projects = await list_published_projects()
+        assert [p.id for p in projects] == [published.id]
+
+    async def test_list_published_projects_ordered_newest_first(self, test_db):
+        first = await create_project("First", user_id="test-user")
+        second = await create_project("Second", user_id="test-user")
+        await update_project_published_url(first.id, "first-slug")
+        await update_project_published_url(second.id, "second-slug")
+
+        projects = await list_published_projects()
+        assert [p.id for p in projects] == [second.id, first.id]
 
     async def test_delete_project_cascades_messages(self, test_db):
         project = await create_project("App", user_id="test-user")
