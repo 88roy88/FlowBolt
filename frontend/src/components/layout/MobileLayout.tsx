@@ -48,7 +48,7 @@ export function MobileLayout() {
             <p className="text-sm text-muted-foreground text-center leading-relaxed">
               Describe what you want to build and the AI will generate it for you.
             </p>
-            <div className="w-full rounded-2xl border border-primary/20 shadow-[0_2px_20px_color-mix(in_srgb,var(--primary)_6%,transparent)] [&>div]:border-t-0 [&>div]:rounded-2xl">
+            <div className="w-full">
               <PromptInput />
             </div>
           </div>
