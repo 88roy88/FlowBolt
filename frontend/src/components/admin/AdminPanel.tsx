@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Trash2, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -13,43 +14,28 @@ interface PlatformUser {
   created_at: string;
 }
 
-interface PublishedApp {
-  project_id: string;
-  name: string;
-  owner_id: string;
-  project_url: string;
-  public_path: string;
-  published_at: string;
-}
-
 type Tab = 'users' | 'published';
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('users');
-  const [users, setUsers] = useState<PlatformUser[]>([]);
-  const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
-  const [apps, setApps] = useState<PublishedApp[]>([]);
-  const [appsLoading, setAppsLoading] = useState(true);
 
-  useEffect(() => {
-    api.fetchPlatformUsers()
-      .then(setUsers)
-      .catch(() => setError('Failed to load users'))
-      .finally(() => setLoading(false));
-  }, []);
+  const usersQuery = useQuery({
+    queryKey: ['admin', 'platform-users'],
+    queryFn: api.fetchPlatformUsers,
+  });
+  const users = usersQuery.data ?? [];
 
   // Lazy: only hit the endpoint once the tab is actually opened.
-  useEffect(() => {
-    if (tab !== 'published') return;
-    setAppsLoading(true);
-    api.fetchPublishedApps()
-      .then(setApps)
-      .catch(() => setError('Failed to load published apps'))
-      .finally(() => setAppsLoading(false));
-  }, [tab]);
+  const appsQuery = useQuery({
+    queryKey: ['admin', 'published-apps'],
+    queryFn: api.fetchPublishedApps,
+    enabled: tab === 'published',
+  });
+  const apps = appsQuery.data ?? [];
 
   const handleInvite = async () => {
     const trimmed = userId.trim();
@@ -57,7 +43,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     setError('');
     try {
       const user = await api.invitePlatformUser(trimmed);
-      setUsers((prev) => [user, ...prev]);
+      queryClient.setQueryData(['admin', 'platform-users'], (prev: PlatformUser[] | undefined) => [
+        user,
+        ...(prev ?? []),
+      ]);
       setUserId('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite user');
@@ -67,7 +56,9 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const handleRevoke = async (targetUserId: string) => {
     try {
       await api.revokePlatformUser(targetUserId);
-      setUsers((prev) => prev.filter((u) => u.user_id !== targetUserId));
+      queryClient.setQueryData(['admin', 'platform-users'], (prev: PlatformUser[] | undefined) =>
+        (prev ?? []).filter((u) => u.user_id !== targetUserId),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to revoke user');
     }
@@ -90,7 +81,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="w-[560px]">
+      <DialogContent className="w-[760px] max-w-[760px]">
         <DialogClose onClose={onClose} />
         <DialogTitle className="mb-3">{t('admin.title', 'Admin')}</DialogTitle>
 
@@ -117,13 +108,13 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
               </Button>
             </div>
 
-            {error && (
-              <p className="text-destructive text-xs mb-2">{error}</p>
+            {(error || usersQuery.isError) && (
+              <p className="text-destructive text-xs mb-2">{error || 'Failed to load users'}</p>
             )}
 
             {/* Users list */}
             <div className="max-h-[300px] overflow-auto space-y-1">
-              {loading ? (
+              {usersQuery.isLoading ? (
                 <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>
               ) : users.length === 0 ? (
                 <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noUsers', 'No platform users yet')}</p>
@@ -151,13 +142,13 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
         {tab === 'published' && (
           <>
-            {error && (
-              <p className="text-destructive text-xs mb-2">{error}</p>
+            {(error || appsQuery.isError) && (
+              <p className="text-destructive text-xs mb-2">{error || 'Failed to load published apps'}</p>
             )}
 
             {/* Published apps list */}
             <div className="max-h-[300px] overflow-auto space-y-1">
-              {appsLoading ? (
+              {appsQuery.isLoading ? (
                 <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>
               ) : apps.length === 0 ? (
                 <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noPublished', 'No published apps yet')}</p>
