@@ -6,10 +6,6 @@ from flow44.sandbox.constants import SKIP_DIRS
 
 
 def sync_protected_template_files(workspace_dir: str, template_dir: str) -> str:
-    """Overwrite each project's framework/auth files with the template's version if they differ.
-
-    See flow44.ai.file_safety.SYNCABLE_TEMPLATE_FILE_PATTERNS for what's in scope and why.
-    """
     if not os.path.isdir(workspace_dir):
         return "workspace not present on this pod, skipped"
 
