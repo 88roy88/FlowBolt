@@ -5,7 +5,6 @@ from flow44.sandbox.constants import SKIP_DIRS
 
 
 def fix_file_permissions(workspace_dir: str) -> str:
-    """Walk workspace_dir and OR group/other write bits onto any file missing them."""
     if not os.path.isdir(workspace_dir):
         return "workspace not present on this pod, skipped"
 
@@ -21,7 +20,6 @@ def fix_file_permissions(workspace_dir: str) -> str:
 
 
 def _ensure_writable(path: str) -> str:
-    """Make `path` group/other writable if it isn't. Returns "fixed", "already writable", or "failed"."""
     try:
         mode = stat.S_IMODE(os.stat(path).st_mode)
     except OSError:
@@ -35,23 +33,15 @@ def _ensure_writable(path: str) -> str:
         os.chmod(path, new_mode)
         return "fixed"
     except OSError:
-        pass  # not the file's owner - fall back to recreating it as ourselves
-
-    try:
-        _recreate_with_mode(path, new_mode)
-        return "fixed"
-    except OSError:
-        return "failed"
+        try:
+            _recreate_with_mode(path, new_mode)
+            return "fixed"
+        except OSError:
+            return "failed"
 
 
 def _recreate_with_mode(path: str, mode: int) -> None:
-    """Unlink and recreate `path` (preserving its content) so the current process owns it, then set `mode`.
-
-    chmod is restricted to a file's owner (or root), so a file created by a
-    different uid can't be re-permissioned directly. Unlinking only requires
-    write access on the containing directory though, so recreating the file
-    makes the current uid the owner and lets fchmod always succeed.
-    """
+    """Recreate file when no permission to chmod (require write)"""
     with open(path, "rb") as f:
         content = f.read()
     os.unlink(path)

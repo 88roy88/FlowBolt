@@ -24,13 +24,12 @@ class ProjectMaintenanceResult(BaseModel):
     detail: str
 
 
-async def _run_over_projects(op: Callable[[Project], Awaitable[str]]) -> list[ProjectMaintenanceResult]:
-    """Run `op` against every project, capturing a per-project success/failure result."""
+async def _run_over_projects(operation: Callable[[Project], Awaitable[str]]) -> list[ProjectMaintenanceResult]:
     projects = await list_all_projects()
     results: list[ProjectMaintenanceResult] = []
     for project in projects:
         try:
-            detail = await op(project)
+            detail = await operation(project)
             result = ProjectMaintenanceResult(
                 project_id=project.id, project_name=project.name, success=True, detail=detail
             )
@@ -52,31 +51,21 @@ async def _run_over_projects(op: Callable[[Project], Awaitable[str]]) -> list[Pr
 
 @router.post("/fix-file-permissions")
 async def fix_workspace_file_permissions(_admin: AdminDep) -> list[ProjectMaintenanceResult]:
-    """Make every non-world-writable file (e.g. -rw-r--r--) in each project's workspace world-writable.
+    """Make all workspace files world-writable. (new files will be world-writable already after os.umask(0))"""
 
-    New files created by this process are already world-writable thanks to changing os.umask to 0.
-    """
-
-    async def op(project: Project) -> str:
+    async def fix_permissions(project: Project) -> str:
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project.id)
         return await asyncio.to_thread(fix_file_permissions, workspace_dir)
 
-    return await _run_over_projects(op)
+    return await _run_over_projects(fix_permissions)
 
 
 @router.post("/sync-protected-files")
 async def sync_protected_files(_admin: AdminDep) -> list[ProjectMaintenanceResult]:
-    """Overwrite each project's framework/auth files with the current template version if they differ.
+    """Overwrite each project's template files with the up-to-date template if they differ."""
 
-    Scope is src/main.tsx, src/config.ts, index.html, src/auth/**, and src/api/**
-    - files the AI is already forbidden from editing (see flow44.ai.file_safety),
-    so any drift means the project predates a template fix, not an intentional
-    customization. Templated files like vite.config.ts, and per-project files
-    like package.json/lockfiles/.env, are excluded - see flow44.services.maintenance.template_sync.
-    """
-
-    async def op(project: Project) -> str:
+    async def sync_files(project: Project) -> str:
         workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project.id)
         return await asyncio.to_thread(sync_protected_template_files, workspace_dir, settings.TEMPLATE_DIR)
 
-    return await _run_over_projects(op)
+    return await _run_over_projects(sync_files)
