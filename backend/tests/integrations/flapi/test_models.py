@@ -151,6 +151,14 @@ class TestPackageMetadataFieldType:
         assert result.queries[0].fields[0].type_ == "html"
 
 
+class TestPackageMetadataDescription:
+    def test_null_description_does_not_raise(self) -> None:
+        payload = _package_with_field_type("string")
+        payload["Description"] = None
+        result = PackageMetadata.model_validate(payload)
+        assert result.description is None
+
+
 class TestQuickParamUnknownType:
     def test_unknown_param_type_does_not_raise(self) -> None:
         result = _info([_param("x", "Geospatial", "some_value")])
