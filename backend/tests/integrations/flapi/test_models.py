@@ -158,6 +158,12 @@ class TestPackageMetadataDescription:
         result = PackageMetadata.model_validate(payload)
         assert result.description is None
 
+    def test_missing_description_does_not_raise(self) -> None:
+        payload = _package_with_field_type("string")
+        del payload["Description"]
+        result = PackageMetadata.model_validate(payload)
+        assert result.description is None
+
 
 class TestQuickParamUnknownType:
     def test_unknown_param_type_does_not_raise(self) -> None:
