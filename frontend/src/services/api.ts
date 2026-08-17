@@ -248,7 +248,7 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   await request(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
-// --- Admin: platform user management ---
+// --- Admin ---
 
 export async function fetchPlatformUsers(): Promise<{ user_id: string; invited_by: string; created_at: string }[]> {
   return request('/admin/users');
@@ -263,4 +263,15 @@ export async function invitePlatformUser(userId: string): Promise<{ user_id: str
 
 export async function revokePlatformUser(userId: string): Promise<void> {
   await request(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+export async function fetchPublishedApps(): Promise<{
+  project_id: string;
+  name: string;
+  owner_id: string;
+  project_url: string;
+  public_path: string;
+  published_at: string;
+}[]> {
+  return request('/admin/published-apps');
 }

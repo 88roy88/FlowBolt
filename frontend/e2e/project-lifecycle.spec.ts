@@ -26,7 +26,7 @@ test.describe('Empty state', () => {
     await nameInput.press('Enter');
 
     // After creation, the chat input should appear
-    await expect(page.getByPlaceholder(/describe what you want/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByPlaceholder(/what do you want to build/i)).toBeVisible({ timeout: 10_000 });
   });
 });
 

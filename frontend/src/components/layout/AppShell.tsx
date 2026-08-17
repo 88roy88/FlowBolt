@@ -226,7 +226,7 @@ export function AppShell() {
                 Describe what you want to build and the AI will design, plan,
                 and code it for you.
               </p>
-              <div className="w-full rounded-2xl bg-surface/80 border border-primary/20 shadow-[0_2px_24px_color-mix(in_srgb,var(--primary)_8%,transparent)] [&>div]:border-t-0 [&>div]:rounded-2xl">
+              <div className="w-full">
                 <PromptInput />
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
