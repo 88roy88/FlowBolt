@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RotateCcw } from 'lucide-react';
 import { useVersionStore } from '../../stores/version';
+import { useChatStore } from '../../stores/chat';
+import { isAgentAlive } from '../../stores/chatAgentState';
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 
@@ -14,14 +16,24 @@ type Props = {
 export function RestoreVersionButton({ commit_sha, versionLabel, className }: Props) {
   const { t } = useTranslation();
   const restoreVersion = useVersionStore((s) => s.restoreVersion);
+  const agentBusy = useChatStore(isAgentAlive);
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button variant="outline" size="sm" className={className} onClick={() => setOpen(true)}>
-        <RotateCcw size={10} />
-        {t('version.restoreHere', 'Restore here')}
-      </Button>
+      <span
+        className="inline-flex"
+        title={
+          agentBusy
+            ? t('version.busyTooltip', 'Unavailable while the AI works')
+            : t('version.restoreTooltip', 'Discard newer versions')
+        }
+      >
+        <Button variant="outline" size="sm" className={className} disabled={agentBusy} onClick={() => setOpen(true)}>
+          <RotateCcw size={10} />
+          {t('version.restoreHere', 'Restore here')}
+        </Button>
+      </span>
 
       <ConfirmDialog
         open={open}

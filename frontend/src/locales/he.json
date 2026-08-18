@@ -210,7 +210,11 @@
     "editFromOldTitle": "לערוך מגרסה {{version}}?",
     "editFromOldBody": "עריכה מגרסה {{version}} תמחק את כל הגרסאות החדשות יותר. ניתן לשחזר אותן דרך התמיכה. להמשיך?",
     "continueAndSend": "המשך",
-    "previewReadOnly": "חזור לגרסה האחרונה כדי לערוך"
+    "previewReadOnly": "חזור לגרסה האחרונה כדי לערוך",
+    "previewTooltip": "צפייה בגרסה ללא שחזור",
+    "exitPreviewTooltip": "חזרה לגרסה האחרונה",
+    "restoreTooltip": "מחיקת הגרסאות החדשות יותר",
+    "busyTooltip": "לא זמין בזמן עבודת ה-AI"
   },
   "publish": {
     "publishFailed": "הפרסום נכשל",

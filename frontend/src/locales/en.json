@@ -210,7 +210,11 @@
     "editFromOldTitle": "Edit from version {{version}}?",
     "editFromOldBody": "Editing from {{version}} will discard all newer versions. They can be recovered by support. Continue?",
     "continueAndSend": "Continue",
-    "previewReadOnly": "Return to latest to edit"
+    "previewReadOnly": "Return to latest to edit",
+    "previewTooltip": "View version without restoring",
+    "exitPreviewTooltip": "Back to latest",
+    "restoreTooltip": "Discard newer versions",
+    "busyTooltip": "Unavailable while the AI works"
   },
   "publish": {
     "publishFailed": "Publish Failed",

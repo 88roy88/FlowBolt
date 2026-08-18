@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { History, Eye, CheckCircle } from 'lucide-react';
 import { useVersionStore, formatVersionLabel } from '../../stores/version';
+import { useChatStore } from '../../stores/chat';
+import { isAgentAlive } from '../../stores/chatAgentState';
 import { Button } from '../ui/button';
 import { RestoreVersionButton } from '../version/RestoreVersionButton';
 
@@ -15,6 +17,11 @@ export function VersionControl({ commit_sha }: Props) {
   const isPreviewing = useVersionStore((s) => s.previewingVersion === commit_sha);
   const previewVersionAction = useVersionStore((s) => s.previewVersion);
   const exitPreview = useVersionStore((s) => s.exitPreview);
+  const agentBusy = useChatStore(isAgentAlive);
+
+  let previewTitle = t('version.previewTooltip', 'View version without restoring');
+  if (isPreviewing) previewTitle = t('version.exitPreviewTooltip', 'Back to latest');
+  if (agentBusy) previewTitle = t('version.busyTooltip', 'Unavailable while the AI works');
 
   if (isLatestVersion) {
     return (
@@ -29,27 +36,18 @@ export function VersionControl({ commit_sha }: Props) {
     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
       <History size={11} className="text-muted-foreground/50 shrink-0" />
       <span className="text-[11px] text-muted-foreground/60 select-none">{versionLabel}</span>
-      {isPreviewing ? (
+      <span className="inline-flex" title={previewTitle}>
         <Button
           variant="outline"
           size="sm"
           className="h-5 px-2 text-[11px] gap-1"
-          onClick={exitPreview}
+          disabled={agentBusy}
+          onClick={isPreviewing ? exitPreview : () => previewVersionAction(commit_sha)}
         >
           <Eye size={10} />
-          {t('version.exitPreview', 'Exit preview')}
+          {isPreviewing ? t('version.exitPreview', 'Exit preview') : t('version.preview', 'Preview')}
         </Button>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-5 px-2 text-[11px] gap-1"
-          onClick={() => previewVersionAction(commit_sha)}
-        >
-          <Eye size={10} />
-          {t('version.preview', 'Preview')}
-        </Button>
-      )}
+      </span>
       {isPreviewing && (
         <RestoreVersionButton
           commit_sha={commit_sha}

@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { History, X } from 'lucide-react';
 import { useVersionStore, formatVersionLabel } from '../../stores/version';
+import { useChatStore } from '../../stores/chat';
+import { isAgentAlive } from '../../stores/chatAgentState';
 import { Button } from '../ui/button';
 import { RestoreVersionButton } from '../version/RestoreVersionButton';
 
@@ -9,6 +11,7 @@ export function PreviewVersionBanner() {
   const previewingVersion = useVersionStore((s) => s.previewingVersion);
   const versions = useVersionStore((s) => s.versions);
   const exitPreview = useVersionStore((s) => s.exitPreview);
+  const agentBusy = useChatStore(isAgentAlive);
 
   if (!previewingVersion) return null;
 
@@ -20,15 +23,25 @@ export function PreviewVersionBanner() {
       <span className="text-warning font-medium flex-1">
         {t('version.previewingBanner', 'Previewing {{version}}', { version: versionLabel })}
       </span>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-6 px-2 text-[11px] gap-1 border-warning/40 text-warning hover:bg-warning/10"
-        onClick={exitPreview}
+      <span
+        className="inline-flex"
+        title={
+          agentBusy
+            ? t('version.busyTooltip', 'Unavailable while the AI works')
+            : t('version.exitPreviewTooltip', 'Back to latest')
+        }
       >
-        <X size={10} />
-        {t('version.returnToLatest', 'Return to latest')}
-      </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-[11px] gap-1 border-warning/40 text-warning hover:bg-warning/10"
+          disabled={agentBusy}
+          onClick={exitPreview}
+        >
+          <X size={10} />
+          {t('version.returnToLatest', 'Return to latest')}
+        </Button>
+      </span>
       <RestoreVersionButton
         commit_sha={previewingVersion}
         versionLabel={versionLabel}
