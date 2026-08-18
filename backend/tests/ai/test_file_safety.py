@@ -25,6 +25,8 @@ from flow44.ai.file_safety import (
         "src/main.tsx",
         "src/vite-env.d.ts",
         "src/platform/internal/README.md",
+        ".git/hooks/post-checkout",
+        ".git/config",
     ],
 )
 def test_protected_generated_app_files_are_rejected(path: str) -> None:

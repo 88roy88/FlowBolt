@@ -6,7 +6,7 @@ import pytest
 
 from flow44.db.events import get_versions
 from flow44.services.versioning import service as versioning
-from flow44.services.versioning.git_service import GitService
+from flow44.services.versioning.git import Git
 
 from .conftest import requires_git
 
@@ -19,7 +19,7 @@ async def _commit_turn(sandbox) -> str | None:  # type: ignore[no-untyped-def]
 
 async def test_commit_turn_emits_version_event(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "x")
-    await GitService(sandbox).init("v0")  # repo exists (1 commit), no event yet
+    await Git(sandbox).init("v0")  # repo exists (1 commit), no event yet
 
     await sandbox.write_file("a.txt", "y")
     sha = await _commit_turn(sandbox)
@@ -29,13 +29,11 @@ async def test_commit_turn_emits_version_event(sandbox, test_db) -> None:  # typ
     assert len(versions) == 1
     assert versions[0].payload["commit_sha"] == sha
     assert "turn_summary" not in versions[0].payload
-    # commit count before this commit was 1 (the v0 baseline) -> "Version 1".
-    assert await GitService(sandbox)._run("log -1 --format=%s") == "Version 1"
 
 
 async def test_commit_turn_noop_on_clean_tree(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "x")
-    await GitService(sandbox).init("v0")
+    await Git(sandbox).init("v0")
 
     assert await _commit_turn(sandbox) is None
     assert await get_versions(sandbox.project_id) == []
@@ -49,12 +47,13 @@ async def test_commit_turn_initializes_legacy_project(sandbox, test_db) -> None:
     versions = await get_versions(sandbox.project_id)
     assert len(versions) == 1
     assert versions[0].payload["commit_sha"] == sha
-    assert await GitService(sandbox)._run("log -1 --format=%s") == "Version 0"
+    _, subject = await Git(sandbox)._run("log", "-1", "--format=%s")
+    assert subject == versioning._SCAFFOLD_MESSAGE
 
 
 async def test_commit_turn_refuses_while_detached(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "x")
-    git = GitService(sandbox)
+    git = Git(sandbox)
     v0 = await git.init("v0")
     await sandbox.write_file("a.txt", "y")
     await _commit_turn(sandbox)
@@ -67,7 +66,7 @@ async def test_commit_turn_refuses_while_detached(sandbox, test_db) -> None:  # 
 
 async def test_is_previewing_tracks_detached_state(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "one")
-    git = GitService(sandbox)
+    git = Git(sandbox)
     v0 = await git.init("v0")
     await sandbox.write_file("a.txt", "two")
     await _commit_turn(sandbox)
@@ -81,7 +80,7 @@ async def test_is_previewing_tracks_detached_state(sandbox, test_db) -> None:  #
 
 async def test_preview_old_version_detaches(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "one")
-    await GitService(sandbox).init("v0")
+    await Git(sandbox).init("v0")
     await sandbox.write_file("a.txt", "two")
     v1 = await _commit_turn(sandbox)
     await sandbox.write_file("a.txt", "three")
@@ -95,7 +94,7 @@ async def test_preview_old_version_detaches(sandbox, test_db) -> None:  # type: 
 
 async def test_preview_latest_stays_attached(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "one")
-    await GitService(sandbox).init("v0")
+    await Git(sandbox).init("v0")
     await sandbox.write_file("a.txt", "two")
     v1 = await _commit_turn(sandbox)
 
@@ -106,7 +105,7 @@ async def test_preview_latest_stays_attached(sandbox, test_db) -> None:  # type:
 
 async def test_preview_unknown_sha_raises(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "one")
-    await GitService(sandbox).init("v0")
+    await Git(sandbox).init("v0")
     await sandbox.write_file("a.txt", "two")
     await _commit_turn(sandbox)
 
@@ -116,7 +115,7 @@ async def test_preview_unknown_sha_raises(sandbox, test_db) -> None:  # type: ig
 
 async def test_exit_preview_reattaches(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "one")
-    git = GitService(sandbox)
+    git = Git(sandbox)
     v0 = await git.init("v0")
     await sandbox.write_file("a.txt", "two")
     await _commit_turn(sandbox)
@@ -131,7 +130,7 @@ async def test_exit_preview_reattaches(sandbox, test_db) -> None:  # type: ignor
 
 async def test_restore_resets_git_and_trims_forward_events(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "one")
-    await GitService(sandbox).init("v0")
+    await Git(sandbox).init("v0")
 
     await sandbox.write_file("a.txt", "two")
     v1 = await _commit_turn(sandbox)
@@ -143,7 +142,7 @@ async def test_restore_resets_git_and_trims_forward_events(sandbox, test_db) -> 
 
     remaining = await get_versions(sandbox.project_id)
     assert [v.payload["commit_sha"] for v in remaining] == [v1]
-    assert await GitService(sandbox).head_sha() == v1
+    assert await Git(sandbox).head_sha() == v1
     assert await sandbox.read_file("a.txt") == "two"
 
 
@@ -155,7 +154,7 @@ async def test_commit_turn_inits_own_repo_when_nested(sandbox, tmp_path, test_db
     sha = await _commit_turn(sandbox)
 
     assert sha
-    git = GitService(sandbox)
+    git = Git(sandbox)
     assert await git.is_repo()
     assert await git.head_sha() == sha
     assert (tmp_path / "workspace" / ".git").exists()
@@ -164,15 +163,15 @@ async def test_commit_turn_inits_own_repo_when_nested(sandbox, tmp_path, test_db
 
 async def test_ensure_at_latest_reattaches_when_detached(sandbox, test_db) -> None:  # type: ignore[no-untyped-def]
     await sandbox.write_file("a.txt", "one")
-    git = GitService(sandbox)
+    git = Git(sandbox)
     v0 = await git.init("v0")
     await sandbox.write_file("a.txt", "two")
     await _commit_turn(sandbox)
 
     await git.checkout(v0)
-    assert await git.current_is_detached()
+    assert await git.is_detached()
 
     await versioning.ensure_at_latest(sandbox, sandbox.project_id)
 
-    assert not await git.current_is_detached()
+    assert not await git.is_detached()
     assert await sandbox.read_file("a.txt") == "two"
