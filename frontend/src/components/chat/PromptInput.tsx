@@ -4,7 +4,7 @@ import { useChatStore } from '../../stores/chat';
 import { useVersionStore, formatVersionLabel } from '../../stores/version';
 import { isAgentAlive, isAwaitingPlanApproval } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
-import { ArrowUp, Loader2, Database, X } from 'lucide-react';
+import { ArrowUp, CirclePlus, Loader2, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
@@ -77,6 +77,7 @@ export function PromptInput() {
 
   const disabled = inputBlocked || !projectId;
   const canSend = !!value.trim() && !disabled;
+  const dsOpen = showDsSelector && !disabled;
 
   // Global keyboard shortcut: Cmd+K to focus chat
   useEffect(() => {
@@ -90,15 +91,14 @@ export function PromptInput() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const placeholder = !projectId
-    ? t('chat.placeholder.selectProject')
-    : !canWrite
-      ? t('chat.placeholder.readOnly', 'View-only access')
-      : awaitingPlan
-        ? t('chat.placeholder.reviewPlan')
-        : inputBlocked
-          ? t('chat.placeholder.working')
-          : t('chat.placeholder.default');
+  const placeholderText = () => {
+    if (!projectId) return t('chat.placeholder.selectProject');
+    if (!canWrite) return t('chat.placeholder.readOnly');
+    if (awaitingPlan) return t('chat.placeholder.reviewPlan');
+    if (inputBlocked) return t('chat.placeholder.working');
+    return t('chat.placeholder.default');
+  };
+  const placeholder = placeholderText();
 
   const busyLabel =
     agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
@@ -123,29 +123,11 @@ export function PromptInput() {
       confirmLabel={t('version.continueAndSend', 'Continue')}
       onConfirm={handleConfirmSendFromPreview}
     />
-    <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
+    <div className="px-4 pt-2 pb-4 shrink-0">
       {/* Data source selector */}
-      {!inputBlocked && projectId && showDsSelector && (
+      {dsOpen && (
         <div className="mb-2.5 relative">
-          <DataSourceSelector isOpen={showDsSelector} />
-        </div>
-      )}
-
-      {/* Selected data source badges */}
-      {!showDsSelector && selectedDataSources.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {selectedDataSources.map((c) => (
-            <Badge key={c.id} variant="accent" className="gap-1">
-              <span className="font-medium">{c.name}</span>
-              <button
-                onClick={() => removeDataSource(c.id)}
-                className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20"
-                title={t('chat.dataSource.removeDataSource')}
-              >
-                <X size={12} />
-              </button>
-            </Badge>
-          ))}
+          <DataSourceSelector isOpen={dsOpen} />
         </div>
       )}
 
@@ -161,30 +143,29 @@ export function PromptInput() {
         </div>
       ) : null}
 
-      {/* Input row */}
       <div
-        className={`flex items-end gap-2 bg-surface rounded-xl px-3.5 py-2 transition-all duration-200 ${
+        className={`flex flex-col gap-2 bg-surface rounded-2xl p-2.5 transition-all duration-200 ${
           focused && !disabled
             ? 'border border-primary/60 shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_8%,transparent),0_2px_8px_color-mix(in_srgb,var(--primary)_6%,transparent)]'
-            : 'border border-border shadow-[var(--shadow-sm)]'
+            : 'border border-border shadow-[var(--shadow-md)]'
         }`}
       >
-        {/* Data source selector toggle */}
-        {!inputBlocked && projectId && (
-          <button
-            onClick={() => setShowDsSelector((v) => !v)}
-            className={`relative w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-colors ${
-              showDsSelector ? 'bg-primary/15' : ''
-            } ${selectedDataSources.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
-            title={showDsSelector ? 'Hide data source selector' : 'Attach data sources'}
-          >
-            <Database size={16} />
-            {selectedDataSources.length > 0 && (
-              <span className="absolute top-0.5 end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
-                {selectedDataSources.length}
-              </span>
-            )}
-          </button>
+        {/* Selected data source badges */}
+        {!dsOpen && selectedDataSources.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-1">
+            {selectedDataSources.map((c) => (
+              <Badge key={c.id} variant="accent" className="gap-1">
+                <span className="font-medium">{c.name}</span>
+                <button
+                  onClick={() => removeDataSource(c.id)}
+                  className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20"
+                  title={t('chat.dataSource.removeDataSource')}
+                >
+                  <X size={12} />
+                </button>
+              </Badge>
+            ))}
+          </div>
         )}
 
         <textarea
@@ -198,37 +179,47 @@ export function PromptInput() {
           disabled={disabled}
           rows={1}
           data-testid="chat-input"
-          className="flex-1 resize-none text-[15px] leading-normal max-h-[200px] py-1 bg-transparent disabled:opacity-50"
+          className="w-full resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
         />
 
-        <button
-          onClick={handleSubmit}
-          disabled={!canSend}
-          data-testid="send-button"
-          className={`w-[34px] h-[34px] flex items-center justify-center rounded-xl shrink-0 transition-all duration-150 ${
-            canSend
-              ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
-              : 'bg-border text-muted-foreground opacity-40 cursor-default'
-          }`}
-          title={t('common.sendMessage')}
-        >
-          <ArrowUp size={16} strokeWidth={2.5} />
-        </button>
-      </div>
-      <div className="flex items-center justify-between mt-1.5 pt-1 px-1 gap-2">
-        <div className="flex items-center gap-2 min-w-0 shrink-0">
-          <ModelSelector />
-          {selectedDataSources.length > 0 && (
-            <span className="text-[10px] text-muted-foreground/50 hidden sm:inline">
-              {selectedDataSources.length} data source{selectedDataSources.length > 1 ? 's' : ''} attached
-            </span>
+        <div className="flex items-center gap-2">
+          {/* Data source selector toggle */}
+          {projectId && (
+            <button
+              onClick={() => setShowDsSelector((v) => !v)}
+              disabled={disabled}
+              className={`relative w-7 h-7 flex items-center justify-center rounded-full shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default ${
+                dsOpen ? 'bg-primary/15' : 'enabled:hover:bg-muted/50'
+              } ${selectedDataSources.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
+              title={dsOpen ? 'Hide data source selector' : 'Attach data sources'}
+            >
+              <CirclePlus size={18} />
+              {selectedDataSources.length > 0 && (
+                <span className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
+                  {selectedDataSources.length}
+                </span>
+              )}
+            </button>
           )}
+
+          <div className="flex items-center gap-1 ms-auto min-w-0">
+            <ModelSelector />
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={!canSend}
+            data-testid="send-button"
+            className={`w-8 h-8 ms-2 flex items-center justify-center rounded-full shrink-0 transition-all duration-150 ${
+              canSend
+                ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
+                : 'bg-muted text-muted-foreground opacity-50 cursor-default'
+            }`}
+            title={t('common.sendMessage')}
+          >
+            <ArrowUp size={16} strokeWidth={2.5} />
+          </button>
         </div>
-        <span className="text-[11px] text-muted-foreground/60 hidden md:inline shrink-0">
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Enter</kbd> {t('chat.send')}
-          <span className="mx-1">·</span>
-          <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground/60 text-[10px] font-mono">Shift+Enter</kbd> {t('chat.newLine')}
-        </span>
       </div>
     </div>
     </>

@@ -100,7 +100,7 @@ export interface AIModel {
 export interface DataSourceSearchResult {
   id: number;
   name: string;
-  description: string | null;
+  description?: string | null;
 }
 
 // Agent types
@@ -165,7 +165,7 @@ export interface FollowUpStep {
   iteration: number;
 }
 
-export type WSMessage =
+export type WSMessage = { _ts?: string } & (
   | { type: 'message'; content: string; model?: string; dataSourceIds?: number[] }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
@@ -193,4 +193,5 @@ export type WSMessage =
   | { type: 'version_restored'; commit_sha: string }
   | { type: 'preview_version'; commit_sha: string }
   | { type: 'exit_preview' }
-  | { type: 'restore_version'; commit_sha: string };
+  | { type: 'restore_version'; commit_sha: string }
+);

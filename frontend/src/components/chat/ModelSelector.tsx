@@ -1,9 +1,12 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Check } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import type { AIModel } from '../../types';
 
 export function ModelSelector() {
+  const { t } = useTranslation();
   const { models, selectedModel, setSelectedModel, loadModels } = useChatStore();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -29,30 +32,22 @@ export function ModelSelector() {
     }
   }, [models, selectedModel, setSelectedModel]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
+  useClickOutside(dropdownRef, setOpen, open);
 
   return (
     <div ref={dropdownRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1 bg-background border border-border rounded-full text-xs cursor-pointer max-w-[260px]"
-        title={current?.id ?? 'Loading models…'}
+        className="flex items-center gap-1 h-7 px-2 rounded-full text-xs text-muted-foreground cursor-pointer hover:text-foreground hover:bg-muted/50 transition-colors"
+        title={current?.name ?? current?.id ?? 'Loading models…'}
       >
-        <span className="font-medium text-muted-foreground">Model</span>
-        <span className="flex-1 truncate text-left">{current?.name ?? current?.id ?? 'Loading models…'}</span>
-        <ChevronDown size={14} className="shrink-0 opacity-70" />
+        <span>{t('chat.model')}</span>
+        <ChevronDown size={13} className="shrink-0 opacity-60" />
       </button>
 
       {open && (
-        <div className="absolute bottom-full start-0 mb-1 min-w-[260px] max-h-80 overflow-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] z-40">
+        <div className="absolute bottom-full end-0 mb-1.5 w-[200px] max-h-80 overflow-auto bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] z-40">
           {Object.entries(grouped).map(([provider, providerModels]) => (
             <div key={provider}>
               <div className="px-2.5 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-dropdown-divider bg-dropdown-header-bg">

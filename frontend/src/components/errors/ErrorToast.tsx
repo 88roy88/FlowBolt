@@ -40,11 +40,15 @@ function SingleErrorToast({ error }: { error: AppError }) {
     }
   };
 
+  const isConnection = error.source === 'connection';
+  const borderClass = isConnection ? 'border-destructive' : 'border-warning';
+  const textClass = isConnection ? 'text-destructive' : 'text-warning';
+
   return (
-    <div className="flex items-start gap-2.5 p-3 bg-card border border-destructive rounded-lg max-w-[420px] shadow-[var(--shadow-lg)]">
-      <AlertTriangle size={18} className="text-destructive shrink-0 mt-0.5" />
+    <div className={`flex items-start gap-2.5 p-3 bg-card border ${borderClass} rounded-lg max-w-[420px] shadow-[var(--shadow-lg)]`}>
+      <AlertTriangle size={18} className={`${textClass} shrink-0 mt-0.5`} />
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-semibold text-destructive uppercase tracking-wider mb-1">
+        <div className={`text-[11px] font-semibold ${textClass} uppercase tracking-wider mb-1`}>
           {error.source === 'build' ? t('errors.buildError') : error.source === 'runtime' ? t('errors.runtimeError') : error.source === 'console' ? t('errors.consoleError') : t('errors.connectionError')}
         </div>
         <div className="text-[13px] leading-snug break-words">

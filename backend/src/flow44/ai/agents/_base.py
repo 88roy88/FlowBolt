@@ -1,7 +1,6 @@
 from typing import Any
 
-from langfuse.decorators import langfuse_context
-
+from flow44.ai.core.opik_utils import llm_metadata, set_trace_input, set_trace_output, setup_trace
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
 
@@ -25,22 +24,21 @@ class BaseAgent:
         self._trace_id = trace_id
 
     def _setup_trace(self, tags: list[str]) -> None:
-        self._trace_id = langfuse_context.get_current_trace_id()
-        langfuse_context.update_current_trace(
-            session_id=self.project_id,
-            user_id=self._user_id,
-            metadata={"model": self.model or "default"},
-            tags=tags,
-        )
+        self._trace_id = setup_trace(self.project_id, self._user_id, self.model, tags)
 
     async def emit(self, event: dict[str, Any]) -> None:
         await emit_event(self.project_id, event)
 
-    def _llm_metadata(self, generation_name: str) -> dict[str, Any]:
-        trace_id = self._trace_id or langfuse_context.get_current_trace_id()
-        observation_id = langfuse_context.get_current_observation_id()
-        return {
-            "existing_trace_id": trace_id,
-            "parent_observation_id": observation_id,
-            "generation_name": generation_name,
-        }
+    def _set_trace_input(self, input_data: dict[str, Any]) -> None:
+        set_trace_input(input_data)
+
+    def _set_trace_output(self, output: dict[str, Any]) -> None:
+        set_trace_output(output)
+
+    def _llm_metadata(
+        self,
+        generation_name: str,
+        parent_span_id: str | None = None,
+        extra_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return llm_metadata(self._trace_id, generation_name, parent_span_id, extra_metadata)

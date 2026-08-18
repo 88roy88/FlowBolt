@@ -24,15 +24,16 @@
     "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation."
   },
   "sidebar": {
-    "pinSidebar": "Pin sidebar open",
-    "unpinSidebar": "Unpin sidebar",
+    "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "newProject": "New Project",
     "scaffolding": "Scaffolding project...",
     "rename": "Rename",
     "summary": "Summary",
     "sleep": "Sleep",
-    "confirmDelete": "Confirm delete?"
+    "confirmDelete": "Confirm delete?",
+    "searchPlaceholder": "Search projects...",
+    "noProjectsMatch": "No projects match"
   },
   "settings": {
     "title": "Settings",
@@ -136,12 +137,15 @@
     "send": "send",
     "newLine": "new line",
     "scrollToBottom": "Scroll to bottom",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "model": "Model",
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
       "readOnly": "View-only access",
-      "default": "Describe what you want to build..."
+      "default": "What do you want to build? Click on + to add flow packages."
     },
     "phase": {
       "analyzing": "Analyzing",
@@ -173,7 +177,8 @@
     },
     "dataSource": {
       "removeDataSource": "Remove data source",
-      "searchPlaceholder": "Search data sources (optional)"
+      "searchPlaceholder": "Search data sources (optional)",
+      "usedInProject": "Used in this project"
     }
   },
   "sharing": {
@@ -184,10 +189,13 @@
     "noMembers": "No members yet"
   },
   "admin": {
-    "title": "Platform Users",
+    "title": "Admin",
+    "usersTab": "Platform Users",
+    "publishedTab": "Published Apps",
     "userIdPlaceholder": "User ID to invite",
     "invite": "Invite",
-    "noUsers": "No platform users yet"
+    "noUsers": "No platform users yet",
+    "noPublished": "No published apps yet"
   },
   "version": {
     "currentVersion": "Current version",

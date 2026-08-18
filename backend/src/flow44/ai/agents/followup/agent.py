@@ -3,7 +3,7 @@ import json
 import uuid
 from typing import Any
 
-from langfuse.decorators import observe
+from opik import track
 from pydantic import BaseModel
 
 from flow44.ai.agents._chat_agent import ChatAgent
@@ -14,7 +14,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
-from flow44.db.chat import get_messages
+from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
@@ -145,7 +145,7 @@ class FollowUpAgent(ChatAgent):
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 
-    @observe(name="followup-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._setup_trace(["follow-up-agent"])
 
@@ -173,11 +173,7 @@ class FollowUpAgent(ChatAgent):
             self._build_context(),
             get_messages(self.project_id),
         )
-        messages = [
-            Message(role=m.role, content=m.content)
-            for m in history
-            if m.role == "user" or (m.role == "assistant" and m.content.strip())
-        ]
+        messages = self._history_to_messages(history)
 
         system_prompt = render_followup(
             project_summary=context["summary"],
@@ -192,7 +188,7 @@ class FollowUpAgent(ChatAgent):
             system_prompt=system_prompt,
             tools=self._executor,
             model=self.model,
-            metadata_fn=lambda step: self._llm_metadata(f"followup-{step}"),
+            metadata_fn=lambda step, **kwargs: self._llm_metadata(f"followup-{step}", **kwargs),
             emit_fn=self._emit_react_step,
         )
 
@@ -202,6 +198,8 @@ class FollowUpAgent(ChatAgent):
         await self._save_response(answer or "", self._steps)
 
         await self._emit_file_diffs_summary(self._diffs)
+
+        self._set_trace_output({"answer": answer or "", "steps": len(self._steps)})
 
         # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})
@@ -224,6 +222,34 @@ class FollowUpAgent(ChatAgent):
 
         for path, content in files.items():
             await self._write_file_and_emit_diff(self._diffs, path, content)
+
+    def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
+        messages: list[dict[str, Any] | Message] = []
+        pending_legacy = False
+
+        for m in history:
+            if m.role == ChatRole.user:
+                if pending_legacy:
+                    messages.append(
+                        Message.assistant("I made several tool calls and iterations. The details have been compacted.")
+                    )
+                    pending_legacy = False
+                messages.append(Message.user(m.content))
+            elif m.raw_message is not None:
+                pending_legacy = False
+                messages.append(m.raw_message)
+            elif m.role == ChatRole.assistant and m.content.strip():
+                pending_legacy = False
+                messages.append(Message.assistant(m.content))
+            else:
+                pending_legacy = True
+
+        if pending_legacy:
+            messages.append(
+                Message.assistant("I made several tool calls and iterations. The details have been compacted.")
+            )
+
+        return messages
 
     async def _persist_data_sources(
         self, updated_contexts: list[DataSourceContext], stored: list[DataSourceContext]
@@ -256,14 +282,13 @@ class FollowUpAgent(ChatAgent):
         return {"summary": summary, "file_tree": file_tree}
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
-        """Emit ReAct step events and track state for followup agent."""
-        if event["type"] == "react_reasoning":
+        if event["type"] == "react_assistant_turn":
             self._iteration = event["iteration"]
             self._steps.append(
                 {
                     "id": str(uuid.uuid4()),
-                    "type": "reasoning",
-                    "content": event["content"],
+                    "type": "assistant_turn",
+                    "raw_message": event["raw_message"],
                     "iteration": self._iteration,
                 }
             )
@@ -286,6 +311,7 @@ class FollowUpAgent(ChatAgent):
                         "result_preview": event.get("result_preview", ""),
                         "short_preview": event.get("short_preview", ""),
                         "iteration": self._iteration,
+                        "raw_message": event["raw_message"],
                     }
                 )
             await self.emit({"type": "followup_step", **step_data})

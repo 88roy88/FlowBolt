@@ -18,7 +18,6 @@ export function Preview() {
   const saveVersion = useFilesStore((s) => s.saveVersion);
   
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -30,25 +29,28 @@ export function Preview() {
   useEffect(() => {
     if (!projectId) {
       setPreviewUrl(null);
+      setLoading(false);
       return;
     }
     setLoading(true);
     credentialsStore.ensureCookie();
-    const url = `/api/preview/${projectId}/proxy/`;
-    setPreviewUrl(url);
-    setLoading(false);
-    console.debug('[Preview] refresh — reason: project changed', { projectId, refreshKey });
-  }, [projectId, refreshKey]);
+    setPreviewUrl(`/api/preview/${projectId}/proxy/`);
+  }, [projectId]);
 
   const clearConsole = useConsoleStore((s) => s.clear);
 
-  // Auto-refresh preview when files are saved (by user or AI).
-  // Debounce to avoid rapid refreshes during bulk writes.
+  const reloadPreview = useCallback((reason: string) => {
+    const frame = iframeRef.current?.contentWindow;
+    if (!frame) return;
+    console.debug(`[Preview] refresh — reason: ${reason}`);
+    clearConsole();
+    setLoading(true);
+    frame.location.reload();
+  }, [clearConsole]);
+
   const saveVersionRef = useRef(saveVersion);
   const debouncedRefresh = useDebouncedCallback(() => {
-    console.debug('[Preview] refresh — reason: files saved');
-    clearConsole();
-    setRefreshKey((k) => k + 1);
+    reloadPreview('files saved');
   }, 2000, { maxWait: 8000 });
   useEffect(() => {
     if (saveVersion === saveVersionRef.current) return;
@@ -56,11 +58,7 @@ export function Preview() {
     debouncedRefresh();
   }, [saveVersion, debouncedRefresh]);
 
-  const handleRefresh = () => {
-    console.debug('[Preview] refresh — reason: manual');
-    clearConsole();
-    setRefreshKey((k) => k + 1);
-  };
+  const handleRefresh = () => reloadPreview('manual');
 
   const handlePublish = useCallback(() => {
     if (projectId) {
@@ -100,7 +98,7 @@ export function Preview() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { credentialsStore.ensureCookie(); window.open(liveUrl, '_blank'); }}
+              onClick={() => window.open(liveUrl, '_blank')}
               title={t('preview.viewPublishedApp')}
             >
               <ExternalLink size={14} className="text-primary/70" />
@@ -126,19 +124,27 @@ export function Preview() {
 
       {/* iframe */}
       {previewUrl ? (
-        <iframe
-          ref={iframeRef}
-          key={refreshKey}
-          src={previewUrl}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
-          className="flex-1 w-full border-none"
-          style={{ background: 'var(--preview-bg)' }}
-          title={t('preview.title')}
-          data-testid="preview-iframe"
-        />
+        <div className="relative flex-1">
+          <iframe
+            ref={iframeRef}
+            src={previewUrl}
+            onLoad={() => setLoading(false)}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
+            className="absolute inset-0 w-full h-full border-none"
+            style={{ background: 'var(--preview-bg)' }}
+            title={t('preview.title')}
+            data-testid="preview-iframe"
+          />
+          <div
+            className={`pointer-events-none absolute inset-0 flex items-center justify-center gap-2 text-muted-foreground text-sm bg-[var(--preview-bg)]/85 transition-opacity duration-200 ${loading ? 'opacity-100' : 'opacity-0'}`}
+          >
+            <RefreshCw size={16} className="animate-spin text-primary/70" />
+            {t('preview.loading')}
+          </div>
+        </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          {loading ? t('preview.loading') : t('preview.noPreviewAvailable')}
+          {t('preview.noPreviewAvailable')}
         </div>
       )}
     </div>

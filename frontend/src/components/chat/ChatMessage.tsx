@@ -1,7 +1,9 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useTranslation } from 'react-i18next';
 import { FileText, TerminalSquare } from 'lucide-react';
 import type { Message } from '../../types';
+import { formatClock } from '../../utils/formatTime';
 import { Badge } from '../ui/badge';
 import {
   DataSourcesFetchedCard,
@@ -70,6 +72,7 @@ function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: st
 }
 
 export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+  const { i18n } = useTranslation();
   const isUser = message.role === 'user';
 
   if (!message.content && !message.agentCard && !message.actions?.length && !isStreaming) {
@@ -82,18 +85,25 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     </div>
   );
 
+  const timestamp = !isStreaming && (
+    <span className="px-1 text-[11px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
+      {formatClock(message.timestamp, i18n.language)}
+    </span>
+  );
+
   // Agent card messages
   if (message.agentCard) {
     return (
-      <div className={`flex flex-col w-full ${isUser ? 'items-start' : 'items-end'} animate-message-in`}>
+      <div className={`group flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} animate-message-in`}>
         <AgentCardRenderer message={message} />
         {versionControl}
+        {message.agentCard.type === 'error_fix_request' && timestamp}
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-col w-full ${isUser ? 'items-start' : 'items-end'} animate-message-in`}>
+    <div className={`group flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} animate-message-in`}>
       <div
         className={`min-w-0 max-w-[85%] overflow-hidden px-3.5 py-2.5 rounded-xl text-sm leading-relaxed ${
           isUser ? 'bg-user-bubble border border-primary/30' : 'bg-assistant-bubble border border-border'
@@ -156,6 +166,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
         )}
       </div>
       {versionControl}
+      {timestamp}
     </div>
   );
 }

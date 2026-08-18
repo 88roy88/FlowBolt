@@ -66,6 +66,8 @@ class AgentEvent(SQLModel, table=True):
 
 
 async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
+    event.setdefault("_ts", datetime.now(UTC).isoformat())
+
     async with database.async_session() as session:
         row = AgentEvent(
             project_id=project_id,
