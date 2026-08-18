@@ -1,8 +1,3 @@
-"""Thin git wrapper for per-workspace app versioning.
-
-exec() exposes no exit code, so methods parse git's porcelain output.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -15,16 +10,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-_GIT_NAME = "FlowBolt AI"
-_GIT_EMAIL = "ai@flowbolt.local"
+_GIT_NAME = "BuildApp AI"
+_GIT_EMAIL = "ai@buildapp.local"
 
-# git message passed via file (commit -F), not -m: cmd.exe on Windows mangles quoted args.
-_MSG_FILE = ".git/COMMIT_FLOWBOLT_MSG"
+# Message via file: subprocess escapes inner quotes as \", which cmd.exe can't parse, so -m mangles it.
+_MSG_FILE = ".git/COMMIT_BUILDAPP_MSG"
 
 # A full git commit hash (sha-1: 40 hex; sha-256 repos: 64).
 _SHA_RE = re.compile(r"[0-9a-f]{40,64}")
 
 
+# exec() exposes no exit code, so these parse git's porcelain output.
 def _extract_sha(output: str) -> str:
     for line in output.splitlines():
         candidate = line.strip()
@@ -81,7 +77,6 @@ class GitService:
         return await self.commit_all(initial_message)
 
     async def commit_all(self, message: str) -> str | None:
-        """Stage everything and commit. Returns the new SHA, or ``None`` if nothing was committed."""
         await self._run("add -A")
         if not (await self._run("status --porcelain")).strip():
             return None
@@ -95,13 +90,11 @@ class GitService:
         return sha
 
     async def checkout(self, sha: str) -> None:
-        """Detached checkout of a past version for non-destructive preview."""
         await self._run(f"checkout -f --detach {sha}")
 
     async def checkout_latest(self) -> None:
         await self._run("checkout -f main")
 
     async def reset_hard(self, sha: str) -> None:
-        """Re-attach to main and discard everything ahead of ``sha`` (recoverable via reflog)."""
         await self._run("checkout -f main")
         await self._run(f"reset --hard {sha}")

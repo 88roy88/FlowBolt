@@ -4,13 +4,16 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from flow44.db.chat import trim_messages_after
 from flow44.db.events import emit_event, emit_transient, get_versions, trim_events_after
-from flow44.versioning.git_service import GitService
+from flow44.db.heartbeat import is_run_active
+from flow44.services.versioning.git_service import GitService
 
 if TYPE_CHECKING:
+    from fastapi import WebSocket
+
     from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
@@ -112,3 +115,28 @@ async def restore_version(sandbox: PnpmSandbox, project_id: str, commit_sha: str
     if target.created_at:
         await trim_messages_after(project_id, target.created_at.isoformat())
     await emit_transient(project_id, {"type": "version_restored", "commit_sha": commit_sha})
+
+
+async def reject_edit_while_previewing(websocket: WebSocket, sandbox: PnpmSandbox, project_id: str) -> bool:
+    if await is_previewing(sandbox, project_id):
+        await websocket.send_json({"type": "error", "message": "Restore this version before editing"})
+        return True
+    return False
+
+
+async def handle_version_message(
+    websocket: WebSocket, sandbox: PnpmSandbox, project_id: str, msg_type: str, data: dict[str, Any]
+) -> None:
+    if await is_run_active(project_id):
+        await websocket.send_json({"type": "error", "message": "Can't change versions while the AI is working"})
+        return
+    try:
+        if msg_type == "exit_preview":
+            await exit_preview(sandbox, project_id)
+        elif msg_type == "preview_version":
+            await preview_version(sandbox, project_id, data["commit_sha"])
+        else:
+            await restore_version(sandbox, project_id, data["commit_sha"])
+    except Exception:
+        logger.exception("[versioning] %s failed for %s", msg_type, project_id)
+        await websocket.send_json({"type": "error", "message": "Version operation failed"})

@@ -83,7 +83,7 @@ async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = T
 
 
 async def emit_transient(project_id: str, event: dict[str, Any]) -> None:
-    # Broadcast only — never persisted, so not replayed on history reload.
+    # Live-only: never stored, so a history reload won't replay it.
     await _notify(project_id, event)
 
 
@@ -104,7 +104,6 @@ async def clear_events(project_id: str) -> None:
 
 
 async def get_versions(project_id: str) -> list[AgentEvent]:
-    """Return the project's version_committed events (the app version history)."""
     async with database.async_session() as session:
         result = await session.execute(
             select(AgentEvent)
@@ -115,7 +114,6 @@ async def get_versions(project_id: str) -> list[AgentEvent]:
 
 
 async def trim_events_after(project_id: str, event_id: int) -> None:
-    """Delete all events newer than event_id (used when a restore forks history)."""
     async with database.async_session() as session:
         await session.execute(
             delete(AgentEvent).where(col(AgentEvent.project_id) == project_id, col(AgentEvent.id) > event_id)

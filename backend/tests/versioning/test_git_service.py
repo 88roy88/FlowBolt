@@ -2,7 +2,7 @@
 
 import pytest
 
-from flow44.versioning.git_service import GitService
+from flow44.services.versioning.git_service import GitService
 
 from .conftest import requires_git
 

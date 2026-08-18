@@ -5,8 +5,8 @@ import subprocess
 import pytest
 
 from flow44.db.events import get_versions
-from flow44.versioning import service as versioning
-from flow44.versioning.git_service import GitService
+from flow44.services.versioning import service as versioning
+from flow44.services.versioning.git_service import GitService
 
 from .conftest import requires_git
 
