@@ -6,7 +6,7 @@ import { useChatStore } from './chat';
 import { useFilesStore } from './files';
 import { isReplaying } from './chatHandlers';
 
-export interface VersionState {
+interface VersionState {
   versions: string[];
   previewingVersion: string | null;
   previewVersion: (commit_sha: string) => void;
@@ -27,6 +27,13 @@ function settlePendingRestore(ok: boolean) {
   pendingRestore = null;
 }
 
+function sendVersionAction(message: WSMessage): boolean {
+  const projectId = useSessionStore.getState().projectId;
+  if (!projectId) return false;
+  getChatSocket(projectId).send(message);
+  return true;
+}
+
 function reloadFilesAfterVersionChange() {
   void useFilesStore.getState().loadFileTree();
   useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
@@ -38,23 +45,16 @@ export const useVersionStore = create<VersionState>((set) => ({
   previewingVersion: null,
 
   previewVersion(commit_sha: string) {
-    const projectId = useSessionStore.getState().projectId;
-    if (!projectId) return;
-    getChatSocket(projectId).send({ type: 'preview_version', commit_sha });
+    sendVersionAction({ type: 'preview_version', commit_sha });
   },
 
   exitPreview() {
-    const projectId = useSessionStore.getState().projectId;
-    if (!projectId) return;
-    const socket = getChatSocket(projectId);
-    socket.send({ type: 'exit_preview' });
+    sendVersionAction({ type: 'exit_preview' });
   },
 
   restoreVersion(commit_sha: string) {
-    const projectId = useSessionStore.getState().projectId;
-    if (!projectId) return Promise.resolve(false);
     settlePendingRestore(false);
-    getChatSocket(projectId).send({ type: 'restore_version', commit_sha });
+    if (!sendVersionAction({ type: 'restore_version', commit_sha })) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
       pendingRestore = resolve;
     });

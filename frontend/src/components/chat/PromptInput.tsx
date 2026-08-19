@@ -110,20 +110,19 @@ export function PromptInput() {
     t('chat.phase.thinking');
 
   return (
-    <>
-    <ConfirmDialog
-      open={confirmSendOpen}
-      onOpenChange={(open) => { if (!open) setConfirmSendOpen(false); }}
-      title={t('version.editFromOldTitle', 'Edit from version {{version}}?', { version: previewVersionLabel })}
-      body={t(
-        'version.editFromOldBody',
-        'Editing from {{version}} will discard all newer versions. They can be recovered by support. Continue?',
-        { version: previewVersionLabel },
-      )}
-      confirmLabel={t('version.continueAndSend', 'Continue')}
-      onConfirm={handleConfirmSendFromPreview}
-    />
     <div className="px-4 pt-2 pb-4 shrink-0">
+      <ConfirmDialog
+        open={confirmSendOpen}
+        onOpenChange={setConfirmSendOpen}
+        title={t('version.editFromOldTitle', 'Edit from version {{version}}?', { version: previewVersionLabel })}
+        body={t(
+          'version.editFromOldBody',
+          'Editing from {{version}} will discard all newer versions. They can be recovered by support. Continue?',
+          { version: previewVersionLabel },
+        )}
+        confirmLabel={t('version.continueAndSend', 'Continue')}
+        onConfirm={handleConfirmSendFromPreview}
+      />
       {/* Data source selector */}
       {dsOpen && (
         <div className="mb-2.5 relative">
@@ -222,6 +221,5 @@ export function PromptInput() {
         </div>
       </div>
     </div>
-    </>
   );
 }

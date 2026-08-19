@@ -54,7 +54,6 @@ function generateId(): string {
 
 let activeHandler: ((msg: WSMessage) => void) | null = null;
 let activeProjectId: string | null = null;
-let activeVersionHandler: ((msg: WSMessage) => void) | null = null;
 
 function attachHandler(
   projectId: string,
@@ -219,8 +218,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       stopAgentAlivePolling();
       const oldSocket = getChatSocket(activeProjectId);
       if (activeHandler) detachHandler(oldSocket, activeHandler);
-      if (activeVersionHandler) oldSocket.offMessage(activeVersionHandler);
-      activeVersionHandler = null;
+      oldSocket.offMessage(handleVersionMessage);
     }
 
     try {
@@ -245,9 +243,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const socket = getChatSocket(projectId);
         handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler!));
         attachHandler(projectId, socket, handler);
-        if (activeVersionHandler) socket.offMessage(activeVersionHandler);
         socket.onMessage(handleVersionMessage);
-        activeVersionHandler = handleVersionMessage;
       }
 
       // Replay history: agent handler rebuilds messages/cards, version handler stamps versions.
