@@ -33,7 +33,6 @@ __all__ = [
     "DataSourceUsage",
     "FlapiUpstreamError",
     "can_run_without_params",
-    "fetch_data_source",
     "get_display_name",
     "get_params_info",
     "get_usage",
@@ -154,11 +153,16 @@ async def get_params_info(
 async def run_data_source(
     data_source_id: str | int,
     *,
+    execute_continued_process: bool,
     authorization: str | None = None,
     params: QuickParams | None = None,
 ) -> DataSourceResult:
     raw = await data_source_client.run_data_source(
-        data_source_id, authorization=authorization, quick_params=params, all_queries=True
+        data_source_id,
+        authorization=authorization,
+        quick_params=params,
+        all_queries=True,
+        execute_continued_process=execute_continued_process,
     )
     return _to_result(raw)
 
@@ -175,16 +179,6 @@ async def get_display_name(
     if not name:
         raise LookupError(f"Data source {data_source_id} has no display name")
     return name
-
-
-async def fetch_data_source(
-    data_source_id: str | int,
-    *,
-    authorization: str | None = None,
-) -> tuple[str, DataSourceResult]:
-    name = await get_display_name(data_source_id, authorization=authorization)
-    result = await run_data_source(data_source_id, authorization=authorization)
-    return name, result
 
 
 def _default_for(param: ParamDefinition) -> QuickParamValue | None:
@@ -289,6 +283,7 @@ async def get_usage(
         try:
             result = await run_data_source(
                 data_source_id,
+                execute_continued_process=False,
                 authorization=authorization,
                 params=minimal,
             )
