@@ -23,7 +23,6 @@ from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, is_run_active, touch_heartbeat, try_claim_run
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
-from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.versioning import service as versioning
 
@@ -90,14 +89,14 @@ async def _report_run_failure(project_id: str, message: str) -> None:
     await emit_event(project_id, {"type": "error", "message": message})
 
 
-async def _run_agent_safe(project_id: str, sandbox: PnpmSandbox, coro: Any, claimed_at: datetime) -> None:
+async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> None:
     """Run the agent under a heartbeat + timeout, surfacing failures to the client."""
     run_task = asyncio.create_task(coro)
     beat = _Beat(at=claimed_at)
     try:
         await _heartbeat_until_done(project_id, run_task, beat)
         await run_task
-        await versioning.commit_turn(sandbox, project_id)
+        await versioning.commit_turn(project_id)
     except _RunBudgetExceeded:
         logger.error(
             "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
@@ -113,36 +112,34 @@ async def _run_agent_safe(project_id: str, sandbox: PnpmSandbox, coro: Any, clai
         await clear_heartbeat(project_id, only_beat=beat.at)
 
 
-async def _start_agent(project_id: str, sandbox: PnpmSandbox, coro: Any) -> None:
+async def _start_agent(project_id: str, coro: Any) -> None:
     claimed_at = await try_claim_run(project_id)
     if claimed_at is None:
         coro.close()
         raise AgentAlreadyRunning
-    task = asyncio.create_task(_run_agent_safe(project_id, sandbox, coro, claimed_at))
+    task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at))
     _RUNNING.add(task)
     task.add_done_callback(_RUNNING.discard)
 
 
-async def _reject_edit_while_previewing(websocket: WebSocket, sandbox: PnpmSandbox, project_id: str) -> bool:
-    if await versioning.is_previewing(sandbox, project_id):
+async def _reject_edit_while_previewing(websocket: WebSocket, project_id: str) -> bool:
+    if await versioning.is_previewing(project_id):
         await websocket.send_json({"type": "error", "message": "Restore this version before editing"})
         return True
     return False
 
 
-async def _handle_version_message(
-    websocket: WebSocket, sandbox: PnpmSandbox, project_id: str, msg_type: str, data: dict[str, Any]
-) -> None:
+async def _handle_version_message(websocket: WebSocket, project_id: str, msg_type: str, data: dict[str, Any]) -> None:
     if await is_run_active(project_id):
         await websocket.send_json({"type": "error", "message": "Can't change versions while the AI is working"})
         return
     try:
         if msg_type == "exit_preview":
-            await versioning.exit_preview(sandbox, project_id)
+            await versioning.exit_preview(project_id)
         elif msg_type == "preview_version":
-            await versioning.preview_version(sandbox, project_id, data["commit_sha"])
+            await versioning.preview_version(project_id, data["commit_sha"])
         elif msg_type == "restore_version":
-            await versioning.restore_version(sandbox, project_id, data["commit_sha"])
+            await versioning.restore_version(project_id, data["commit_sha"])
     except Exception:
         logger.exception("[versioning] %s failed for %s", msg_type, project_id)
         await websocket.send_json({"type": "error", "message": "Version operation failed"})
@@ -179,7 +176,7 @@ async def chat_ws(  # noqa: C901, PLR0915
         await websocket.close()
         return
 
-    await versioning.ensure_at_latest(sandbox, project.id)
+    await versioning.ensure_at_latest(project.id)
 
     queue = subscribe(project.id)
 
@@ -199,7 +196,7 @@ async def chat_ws(  # noqa: C901, PLR0915
 
             try:
                 if msg_type == "message":
-                    if await _reject_edit_while_previewing(websocket, sandbox, project.id):
+                    if await _reject_edit_while_previewing(websocket, project.id):
                         continue
 
                     user_content: str = data["content"]
@@ -234,7 +231,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                         )
                         await _start_agent(
                             project.id,
-                            sandbox,
                             plan_agent.run(
                                 user_content,
                                 data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
@@ -250,7 +246,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                         )
                         await _start_agent(
                             project.id,
-                            sandbox,
                             followup_agent.run(
                                 user_content,
                                 data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
@@ -270,7 +265,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
-                        if await _reject_edit_while_previewing(websocket, sandbox, project.id):
+                        if await _reject_edit_while_previewing(websocket, project.id):
                             continue
                         await delete_pending_plan(project.id)
                         execute_agent = ExecuteAgent(
@@ -280,7 +275,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             model=selected_model or state.model,
                             user_id=user_id,
                         )
-                        await _start_agent(project.id, sandbox, execute_agent.run())
+                        await _start_agent(project.id, execute_agent.run())
 
                     elif action == "modify" and feedback:
                         plan_agent = PlanAgent(
@@ -289,10 +284,10 @@ async def chat_ws(  # noqa: C901, PLR0915
                             model=selected_model or state.model,
                             user_id=user_id,
                         )
-                        await _start_agent(project.id, sandbox, plan_agent.rebuild_with_feedback(state, feedback))
+                        await _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
 
                 elif msg_type == "fix_error":
-                    if await _reject_edit_while_previewing(websocket, sandbox, project.id):
+                    if await _reject_edit_while_previewing(websocket, project.id):
                         continue
 
                     error_message = data.get("error_message", "")
@@ -329,7 +324,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                     )
                     await _start_agent(
                         project.id,
-                        sandbox,
                         fix_agent.run(
                             error_message=error_message,
                             error_file=error_file,
@@ -339,7 +333,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     )
 
                 elif msg_type in ("preview_version", "restore_version", "exit_preview"):
-                    await _handle_version_message(websocket, sandbox, project.id, msg_type, data)
+                    await _handle_version_message(websocket, project.id, msg_type, data)
             except AgentAlreadyRunning:
                 await websocket.send_json(_AGENT_BUSY)
 

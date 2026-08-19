@@ -3,10 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import subprocess
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from flow44.sandbox.main import PnpmSandbox
+from flow44.sandbox.base import workspace_path
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +14,8 @@ _GIT_EMAIL = "ai@buildapp.local"
 
 
 class Git:
-    def __init__(self, sandbox: PnpmSandbox) -> None:
-        self.workspace_dir = sandbox.workspace_dir
+    def __init__(self, project_id: str) -> None:
+        self.workspace_dir = workspace_path(project_id)
 
     async def _run(self, *args: str) -> tuple[int, str]:
         # Thread, not create_subprocess_exec: uvicorn runs a Windows selector loop, which has no subprocess support.

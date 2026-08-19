@@ -5,14 +5,10 @@ import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
 
 from flow44.db.chat import trim_messages_after
 from flow44.db.events import emit_event, emit_transient, get_versions, trim_events_after
 from flow44.services.versioning.git import Git
-
-if TYPE_CHECKING:
-    from flow44.sandbox.main import PnpmSandbox
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +23,9 @@ class UnknownVersionError(RuntimeError):
 
 
 @asynccontextmanager
-async def _locked_git(sandbox: PnpmSandbox, project_id: str) -> AsyncIterator[Git]:
+async def _locked_git(project_id: str) -> AsyncIterator[Git]:
     async with _locks[project_id]:
-        yield Git(sandbox)
+        yield Git(project_id)
 
 
 async def _emit_committed(project_id: str, sha: str | None, *, notify: bool = True) -> str | None:
@@ -38,18 +34,18 @@ async def _emit_committed(project_id: str, sha: str | None, *, notify: bool = Tr
     return sha
 
 
-async def init_scaffold_version(sandbox: PnpmSandbox, project_id: str) -> None:
+async def init_scaffold_version(project_id: str) -> None:
     try:
-        async with _locked_git(sandbox, project_id) as git:
+        async with _locked_git(project_id) as git:
             sha = await git.init(_SCAFFOLD_MESSAGE)
         await _emit_committed(project_id, sha, notify=False)  # no client connected at scaffold time
     except Exception:
         logger.exception("[versioning] scaffold v0 init failed for %s", project_id)
 
 
-async def commit_turn(sandbox: PnpmSandbox, project_id: str) -> str | None:
+async def commit_turn(project_id: str) -> str | None:
     try:
-        async with _locked_git(sandbox, project_id) as git:
+        async with _locked_git(project_id) as git:
             if not await git.is_repo():
                 sha = await git.init(_SCAFFOLD_MESSAGE)  # TODO(legacy): drop once every project has a v0 baseline
             elif await git.is_detached():
@@ -63,44 +59,44 @@ async def commit_turn(sandbox: PnpmSandbox, project_id: str) -> str | None:
         return None
 
 
-async def preview_version(sandbox: PnpmSandbox, project_id: str, commit_sha: str) -> None:
+async def preview_version(project_id: str, commit_sha: str) -> None:
     versions = await get_versions(project_id)
     if not any(v.payload.get("commit_sha") == commit_sha for v in versions):
         raise UnknownVersionError(commit_sha)  # never hand raw client input to git
     is_latest = versions[-1].payload.get("commit_sha") == commit_sha
-    async with _locked_git(sandbox, project_id) as git:
+    async with _locked_git(project_id) as git:
         await (git.checkout_latest() if is_latest else git.checkout(commit_sha))
     await emit_transient(
         project_id, {"type": "version_preview_active", "commit_sha": commit_sha, "is_latest": is_latest}
     )
 
 
-async def exit_preview(sandbox: PnpmSandbox, project_id: str) -> None:
-    async with _locked_git(sandbox, project_id) as git:
+async def exit_preview(project_id: str) -> None:
+    async with _locked_git(project_id) as git:
         await git.checkout_latest()
     await emit_transient(project_id, {"type": "version_preview_active", "commit_sha": "", "is_latest": True})
 
 
-async def ensure_at_latest(sandbox: PnpmSandbox, project_id: str) -> None:
+async def ensure_at_latest(project_id: str) -> None:
     try:
-        async with _locked_git(sandbox, project_id) as git:
+        async with _locked_git(project_id) as git:
             if await git.is_detached():
                 await git.checkout_latest()
     except Exception:
         logger.exception("[versioning] ensure_at_latest failed for %s", project_id)
 
 
-async def is_previewing(sandbox: PnpmSandbox, project_id: str) -> bool:
-    async with _locked_git(sandbox, project_id) as git:
+async def is_previewing(project_id: str) -> bool:
+    async with _locked_git(project_id) as git:
         return await git.is_detached()
 
 
-async def restore_version(sandbox: PnpmSandbox, project_id: str, commit_sha: str) -> None:
+async def restore_version(project_id: str, commit_sha: str) -> None:
     versions = await get_versions(project_id)
     target = next((v for v in versions if v.payload.get("commit_sha") == commit_sha), None)
     if target is None or target.id is None:
         raise UnknownVersionError(commit_sha)
-    async with _locked_git(sandbox, project_id) as git:
+    async with _locked_git(project_id) as git:
         await git.reset_hard(commit_sha)
     await trim_events_after(project_id, target.id)
     if target.created_at:
