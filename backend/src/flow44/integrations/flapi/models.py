@@ -195,6 +195,6 @@ class Query(PascalCaseBaseModel):
 class PackageMetadata(PascalCaseBaseModel):
     id_: int = Field(alias="Id")
     name: str
-    description: str
+    description: str | None = None
     # output_queries_id: list[Any]
     queries: list[Query]
