@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from flow44.ai.file_safety import (
+    SYNCABLE_TEMPLATE_FILE_PATTERNS,
     FileSafetyError,
     format_rejection_feedback,
     normalized_path_or_reject,
@@ -27,6 +28,7 @@ from flow44.ai.file_safety import (
         "src/platform/internal/README.md",
         ".git/hooks/post-checkout",
         ".git/config",
+        ".gitignore",
     ],
 )
 def test_protected_generated_app_files_are_rejected(path: str) -> None:
@@ -111,3 +113,8 @@ def test_file_safety_prompt_context_uses_contract_values() -> None:
     assert "**/package.json" in context["protected_patterns"]
     assert "src/platform/**" in context["protected_patterns"]
     assert "**/vite.config.*" in context["protected_patterns"]
+
+
+def test_gitignore_syncs_from_the_template() -> None:
+    # Projects predating a template ignore rule must pick it up, or the dev server log lands in git.
+    assert "**/.gitignore" in SYNCABLE_TEMPLATE_FILE_PATTERNS

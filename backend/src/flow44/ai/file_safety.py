@@ -27,6 +27,7 @@ _PROTECTED_APP_FILE_PATHS: tuple[str, ...] = (
 
 _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
     "**/.git/**",
+    "**/.gitignore",
     "src/api/**",
     "src/auth/**",
     "src/platform/**",

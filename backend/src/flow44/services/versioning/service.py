@@ -77,6 +77,20 @@ async def exit_preview(project_id: str) -> None:
     await emit_transient(project_id, {"type": "version_preview_active", "commit_sha": "", "is_latest": True})
 
 
+async def emit_preview_state(project_id: str) -> None:
+    try:
+        versions = await get_versions(project_id)
+        async with _locked_git(project_id) as git:
+            head = await git.head_sha()
+    except Exception:
+        logger.exception("[versioning] preview state read failed for %s", project_id)
+        return
+    latest = versions[-1].payload.get("commit_sha") if versions else None
+    await emit_transient(
+        project_id, {"type": "version_preview_active", "commit_sha": head, "is_latest": head == latest}
+    )
+
+
 async def ensure_at_latest(project_id: str) -> None:
     try:
         async with _locked_git(project_id) as git:
@@ -97,7 +111,7 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
     if target is None or target.id is None:
         raise UnknownVersionError(commit_sha)
     async with _locked_git(project_id) as git:
-        await git.reset_hard(commit_sha)
+        await git.restore_main(commit_sha)
     await trim_events_after(project_id, target.id)
     if target.created_at:
         await trim_messages_after(project_id, target.created_at.isoformat())

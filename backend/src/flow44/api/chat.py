@@ -143,6 +143,7 @@ async def _handle_version_message(websocket: WebSocket, project_id: str, msg_typ
     except Exception:
         logger.exception("[versioning] %s failed for %s", msg_type, project_id)
         await websocket.send_json({"type": "error", "message": "Version operation failed"})
+        await versioning.emit_preview_state(project_id)
 
 
 @http_router.get("/{project_id}/history")

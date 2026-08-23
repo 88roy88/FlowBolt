@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from flow44.config import settings
-from flow44.services.versioning.git import Git
+from flow44.services.versioning.git import Git, GitError
 
 from .conftest import requires_git
 
@@ -51,7 +51,7 @@ async def test_checkout_roundtrip(project_id: str, workspace: Path) -> None:
     assert (workspace / "a.txt").read_text() == "two"
 
 
-async def test_reset_hard_drops_ahead_but_reflog_keeps(project_id: str, workspace: Path) -> None:
+async def test_restore_main_drops_ahead_but_reflog_keeps(project_id: str, workspace: Path) -> None:
     (workspace / "a.txt").write_text("one")
     git = Git(project_id)
     v0 = await git.init("v0")
@@ -59,10 +59,10 @@ async def test_reset_hard_drops_ahead_but_reflog_keeps(project_id: str, workspac
     v1 = await git.commit_all("two")
     assert v1
 
-    await git.reset_hard(v0)
+    await git.restore_main(v0)
     assert await git.head_sha() == v0
     assert (workspace / "a.txt").read_text() == "one"
-    _, reflog = await git._run("reflog")
+    reflog = await git._run("reflog")
     assert v1[:7] in reflog
 
 
@@ -84,8 +84,93 @@ async def test_commit_message_preserved(project_id: str, workspace: Path) -> Non
     await git.init("v0")
     (workspace / "a.txt").write_text("y")
     await git.commit_all("Version 7")
-    _, subject = await git._run("log", "-1", "--format=%s")
+    subject = await git._run("log", "-1", "--format=%s")
     assert subject == "Version 7"
+
+
+async def test_restore_main_moves_branch_from_detached_head(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("one")
+    git = Git(project_id)
+    await git.init("v0")
+    (workspace / "a.txt").write_text("two")
+    v1 = await git.commit_all("two")
+    (workspace / "a.txt").write_text("three")
+    await git.commit_all("three")
+    assert v1
+
+    await git.checkout(v1)
+    await git.restore_main(v1)
+
+    assert await git.head_sha() == v1
+    assert await git._run("rev-parse", "main") == v1
+    assert not await git.is_detached()
+    assert (workspace / "a.txt").read_text() == "two"
+
+
+async def test_restore_main_from_attached_head(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("one")
+    git = Git(project_id)
+    v0 = await git.init("v0")
+    (workspace / "a.txt").write_text("two")
+    await git.commit_all("two")
+    assert v0
+
+    await git.restore_main(v0)
+
+    assert await git.head_sha() == v0
+    assert await git._run("rev-parse", "main") == v0
+    assert not await git.is_detached()
+
+
+async def test_run_raises_with_git_stderr(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("x")
+    git = Git(project_id)
+    await git.init("v0")
+
+    with pytest.raises(GitError) as excinfo:
+        await git.checkout("deadbeef")
+
+    assert "deadbeef" in str(excinfo.value)
+
+
+async def test_checkout_latest_raises_when_main_missing(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("one")
+    git = Git(project_id)
+    v0 = await git.init("v0")
+    (workspace / "a.txt").write_text("two")
+    await git.commit_all("two")
+    assert v0
+
+    await git.checkout(v0)
+    await git._run("branch", "-D", "main")
+
+    with pytest.raises(GitError):
+        await git.checkout_latest()
+
+
+async def test_restore_main_recreates_branch_when_checkout_would_fail(project_id: str, workspace: Path) -> None:
+    # Restore must re-point `main` itself: relying on a prior checkout left main ahead when that checkout failed.
+    (workspace / "a.txt").write_text("one")
+    git = Git(project_id)
+    v0 = await git.init("v0")
+    (workspace / "a.txt").write_text("two")
+    await git.commit_all("two")
+    assert v0
+
+    await git.checkout(v0)
+    await git._run("branch", "-D", "main")
+
+    await git.restore_main(v0)
+
+    assert await git._run("rev-parse", "main") == v0
+    assert not await git.is_detached()
+
+
+async def test_queries_stay_safe_outside_a_repo(project_id: str, workspace: Path) -> None:
+    git = Git(project_id)
+
+    assert await git.is_repo() is False
+    assert await git.is_detached() is False
 
 
 def test_runs_on_a_selector_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

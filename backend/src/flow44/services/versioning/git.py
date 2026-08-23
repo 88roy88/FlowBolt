@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import subprocess
 
 from flow44.sandbox.base import workspace_path
 
-logger = logging.getLogger(__name__)
-
-
 _GIT_NAME = "BuildApp AI"
 _GIT_EMAIL = "ai@buildapp.local"
+
+
+class GitError(RuntimeError):
+    pass
 
 
 class Git:
     def __init__(self, project_id: str) -> None:
         self.workspace_dir = workspace_path(project_id)
 
-    async def _run(self, *args: str) -> tuple[int, str]:
+    async def _run(self, *args: str) -> str:
         # Thread, not create_subprocess_exec: uvicorn runs a Windows selector loop, which has no subprocess support.
         result = await asyncio.to_thread(
             subprocess.run,
@@ -28,27 +28,31 @@ class Git:
             errors="replace",
         )
         if result.returncode:
-            logger.debug("[git] %s failed (%s): %s", args[0], result.returncode, result.stderr.strip())
-        return result.returncode, result.stdout.strip()
+            raise GitError(f"git {' '.join(args)} ({result.returncode}): {result.stderr.strip()}")
+        return result.stdout.strip()
 
     async def _succeeds(self, *args: str) -> bool:
-        code, _ = await self._run(*args)
-        return code == 0
+        try:
+            await self._run(*args)
+            return True
+        except GitError:
+            return False
 
     # -- Queries --
 
     async def is_repo(self) -> bool:
         # `--git-dir` is `.git` only for a workspace-local repo; an ancestor repo yields an abs path.
-        code, out = await self._run("rev-parse", "--git-dir")
-        return code == 0 and out in (".git", ".git/")
+        try:
+            return await self._run("rev-parse", "--git-dir") in (".git", ".git/")
+        except GitError:
+            return False
 
     async def is_detached(self) -> bool:
         # `symbolic-ref -q HEAD` fails when detached — and on a non-repo too, hence the is_repo check.
         return await self.is_repo() and not await self._succeeds("symbolic-ref", "-q", "HEAD")
 
     async def head_sha(self) -> str:
-        _, out = await self._run("rev-parse", "HEAD")
-        return out
+        return await self._run("rev-parse", "HEAD")
 
     # -- Mutations --
 
@@ -62,8 +66,9 @@ class Git:
 
     async def commit_all(self, message: str) -> str | None:
         await self._run("add", "-A")
-        if not await self._succeeds("commit", "-m", message):
+        if not await self._run("status", "--porcelain"):
             return None
+        await self._run("commit", "-m", message)
         return await self.head_sha()
 
     async def checkout(self, sha: str) -> None:
@@ -72,7 +77,6 @@ class Git:
     async def checkout_latest(self) -> None:
         await self._run("checkout", "-f", "main")
 
-    async def reset_hard(self, sha: str) -> None:
-        # Everything ahead of `sha` stays recoverable via reflog.
-        await self.checkout_latest()
-        await self._run("reset", "--hard", sha)
+    async def restore_main(self, sha: str) -> None:
+        # One command: a separate checkout can fail and leave `main` ahead, silently un-restoring later.
+        await self._run("checkout", "-f", "-B", "main", sha)
