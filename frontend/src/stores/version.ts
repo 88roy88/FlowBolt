@@ -4,6 +4,7 @@ import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useChatStore } from './chat';
 import { useFilesStore } from './files';
+import { useErrorStore } from './errors';
 import { isReplaying } from './chatHandlers';
 
 interface VersionState {
@@ -34,9 +35,8 @@ function sendVersionAction(message: WSMessage): boolean {
   return true;
 }
 
-function reloadFilesAfterVersionChange() {
+function refreshEditorFiles() {
   void useFilesStore.getState().loadFileTree();
-  useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
   void useFilesStore.getState().refreshOpenFiles();
 }
 
@@ -45,7 +45,8 @@ export const useVersionStore = create<VersionState>((set) => ({
   previewingVersion: null,
 
   previewVersion(commit_sha: string) {
-    sendVersionAction({ type: 'preview_version', commit_sha });
+    if (!sendVersionAction({ type: 'preview_version', commit_sha })) return;
+    useErrorStore.getState().suppressPreviewErrors(true);
   },
 
   exitPreview() {
@@ -80,7 +81,8 @@ function handleVersionCommitted(msg: { commit_sha: string }) {
 function handleVersionPreviewActive(msg: { commit_sha: string; is_latest: boolean }) {
   const previewingVersion = msg.is_latest ? null : msg.commit_sha;
   useVersionStore.setState({ previewingVersion });
-  if (!isReplaying()) reloadFilesAfterVersionChange();
+  useErrorStore.getState().suppressPreviewErrors(previewingVersion !== null);
+  if (!isReplaying()) refreshEditorFiles();
 }
 
 function handleVersionRestored(msg: { commit_sha: string }) {
@@ -96,7 +98,8 @@ function handleVersionRestored(msg: { commit_sha: string }) {
       versions: shaIdx >= 0 ? s.versions.slice(0, shaIdx + 1) : s.versions,
     };
   });
-  reloadFilesAfterVersionChange();
+  useErrorStore.getState().suppressPreviewErrors(false);
+  refreshEditorFiles();
   settlePendingRestore(true);
 }
 
