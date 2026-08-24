@@ -42,7 +42,7 @@ FieldType = (
     ]
     | str
 )
-# OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
+# OntologyType = Literal["TEXT", "LOCATION", "ENTITY_ID", "CONTACT_INFO", "DEVICE_ID", "TIMESTAMP"]
 
 type CubeId = str
 type QueryDisplayName = str
