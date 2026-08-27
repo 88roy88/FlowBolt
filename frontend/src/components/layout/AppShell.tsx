@@ -7,6 +7,8 @@ import { ClassicLayout } from './ClassicLayout';
 import { FlexibleLayout } from './FlexibleLayout';
 import { MobileLayout } from './MobileLayout';
 import { BottomDrawer } from './BottomDrawer';
+import { PreviewVersionBanner } from '../preview/PreviewVersionBanner';
+import { UnsavedEditsDialog } from '../version/UnsavedEditsDialog';
 import { PublishModal } from '../publish/PublishModal';
 import { AdminPanel } from '../admin/AdminPanel';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
@@ -177,7 +179,14 @@ export function AppShell() {
   );
 
 
-  if (isMobile) return <MobileLayout />;
+  if (isMobile) {
+    return (
+      <>
+        <MobileLayout />
+        <UnsavedEditsDialog />
+      </>
+    );
+  }
 
   return (
     <div className="flex flex-row h-full w-full overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}>
@@ -204,6 +213,7 @@ export function AppShell() {
       {/* Main content */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <GlobalProgress />
+        <PreviewVersionBanner />
 
         {isNewProject ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8 relative overflow-hidden">
@@ -261,6 +271,7 @@ export function AppShell() {
       {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
 
       <PublishModal />
+      <UnsavedEditsDialog />
     </div>
   );
 }

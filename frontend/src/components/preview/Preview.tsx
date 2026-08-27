@@ -9,7 +9,6 @@ import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
-import { PreviewVersionBanner } from './PreviewVersionBanner';
 
 export function Preview() {
   const { t } = useTranslation();
@@ -119,8 +118,6 @@ export function Preview() {
           )}
         </div>
       </div>
-
-      <PreviewVersionBanner />
 
       {/* iframe */}
       {previewUrl ? (

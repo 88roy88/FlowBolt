@@ -214,7 +214,19 @@
     "previewTooltip": "View version without restoring",
     "exitPreviewTooltip": "Back to latest",
     "restoreTooltip": "Discard newer versions",
-    "busyTooltip": "Unavailable while the AI works"
+    "busyTooltip": "Unavailable while the AI works",
+    "previewingShared": "Everyone viewing this project sees this version.",
+    "unsavedTitle": "You have unsaved edits",
+    "unsavedPreviewBody": "Viewing an older version will replace your current files. Save your edits as a version first, or discard them permanently.",
+    "unsavedRestoreBody": "Restoring will replace your current files. Save your edits as a version first, or discard them permanently.",
+    "saveAndContinue": "Save and continue",
+    "discardEdits": "Discard my edits",
+    "unsavedEdits": "Unsaved edits",
+    "saveAsVersion": "Save as version",
+    "saveAsVersionTooltip": "Save your edits as a version you can return to",
+    "youEdited": "You edited {{files}}",
+    "youEditedMore": "You edited {{files}} and {{count}} more",
+    "youEditedFiles": "You edited the project"
   },
   "publish": {
     "publishFailed": "Publish Failed",

@@ -12,6 +12,8 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   confirmClassName?: string;
   confirmIcon?: ReactNode;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
 }
 
 export function ConfirmDialog({
@@ -23,6 +25,8 @@ export function ConfirmDialog({
   onConfirm,
   confirmClassName,
   confirmIcon,
+  secondaryLabel,
+  onSecondary,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   return (
@@ -35,6 +39,11 @@ export function ConfirmDialog({
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
+          {secondaryLabel && (
+            <Button variant="outline" size="sm" onClick={onSecondary}>
+              {secondaryLabel}
+            </Button>
+          )}
           <Button variant="default" size="sm" className={confirmClassName} onClick={onConfirm}>
             {confirmIcon}
             {confirmLabel}

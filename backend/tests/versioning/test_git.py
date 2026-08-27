@@ -166,6 +166,32 @@ async def test_restore_main_recreates_branch_when_checkout_would_fail(project_id
     assert not await git.is_detached()
 
 
+async def test_is_dirty_and_changed_files_track_the_working_tree(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("one")
+    git = Git(project_id)
+    await git.init("v0")
+
+    assert await git.is_dirty() is False
+    assert await git.changed_files() == []
+
+    (workspace / "a.txt").write_text("two")
+    (workspace / "new.txt").write_text("added")
+
+    assert await git.is_dirty() is True
+    assert await git.changed_files() == ["a.txt", "new.txt"]
+
+
+async def test_changed_files_ignores_gitignored_paths(project_id: str, workspace: Path) -> None:
+    (workspace / ".gitignore").write_text("node_modules\n")
+    git = Git(project_id)
+    await git.init("v0")
+    (workspace / "node_modules").mkdir()
+    (workspace / "node_modules" / "dep.js").write_text("noise")
+    (workspace / "src.ts").write_text("real")
+
+    assert await git.changed_files() == ["src.ts"]
+
+
 async def test_queries_stay_safe_outside_a_repo(project_id: str, workspace: Path) -> None:
     git = Git(project_id)
 

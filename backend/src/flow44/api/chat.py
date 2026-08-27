@@ -19,8 +19,8 @@ from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
 from flow44.db.chat import ChatRole, get_messages, save_message
-from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
-from flow44.db.heartbeat import clear_heartbeat, is_run_active, touch_heartbeat, try_claim_run
+from flow44.db.events import emit_event, get_events, has_subscribers, subscribe, unsubscribe
+from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
@@ -113,37 +113,45 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
 
 
 async def _start_agent(project_id: str, coro: Any) -> None:
-    claimed_at = await try_claim_run(project_id)
-    if claimed_at is None:
+    try:
+        claimed_at = await versioning.claim_run_unless_previewing(project_id)
+        if claimed_at is None:
+            raise AgentAlreadyRunning
+    except Exception:
         coro.close()
-        raise AgentAlreadyRunning
+        raise
     task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at))
     _RUNNING.add(task)
     task.add_done_callback(_RUNNING.discard)
 
 
-async def _reject_edit_while_previewing(websocket: WebSocket, project_id: str) -> bool:
-    if await versioning.is_previewing(project_id):
-        await websocket.send_json({"type": "error", "message": "Restore this version before editing"})
-        return True
-    return False
+async def _version_error(websocket: WebSocket, message: str, code: str) -> None:
+    await websocket.send_json({"type": "version_error", "message": message, "code": code})
 
 
 async def _handle_version_message(websocket: WebSocket, project_id: str, msg_type: str, data: dict[str, Any]) -> None:
-    if await is_run_active(project_id):
-        await websocket.send_json({"type": "error", "message": "Can't change versions while the AI is working"})
-        return
     try:
-        if msg_type == "exit_preview":
-            await versioning.exit_preview(project_id)
-        elif msg_type == "preview_version":
-            await versioning.preview_version(project_id, data["commit_sha"])
-        elif msg_type == "restore_version":
-            await versioning.restore_version(project_id, data["commit_sha"])
+        await versioning.handle_version_op(project_id, msg_type, data.get("commit_sha", ""), data.get("on_dirty"))
+    except versioning.RunActiveError:
+        await _version_error(websocket, "Can't change versions while the AI is working", "run_active")
+    except versioning.DirtyWorkspaceError:
+        await _version_error(websocket, "You have unsaved edits", "dirty_workspace")
     except Exception:
         logger.exception("[versioning] %s failed for %s", msg_type, project_id)
-        await websocket.send_json({"type": "error", "message": "Version operation failed"})
-        await versioning.emit_preview_state(project_id)
+        await _version_error(websocket, "Version operation failed", "failed")
+        await versioning.broadcast_current_version(project_id)
+
+
+async def _handle_save_version(websocket: WebSocket, project_id: str) -> None:
+    try:
+        await versioning.save_edits_as_version(project_id)
+    except versioning.RunActiveError:
+        await _version_error(websocket, "Can't save while the AI is working", "run_active")
+    except versioning.PreviewActiveError:
+        await _version_error(websocket, "Return to latest to save your edits", "previewing")
+    except Exception:
+        logger.exception("[versioning] save_version failed for %s", project_id)
+        await _version_error(websocket, "Version operation failed", "failed")
 
 
 @http_router.get("/{project_id}/history")
@@ -177,9 +185,9 @@ async def chat_ws(  # noqa: C901, PLR0915
         await websocket.close()
         return
 
-    await versioning.ensure_at_latest(project.id)
-
+    had_subscribers = has_subscribers(project.id)
     queue = subscribe(project.id)
+    await versioning.broadcast_current_version(project.id, reset_orphaned_preview=not had_subscribers)
 
     async def _forward_events() -> None:
         try:
@@ -197,9 +205,6 @@ async def chat_ws(  # noqa: C901, PLR0915
 
             try:
                 if msg_type == "message":
-                    if await _reject_edit_while_previewing(websocket, project.id):
-                        continue
-
                     user_content: str = data["content"]
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
@@ -266,8 +271,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
-                        if await _reject_edit_while_previewing(websocket, project.id):
-                            continue
                         await delete_pending_plan(project.id)
                         execute_agent = ExecuteAgent(
                             project_id=project.id,
@@ -288,9 +291,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                         await _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
 
                 elif msg_type == "fix_error":
-                    if await _reject_edit_while_previewing(websocket, project.id):
-                        continue
-
                     error_message = data.get("error_message", "")
                     error_file = data.get("error_file")
                     error_line = data.get("error_line")
@@ -335,8 +335,13 @@ async def chat_ws(  # noqa: C901, PLR0915
 
                 elif msg_type in ("preview_version", "restore_version", "exit_preview"):
                     await _handle_version_message(websocket, project.id, msg_type, data)
+
+                elif msg_type == "save_version":
+                    await _handle_save_version(websocket, project.id)
             except AgentAlreadyRunning:
                 await websocket.send_json(_AGENT_BUSY)
+            except versioning.PreviewActiveError:
+                await websocket.send_json({"type": "error", "message": "Restore this version before editing"})
 
     forward_task = asyncio.create_task(_forward_events())
 

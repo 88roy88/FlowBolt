@@ -43,12 +43,14 @@ export function EditorPanel() {
     revealVersion,
     clearPendingReveal,
     openFile,
+    hasUnsavedEdits,
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
-  const currentProject = useSessionStore((s) => s.currentProject);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
   const aiFlowActive = useChatStore(isAgentAlive);
   const previewing = useVersionStore((s) => s.previewingVersion != null);
+  const saveVersion = useVersionStore((s) => s.saveVersion);
+  const currentProject = useSessionStore((s) => s.currentProject);
   const noWritePermission = currentProject?.role ? !WRITE_ROLES.has(currentProject.role) : false;
   const readOnlyUntilInitialBuildComplete = !buildCompleted;
   const editorReadOnly = noWritePermission || readOnlyUntilInitialBuildComplete || aiFlowActive || previewing;
@@ -221,6 +223,18 @@ export function EditorPanel() {
           <div className="flex-1 min-w-0">
             <FileTabs />
           </div>
+          {hasUnsavedEdits && !editorReadOnly && (
+            <div className="flex items-center gap-1.5 px-3 shrink-0">
+              <span className="text-[11px] text-warning">● {t('version.unsavedEdits', 'Unsaved edits')}</span>
+              <button
+                onClick={saveVersion}
+                title={t('version.saveAsVersionTooltip', 'Save your edits as a version you can return to')}
+                className="h-5 px-2 text-[11px] rounded-md border border-warning/40 text-warning hover:bg-warning/10 transition-colors"
+              >
+                {t('version.saveAsVersion', 'Save as version')}
+              </button>
+            </div>
+          )}
           {saveStatus !== 'idle' && (
             <div className="flex items-center gap-1 px-3 text-[11px] text-muted-foreground shrink-0">
               {saveStatus === 'saving' ? (

@@ -214,7 +214,19 @@
     "previewTooltip": "צפייה בגרסה ללא שחזור",
     "exitPreviewTooltip": "חזרה לגרסה האחרונה",
     "restoreTooltip": "מחיקת הגרסאות החדשות יותר",
-    "busyTooltip": "לא זמין בזמן עבודת ה-AI"
+    "busyTooltip": "לא זמין בזמן עבודת ה-AI",
+    "previewingShared": "כל מי שצופה בפרויקט רואה את הגרסה הזו.",
+    "unsavedTitle": "יש לך עריכות שלא נשמרו",
+    "unsavedPreviewBody": "צפייה בגרסה ישנה יותר תחליף את הקבצים הנוכחיים שלך. שמור את העריכות כגרסה, או מחק אותן לצמיתות.",
+    "unsavedRestoreBody": "השחזור יחליף את הקבצים הנוכחיים שלך. שמור את העריכות כגרסה, או מחק אותן לצמיתות.",
+    "saveAndContinue": "שמור והמשך",
+    "discardEdits": "מחק את העריכות שלי",
+    "unsavedEdits": "עריכות שלא נשמרו",
+    "saveAsVersion": "שמור כגרסה",
+    "saveAsVersionTooltip": "שמור את העריכות שלך כגרסה שתוכל לחזור אליה",
+    "youEdited": "ערכת את {{files}}",
+    "youEditedMore": "ערכת את {{files}} ועוד {{count}}",
+    "youEditedFiles": "ערכת את הפרויקט"
   },
   "publish": {
     "publishFailed": "הפרסום נכשל",

@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
-import { FileText, TerminalSquare } from 'lucide-react';
+import { FileText, Pencil, TerminalSquare } from 'lucide-react';
 import type { Message } from '../../types';
 import { formatClock } from '../../utils/formatTime';
 import { Badge } from '../ui/badge';
@@ -43,6 +43,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
         errorLine={card.errorLine}
         errorStack={card.errorStack}
       />;
+    case 'user_edit':
+      return <UserEditCard files={card.files} />;
     case 'fix_progress':
       return <FixProgressCard steps={card.steps} content={message.content} diffs={card.diffs} />;
     case 'followup_progress':
@@ -55,6 +57,21 @@ function AgentCardRenderer({ message }: { message: Message }) {
     default:
       return null;
   }
+}
+
+function UserEditCard({ files }: { files: string[] }) {
+  const { t } = useTranslation();
+  const shown = files.slice(0, 3).join(', ');
+  const label = files.length > 3
+    ? t('version.youEditedMore', 'You edited {{files}} and {{count}} more', { files: shown, count: files.length - 3 })
+    : t('version.youEdited', 'You edited {{files}}', { files: shown });
+
+  return (
+    <div className="flex items-center gap-1.5 px-1 text-[12px] text-muted-foreground">
+      <Pencil size={12} className="text-primary/70 shrink-0" />
+      <span className="truncate">{files.length ? label : t('version.youEditedFiles', 'You edited the project')}</span>
+    </div>
+  );
 }
 
 function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: string }[] }) {

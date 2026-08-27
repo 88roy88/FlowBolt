@@ -54,6 +54,14 @@ class Git:
     async def head_sha(self) -> str:
         return await self._run("rev-parse", "HEAD")
 
+    async def is_dirty(self) -> bool:
+        return bool(await self._run("status", "--porcelain"))
+
+    async def changed_files(self) -> list[str]:
+        tracked = await self._run("diff", "--name-only", "HEAD")
+        untracked = await self._run("ls-files", "--others", "--exclude-standard")
+        return sorted({*tracked.splitlines(), *untracked.splitlines()} - {""})
+
     # -- Mutations --
 
     async def init(self, message: str) -> str | None:

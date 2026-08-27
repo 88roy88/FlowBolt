@@ -23,6 +23,10 @@ def subscribe(project_id: str) -> asyncio.Queue[dict[str, Any]]:
     return queue
 
 
+def has_subscribers(project_id: str) -> bool:
+    return bool(_channels.get(project_id))
+
+
 def unsubscribe(project_id: str, queue: asyncio.Queue[dict[str, Any]]) -> None:
     if project_id in _channels:
         try:

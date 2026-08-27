@@ -98,7 +98,7 @@ async def test_supervisor_beats_while_running(monkeypatch: pytest.MonkeyPatch) -
 
 
 async def test_start_agent_rejects_when_run_active(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat, "try_claim_run", AsyncMock(return_value=None))
+    monkeypatch.setattr(chat.versioning, "claim_run_unless_previewing", AsyncMock(return_value=None))
     ran = False
 
     async def _agent() -> None:
@@ -112,7 +112,7 @@ async def test_start_agent_rejects_when_run_active(monkeypatch: pytest.MonkeyPat
 
 
 async def test_start_agent_starts_when_claim_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat, "try_claim_run", AsyncMock(return_value=CLAIMED_AT))
+    monkeypatch.setattr(chat.versioning, "claim_run_unless_previewing", AsyncMock(return_value=CLAIMED_AT))
     monkeypatch.setattr(chat, "emit_event", AsyncMock())
     _patch_heartbeat(monkeypatch)
     _patch_commit_turn(monkeypatch)
