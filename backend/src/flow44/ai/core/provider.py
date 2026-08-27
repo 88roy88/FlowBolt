@@ -112,7 +112,7 @@ async def stream_chat(
             api_base=settings.AI_BASE_URL,
             api_key=settings.AI_API_KEY,
             stream=True,
-            timeout=settings.AI_REQUEST_TIMEOUT,
+            timeout=settings.AI_STREAM_TIMEOUT,
             metadata=metadata or {},
         )
 
