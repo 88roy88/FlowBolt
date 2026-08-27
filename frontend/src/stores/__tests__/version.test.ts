@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleVersionMessage, useVersionStore } from '../version';
 import { useChatStore } from '../chat';
+import { useErrorStore } from '../errors';
 import type { WSMessage } from '../../types';
 
 vi.mock('../chat', () => {
@@ -104,6 +105,7 @@ describe('version_error handling', () => {
   beforeEach(() => {
     useVersionStore.setState({ versions: [], previewingVersion: null, pendingDirtyOp: null });
     useChatStore.setState({ messages: [{ id: 'a1', role: 'assistant', content: 'done', timestamp: 1 }] });
+    useErrorStore.setState({ errors: [], previewErrorsSuppressed: false });
   });
 
   it('opens the unsaved-edits dialog for the op that was refused', () => {
@@ -119,5 +121,16 @@ describe('version_error handling', () => {
     expect(useChatStore.getState().messages).toHaveLength(1);
     expect(useChatStore.getState().agentAlive).toBeUndefined();
     expect(useVersionStore.getState().pendingDirtyOp).toBeNull();
+  });
+
+  it('survives the correction frame the backend sends after a failed op while previewing', () => {
+    useVersionStore.getState().previewVersion('sha1');
+    handleVersionMessage(msg({ type: 'version_preview_active', commit_sha: 'sha1', is_latest: false }));
+
+    handleVersionMessage(msg({ type: 'version_error', message: 'Version operation failed', code: 'failed' }));
+    handleVersionMessage(msg({ type: 'version_preview_active', commit_sha: 'sha1', is_latest: false }));
+
+    expect(useErrorStore.getState().errors).toHaveLength(1);
+    expect(useErrorStore.getState().errors[0].message).toEqual('Version operation failed');
   });
 });

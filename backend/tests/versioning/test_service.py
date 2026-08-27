@@ -1,6 +1,5 @@
 """Tests for versioning orchestration (commit_turn / restore) against a real DB + git."""
 
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -9,7 +8,7 @@ from flow44.db.events import emit_event, get_versions, subscribe, unsubscribe
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git, GitError
 
-from .conftest import requires_git
+from .conftest import outer_repo, requires_git
 
 pytestmark = [pytest.mark.asyncio, requires_git]
 
@@ -156,7 +155,7 @@ async def test_restore_resets_git_and_trims_forward_events(project_id: str, work
 
 async def test_commit_turn_inits_own_repo_when_nested(project_id: str, workspace: Path, tmp_path: Path) -> None:
     # Outer repo around the workspace: a legacy project must still init its own repo.
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)  # noqa: S607
+    outer_repo(tmp_path)
     (workspace / "a.txt").write_text("x")
 
     sha = await versioning.commit_turn(project_id)
@@ -269,6 +268,33 @@ async def test_restore_to_scaffold_version(project_id: str, workspace: Path) -> 
 
     assert [v.payload["commit_sha"] for v in await get_versions(project_id)] == [v0]
     assert (workspace / "a.txt").read_text() == "zero"
+
+
+async def test_broadcast_says_nothing_for_a_project_with_no_baseline(
+    project_id: str, workspace: Path, tmp_path: Path
+) -> None:
+    # F-10: head_sha() used to leak the enclosing repo's HEAD, giving legacy projects a false preview banner.
+    outer_repo(tmp_path)
+    (workspace / "a.txt").write_text("x")
+
+    queue = subscribe(project_id)
+    try:
+        await versioning.broadcast_current_version(project_id, reset_orphaned_preview=False)
+        await versioning.broadcast_current_version(project_id, reset_orphaned_preview=True)
+    finally:
+        unsubscribe(project_id, queue)
+
+    assert queue.empty()
+
+
+async def test_save_edits_bootstraps_a_project_with_no_baseline(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("x")
+
+    await versioning.save_edits_as_version(project_id)
+
+    versions = await get_versions(project_id)
+    assert len(versions) == 1
+    assert versions[0].payload["commit_sha"] == await Git(project_id).head_sha()
 
 
 async def test_broadcast_current_version_reports_the_real_head(project_id: str, workspace: Path) -> None:

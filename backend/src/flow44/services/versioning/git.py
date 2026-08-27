@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import subprocess
 
 from flow44.sandbox.base import workspace_path
@@ -16,12 +17,15 @@ class GitError(RuntimeError):
 class Git:
     def __init__(self, project_id: str) -> None:
         self.workspace_dir = workspace_path(project_id)
+        self.git_dir = os.path.join(self.workspace_dir, ".git")
 
     async def _run(self, *args: str) -> str:
+        # Naming the repo is what contains git: under bare `-C`, a workspace without `.git` finds the enclosing one.
+        repo = ["-C", self.workspace_dir, "--git-dir", self.git_dir, "--work-tree", self.workspace_dir]
         # Thread, not create_subprocess_exec: uvicorn runs a Windows selector loop, which has no subprocess support.
         result = await asyncio.to_thread(
             subprocess.run,
-            ["git", "-C", self.workspace_dir, *args],
+            ["git", *repo, *args],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -41,11 +45,7 @@ class Git:
     # -- Queries --
 
     async def is_repo(self) -> bool:
-        # `--git-dir` is `.git` only for a workspace-local repo; an ancestor repo yields an abs path.
-        try:
-            return await self._run("rev-parse", "--git-dir") in (".git", ".git/")
-        except GitError:
-            return False
+        return await self._succeeds("rev-parse", "--git-dir")
 
     async def is_detached(self) -> bool:
         # `symbolic-ref -q HEAD` fails when detached — and on a non-repo too, hence the is_repo check.

@@ -123,6 +123,13 @@ async def _restore_version(project_id: str, git: Git, commit_sha: str, on_dirty:
     await emit_transient(project_id, {"type": "version_restored", "commit_sha": commit_sha})
 
 
+async def _bootstrap_legacy(project_id: str, git: Git) -> str | None:
+    sha = await git.init(_SCAFFOLD_MESSAGE)  # TODO(legacy): drop once every project has a v0 baseline
+    if sha:
+        await _emit_committed(project_id, sha)
+    return sha
+
+
 # -- Public API: the caller handles the errors these raise --
 
 
@@ -144,6 +151,9 @@ async def save_edits_as_version(project_id: str) -> None:
     async with _exclusive_git(project_id) as git:
         if await is_run_active(project_id):
             raise RunActiveError
+        if not await git.is_repo():
+            await _bootstrap_legacy(project_id, git)
+            return
         if await git.is_detached():
             raise PreviewActiveError
         await _commit_unsaved_edits(project_id, git, "save")
@@ -164,7 +174,7 @@ async def init_scaffold_version(project_id: str) -> None:
         async with _exclusive_git(project_id) as git:
             sha = await git.init(_SCAFFOLD_MESSAGE)
             if sha:
-                await _emit_committed(project_id, sha, notify=False)  # no client connected at scaffold time
+                await _emit_committed(project_id, sha, notify=False)
     except Exception:
         logger.exception("[versioning] scaffold v0 init failed for %s", project_id)
 
@@ -173,12 +183,11 @@ async def commit_turn(project_id: str) -> str | None:
     try:
         async with _exclusive_git(project_id) as git:
             if not await git.is_repo():
-                sha = await git.init(_SCAFFOLD_MESSAGE)  # TODO(legacy): drop once every project has a v0 baseline
-            elif await git.is_detached():
+                return await _bootstrap_legacy(project_id, git)
+            if await git.is_detached():
                 logger.warning("[versioning] refusing to commit while detached for %s", project_id)
                 return None
-            else:
-                sha = await git.commit_all(_TURN_MESSAGE)
+            sha = await git.commit_all(_TURN_MESSAGE)
             if sha:
                 await _emit_committed(project_id, sha)
             return sha
@@ -190,6 +199,8 @@ async def commit_turn(project_id: str) -> str | None:
 async def broadcast_current_version(project_id: str, *, reset_orphaned_preview: bool = False) -> None:
     try:
         async with _exclusive_git(project_id) as git:
+            if not await git.is_repo():
+                return
             if reset_orphaned_preview and await git.is_detached():
                 await git.checkout_latest()
             await _emit_current_version(project_id, git)

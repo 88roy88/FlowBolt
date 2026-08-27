@@ -1,6 +1,7 @@
 """Fixtures for versioning tests — real git in a temp workspace, no mocks."""
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,19 @@ from flow44.db.project import create_project
 
 git_missing = shutil.which("git") is None
 requires_git = pytest.mark.skipif(git_missing, reason="git not installed")
+
+
+def git_out(root: Path, *args: str) -> str:
+    done = subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)  # noqa: S607
+    return done.stdout.strip()
+
+
+def outer_repo(root: Path) -> str:
+    git_out(root, "init")
+    (root / "sentinel.txt").write_text("outer")
+    git_out(root, "add", "-A")
+    git_out(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "outer")
+    return git_out(root, "rev-parse", "HEAD")
 
 
 @pytest.fixture

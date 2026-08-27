@@ -48,7 +48,8 @@ export const useErrorStore = create<ErrorState>((set, get) => ({
   },
 
   suppressPreviewErrors(suppressed) {
-    set(suppressed ? { previewErrorsSuppressed: true, errors: [] } : { previewErrorsSuppressed: false });
+    const entering = suppressed && !get().previewErrorsSuppressed;
+    set(entering ? { previewErrorsSuppressed: true, errors: [] } : { previewErrorsSuppressed: suppressed });
   },
 
   dismissError(id) {

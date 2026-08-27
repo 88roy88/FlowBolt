@@ -8,7 +8,7 @@ import pytest
 from flow44.config import settings
 from flow44.services.versioning.git import Git, GitError
 
-from .conftest import requires_git
+from .conftest import git_out, outer_repo, requires_git
 
 pytestmark = requires_git
 
@@ -192,11 +192,43 @@ async def test_changed_files_ignores_gitignored_paths(project_id: str, workspace
     assert await git.changed_files() == ["src.ts"]
 
 
-async def test_queries_stay_safe_outside_a_repo(project_id: str, workspace: Path) -> None:
+async def test_no_op_can_reach_an_enclosing_repo(project_id: str, workspace: Path, tmp_path: Path) -> None:
+    # F-9: with only `-C`, a workspace without `.git` sent every one of these into the repo around it.
+    outer_head = outer_repo(tmp_path)
     git = Git(project_id)
 
     assert await git.is_repo() is False
     assert await git.is_detached() is False
+
+    ops = [
+        git.head_sha,
+        git.is_dirty,
+        git.changed_files,
+        git.checkout_latest,
+        lambda: git.commit_all("must never reach the enclosing repo"),
+        lambda: git.checkout("HEAD"),
+        lambda: git.restore_main("HEAD"),
+    ]
+    for op in ops:
+        with pytest.raises(GitError):
+            await op()
+
+    assert git_out(tmp_path, "rev-parse", "HEAD") == outer_head
+    assert git_out(tmp_path, "status", "--porcelain") == ""
+    assert (tmp_path / "sentinel.txt").read_text() == "outer"
+
+
+async def test_a_half_built_git_dir_is_not_a_repo(project_id: str, workspace: Path, tmp_path: Path) -> None:
+    # Production has workspaces whose `.git/` holds only `objects/`; git rejects those, so init must adopt them.
+    outer_repo(tmp_path)
+    (workspace / "a.txt").write_text("x")
+    (workspace / ".git" / "objects").mkdir(parents=True)
+    git = Git(project_id)
+
+    assert await git.is_repo() is False
+
+    assert await git.init("v0")
+    assert await git.is_repo() is True
 
 
 def test_runs_on_a_selector_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
