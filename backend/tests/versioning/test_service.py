@@ -367,6 +367,28 @@ async def test_preview_discards_dirty_tree_when_told_to(project_id: str, workspa
     assert len(await get_versions(project_id)) == 2
 
 
+async def test_preview_discard_removes_untracked_files(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("one")
+    git = Git(project_id)
+    await git.init("v0")
+    (workspace / "a.txt").write_text("two")
+    v1 = await versioning.commit_turn(project_id)
+    (workspace / "a.txt").write_text("three")
+    await versioning.commit_turn(project_id)
+    (workspace / "scratch.txt").write_text("untracked")
+
+    await preview(project_id, v1, "discard")
+
+    assert not (workspace / "scratch.txt").exists()
+
+    await exit_preview(project_id)
+    (workspace / "a.txt").write_text("four")
+    sha = await versioning.commit_turn(project_id)
+
+    tracked = await git._run("ls-tree", "-r", "--name-only", sha)
+    assert "scratch.txt" not in tracked.splitlines()
+
+
 async def test_version_op_refused_while_a_run_is_active(project_id: str, workspace: Path) -> None:
     (workspace / "a.txt").write_text("one")
     await Git(project_id).init("v0")

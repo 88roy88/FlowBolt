@@ -5,6 +5,7 @@ import contextlib
 import json
 import logging
 import time
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -112,14 +113,25 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         await clear_heartbeat(project_id, only_beat=beat.at)
 
 
-async def _start_agent(project_id: str, coro: Any) -> None:
+async def _claim_run(project_id: str) -> datetime:
+    """Take the run lock up front, so a refused turn never reaches its side effects."""
+    claimed_at = await versioning.claim_run_unless_previewing(project_id)
+    if claimed_at is None:
+        raise AgentAlreadyRunning
+    return claimed_at
+
+
+@contextlib.asynccontextmanager
+async def _claimed_run(project_id: str) -> AsyncIterator[datetime]:
+    claimed_at = await _claim_run(project_id)
     try:
-        claimed_at = await versioning.claim_run_unless_previewing(project_id)
-        if claimed_at is None:
-            raise AgentAlreadyRunning
+        yield claimed_at
     except Exception:
-        coro.close()
+        await clear_heartbeat(project_id, only_beat=claimed_at)
         raise
+
+
+def _start_agent(project_id: str, coro: Any, claimed_at: datetime) -> None:
     task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at))
     _RUNNING.add(task)
     task.add_done_callback(_RUNNING.discard)
@@ -209,8 +221,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
 
-                    await save_message(project.id, ChatRole.user, user_content)
-
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                     if ds_ids:
                         ds_names: list[str] = []
@@ -223,40 +233,46 @@ async def chat_ws(  # noqa: C901, PLR0915
                         user_event["data_sources"] = [
                             {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                         ]
-                    await emit_event(project.id, user_event, notify=False)
 
-                    is_new = await _is_new_project(project.id)
+                    # Claim first: a refused turn must not leave the message behind.
+                    async with _claimed_run(project.id) as claimed_at:
+                        await save_message(project.id, ChatRole.user, user_content)
+                        await emit_event(project.id, user_event, notify=False)
 
-                    if is_new:
-                        plan_agent = PlanAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            model=selected_model,
-                            data_source_authorization=data_source_authorization,
-                            user_id=user_id,
-                        )
-                        await _start_agent(
-                            project.id,
-                            plan_agent.run(
-                                user_content,
-                                data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                            ),
-                        )
-                    else:
-                        followup_agent = FollowUpAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            model=selected_model,
-                            user_id=user_id,
-                            data_source_authorization=data_source_authorization,
-                        )
-                        await _start_agent(
-                            project.id,
-                            followup_agent.run(
-                                user_content,
-                                data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                            ),
-                        )
+                        is_new = await _is_new_project(project.id)
+
+                        if is_new:
+                            plan_agent = PlanAgent(
+                                project_id=project.id,
+                                sandbox=sandbox,
+                                model=selected_model,
+                                data_source_authorization=data_source_authorization,
+                                user_id=user_id,
+                            )
+                            _start_agent(
+                                project.id,
+                                plan_agent.run(
+                                    user_content,
+                                    data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
+                                ),
+                                claimed_at,
+                            )
+                        else:
+                            followup_agent = FollowUpAgent(
+                                project_id=project.id,
+                                sandbox=sandbox,
+                                model=selected_model,
+                                user_id=user_id,
+                                data_source_authorization=data_source_authorization,
+                            )
+                            _start_agent(
+                                project.id,
+                                followup_agent.run(
+                                    user_content,
+                                    data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
+                                ),
+                                claimed_at,
+                            )
 
                 elif msg_type == "plan_response":
                     action = data.get("action")
@@ -271,24 +287,27 @@ async def chat_ws(  # noqa: C901, PLR0915
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
-                        await delete_pending_plan(project.id)
-                        execute_agent = ExecuteAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            state=state,
-                            model=selected_model or state.model,
-                            user_id=user_id,
-                        )
-                        await _start_agent(project.id, execute_agent.run())
+                        # before the delete: a refusal must not lose the plan
+                        async with _claimed_run(project.id) as claimed_at:
+                            await delete_pending_plan(project.id)
+                            execute_agent = ExecuteAgent(
+                                project_id=project.id,
+                                sandbox=sandbox,
+                                state=state,
+                                model=selected_model or state.model,
+                                user_id=user_id,
+                            )
+                            _start_agent(project.id, execute_agent.run(), claimed_at)
 
                     elif action == "modify" and feedback:
-                        plan_agent = PlanAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            model=selected_model or state.model,
-                            user_id=user_id,
-                        )
-                        await _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
+                        async with _claimed_run(project.id) as claimed_at:
+                            plan_agent = PlanAgent(
+                                project_id=project.id,
+                                sandbox=sandbox,
+                                model=selected_model or state.model,
+                                user_id=user_id,
+                            )
+                            _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback), claimed_at)
 
                 elif msg_type == "fix_error":
                     error_message = data.get("error_message", "")
@@ -300,38 +319,40 @@ async def chat_ws(  # noqa: C901, PLR0915
                     error_desc = f"Fix error: {error_message}"
                     if error_file:
                         error_desc += f" in {error_file}"
-                    await save_message(project.id, ChatRole.user, error_desc)
+                    async with _claimed_run(project.id) as claimed_at:
+                        await save_message(project.id, ChatRole.user, error_desc)
 
-                    await emit_event(
-                        project.id,
-                        {
-                            "type": "user_message",
-                            "content": "",
-                            "error_fix_request": {
-                                "errorMessage": error_message,
-                                "errorFile": error_file,
-                                "errorLine": error_line,
-                                "errorStack": error_stack,
+                        await emit_event(
+                            project.id,
+                            {
+                                "type": "user_message",
+                                "content": "",
+                                "error_fix_request": {
+                                    "errorMessage": error_message,
+                                    "errorFile": error_file,
+                                    "errorLine": error_line,
+                                    "errorStack": error_stack,
+                                },
                             },
-                        },
-                        notify=False,
-                    )
+                            notify=False,
+                        )
 
-                    fix_agent = FixErrorAgent(
-                        project_id=project.id,
-                        sandbox=sandbox,
-                        model=selected_model,
-                        user_id=user_id,
-                    )
-                    await _start_agent(
-                        project.id,
-                        fix_agent.run(
-                            error_message=error_message,
-                            error_file=error_file,
-                            error_line=error_line,
-                            error_stack=error_stack,
-                        ),
-                    )
+                        fix_agent = FixErrorAgent(
+                            project_id=project.id,
+                            sandbox=sandbox,
+                            model=selected_model,
+                            user_id=user_id,
+                        )
+                        _start_agent(
+                            project.id,
+                            fix_agent.run(
+                                error_message=error_message,
+                                error_file=error_file,
+                                error_line=error_line,
+                                error_stack=error_stack,
+                            ),
+                            claimed_at,
+                        )
 
                 elif msg_type in ("preview_version", "restore_version", "exit_preview"):
                     await _handle_version_message(websocket, project.id, msg_type, data)
@@ -341,7 +362,7 @@ async def chat_ws(  # noqa: C901, PLR0915
             except AgentAlreadyRunning:
                 await websocket.send_json(_AGENT_BUSY)
             except versioning.PreviewActiveError:
-                await websocket.send_json({"type": "error", "message": "Restore this version before editing"})
+                await _version_error(websocket, "Restore this version before editing", "previewing")
 
     forward_task = asyncio.create_task(_forward_events())
 

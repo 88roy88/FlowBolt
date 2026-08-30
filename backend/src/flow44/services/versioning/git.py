@@ -88,3 +88,6 @@ class Git:
     async def restore_main(self, sha: str) -> None:
         # One command: a separate checkout can fail and leave `main` ahead, silently un-restoring later.
         await self._run("checkout", "-f", "-B", "main", sha)
+
+    async def clean_untracked(self) -> None:
+        await self._run("clean", "-fd")

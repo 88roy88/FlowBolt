@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleVersionMessage, useVersionStore } from '../version';
 import { useChatStore } from '../chat';
 import { useErrorStore } from '../errors';
+import { useFilesStore } from '../files';
 import type { WSMessage } from '../../types';
 
 vi.mock('../chat', () => {
@@ -65,6 +66,20 @@ describe('version_restored handling', () => {
     expect(useVersionStore.getState().versions).toEqual(['sha1']);
     expect(useVersionStore.getState().previewingVersion).toBeNull();
   });
+
+  it('clears the chat when restoring to v0, whose message was never stamped', () => {
+    useVersionStore.setState({ versions: ['v0sha'] });
+    useChatStore.setState({
+      messages: [
+        { id: 'u1', role: 'user', content: 'hi', timestamp: 1 },
+        { id: 'a1', role: 'assistant', content: 'built it', timestamp: 2 },
+      ],
+    });
+    handleVersionMessage(msg({ type: 'version_restored', commit_sha: 'v0sha' }));
+
+    expect(useChatStore.getState().messages).toEqual([]);
+    expect(useVersionStore.getState().versions).toEqual(['v0sha']);
+  });
 });
 
 describe('version_committed handling', () => {
@@ -106,6 +121,13 @@ describe('version_error handling', () => {
     useVersionStore.setState({ versions: [], previewingVersion: null, pendingDirtyOp: null });
     useChatStore.setState({ messages: [{ id: 'a1', role: 'assistant', content: 'done', timestamp: 1 }] });
     useErrorStore.setState({ errors: [], previewErrorsSuppressed: false });
+    vi.mocked(useFilesStore.setState).mockClear();
+  });
+
+  it('restores hasUnsavedEdits when a save is refused', () => {
+    handleVersionMessage(msg({ type: 'version_error', message: 'Return to latest to save your edits', code: 'previewing' }));
+
+    expect(useFilesStore.setState).toHaveBeenCalledWith({ hasUnsavedEdits: true });
   });
 
   it('opens the unsaved-edits dialog for the op that was refused', () => {
@@ -132,5 +154,14 @@ describe('version_error handling', () => {
 
     expect(useErrorStore.getState().errors).toHaveLength(1);
     expect(useErrorStore.getState().errors[0].message).toEqual('Version operation failed');
+  });
+});
+
+describe('reset', () => {
+  it('lifts preview error suppression', () => {
+    useErrorStore.setState({ previewErrorsSuppressed: true });
+    useVersionStore.getState().reset();
+
+    expect(useErrorStore.getState().previewErrorsSuppressed).toBe(false);
   });
 });

@@ -85,6 +85,7 @@ async def _commit_unsaved_edits(project_id: str, git: Git, on_dirty: OnDirty | N
     if on_dirty is None:
         raise DirtyWorkspaceError
     if on_dirty == "discard":
+        await git.clean_untracked()
         return
     files = await git.changed_files()
     sha = await git.commit_all(_USER_EDITS_MESSAGE)

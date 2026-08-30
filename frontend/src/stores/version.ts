@@ -92,6 +92,7 @@ export const useVersionStore = create<VersionState>((set, get) => ({
 
   reset() {
     set({ versions: [], previewingVersion: null, pendingDirtyOp: null });
+    useErrorStore.getState().suppressPreviewErrors(false);
   },
 }));
 
@@ -133,17 +134,16 @@ function handleVersionPreviewActive(msg: { commit_sha: string; is_latest: boolea
 }
 
 function handleVersionRestored(msg: { commit_sha: string }) {
-  const sha = msg.commit_sha;
+  const versions = useVersionStore.getState().versions;
+  const shaIdx = versions.indexOf(msg.commit_sha);
+  const keep = new Set(versions.slice(0, shaIdx + 1));
   useChatStore.setState((s) => {
-    const idx = s.messages.findIndex((m) => m.version === sha);
-    return { messages: idx >= 0 ? s.messages.slice(0, idx + 1) : s.messages };
+    const last = s.messages.findLastIndex((m) => m.version && keep.has(m.version));
+    return { messages: s.messages.slice(0, last + 1) };
   });
-  useVersionStore.setState((s) => {
-    const shaIdx = s.versions.indexOf(sha);
-    return {
-      previewingVersion: null,
-      versions: shaIdx >= 0 ? s.versions.slice(0, shaIdx + 1) : s.versions,
-    };
+  useVersionStore.setState({
+    previewingVersion: null,
+    versions: shaIdx >= 0 ? versions.slice(0, shaIdx + 1) : versions,
   });
   useErrorStore.getState().suppressPreviewErrors(false);
   refreshEditorFiles();
@@ -158,6 +158,9 @@ function handleVersionError(msg: { message: string; code: string }) {
     useErrorStore.getState().suppressPreviewErrors(false);
     return;
   }
+  useFilesStore.setState({ hasUnsavedEdits: true });
+  const previewing = useVersionStore.getState().previewingVersion !== null;
+  useErrorStore.getState().suppressPreviewErrors(previewing);
   useErrorStore.getState().pushError({ source: 'connection', message: msg.message });
 }
 

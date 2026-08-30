@@ -97,22 +97,20 @@ async def test_supervisor_beats_while_running(monkeypatch: pytest.MonkeyPatch) -
     clear.assert_awaited_once()
 
 
-async def test_start_agent_rejects_when_run_active(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_claim_run_rejects_when_run_active(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chat.versioning, "claim_run_unless_previewing", AsyncMock(return_value=None))
-    ran = False
-
-    async def _agent() -> None:
-        nonlocal ran
-        ran = True
 
     with pytest.raises(chat.AgentAlreadyRunning):
-        await chat._start_agent(PROJECT_ID, _agent())
-
-    assert ran is False  # the coro was closed, never scheduled
+        await chat._claim_run(PROJECT_ID)
 
 
-async def test_start_agent_starts_when_claim_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_claim_run_returns_the_claim_stamp(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chat.versioning, "claim_run_unless_previewing", AsyncMock(return_value=CLAIMED_AT))
+
+    assert await chat._claim_run(PROJECT_ID) == CLAIMED_AT
+
+
+async def test_start_agent_runs_the_coro_under_the_supervisor(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chat, "emit_event", AsyncMock())
     _patch_heartbeat(monkeypatch)
     _patch_commit_turn(monkeypatch)
@@ -121,7 +119,7 @@ async def test_start_agent_starts_when_claim_succeeds(monkeypatch: pytest.Monkey
     async def _agent() -> None:
         started.set()
 
-    await chat._start_agent(PROJECT_ID, _agent())
+    chat._start_agent(PROJECT_ID, _agent(), CLAIMED_AT)
 
     await asyncio.wait_for(started.wait(), timeout=1)
     await asyncio.sleep(0.01)  # let the supervisor finish and clear the heartbeat
