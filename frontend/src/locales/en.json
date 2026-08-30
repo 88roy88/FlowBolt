@@ -130,7 +130,10 @@
     "openInEditor": "Open in editor",
     "retry": "Retry",
     "fixWithAI": "Fix with AI",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "somethingWentWrong": "Something went wrong",
+    "reloadPage": "Reload page",
+    "errorDetails": "Error details"
   },
   "chat": {
     "chat": "Chat",

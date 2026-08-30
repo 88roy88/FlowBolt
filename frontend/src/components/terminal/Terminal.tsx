@@ -6,8 +6,17 @@ import { useSessionStore } from '../../stores/session';
 import { getTerminalSocket } from '../../services/websocket/terminal';
 import { getTerminalTheme } from '../../utils/terminalTheme';
 import '@xterm/xterm/css/xterm.css';
+import { ErrorBoundary } from '../errors/ErrorBoundary';
 
 export function Terminal() {
+  return (
+    <ErrorBoundary>
+      <TerminalContent />
+    </ErrorBoundary>
+  );
+}
+
+function TerminalContent() {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const projectId = useSessionStore((s) => s.projectId);

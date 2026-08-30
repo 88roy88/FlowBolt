@@ -13,6 +13,7 @@ import { PhaseIndicator } from './PhaseIndicator';
 import { DesignProgress } from './DesignProgress';
 import { FixProgressCard } from './cards/FixProgressCard';
 import { FollowUpProgress } from './cards/FollowUpProgress';
+import { ErrorBoundary } from '../errors/ErrorBoundary';
 
 type DayGroup = { key: string; ts: number; msgs: Message[] };
 
@@ -36,6 +37,14 @@ function DayDivider({ label }: { label: string }) {
 }
 
 export function ChatPanel() {
+  return (
+    <ErrorBoundary>
+      <ChatPanelContent />
+    </ErrorBoundary>
+  );
+}
+
+function ChatPanelContent() {
   const { t, i18n } = useTranslation();
   const {
     messages, currentAssistantMessage, actions, error, clearError,

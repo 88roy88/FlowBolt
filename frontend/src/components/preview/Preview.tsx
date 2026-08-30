@@ -9,8 +9,17 @@ import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
+import { ErrorBoundary } from '../errors/ErrorBoundary';
 
 export function Preview() {
+  return (
+    <ErrorBoundary>
+      <PreviewContent />
+    </ErrorBoundary>
+  );
+}
+
+function PreviewContent() {
   const { t } = useTranslation();
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);

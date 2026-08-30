@@ -130,7 +130,10 @@
     "openInEditor": "פתח בעורך",
     "retry": "נסה שוב",
     "fixWithAI": "תקן עם בינה מלאכותית",
-    "dismiss": "סגור"
+    "dismiss": "סגור",
+    "somethingWentWrong": "משהו השתבש",
+    "reloadPage": "טען מחדש את הדף",
+    "errorDetails": "פרטי השגיאה"
   },
   "chat": {
     "chat": "צ'אט",

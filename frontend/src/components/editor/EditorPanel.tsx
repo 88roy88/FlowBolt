@@ -27,8 +27,17 @@ import { useMonacoProjectModels } from './useMonacoProjectModels';
 import { useEditorPanelSearch } from './useEditorPanelSearch';
 import { useEditorPanelQuickOpen } from './useEditorPanelQuickOpen';
 import { createEditorPanelMonacoOnMount } from './editorPanelMonacoOnMount';
+import { ErrorBoundary } from '../errors/ErrorBoundary';
 
 export function EditorPanel() {
+  return (
+    <ErrorBoundary>
+      <EditorPanelContent />
+    </ErrorBoundary>
+  );
+}
+
+function EditorPanelContent() {
   const { t } = useTranslation();
   const {
     fileTree,
