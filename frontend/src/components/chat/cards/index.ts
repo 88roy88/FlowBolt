@@ -5,6 +5,7 @@ export { DesignCompleteCard } from './DesignCompleteCard';
 export { DataSourcesFetchedCard } from './DataSourcesFetchedCard';
 export { ProjectSummaryCard } from './ProjectSummaryCard';
 export { ProjectSummaryContent } from './ProjectSummaryContent';
+export { UserEditCard } from './UserEditCard';
 export { ErrorFixRequestCard } from './ErrorFixRequestCard';
 export { FixProgressCard } from './FixProgressCard';
 export { DiffBlock } from './DiffBlock';
