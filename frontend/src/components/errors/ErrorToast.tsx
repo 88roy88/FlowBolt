@@ -4,6 +4,8 @@ import { useErrorStore, type AppError } from '../../stores/errors';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
+import { useVersionStore } from '../../stores/version';
+import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { Button } from '../ui/button';
 
 export { useErrorCapture } from '../../hooks/useErrorCapture';
@@ -22,7 +24,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
   const { t } = useTranslation();
   const dismissError = useErrorStore((s) => s.dismissError);
   const sendFixError = useChatStore((s) => s.sendFixError);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const { code } = useWorkspaceLock();
   const openFile = useFilesStore((s) => s.openFile);
   const loadProjects = useSessionStore((s) => s.loadProjects);
 
@@ -69,7 +71,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
             {t('errors.retry')}
           </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={handleFix} disabled={isStreaming} className="mt-2.5 ms-auto">
+          <Button variant="outline" size="sm" onClick={handleFix} disabled={code !== null} className="mt-2.5 ms-auto">
             <Wrench size={12} />
             {t('errors.fixWithAI')}
           </Button>
@@ -83,7 +85,8 @@ function SingleErrorToast({ error }: { error: AppError }) {
 }
 
 export function ErrorToast() {
-  const errors = useErrorStore((s) => s.errors);
+  const previewing = useVersionStore((s) => s.previewingVersion !== null);
+  const errors = useErrorStore((s) => s.errors).filter((e) => !previewing || e.source === 'connection');
   if (errors.length === 0) return null;
 
   return (

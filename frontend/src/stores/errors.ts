@@ -13,19 +13,15 @@ export interface AppError {
 
 interface ErrorState {
   errors: AppError[];
-  previewErrorsSuppressed: boolean;
   pushError: (error: Omit<AppError, 'id' | 'timestamp'>) => void;
-  suppressPreviewErrors: (suppressed: boolean) => void;
   dismissError: (id: string) => void;
   clearErrors: () => void;
 }
 
 export const useErrorStore = create<ErrorState>((set, get) => ({
   errors: [],
-  previewErrorsSuppressed: false,
 
   pushError(partial) {
-    if (get().previewErrorsSuppressed && partial.source !== 'connection') return;
     const existing = get().errors;
     // Deduplicate by file + line (stable across re-renders with different timestamps)
     const isDupe = existing.some((e) => {
@@ -45,11 +41,6 @@ export const useErrorStore = create<ErrorState>((set, get) => ({
     set((s) => ({
       errors: [...s.errors.slice(-4), error],
     }));
-  },
-
-  suppressPreviewErrors(suppressed) {
-    const entering = suppressed && !get().previewErrorsSuppressed;
-    set(entering ? { previewErrorsSuppressed: true, errors: [] } : { previewErrorsSuppressed: suppressed });
   },
 
   dismissError(id) {

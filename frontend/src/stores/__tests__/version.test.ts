@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleVersionMessage, useVersionStore } from '../version';
 import { useChatStore } from '../chat';
 import { useErrorStore } from '../errors';
-import { useFilesStore } from '../files';
 import type { WSMessage } from '../../types';
 
 vi.mock('../chat', () => {
@@ -25,7 +24,6 @@ vi.mock('../files', () => ({
       refreshOpenFiles: vi.fn(),
       saveVersion: 0,
     }),
-    setState: vi.fn(),
   },
 }));
 
@@ -121,15 +119,8 @@ describe('version_error handling', () => {
   beforeEach(() => {
     useVersionStore.setState({ versions: [], previewingVersion: null, pendingDirtyOp: null });
     useChatStore.setState({ messages: [{ id: 'a1', role: 'assistant', content: 'done', timestamp: 1 }] });
-    useErrorStore.setState({ errors: [], previewErrorsSuppressed: false });
-    vi.mocked(useFilesStore.setState).mockClear();
+    useErrorStore.setState({ errors: [] });
     socketSend.mockReset();
-  });
-
-  it('restores hasUnsavedEdits when a save is refused', () => {
-    handleVersionMessage(msg({ type: 'version_error', message: 'Return to latest to save your edits', code: 'previewing' }));
-
-    expect(useFilesStore.setState).toHaveBeenCalledWith({ hasUnsavedEdits: true });
   });
 
   it('opens the unsaved-edits dialog for the op that was refused, listing the files', () => {
@@ -143,19 +134,6 @@ describe('version_error handling', () => {
       commit_sha: 'sha1',
       files: ['src/App.tsx'],
     });
-  });
-
-  it('resolves a refused send by settling the tree first, then running it', () => {
-    const sent: unknown[] = [];
-    socketSend.mockImplementation((m: unknown) => sent.push(m));
-    const run = vi.fn();
-    useVersionStore.getState().requestDirtyResolve({ op: 'send', run });
-
-    useVersionStore.getState().resolveDirtyOp('discard');
-
-    expect(sent).toEqual([{ type: 'discard_edits' }]);
-    expect(run).toHaveBeenCalledOnce();
-    expect(useVersionStore.getState().pendingDirtyOp).toBeNull();
   });
 
   it('re-issues a refused preview after saving', () => {
@@ -190,11 +168,3 @@ describe('version_error handling', () => {
   });
 });
 
-describe('reset', () => {
-  it('lifts preview error suppression', () => {
-    useErrorStore.setState({ previewErrorsSuppressed: true });
-    useVersionStore.getState().reset();
-
-    expect(useErrorStore.getState().previewErrorsSuppressed).toBe(false);
-  });
-});

@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from 'react';
 import { useFilesStore } from '../../stores/files';
+import { workspaceLocked } from '../../stores/workspaceLock';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
 
 export function useEditorPanelSave(
@@ -12,6 +13,7 @@ export function useEditorPanelSave(
 
   const doSave = useCallback(
     (path: string) => {
+      if (workspaceLocked()) return;
       setSaveStatus('saving');
       saveFile(path)
         .then(() => {

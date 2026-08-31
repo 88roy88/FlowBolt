@@ -23,8 +23,6 @@ interface FilesState {
   uploadFiles: (basePath: string, files: File[]) => Promise<void>;
   renamePath: (oldPath: string, newPath: string) => Promise<void>;
   deletePath: (path: string) => Promise<void>;
-  hasUnsavedEdits: boolean;
-  markUnsavedEdits: () => void;
   /** Incremented on every file save — used to trigger preview refresh. */
   saveVersion: number;
   refreshOpenFiles: () => Promise<void>;
@@ -100,11 +98,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
   pendingRevealColumn: null,
   revealVersion: 0,
   saveVersion: 0,
-  hasUnsavedEdits: false,
-
-  markUnsavedEdits() {
-    set({ hasUnsavedEdits: true });
-  },
 
   async loadFileTree() {
     const projectId = useSessionStore.getState().projectId;
@@ -244,7 +237,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     const content = get().openFiles.get(normalizedPath);
     if (content !== undefined) {
       await api.saveFileContent(projectId, normalizedPath, content).catch(reportWorkspaceLock);
-      get().markUnsavedEdits();
       set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
   },
@@ -254,7 +246,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     if (!projectId) return;
     const normalizedPath = normalizePath(path);
     await api.createFileEntry(projectId, normalizedPath, content).catch(reportWorkspaceLock);
-    get().markUnsavedEdits();
     await get().loadFileTree();
     await get().openFile(normalizedPath);
   },
@@ -270,7 +261,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       const uploadPath = joinPath(normalizedBasePath, relativePath);
       await api.uploadFileEntry(projectId, uploadPath, file).catch(reportWorkspaceLock);
     }
-    get().markUnsavedEdits();
     await get().loadFileTree();
   },
 
@@ -280,7 +270,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     const normalizedOldPath = normalizePath(oldPath);
     const normalizedNewPath = normalizePath(newPath);
     await api.renameFileEntry(projectId, normalizedOldPath, normalizedNewPath).catch(reportWorkspaceLock);
-    get().markUnsavedEdits();
 
     set((state) => {
       const nextOpenFiles = new Map<string, string>();
@@ -319,7 +308,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     if (!projectId) return;
     const normalizedPath = normalizePath(path);
     await api.deleteFileEntry(projectId, normalizedPath).catch(reportWorkspaceLock);
-    get().markUnsavedEdits();
 
     set((state) => {
       const nextOpenFiles = new Map<string, string>();
@@ -358,7 +346,6 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       pendingRevealLine: null,
       pendingRevealColumn: null,
       revealVersion: 0,
-      hasUnsavedEdits: false,
     });
   },
 }));

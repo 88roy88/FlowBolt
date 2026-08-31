@@ -5,7 +5,7 @@ import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
 import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState } from './chatHandlers';
-import { handleVersionMessage, useVersionStore } from './version';
+import { armTurn, handleVersionMessage, useVersionStore } from './version';
 import { requestPermissionIfNeeded } from '../utils/notifications';
 import { AGENT_PHASE } from './chatAgentState';
 import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
@@ -34,6 +34,7 @@ export interface ChatState {
   agentAlivePollId: number;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
+  rollbackTurn: (id: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
@@ -146,6 +147,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (currentProject && selectedModel) {
       updateProjectModel(currentProject.id, selectedModel).catch(() => {});
     }
+
+    armTurn(
+      () => get().sendFixError(errorMessage, errorFile, errorLine, errorStack),
+      () => get().rollbackTurn(userMessage.id),
+    );
   },
 
   sendMessage(content: string) {
@@ -190,6 +196,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     set({ selectedDataSources: [] });
+    armTurn(() => get().sendMessage(content), () => get().rollbackTurn(userMessage.id));
+  },
+
+  rollbackTurn(id: string) {
+    stopAgentAlivePolling();
+    set((state) => ({
+      messages: state.messages.filter((m) => m.id !== id),
+      isStreaming: false,
+      agentAlive: false,
+      ...RESET_STATE,
+    }));
   },
 
   respondToPlan(action: 'accept' | 'modify', feedback?: string) {

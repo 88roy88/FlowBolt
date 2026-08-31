@@ -8,7 +8,6 @@ import { FlexibleLayout } from './FlexibleLayout';
 import { MobileLayout } from './MobileLayout';
 import { BottomDrawer } from './BottomDrawer';
 import { PreviewVersionBanner } from '../preview/PreviewVersionBanner';
-import { UnsavedEditsDialog } from '../version/UnsavedEditsDialog';
 import { PublishModal } from '../publish/PublishModal';
 import { AdminPanel } from '../admin/AdminPanel';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
@@ -17,6 +16,7 @@ import { Settings, Shield } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
+import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 const SIDEBAR_WIDTH = 280;
@@ -78,6 +78,7 @@ export function AppShell() {
   };
 
   // Shared state
+  const { code } = useWorkspaceLock();
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
@@ -179,14 +180,7 @@ export function AppShell() {
   );
 
 
-  if (isMobile) {
-    return (
-      <>
-        <MobileLayout />
-        <UnsavedEditsDialog />
-      </>
-    );
-  }
+  if (isMobile) return <MobileLayout />;
 
   return (
     <div className="flex flex-row h-full w-full overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}>
@@ -244,6 +238,7 @@ export function AppShell() {
                   <button
                     key={hint}
                     onClick={() => useChatStore.getState().sendMessage(hint)}
+                    disabled={code !== null}
                     className="px-3 py-1.5 text-xs bg-primary/5 text-primary/60 border border-primary/20 rounded-full hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
                   >
                     {hint}
@@ -271,7 +266,6 @@ export function AppShell() {
       {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
 
       <PublishModal />
-      <UnsavedEditsDialog />
     </div>
   );
 }

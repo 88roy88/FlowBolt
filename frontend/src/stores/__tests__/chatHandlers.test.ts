@@ -79,6 +79,7 @@ const INITIAL_STATE: ChatState = {
   historyLoaded: true,
   sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
   sendFixError: vi.fn() as unknown as ChatState['sendFixError'],
+  rollbackTurn: vi.fn() as unknown as ChatState['rollbackTurn'],
   respondToPlan: vi.fn() as unknown as ChatState['respondToPlan'],
   addMessage: vi.fn() as unknown as ChatState['addMessage'],
   loadHistory: vi.fn() as unknown as ChatState['loadHistory'],

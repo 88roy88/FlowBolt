@@ -8,9 +8,8 @@ import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useChatStore } from '../../stores/chat';
 import { useVersionStore } from '../../stores/version';
-import { isAgentAlive } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
-import { WRITE_ROLES } from '../../types';
+import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
@@ -43,23 +42,13 @@ export function EditorPanel() {
     revealVersion,
     clearPendingReveal,
     openFile,
-    hasUnsavedEdits,
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
-  const aiFlowActive = useChatStore(isAgentAlive);
-  const previewing = useVersionStore((s) => s.previewingVersion != null);
   const saveVersion = useVersionStore((s) => s.saveVersion);
-  const currentProject = useSessionStore((s) => s.currentProject);
-  const noWritePermission = currentProject?.role ? !WRITE_ROLES.has(currentProject.role) : false;
-  const readOnlyUntilInitialBuildComplete = !buildCompleted;
-  const editorReadOnly = noWritePermission || readOnlyUntilInitialBuildComplete || aiFlowActive || previewing;
-  const readOnlyMessage = (() => {
-    if (noWritePermission) return t('editor.readOnlyNoPermission', 'View-only access');
-    if (readOnlyUntilInitialBuildComplete) return t('editor.readOnlyUntilFirstAiResponse');
-    if (previewing) return t('version.previewReadOnly', 'Return to latest to edit');
-    return t('editor.readOnlyWhileAiWorking');
-  })();
+  const { code } = useWorkspaceLock();
+  const editorReadOnly = code !== null || !buildCompleted;
+  const readOnlyMessage = code ? t(LOCK_MESSAGES[code]) : t('editor.readOnlyUntilFirstAiResponse');
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
@@ -223,17 +212,13 @@ export function EditorPanel() {
           <div className="flex-1 min-w-0">
             <FileTabs />
           </div>
-          {hasUnsavedEdits && !editorReadOnly && (
-            <div className="flex items-center gap-1.5 px-3 shrink-0">
-              <span className="text-[11px] text-warning">● {t('version.unsavedEdits', 'Unsaved edits')}</span>
-              <button
-                onClick={saveVersion}
-                title={t('version.saveAsVersionTooltip', 'Save your edits as a version you can return to')}
-                className="h-5 px-2 text-[11px] rounded-md border border-warning/40 text-warning hover:bg-warning/10 transition-colors"
-              >
-                {t('version.saveAsVersion', 'Save as version')}
-              </button>
-            </div>
+          {!editorReadOnly && (
+            <button
+              onClick={saveVersion}
+              className="mx-3 h-5 px-2 text-[11px] shrink-0 rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
+            >
+              {t('version.saveAsVersion', 'Save as version')}
+            </button>
           )}
           {saveStatus !== 'idle' && (
             <div className="flex items-center gap-1 px-3 text-[11px] text-muted-foreground shrink-0">
