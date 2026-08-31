@@ -247,6 +247,24 @@ class TestAgentEventCRUD:
         events = await get_events(project.id)
         assert events == []
 
+    async def test_emit_event_created_at_comes_from_the_app_clock(self, test_db, monkeypatch):
+        # A db server_default would stamp ~now instead of the frozen value, and would disagree
+        # with payload._ts — which the history endpoint replays in place of created_at.
+        frozen = datetime(2020, 1, 1, 12, 0, tzinfo=UTC)
+
+        class FrozenDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return frozen
+
+        monkeypatch.setattr("flow44.db.events.datetime", FrozenDatetime)
+        project = await create_project("App", user_id="test-user")
+        await emit_event(project.id, {"type": "phase", "phase": "designing"}, notify=False)
+
+        events = await get_events(project.id)
+        assert events[0].created_at == frozen
+        assert events[0].payload["_ts"] == frozen.isoformat()
+
     async def test_events_isolated_by_project(self, test_db):
         p1 = await create_project("App 1", user_id="test-user")
         p2 = await create_project("App 2", user_id="test-user")

@@ -3,8 +3,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, func
-from sqlmodel import Field, SQLModel, select
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, delete, func
+from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
 
@@ -66,11 +66,15 @@ class AgentEvent(SQLModel, table=True):
 
 
 async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
-    event_type = event.get("type", "unknown")
     event.setdefault("_ts", datetime.now(UTC).isoformat())
 
     async with database.async_session() as session:
-        row = AgentEvent(project_id=project_id, event_type=event_type, payload=event)
+        row = AgentEvent(
+            project_id=project_id,
+            event_type=event.get("type", "unknown"),
+            payload=event,
+            created_at=datetime.now(UTC),
+        )
         session.add(row)
         await session.commit()
 
@@ -90,7 +94,5 @@ async def get_events(project_id: str, after_id: int = 0) -> list[AgentEvent]:
 
 async def clear_events(project_id: str) -> None:
     async with database.async_session() as session:
-        result = await session.execute(select(AgentEvent).where(AgentEvent.project_id == project_id))
-        for row in result.scalars().all():
-            await session.delete(row)
+        await session.execute(delete(AgentEvent).where(col(AgentEvent.project_id) == project_id))
         await session.commit()
