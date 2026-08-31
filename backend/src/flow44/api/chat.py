@@ -5,9 +5,10 @@ import contextlib
 import json
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -26,6 +27,7 @@ from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.versioning import service as versioning
+from flow44.services.versioning.git import GitError
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,7 @@ async def _is_new_project(project_id: str) -> bool:
 _RUNNING: set[asyncio.Task[None]] = set()
 
 _AGENT_BUSY = {"type": "error", "message": "An agent is already running for this project"}
+_VERSION_FAILED = {"type": "version_error", "message": "Version operation failed", "code": "failed"}
 
 
 class AgentAlreadyRunning(Exception):
@@ -115,20 +118,10 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
 
 async def _claim_run(project_id: str) -> datetime:
     """Take the run lock up front, so a refused turn never reaches its side effects."""
-    claimed_at = await versioning.claim_run_unless_previewing(project_id)
+    claimed_at = await versioning.begin_turn(project_id)
     if claimed_at is None:
         raise AgentAlreadyRunning
     return claimed_at
-
-
-@contextlib.asynccontextmanager
-async def _claimed_run(project_id: str) -> AsyncIterator[datetime]:
-    claimed_at = await _claim_run(project_id)
-    try:
-        yield claimed_at
-    except Exception:
-        await clear_heartbeat(project_id, only_beat=claimed_at)
-        raise
 
 
 def _start_agent(project_id: str, coro: Any, claimed_at: datetime) -> None:
@@ -137,33 +130,24 @@ def _start_agent(project_id: str, coro: Any, claimed_at: datetime) -> None:
     task.add_done_callback(_RUNNING.discard)
 
 
-async def _version_error(websocket: WebSocket, message: str, code: str) -> None:
-    await websocket.send_json({"type": "version_error", "message": message, "code": code})
-
-
-async def _handle_version_message(websocket: WebSocket, project_id: str, msg_type: str, data: dict[str, Any]) -> None:
+async def _start_turn(
+    project_id: str,
+    make_coro: Callable[[], Any],
+    prepare: Callable[[], Awaitable[Any]] | None = None,
+) -> None:
+    claimed_at = await _claim_run(project_id)
     try:
-        await versioning.handle_version_op(project_id, msg_type, data.get("commit_sha", ""), data.get("on_dirty"))
-    except versioning.RunActiveError:
-        await _version_error(websocket, "Can't change versions while the AI is working", "run_active")
-    except versioning.DirtyWorkspaceError:
-        await _version_error(websocket, "You have unsaved edits", "dirty_workspace")
+        if prepare is not None:
+            await prepare()
+        _start_agent(project_id, make_coro(), claimed_at)
     except Exception:
-        logger.exception("[versioning] %s failed for %s", msg_type, project_id)
-        await _version_error(websocket, "Version operation failed", "failed")
-        await versioning.broadcast_current_version(project_id)
+        await clear_heartbeat(project_id, only_beat=claimed_at)
+        raise
 
 
-async def _handle_save_version(websocket: WebSocket, project_id: str) -> None:
-    try:
-        await versioning.save_edits_as_version(project_id)
-    except versioning.RunActiveError:
-        await _version_error(websocket, "Can't save while the AI is working", "run_active")
-    except versioning.PreviewActiveError:
-        await _version_error(websocket, "Return to latest to save your edits", "previewing")
-    except Exception:
-        logger.exception("[versioning] save_version failed for %s", project_id)
-        await _version_error(websocket, "Version operation failed", "failed")
+async def _save_user_turn(project_id: str, content: str, event: dict[str, Any]) -> None:
+    await save_message(project_id, ChatRole.user, content)
+    await emit_event(project_id, event, notify=False)
 
 
 @http_router.get("/{project_id}/history")
@@ -234,45 +218,21 @@ async def chat_ws(  # noqa: C901, PLR0915
                             {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                         ]
 
+                    agent_cls = PlanAgent if await _is_new_project(project.id) else FollowUpAgent
+                    agent = agent_cls(
+                        project_id=project.id,
+                        sandbox=sandbox,
+                        model=selected_model,
+                        user_id=user_id,
+                        data_source_authorization=data_source_authorization,
+                    )
+                    source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
                     # Claim first: a refused turn must not leave the message behind.
-                    async with _claimed_run(project.id) as claimed_at:
-                        await save_message(project.id, ChatRole.user, user_content)
-                        await emit_event(project.id, user_event, notify=False)
-
-                        is_new = await _is_new_project(project.id)
-
-                        if is_new:
-                            plan_agent = PlanAgent(
-                                project_id=project.id,
-                                sandbox=sandbox,
-                                model=selected_model,
-                                data_source_authorization=data_source_authorization,
-                                user_id=user_id,
-                            )
-                            _start_agent(
-                                project.id,
-                                plan_agent.run(
-                                    user_content,
-                                    data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                                ),
-                                claimed_at,
-                            )
-                        else:
-                            followup_agent = FollowUpAgent(
-                                project_id=project.id,
-                                sandbox=sandbox,
-                                model=selected_model,
-                                user_id=user_id,
-                                data_source_authorization=data_source_authorization,
-                            )
-                            _start_agent(
-                                project.id,
-                                followup_agent.run(
-                                    user_content,
-                                    data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                                ),
-                                claimed_at,
-                            )
+                    await _start_turn(
+                        project.id,
+                        partial(agent.run, user_content, data_source_ids=source_ids),
+                        prepare=partial(_save_user_turn, project.id, user_content, user_event),
+                    )
 
                 elif msg_type == "plan_response":
                     action = data.get("action")
@@ -287,27 +247,28 @@ async def chat_ws(  # noqa: C901, PLR0915
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
+                        execute_agent = ExecuteAgent(
+                            project_id=project.id,
+                            sandbox=sandbox,
+                            state=state,
+                            model=selected_model or state.model,
+                            user_id=user_id,
+                        )
                         # before the delete: a refusal must not lose the plan
-                        async with _claimed_run(project.id) as claimed_at:
-                            await delete_pending_plan(project.id)
-                            execute_agent = ExecuteAgent(
-                                project_id=project.id,
-                                sandbox=sandbox,
-                                state=state,
-                                model=selected_model or state.model,
-                                user_id=user_id,
-                            )
-                            _start_agent(project.id, execute_agent.run(), claimed_at)
+                        await _start_turn(
+                            project.id,
+                            execute_agent.run,
+                            prepare=partial(delete_pending_plan, project.id),
+                        )
 
                     elif action == "modify" and feedback:
-                        async with _claimed_run(project.id) as claimed_at:
-                            plan_agent = PlanAgent(
-                                project_id=project.id,
-                                sandbox=sandbox,
-                                model=selected_model or state.model,
-                                user_id=user_id,
-                            )
-                            _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback), claimed_at)
+                        plan_agent = PlanAgent(
+                            project_id=project.id,
+                            sandbox=sandbox,
+                            model=selected_model or state.model,
+                            user_id=user_id,
+                        )
+                        await _start_turn(project.id, partial(plan_agent.rebuild_with_feedback, state, feedback))
 
                 elif msg_type == "fix_error":
                     error_message = data.get("error_message", "")
@@ -319,50 +280,55 @@ async def chat_ws(  # noqa: C901, PLR0915
                     error_desc = f"Fix error: {error_message}"
                     if error_file:
                         error_desc += f" in {error_file}"
-                    async with _claimed_run(project.id) as claimed_at:
-                        await save_message(project.id, ChatRole.user, error_desc)
+                    fix_event: dict[str, Any] = {
+                        "type": "user_message",
+                        "content": "",
+                        "error_fix_request": {
+                            "errorMessage": error_message,
+                            "errorFile": error_file,
+                            "errorLine": error_line,
+                            "errorStack": error_stack,
+                        },
+                    }
+                    fix_agent = FixErrorAgent(
+                        project_id=project.id,
+                        sandbox=sandbox,
+                        model=selected_model,
+                        user_id=user_id,
+                    )
+                    await _start_turn(
+                        project.id,
+                        partial(
+                            fix_agent.run,
+                            error_message=error_message,
+                            error_file=error_file,
+                            error_line=error_line,
+                            error_stack=error_stack,
+                        ),
+                        prepare=partial(_save_user_turn, project.id, error_desc, fix_event),
+                    )
 
-                        await emit_event(
-                            project.id,
-                            {
-                                "type": "user_message",
-                                "content": "",
-                                "error_fix_request": {
-                                    "errorMessage": error_message,
-                                    "errorFile": error_file,
-                                    "errorLine": error_line,
-                                    "errorStack": error_stack,
-                                },
-                            },
-                            notify=False,
-                        )
+                elif msg_type == "preview_version":
+                    await versioning.preview_version(project.id, data.get("commit_sha", ""))
 
-                        fix_agent = FixErrorAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            model=selected_model,
-                            user_id=user_id,
-                        )
-                        _start_agent(
-                            project.id,
-                            fix_agent.run(
-                                error_message=error_message,
-                                error_file=error_file,
-                                error_line=error_line,
-                                error_stack=error_stack,
-                            ),
-                            claimed_at,
-                        )
+                elif msg_type == "restore_version":
+                    await versioning.restore_version(project.id, data.get("commit_sha", ""))
 
-                elif msg_type in ("preview_version", "restore_version", "exit_preview"):
-                    await _handle_version_message(websocket, project.id, msg_type, data)
+                elif msg_type == "exit_preview":
+                    await versioning.exit_preview(project.id)
 
                 elif msg_type == "save_version":
-                    await _handle_save_version(websocket, project.id)
+                    await versioning.save_version(project.id)
+
+                elif msg_type == "discard_edits":
+                    await versioning.discard_edits(project.id)
             except AgentAlreadyRunning:
                 await websocket.send_json(_AGENT_BUSY)
-            except versioning.PreviewActiveError:
-                await _version_error(websocket, "Restore this version before editing", "previewing")
+            except versioning.WorkspaceLocked as exc:
+                await websocket.send_json(exc.payload)
+            except (GitError, versioning.UnknownVersionError):
+                logger.exception("[versioning] %s failed for %s", msg_type, project.id)
+                await websocket.send_json(_VERSION_FAILED)
 
     forward_task = asyncio.create_task(_forward_events())
 

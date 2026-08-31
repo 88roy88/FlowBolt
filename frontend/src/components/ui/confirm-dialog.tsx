@@ -7,7 +7,7 @@ interface ConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  body: string;
+  body: ReactNode;
   confirmLabel: string;
   onConfirm: () => void;
   confirmClassName?: string;
@@ -34,7 +34,7 @@ export function ConfirmDialog({
       <DialogContent>
         <DialogClose onClose={() => onOpenChange(false)} />
         <DialogTitle>{title}</DialogTitle>
-        <p className="text-sm text-muted-foreground mt-2 mb-4">{body}</p>
+        <div className="text-sm text-muted-foreground mt-2 mb-4">{body}</div>
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}

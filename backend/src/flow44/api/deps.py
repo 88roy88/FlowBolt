@@ -22,6 +22,7 @@ from flow44.logging import _project_id as _log_project_id
 from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,14 @@ def require_permission(permission: Permission) -> Any:
         return user_permissions
 
     return Depends(_check)
+
+
+async def require_writable_workspace(project: ProjectDep) -> None:
+    """Gate: the working tree must not be owned by a run or a preview."""
+    try:
+        await versioning.require_writable(project.id)
+    except versioning.WorkspaceLocked as exc:
+        raise HTTPException(status_code=409, detail=exc.payload) from None
 
 
 async def require_platform_user(user_id: UserDep) -> str:

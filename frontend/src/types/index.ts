@@ -10,7 +10,6 @@ export interface Message {
 }
 
 export type VersionAuthor = 'ai' | 'user';
-export type OnDirty = 'save' | 'discard';
 export type VersionErrorCode = 'run_active' | 'dirty_workspace' | 'previewing' | 'failed';
 
 export interface ProjectSummary {
@@ -196,9 +195,10 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'version_committed'; commit_sha: string; author?: VersionAuthor; files?: string[] }
   | { type: 'version_preview_active'; commit_sha: string; is_latest: boolean }
   | { type: 'version_restored'; commit_sha: string }
-  | { type: 'version_error'; message: string; code: VersionErrorCode }
-  | { type: 'preview_version'; commit_sha: string; on_dirty?: OnDirty }
+  | { type: 'version_error'; message: string; code: VersionErrorCode; files?: string[] }
+  | { type: 'preview_version'; commit_sha: string }
   | { type: 'exit_preview' }
-  | { type: 'restore_version'; commit_sha: string; on_dirty?: OnDirty }
+  | { type: 'restore_version'; commit_sha: string }
   | { type: 'save_version' }
+  | { type: 'discard_edits' }
 );

@@ -13,12 +13,19 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from flow44.main import app
-from flow44.services.versioning.service import PreviewActiveError
+from flow44.services.versioning.service import WorkspaceLocked
 
 client = TestClient(app, raise_server_exceptions=False)
 
 PROJECT_ID = "proj-refusals"
 CLAIMED_AT = datetime(2026, 1, 1, tzinfo=UTC)
+
+PREVIEWING = {
+    "type": "version_error",
+    "code": "previewing",
+    "message": "Restore this version before editing",
+    "files": [],
+}
 
 
 @contextmanager
@@ -37,7 +44,8 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
         patch("flow44.api.deps.get_user_id", return_value="user-a"),
         patch("flow44.api.chat.sandbox_manager") as mgr,
         patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
-        patch("flow44.api.chat.versioning.claim_run_unless_previewing", claim),
+        patch("flow44.api.chat.versioning.begin_turn", claim),
+        patch("flow44.api.chat._is_new_project", new_callable=AsyncMock, return_value=True),
         patch("flow44.api.chat.save_message", writes["save_message"]),
         patch("flow44.api.chat.emit_event", writes["emit_event"]),
         patch("flow44.api.chat.delete_pending_plan", writes["delete_pending_plan"]),
@@ -59,12 +67,28 @@ def _send(payload: dict[str, Any], claim: AsyncMock) -> tuple[dict[str, Any], di
         return reply, writes
 
 
+def _locked(code: str, files: list[str] | None = None) -> AsyncMock:
+    return AsyncMock(side_effect=WorkspaceLocked(code, files))
+
+
 def test_message_refused_while_previewing_saves_nothing() -> None:
-    reply, writes = _send({"type": "message", "content": "change the header"}, AsyncMock(side_effect=PreviewActiveError))
+    reply, writes = _send({"type": "message", "content": "change the header"}, _locked("previewing"))
 
     writes["save_message"].assert_not_awaited()
     writes["emit_event"].assert_not_awaited()
-    assert reply == {"type": "version_error", "message": "Restore this version before editing", "code": "previewing"}
+    assert reply == PREVIEWING
+
+
+def test_message_refused_over_unsaved_edits_reports_the_files() -> None:
+    reply, writes = _send({"type": "message", "content": "change the header"}, _locked("dirty_workspace", ["src/App.tsx"]))
+
+    writes["save_message"].assert_not_awaited()
+    assert reply == {
+        "type": "version_error",
+        "code": "dirty_workspace",
+        "message": "You have unsaved edits",
+        "files": ["src/App.tsx"],
+    }
 
 
 def test_message_refused_as_busy_saves_nothing() -> None:
@@ -77,12 +101,10 @@ def test_message_refused_as_busy_saves_nothing() -> None:
 
 
 def test_fix_error_refused_while_previewing_saves_nothing() -> None:
-    reply, writes = _send(
-        {"type": "fix_error", "error_message": "boom"}, AsyncMock(side_effect=PreviewActiveError)
-    )
+    reply, writes = _send({"type": "fix_error", "error_message": "boom"}, _locked("previewing"))
 
     writes["save_message"].assert_not_awaited()
-    assert reply == {"type": "version_error", "message": "Restore this version before editing", "code": "previewing"}
+    assert reply == PREVIEWING
 
 
 def test_refused_plan_accept_keeps_the_pending_plan() -> None:
@@ -93,12 +115,10 @@ def test_refused_plan_accept_keeps_the_pending_plan() -> None:
         patch("flow44.api.chat.BuildState") as build_state,
     ):
         build_state.model_validate_json.return_value = state
-        reply, writes = _send(
-            {"type": "plan_response", "action": "accept"}, AsyncMock(side_effect=PreviewActiveError)
-        )
+        reply, writes = _send({"type": "plan_response", "action": "accept"}, _locked("previewing"))
 
     writes["delete_pending_plan"].assert_not_awaited()
-    assert reply == {"type": "version_error", "message": "Restore this version before editing", "code": "previewing"}
+    assert reply == PREVIEWING
 
 
 def test_run_claim_released_when_a_side_effect_raises() -> None:
@@ -115,3 +135,15 @@ def test_run_claim_released_when_a_side_effect_raises() -> None:
 
     assert reply == {"type": "error", "message": "Internal server error"}
     clear_heartbeat.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
+
+
+def test_version_op_refusal_reaches_the_client() -> None:
+    with patch("flow44.api.chat.versioning.preview_version", _locked("run_active")):
+        reply, _ = _send({"type": "preview_version", "commit_sha": "abc"}, AsyncMock(return_value=CLAIMED_AT))
+
+    assert reply == {
+        "type": "version_error",
+        "code": "run_active",
+        "message": "Can't edit while the AI is working",
+        "files": [],
+    }

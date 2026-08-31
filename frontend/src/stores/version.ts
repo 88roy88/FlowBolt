@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, OnDirty, WSMessage } from '../types';
+import type { Message, WSMessage } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useChatStore } from './chat';
@@ -7,17 +7,20 @@ import { useFilesStore } from './files';
 import { useErrorStore } from './errors';
 import { isReplaying } from './chatHandlers';
 
-type PendingDirtyOp = { op: 'preview' | 'restore'; commit_sha: string };
+type VersionOp = { op: 'preview'; commit_sha: string } | { op: 'restore'; commit_sha: string };
+export type PendingDirtyOp = (VersionOp | { op: 'send'; run: () => void }) & { files?: string[] };
+type DirtyResolution = 'save' | 'discard';
 
 interface VersionState {
   versions: string[];
   previewingVersion: string | null;
   pendingDirtyOp: PendingDirtyOp | null;
-  previewVersion: (commit_sha: string, on_dirty?: OnDirty) => void;
+  previewVersion: (commit_sha: string) => void;
   exitPreview: () => void;
-  restoreVersion: (commit_sha: string, on_dirty?: OnDirty) => Promise<boolean>;
+  restoreVersion: (commit_sha: string) => Promise<boolean>;
   saveVersion: () => void;
-  resolveDirtyOp: (on_dirty: OnDirty) => void;
+  requestDirtyResolve: (op: PendingDirtyOp) => void;
+  resolveDirtyOp: (resolution: DirtyResolution) => void;
   dismissDirtyOp: () => void;
   reset: () => void;
 }
@@ -29,7 +32,7 @@ export function formatVersionLabel(versions: string[], commit_sha: string): stri
 
 let pendingRestore: ((ok: boolean) => void) | null = null;
 
-let lastAttempt: PendingDirtyOp | null = null;
+let lastAttempt: VersionOp | null = null;
 
 function settlePendingRestore(ok: boolean) {
   pendingRestore?.(ok);
@@ -43,6 +46,11 @@ function sendVersionAction(message: WSMessage): boolean {
   return true;
 }
 
+function sendRestore(commit_sha: string): boolean {
+  lastAttempt = { op: 'restore', commit_sha };
+  return sendVersionAction({ type: 'restore_version', commit_sha });
+}
+
 function refreshEditorFiles() {
   void useFilesStore.getState().loadFileTree();
   void useFilesStore.getState().refreshOpenFiles();
@@ -53,9 +61,9 @@ export const useVersionStore = create<VersionState>((set, get) => ({
   previewingVersion: null,
   pendingDirtyOp: null,
 
-  previewVersion(commit_sha: string, on_dirty?: OnDirty) {
+  previewVersion(commit_sha: string) {
     lastAttempt = { op: 'preview', commit_sha };
-    if (!sendVersionAction({ type: 'preview_version', commit_sha, on_dirty })) return;
+    if (!sendVersionAction({ type: 'preview_version', commit_sha })) return;
     useErrorStore.getState().suppressPreviewErrors(true);
   },
 
@@ -63,10 +71,9 @@ export const useVersionStore = create<VersionState>((set, get) => ({
     sendVersionAction({ type: 'exit_preview' });
   },
 
-  restoreVersion(commit_sha: string, on_dirty?: OnDirty) {
+  restoreVersion(commit_sha: string) {
     settlePendingRestore(false);
-    lastAttempt = { op: 'restore', commit_sha };
-    if (!sendVersionAction({ type: 'restore_version', commit_sha, on_dirty })) return Promise.resolve(false);
+    if (!sendRestore(commit_sha)) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
       pendingRestore = resolve;
     });
@@ -77,12 +84,21 @@ export const useVersionStore = create<VersionState>((set, get) => ({
     useFilesStore.setState({ hasUnsavedEdits: false }); // a clean tree commits nothing, so nothing would clear it
   },
 
-  resolveDirtyOp(on_dirty: OnDirty) {
+  requestDirtyResolve(op: PendingDirtyOp) {
+    lastAttempt = null;
+    set({ pendingDirtyOp: op });
+  },
+
+  resolveDirtyOp(resolution: DirtyResolution) {
     const pending = get().pendingDirtyOp;
     set({ pendingDirtyOp: null });
     if (!pending) return;
-    if (pending.op === 'preview') get().previewVersion(pending.commit_sha, on_dirty);
-    else void get().restoreVersion(pending.commit_sha, on_dirty);
+    // Same socket, so the server settles the tree before it reads the retried op.
+    if (!sendVersionAction({ type: resolution === 'save' ? 'save_version' : 'discard_edits' })) return;
+    useFilesStore.setState({ hasUnsavedEdits: false });
+    if (pending.op === 'send') pending.run();
+    else if (pending.op === 'preview') get().previewVersion(pending.commit_sha);
+    else sendRestore(pending.commit_sha);
   },
 
   dismissDirtyOp() {
@@ -150,15 +166,15 @@ function handleVersionRestored(msg: { commit_sha: string }) {
   settlePendingRestore(true);
 }
 
-function handleVersionError(msg: { message: string; code: string }) {
-  settlePendingRestore(false);
-  if (msg.code === 'dirty_workspace') {
-    useVersionStore.setState({ pendingDirtyOp: lastAttempt });
-    useFilesStore.setState({ hasUnsavedEdits: true }); // the tree may be dirty from the terminal, which we never see
+function handleVersionError(msg: { message: string; code: string; files?: string[] }) {
+  useFilesStore.setState({ hasUnsavedEdits: true });
+  if (msg.code === 'dirty_workspace' && lastAttempt) {
+    useVersionStore.setState({ pendingDirtyOp: { ...lastAttempt, files: msg.files } });
+    lastAttempt = null;
     useErrorStore.getState().suppressPreviewErrors(false);
     return;
   }
-  useFilesStore.setState({ hasUnsavedEdits: true });
+  settlePendingRestore(false);
   const previewing = useVersionStore.getState().previewingVersion !== null;
   useErrorStore.getState().suppressPreviewErrors(previewing);
   useErrorStore.getState().pushError({ source: 'connection', message: msg.message });

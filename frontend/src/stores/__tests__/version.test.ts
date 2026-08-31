@@ -35,8 +35,9 @@ vi.mock('../session', () => ({
   },
 }));
 
+const socketSend = vi.fn();
 vi.mock('../../services/websocket', () => ({
-  getChatSocket: () => ({ send: vi.fn() }),
+  getChatSocket: () => ({ send: socketSend }),
 }));
 
 function msg(data: Record<string, unknown>): WSMessage {
@@ -122,6 +123,7 @@ describe('version_error handling', () => {
     useChatStore.setState({ messages: [{ id: 'a1', role: 'assistant', content: 'done', timestamp: 1 }] });
     useErrorStore.setState({ errors: [], previewErrorsSuppressed: false });
     vi.mocked(useFilesStore.setState).mockClear();
+    socketSend.mockReset();
   });
 
   it('restores hasUnsavedEdits when a save is refused', () => {
@@ -130,11 +132,42 @@ describe('version_error handling', () => {
     expect(useFilesStore.setState).toHaveBeenCalledWith({ hasUnsavedEdits: true });
   });
 
-  it('opens the unsaved-edits dialog for the op that was refused', () => {
+  it('opens the unsaved-edits dialog for the op that was refused, listing the files', () => {
+    useVersionStore.getState().previewVersion('sha1');
+    handleVersionMessage(
+      msg({ type: 'version_error', message: 'You have unsaved edits', code: 'dirty_workspace', files: ['src/App.tsx'] }),
+    );
+
+    expect(useVersionStore.getState().pendingDirtyOp).toEqual({
+      op: 'preview',
+      commit_sha: 'sha1',
+      files: ['src/App.tsx'],
+    });
+  });
+
+  it('resolves a refused send by settling the tree first, then running it', () => {
+    const sent: unknown[] = [];
+    socketSend.mockImplementation((m: unknown) => sent.push(m));
+    const run = vi.fn();
+    useVersionStore.getState().requestDirtyResolve({ op: 'send', run });
+
+    useVersionStore.getState().resolveDirtyOp('discard');
+
+    expect(sent).toEqual([{ type: 'discard_edits' }]);
+    expect(run).toHaveBeenCalledOnce();
+    expect(useVersionStore.getState().pendingDirtyOp).toBeNull();
+  });
+
+  it('re-issues a refused preview after saving', () => {
+    const sent: unknown[] = [];
+    socketSend.mockImplementation((m: unknown) => sent.push(m));
     useVersionStore.getState().previewVersion('sha1');
     handleVersionMessage(msg({ type: 'version_error', message: 'You have unsaved edits', code: 'dirty_workspace' }));
+    sent.length = 0;
 
-    expect(useVersionStore.getState().pendingDirtyOp).toEqual({ op: 'preview', commit_sha: 'sha1' });
+    useVersionStore.getState().resolveDirtyOp('save');
+
+    expect(sent).toEqual([{ type: 'save_version' }, { type: 'preview_version', commit_sha: 'sha1' }]);
   });
 
   it('leaves chat state untouched, so a version failure is not reported as a failed build', () => {

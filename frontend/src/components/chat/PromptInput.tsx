@@ -4,6 +4,7 @@ import { useChatStore } from '../../stores/chat';
 import { useVersionStore, formatVersionLabel } from '../../stores/version';
 import { isAgentAlive, isAwaitingPlanApproval } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
+import { useFilesStore } from '../../stores/files';
 import { ArrowUp, CirclePlus, Loader2, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
@@ -28,6 +29,8 @@ export function PromptInput() {
   const previewingVersion = useVersionStore((s) => s.previewingVersion);
   const versions = useVersionStore((s) => s.versions);
   const restoreVersion = useVersionStore((s) => s.restoreVersion);
+  const requestDirtyResolve = useVersionStore((s) => s.requestDirtyResolve);
+  const hasUnsavedEdits = useFilesStore((s) => s.hasUnsavedEdits);
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const projectRole = currentProject?.role;
@@ -53,6 +56,10 @@ export function PromptInput() {
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || inputBlocked || !projectId) return;
+    if (hasUnsavedEdits) {
+      requestDirtyResolve({ op: 'send', run: () => submitMessage(trimmed) });
+      return;
+    }
     if (previewingVersion != null) {
       setConfirmSendOpen(true);
       return;

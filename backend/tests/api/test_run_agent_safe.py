@@ -98,14 +98,14 @@ async def test_supervisor_beats_while_running(monkeypatch: pytest.MonkeyPatch) -
 
 
 async def test_claim_run_rejects_when_run_active(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat.versioning, "claim_run_unless_previewing", AsyncMock(return_value=None))
+    monkeypatch.setattr(chat.versioning, "begin_turn", AsyncMock(return_value=None))
 
     with pytest.raises(chat.AgentAlreadyRunning):
         await chat._claim_run(PROJECT_ID)
 
 
 async def test_claim_run_returns_the_claim_stamp(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat.versioning, "claim_run_unless_previewing", AsyncMock(return_value=CLAIMED_AT))
+    monkeypatch.setattr(chat.versioning, "begin_turn", AsyncMock(return_value=CLAIMED_AT))
 
     assert await chat._claim_run(PROJECT_ID) == CLAIMED_AT
 

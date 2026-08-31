@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+from pathlib import Path
 
 from flow44.sandbox.base import workspace_path
 
@@ -35,21 +36,20 @@ class Git:
             raise GitError(f"git {' '.join(args)} ({result.returncode}): {result.stderr.strip()}")
         return result.stdout.strip()
 
-    async def _succeeds(self, *args: str) -> bool:
-        try:
-            await self._run(*args)
-            return True
-        except GitError:
-            return False
-
     # -- Queries --
 
-    async def is_repo(self) -> bool:
-        return await self._succeeds("rev-parse", "--git-dir")
+    def _head(self) -> str | None:
+        try:
+            return Path(self.git_dir, "HEAD").read_text()
+        except OSError:
+            return None
 
-    async def is_detached(self) -> bool:
-        # `symbolic-ref -q HEAD` fails when detached — and on a non-repo too, hence the is_repo check.
-        return await self.is_repo() and not await self._succeeds("symbolic-ref", "-q", "HEAD")
+    def is_repo(self) -> bool:
+        return self._head() is not None
+
+    def is_detached(self) -> bool:
+        head = self._head()
+        return head is not None and not head.startswith("ref:")
 
     async def head_sha(self) -> str:
         return await self._run("rev-parse", "HEAD")
@@ -89,5 +89,6 @@ class Git:
         # One command: a separate checkout can fail and leave `main` ahead, silently un-restoring later.
         await self._run("checkout", "-f", "-B", "main", sha)
 
-    async def clean_untracked(self) -> None:
+    async def discard_all(self) -> None:
+        await self._run("reset", "--hard", "HEAD")
         await self._run("clean", "-fd")

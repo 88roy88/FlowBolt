@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { FileEntry } from '../types';
 import * as api from '../services/api';
 import { useSessionStore } from './session';
+import { useErrorStore } from './errors';
 import { queryClient } from '../lib/queryClient';
 
 interface FilesState {
@@ -32,6 +33,15 @@ interface FilesState {
 }
 
 let _fileTreeRequestSerial = 0;
+
+// The UI already blocks these, so a 409 is a real race the user has to see.
+function reportWorkspaceLock(err: unknown): never {
+  const detail = err instanceof api.ApiError ? (err.detail as { type?: string; message?: string }) : null;
+  if (detail?.type === 'version_error') {
+    useErrorStore.getState().pushError({ source: 'connection', message: detail.message ?? '' });
+  }
+  throw err;
+}
 
 function storageKey(projectId: string) { return `editor-tabs:${projectId}`; }
 
@@ -233,7 +243,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     if (!projectId) return;
     const content = get().openFiles.get(normalizedPath);
     if (content !== undefined) {
-      await api.saveFileContent(projectId, normalizedPath, content);
+      await api.saveFileContent(projectId, normalizedPath, content).catch(reportWorkspaceLock);
       get().markUnsavedEdits();
       set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
@@ -243,7 +253,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
     const normalizedPath = normalizePath(path);
-    await api.createFileEntry(projectId, normalizedPath, content);
+    await api.createFileEntry(projectId, normalizedPath, content).catch(reportWorkspaceLock);
     get().markUnsavedEdits();
     await get().loadFileTree();
     await get().openFile(normalizedPath);
@@ -258,7 +268,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
         ? file.webkitRelativePath
         : file.name;
       const uploadPath = joinPath(normalizedBasePath, relativePath);
-      await api.uploadFileEntry(projectId, uploadPath, file);
+      await api.uploadFileEntry(projectId, uploadPath, file).catch(reportWorkspaceLock);
     }
     get().markUnsavedEdits();
     await get().loadFileTree();
@@ -269,7 +279,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     if (!projectId) return;
     const normalizedOldPath = normalizePath(oldPath);
     const normalizedNewPath = normalizePath(newPath);
-    await api.renameFileEntry(projectId, normalizedOldPath, normalizedNewPath);
+    await api.renameFileEntry(projectId, normalizedOldPath, normalizedNewPath).catch(reportWorkspaceLock);
     get().markUnsavedEdits();
 
     set((state) => {
@@ -308,7 +318,7 @@ export const useFilesStore = create<FilesState>((set, get) => ({
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
     const normalizedPath = normalizePath(path);
-    await api.deleteFileEntry(projectId, normalizedPath);
+    await api.deleteFileEntry(projectId, normalizedPath).catch(reportWorkspaceLock);
     get().markUnsavedEdits();
 
     set((state) => {

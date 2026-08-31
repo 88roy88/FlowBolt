@@ -18,7 +18,7 @@ async def test_init_creates_repo_and_baseline(project_id: str, workspace: Path) 
     git = Git(project_id)
     sha = await git.init("Version 0 — blank scaffold")
     assert sha
-    assert await git.is_repo()
+    assert git.is_repo()
     assert await git.head_sha() == sha
 
 
@@ -73,9 +73,9 @@ async def test_detached_detection(project_id: str, workspace: Path) -> None:
     (workspace / "a.txt").write_text("2")
     await git.commit_all("2")
 
-    assert not await git.is_detached()
+    assert not git.is_detached()
     await git.checkout(v0)
-    assert await git.is_detached()
+    assert git.is_detached()
 
 
 async def test_commit_message_preserved(project_id: str, workspace: Path) -> None:
@@ -103,7 +103,7 @@ async def test_restore_main_moves_branch_from_detached_head(project_id: str, wor
 
     assert await git.head_sha() == v1
     assert await git._run("rev-parse", "main") == v1
-    assert not await git.is_detached()
+    assert not git.is_detached()
     assert (workspace / "a.txt").read_text() == "two"
 
 
@@ -119,7 +119,7 @@ async def test_restore_main_from_attached_head(project_id: str, workspace: Path)
 
     assert await git.head_sha() == v0
     assert await git._run("rev-parse", "main") == v0
-    assert not await git.is_detached()
+    assert not git.is_detached()
 
 
 async def test_run_raises_with_git_stderr(project_id: str, workspace: Path) -> None:
@@ -163,7 +163,7 @@ async def test_restore_main_recreates_branch_when_checkout_would_fail(project_id
     await git.restore_main(v0)
 
     assert await git._run("rev-parse", "main") == v0
-    assert not await git.is_detached()
+    assert not git.is_detached()
 
 
 async def test_is_dirty_and_changed_files_track_the_working_tree(project_id: str, workspace: Path) -> None:
@@ -197,8 +197,8 @@ async def test_no_op_can_reach_an_enclosing_repo(project_id: str, workspace: Pat
     outer_head = outer_repo(tmp_path)
     git = Git(project_id)
 
-    assert await git.is_repo() is False
-    assert await git.is_detached() is False
+    assert git.is_repo() is False
+    assert git.is_detached() is False
 
     ops = [
         git.head_sha,
@@ -225,10 +225,10 @@ async def test_a_half_built_git_dir_is_not_a_repo(project_id: str, workspace: Pa
     (workspace / ".git" / "objects").mkdir(parents=True)
     git = Git(project_id)
 
-    assert await git.is_repo() is False
+    assert git.is_repo() is False
 
     assert await git.init("v0")
-    assert await git.is_repo() is True
+    assert git.is_repo() is True
 
 
 def test_runs_on_a_selector_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -239,6 +239,6 @@ def test_runs_on_a_selector_event_loop(tmp_path: Path, monkeypatch: pytest.Monke
 
     loop = asyncio.SelectorEventLoop()
     try:
-        assert loop.run_until_complete(git.is_repo()) is False
+        assert loop.run_until_complete(git.init("v0")) is None
     finally:
         loop.close()

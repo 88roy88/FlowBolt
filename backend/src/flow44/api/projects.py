@@ -104,7 +104,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
 
         try:
             await sandbox_manager.create_sandbox(project.id)
-            await versioning.init_scaffold_version(project.id)
+            await versioning.ensure_repo(project.id)
         except Exception:
             logger.exception("[projects] Sandbox creation failed for project %s", project.id)
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
