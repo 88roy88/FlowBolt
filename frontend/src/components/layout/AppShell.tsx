@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { GlobalProgress } from './GlobalProgress';
@@ -8,14 +8,17 @@ import { FlexibleLayout } from './FlexibleLayout';
 import { MobileLayout } from './MobileLayout';
 import { BottomDrawer } from './BottomDrawer';
 import { PublishModal } from '../publish/PublishModal';
+import { AdminPanel } from '../admin/AdminPanel';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
 import { PromptInput } from '../chat/PromptInput';
+import { Settings, Shield } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 const SIDEBAR_WIDTH = 280;
+const RAIL_WIDTH = 56;
 type LayoutMode = 'classic' | 'flexible';
 
 function loadLayoutMode(): LayoutMode {
@@ -24,6 +27,14 @@ function loadLayoutMode(): LayoutMode {
     if (v === 'classic' || v === 'flexible') return v;
   } catch {}
   return 'classic';
+}
+
+function loadSidebarExpanded(): boolean {
+  try {
+    return localStorage.getItem('sidebar-expanded') === 'true';
+  } catch {
+    return false;
+  }
 }
 
 function getProjectHasMessages(projectId: string): boolean | null {
@@ -47,26 +58,17 @@ export function AppShell() {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
-  // All hooks must be called before any conditional returns
-  // Sidebar
-  const [sidebarPinned, setSidebarPinned] = useState(false);
-  const [sidebarHover, setSidebarHover] = useState(false);
-  const [sidebarClosing, setSidebarClosing] = useState(false);
-  const [sidebarBusy, setSidebarBusy] = useState(false);
-  const hoverLockRef = useRef(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(loadSidebarExpanded);
 
-  const closeSidebar = () => {
-    setSidebarPinned(false);
-    setSidebarHover(false);
-    setSidebarClosing(true);
-    hoverLockRef.current = true;
-    setTimeout(() => { setSidebarClosing(false); hoverLockRef.current = false; }, 250);
+  const toggleSidebar = (expanded: boolean) => {
+    setSidebarExpanded(expanded);
+    try { localStorage.setItem('sidebar-expanded', expanded ? 'true' : 'false'); } catch {}
   };
-
 
   // Layout + settings
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(loadLayoutMode);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   const switchLayout = (mode: LayoutMode) => {
     setLayoutMode(mode);
@@ -79,6 +81,7 @@ export function AppShell() {
   const historyLoaded = useChatStore((s) => s.historyLoaded);
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
+  const userStatus = useSessionStore((s) => s.userStatus);
 
   // Use cache to determine layout before history loads to prevent flicker
   // Read project ID from URL hash immediately (don't wait for currentProject to be set)
@@ -133,7 +136,7 @@ export function AppShell() {
 
   const IconRail = () => (
     <div className="flex flex-col items-center h-full py-2 gap-1">
-      <button onClick={() => setSidebarPinned(true)} title={t('sidebar.expandSidebar')} className="mb-1 shrink-0">
+      <button onClick={() => toggleSidebar(true)} title={t('sidebar.expandSidebar')} className="mb-1 shrink-0">
         <FlowLogo size={18} className="text-brand" />
       </button>
       <div className="w-8 h-px bg-border shrink-0" />
@@ -153,6 +156,23 @@ export function AppShell() {
           </button>
         ))}
       </div>
+      <div className="w-8 h-px bg-border shrink-0" />
+      {userStatus?.is_admin && (
+        <button
+          onClick={() => setShowAdminPanel(true)}
+          title={t('admin.title', 'Platform Users')}
+          className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors shrink-0"
+        >
+          <Shield size={16} className="text-warning/70" />
+        </button>
+      )}
+      <button
+        onClick={() => setShowSettings(true)}
+        title={t('common.settings')}
+        className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors shrink-0"
+      >
+        <Settings size={16} className="text-primary/70" />
+      </button>
     </div>
   );
 
@@ -161,35 +181,25 @@ export function AppShell() {
 
   return (
     <div className="flex flex-row h-full w-full overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}>
-      {/* Sidebar */}
-      {sidebarPinned ? (
+      <div
+        className="relative shrink-0 h-full bg-surface border-e border-border overflow-hidden transition-[width] duration-200 ease-out"
+        style={{ width: sidebarExpanded ? SIDEBAR_WIDTH : RAIL_WIDTH }}
+      >
         <div
-          className="shrink-0 bg-surface border-e border-border flex flex-col animate-[slideIn_0.25s_ease-out]"
+          inert={sidebarExpanded}
+          className={`absolute inset-y-0 start-0 transition-opacity duration-150 ${sidebarExpanded ? 'opacity-0' : 'opacity-100'}`}
+          style={{ width: RAIL_WIDTH }}
+        >
+          <IconRail />
+        </div>
+        <div
+          inert={!sidebarExpanded}
+          className={`absolute inset-y-0 start-0 transition-opacity duration-150 ${sidebarExpanded ? 'opacity-100' : 'opacity-0'}`}
           style={{ width: SIDEBAR_WIDTH }}
         >
-          <Sidebar onCloseSidebar={closeSidebar} isPinned={true} onPin={() => setSidebarPinned(true)} onOpenSettings={() => setShowSettings(true)} onBusyChange={setSidebarBusy} />
+          <Sidebar onCollapse={() => toggleSidebar(false)} onOpenSettings={() => setShowSettings(true)} onOpenAdmin={() => setShowAdminPanel(true)} />
         </div>
-      ) : (
-        <div
-          className="relative shrink-0"
-          onMouseEnter={() => { if (!hoverLockRef.current) setSidebarHover(true); }}
-          onMouseLeave={() => { if (!sidebarBusy) closeSidebar(); }}
-        >
-          <div className="w-14 h-full bg-surface border-e border-border flex flex-col">
-            <IconRail />
-          </div>
-          {(sidebarHover || sidebarClosing) && (
-            <div
-              className={`absolute top-0 start-0 z-30 h-full bg-surface border-e border-border shadow-[var(--shadow-lg)] ${
-                sidebarClosing ? 'animate-[slideOut_0.2s_ease-in_forwards]' : 'animate-[slideIn_0.25s_ease-out]'
-              }`}
-              style={{ width: SIDEBAR_WIDTH }}
-            >
-              <Sidebar onCloseSidebar={closeSidebar} isPinned={false} onPin={() => { setSidebarPinned(true); setSidebarHover(false); }} onOpenSettings={() => setShowSettings(true)} onBusyChange={setSidebarBusy} />
-            </div>
-          )}
-        </div>
-      )}
+      </div>
 
       {/* Main content */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -216,7 +226,7 @@ export function AppShell() {
                 Describe what you want to build and the AI will design, plan,
                 and code it for you.
               </p>
-              <div className="w-full rounded-2xl bg-surface/80 border border-primary/20 shadow-[0_2px_24px_color-mix(in_srgb,var(--primary)_8%,transparent)] [&>div]:border-t-0 [&>div]:rounded-2xl">
+              <div className="w-full">
                 <PromptInput />
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
@@ -247,6 +257,8 @@ export function AppShell() {
           onClose={() => setShowSettings(false)}
         />
       )}
+
+      {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
 
       <PublishModal />
     </div>

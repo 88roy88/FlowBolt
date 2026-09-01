@@ -149,6 +149,22 @@ class TestPromptRendering:
         assert "dataSourceAnalytics" in result
         assert "pre-generated" in result.lower()
 
+    def test_jsx_files_must_be_named_tsx(self) -> None:
+        rendered = [
+            render_architecture(),
+            render_merge(),
+            render_codegen(
+                task_title="Create Header",
+                task_description="Build the header component",
+                task_files=["src/Header.tsx"],
+                architecture={},
+                ux_design={},
+            ),
+        ]
+        for result in rendered:
+            assert "`.tsx`" in result
+            assert "JSX" in result
+
     def test_fix_prompts_include_file_safety_rules_once(self) -> None:
         execute_fix = render_feedback(files={"src/App.tsx": "broken"})
         direct_fix = render_fix_error_direct(error_message="broken", files={"src/App.tsx": "broken"})

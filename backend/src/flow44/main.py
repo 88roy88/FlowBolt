@@ -1,12 +1,13 @@
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-import litellm
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from flow44.ai.core.opik_utils import flush_opik_traces, setup_opik_tracing
 from flow44.api import (
     adapi,
     admin,
@@ -35,6 +36,11 @@ from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.heartbeat_reaper import heartbeat_reaper
 
+if os.name == "posix":
+    # Sandbox workspaces live on an NFS PVC written to by pods with varying uids; the default umask
+    # (022) strips write permission from files this process creates so other pods can't write to them.
+    os.umask(0)
+
 setup_logging(settings.LOG_FILE_PATH)
 
 logger = logging.getLogger(__name__)
@@ -42,13 +48,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
-        # Credentials already in os.environ via LangfuseSettings.model_post_init
-        litellm.success_callback = ["langfuse"]
-        litellm.failure_callback = ["langfuse"]
-        logger.info("Langfuse tracing enabled")
-    else:
-        logger.info("Langfuse tracing not enabled (missing keys)")
+    setup_opik_tracing()
 
     logger.info("Initialising database...")
     await init_db()
@@ -75,6 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await idle_reaper.stop()
     await heartbeat_reaper.stop()
     await sandbox_manager.suspend_all()
+    flush_opik_traces()
     logger.info("Shutdown complete.")
 
 

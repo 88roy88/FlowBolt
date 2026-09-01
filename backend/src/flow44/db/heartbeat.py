@@ -3,8 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, delete, func
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Field, SQLModel, col
 
 from flow44.config import settings
@@ -19,11 +18,6 @@ class AgentRunHeartbeat(SQLModel, table=True):
 
     project_id: str = Field(sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True))
     beat_at: datetime = Field(sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False))
-
-
-def _insert() -> Any:
-    """The dialect-native INSERT that supports ON CONFLICT (upsert)."""
-    return pg_insert if database.get_engine().dialect.name == "postgresql" else sqlite_insert
 
 
 def _stale_cutoff() -> datetime:
@@ -45,7 +39,7 @@ async def _commit(stmt: Any) -> Any:
 async def touch_heartbeat(project_id: str) -> datetime:
     now = datetime.now(UTC)
     await _commit(
-        _insert()(AgentRunHeartbeat)
+        insert(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
         .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now})
     )
@@ -55,7 +49,7 @@ async def touch_heartbeat(project_id: str) -> datetime:
 async def try_claim_run(project_id: str) -> datetime | None:
     now = datetime.now(UTC)
     stmt = (
-        _insert()(AgentRunHeartbeat)
+        insert(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
         .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now}, where=_stale())
         .returning(col(AgentRunHeartbeat.project_id))

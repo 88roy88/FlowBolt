@@ -28,9 +28,9 @@ async function gotoHomeReady(page: import('@playwright/test').Page) {
 /** Wait for projects to load, expand sidebar if collapsed. */
 async function ensureSidebar(page: import('@playwright/test').Page) {
   // Icon rail uses a button with initials; full sidebar uses a non-button row.
-  const rail = page.getByRole('button', { name: 'ET' });
+  const rail = page.getByRole('button', { name: 'ET', exact: true });
   const row = page.getByTestId(`project-item-${MOCK_PROJECT.id}`);
-  await expect(rail.or(row)).toBeVisible({ timeout: 30_000 });
+  await expect(rail.or(row).first()).toBeVisible({ timeout: 30_000 });
   // Expand if collapsed
   const expandBtn = page.getByRole('button', { name: 'Expand sidebar' });
   if (await expandBtn.isVisible()) {
@@ -66,7 +66,7 @@ test.describe('Happy path', () => {
     await ensureSidebar(page);
 
     // The chat textarea should be ready
-    const chatInput = page.getByPlaceholder(/describe what you want/i);
+    const chatInput = page.getByPlaceholder(/what do you want to build/i);
     await expect(chatInput).toBeVisible({ timeout: 5_000 });
 
     // Type a message
@@ -80,8 +80,8 @@ test.describe('Happy path', () => {
 
   test('model selector shows mock model', async ({ page }) => {
     await gotoHomeReady(page);
-    // The model selector should display our mock model
-    await expect(page.getByText('Test Model')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Model' }).click({ timeout: 30_000 });
+    await expect(page.getByText('Test Model')).toBeVisible();
   });
 
   test('suggestion buttons are visible', async ({ page }) => {

@@ -1,5 +1,3 @@
-"""ReActFlow: Flow subclass for Reason + Act agents with tool loops."""
-
 from __future__ import annotations
 
 import json
@@ -11,7 +9,7 @@ from pydantic import BaseModel
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat_with_tools
-from flow44.ai.core.tools import ToolExecutor
+from flow44.ai.core.tools import ToolExecutor, truncate_tool_args
 
 logger = logging.getLogger(__name__)
 
@@ -19,21 +17,6 @@ StateT = TypeVar("StateT", bound=BaseModel)
 
 
 class ReActFlow(Flow[StateT], Generic[StateT]):
-    """
-    Flow subclass for ReAct (Reason + Act) pattern with tool usage.
-
-    Implements the standard ReAct loop:
-    1. Call LLM with tools available
-    2. If no tool calls → return answer (flow ends)
-    3. If tool calls → execute tools, add results to messages, loop back to step 1
-
-    Automatically handles:
-    - Tool execution
-    - Message history management
-    - Max iteration limits
-    - Error handling
-    """
-
     def __init__(
         self,
         name: str = "react",
@@ -44,34 +27,23 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
 
     async def react_loop(
         self,
-        messages: list[Message],
+        messages: list[dict[str, Any] | Message],
         system_prompt: str,
         tools: ToolExecutor,
         model: str | None = None,
         metadata_fn: Any = None,
         emit_fn: Any = None,
     ) -> str:
-        """
-        Run the ReAct loop: LLM → tools → LLM → tools → ... until done.
-
-        Args:
-            messages: Conversation history
-            system_prompt: System prompt for the LLM
-            tools: ToolExecutor with available tools
-            model: Model to use
-            metadata_fn: Optional function to generate metadata for observability
-            emit_fn: Optional function to emit progress events
-
-        Returns:
-            Final assistant response (when no tool calls remain)
-        """
-        working_messages: list[dict[str, Any]] = [m.to_dict() for m in messages]
+        working_messages: list[dict[str, Any]] = [m.to_dict() if isinstance(m, Message) else m for m in messages]
         tool_schemas = tools.get_schemas()
         last_content = ""
 
         for iteration in range(self.max_iterations):
-            # Call LLM with tools
-            metadata = metadata_fn(f"react-{iteration}") if metadata_fn else None
+            metadata = (
+                metadata_fn(f"react-{iteration}", extra_metadata={"available_tools": tool_schemas})
+                if metadata_fn
+                else None
+            )
 
             try:
                 logger.info(
@@ -100,26 +72,33 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             choice = response.choices[0]
             message = choice.message
             last_content = message.content or ""
-            reasoning_content = getattr(message, "reasoning_content", None) or ""
 
-            # No tool calls → we're done
             if not message.tool_calls:
                 return last_content
 
-            interim_reasoning = reasoning_content.strip()
-            if emit_fn and interim_reasoning:
+            assistant_message = message.model_dump()
+            working_messages.append(assistant_message)
+
+            raw_assistant_message = dict(assistant_message)
+            raw_assistant_message["tool_calls"] = [
+                {
+                    **tc,
+                    "function": {
+                        **tc["function"],
+                        "arguments": json.dumps(truncate_tool_args(json.loads(tc["function"]["arguments"] or "{}"))),
+                    },
+                }
+                for tc in assistant_message.get("tool_calls") or []
+            ]
+            if emit_fn:
                 await emit_fn(
                     {
-                        "type": "react_reasoning",
-                        "content": interim_reasoning,
+                        "type": "react_assistant_turn",
+                        "raw_message": raw_assistant_message,
                         "iteration": iteration,
                     }
                 )
 
-            # Add assistant message with tool calls
-            working_messages.append(message.model_dump())
-
-            # Execute each tool call
             for tool_call in message.tool_calls:
                 tool_name = tool_call.function.name
                 try:
@@ -127,7 +106,6 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                 except json.JSONDecodeError:
                     args = {}
 
-                # Emit progress if callback provided
                 if emit_fn:
                     step_data = {
                         "tool": tool_name,
@@ -137,11 +115,9 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                     }
                     await emit_fn({"type": "react_step", **step_data})
 
-                # Execute tool
                 result = await tools.execute(tool_name, tool_use_id=tool_call.id, **args)
                 result_str = str(result.value) if not result.is_error else f"Error: {result.value}"
 
-                # Emit completion if callback provided
                 if emit_fn:
                     preview = result_str[:200] + "..." if len(result_str) > 200 else result_str
                     event: dict[str, object] = {
@@ -151,12 +127,12 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                         "status": "completed",
                         "result_preview": preview,
                         "iteration": iteration,
+                        "raw_message": {"role": "tool", "tool_call_id": tool_call.id, "content": preview},
                     }
                     if result.short_preview:
                         event["short_preview"] = result.short_preview
                     await emit_fn(event)
 
-                # Add tool result to messages
                 working_messages.append(
                     {
                         "role": "tool",

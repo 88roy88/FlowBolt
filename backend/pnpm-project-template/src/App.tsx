@@ -1,21 +1,4 @@
-import { authConfig } from './auth/config';
-
-const SPECIAL_USERS = ['666royz', '619roym', '611noat', "dev-user"];
-
-function getAppSuffix(): string {
-  try {
-    const raw = localStorage.getItem(authConfig.storageKey);
-    if (!raw) return '44';
-    const userId = JSON.parse(raw)?.userId;
-    const isSpecial = typeof userId === 'string' && !!SPECIAL_USERS.find(id => id.startsWith(userId));
-    return isSpecial ? 'Base' : '44';
-  } catch {
-    return '44';
-  }
-}
-
 export default function App() {
-  const suffix = getAppSuffix();
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
       <div className="text-center space-y-6">
@@ -32,7 +15,7 @@ export default function App() {
             Ready to build
           </h1>
           <p className="text-slate-400 text-sm max-w-xs mx-auto">
-            Describe what you'd like to create and Flow{suffix} will generate it for you
+            Describe what you'd like to create and BuildApp will generate it for you
           </p>
         </div>
         <div className="flex items-center justify-center gap-1.5">
@@ -45,11 +28,11 @@ export default function App() {
             <path d="M6.5 3.8C5.3 3.05 3.75 3.92 3.75 5.33v13.34c0 1.41 1.55 2.28 2.75 1.53l11.25-6.67c1.15-.72 1.15-2.34 0-3.06L6.5 3.8z" />
           </svg>
           <span className="text-3xl font-bold tracking-tight">
-            <span className="text-[#2bbcc4]">FLOW</span>
-            <span className="text-white">{suffix}</span>
+            <span className="text-[#2bbcc4]">Build</span>
+            <span className="text-white">App</span>
           </span>
         </div>
       </div>
     </div>
-  )
+  );
 }

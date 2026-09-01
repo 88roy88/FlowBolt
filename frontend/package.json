@@ -25,6 +25,7 @@
     "@xterm/xterm": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
     "i18next": "^25.10.9",
     "jose": "^6.2.3",
     "js-cookie": "^3.0.8",

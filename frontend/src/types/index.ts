@@ -124,7 +124,7 @@ export interface AIModel {
 export interface DataSourceSearchResult {
   id: number;
   name: string;
-  description: string | null;
+  description?: string | null;
 }
 
 export interface AdUser {
@@ -207,7 +207,7 @@ export interface FollowUpStep {
   iteration: number;
 }
 
-export type WSMessage =
+export type WSMessage = { _ts?: string } & (
   | { type: 'message'; content: string; model?: string; dataSourceIds?: number[] }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
@@ -229,4 +229,5 @@ export type WSMessage =
   | { type: 'followup_step'; tool: string; args: Record<string, string>; status: string; result_preview?: string; iteration: number }
   | { type: 'file_diffs'; diffs: FileDiff[] }
   | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
-  | { type: 'plan_accepted'; overview: PlanOverview };
+  | { type: 'plan_accepted'; overview: PlanOverview }
+);

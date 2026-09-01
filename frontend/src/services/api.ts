@@ -304,6 +304,17 @@ export async function revokePlatformUser(userId: string): Promise<void> {
   await request(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
+export async function fetchPublishedApps(): Promise<{
+  project_id: string;
+  name: string;
+  owner_id: string;
+  project_url: string;
+  public_path: string;
+  published_at: string;
+}[]> {
+  return request('/admin/published-apps');
+}
+
 export async function fetchPlatformGroups(): Promise<PlatformGroup[]> {
   return request<PlatformGroup[]>('/admin/groups');
 }
