@@ -1,14 +1,11 @@
-"""add project_member_groups table (and merge the two existing heads)
+"""add project_member_groups table
 
 Revision ID: a7c3e9f10b21
-Revises: f550c1c17fde, a1b2c3d4e5f6
+Revises: c68747447b66
 Create Date: 2026-07-09 10:00:00.000000
 
-The migration history had two divergent heads (both already applied to the DB):
-``f550c1c17fde`` (heartbeat/agent-events) and ``a1b2c3d4e5f6`` (rename
-followup_diffs). This revision depends on both, merging them back into a single
-head, and adds the ``project_member_groups`` table used to grant directory
-groups access to a project.
+Adds the ``project_member_groups`` table used to grant directory groups access
+to a project.
 
 """
 from typing import Sequence, Union
@@ -20,7 +17,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = 'a7c3e9f10b21'
-down_revision: Union[str, Sequence[str], None] = ('f550c1c17fde', 'a1b2c3d4e5f6')
+down_revision: Union[str, Sequence[str], None] = 'c68747447b66'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
