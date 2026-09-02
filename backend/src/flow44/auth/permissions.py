@@ -19,6 +19,21 @@ class Role(StrEnum):
     maintainer = "maintainer"
 
 
+# Display-only role labels for the creator/admin tiers (no Role enum member).
+OWNER_ROLE = "owner"
+ADMIN_ROLE = "admin"
+
+# Display precedence when a project reaches a user through several sources; higher
+# wins. Cosmetic only — authorization unions permissions in deps.
+ROLE_RANK: dict[str, int] = {
+    Role.viewer.value: 1,
+    Role.editor.value: 2,
+    Role.publisher.value: 2,
+    Role.maintainer.value: 3,
+    ADMIN_ROLE: 4,
+    OWNER_ROLE: 5,
+}
+
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.viewer: {Permission.read},
     Role.editor: {Permission.read, Permission.write},

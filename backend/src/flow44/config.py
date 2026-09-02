@@ -98,6 +98,15 @@ class FlapiSettings(BuildAppSettings):
     FLAPI_VERIFY_SSL: bool = True
 
 
+class DirectorySettings(BuildAppSettings):
+    # Defaults to the local directory-mock in dev.
+    DIRECTORY_BASE_URL: str = "http://localhost:6666"
+    DIRECTORY_VERIFY_SSL: bool = True
+    DIRECTORY_TIMEOUT_SECONDS: float = 5.0
+    # Sent as the ClientId header; the local mock ignores it.
+    DIRECTORY_CLIENT_ID: str = "default"
+
+
 class S3Settings(BuildAppSettings):
     S3_ENDPOINT_URL: str
     S3_USE_SSL: bool = True
@@ -137,6 +146,7 @@ class Settings(
     SearchIndexSettings,
     AuthSettings,
     FlapiSettings,
+    DirectorySettings,
     S3Settings,
     OpikSettings,
     LoggerSettings,

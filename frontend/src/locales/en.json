@@ -185,17 +185,26 @@
     "title": "Share",
     "share": "Share",
     "owner": "Owner",
-    "userIdPlaceholder": "User ID",
+    "inviteAs": "Invite as",
     "noMembers": "No members yet"
   },
   "admin": {
     "title": "Admin",
     "usersTab": "Platform Users",
     "publishedTab": "Published Apps",
-    "userIdPlaceholder": "User ID to invite",
     "invite": "Invite",
     "noUsers": "No platform users yet",
-    "noPublished": "No published apps yet"
+    "noPublished": "No published apps yet",
+    "searchAll": "All",
+    "searchUsers": "Users",
+    "searchGroups": "Groups",
+    "searchPlaceholder": "Search users & groups by name or email…",
+    "searchUsersPlaceholder": "Search users by name or email…",
+    "searchGroupsPlaceholder": "Search groups by name or email…",
+    "searchMinChars": "Type at least 3 characters to search",
+    "searchNoResults": "No results",
+    "searchUnavailable": "Directory search is unavailable",
+    "searchInvite": "Invite"
   },
   "publish": {
     "publishFailed": "Publish Failed",

@@ -9,9 +9,16 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, is_admin, require_permission
-from flow44.auth.permissions import get_admin_permissions, has_permission
-from flow44.db.platform_user import is_platform_user as db_is_platform_user
+from flow44.api.deps import (
+    Permission,
+    PlatformUserDep,
+    ProjectDep,
+    UserDep,
+    has_platform_access,
+    is_admin,
+    require_permission,
+)
+from flow44.auth.permissions import ADMIN_ROLE, OWNER_ROLE, ROLE_RANK, get_admin_permissions, has_permission
 from flow44.db.project import (
     Project,
     create_project,
@@ -22,6 +29,8 @@ from flow44.db.project import (
 )
 from flow44.db.project import list_user_projects as db_list_user_projects
 from flow44.db.project_member import list_shared_projects
+from flow44.db.project_member_group import list_group_shared_projects
+from flow44.integrations.directory.client import directory_client
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
@@ -62,11 +71,10 @@ def _serialize_project(project: Project, role: str) -> ProjectResponse:
 
 @router.get("/me")
 async def get_current_user(user_id: UserDep) -> dict[str, Any]:
-    admin = is_admin(user_id)
     return {
         "user_id": user_id,
-        "is_admin": admin,
-        "is_platform_user": admin or await db_is_platform_user(user_id),
+        "is_admin": is_admin(user_id),
+        "is_platform_user": await has_platform_access(user_id),
     }
 
 
@@ -79,19 +87,33 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
         all_projects = await list_all_projects()
         result: list[ProjectResponse] = []
         for p in all_projects:
-            role = "owner" if p.user_id == user_id else "admin"
+            role = OWNER_ROLE if p.user_id == user_id else ADMIN_ROLE
             result.append(_serialize_project(p, role))
         return result
 
-    owned, shared = await asyncio.gather(db_list_user_projects(user_id), list_shared_projects(user_id))
+    owned, shared, user_group_ids = await asyncio.gather(
+        db_list_user_projects(user_id),
+        list_shared_projects(user_id),
+        directory_client.get_user_group_ids(user_id),
+    )
+    group_shared = await list_group_shared_projects(user_group_ids)
 
-    result = []
+    # Collapse to one entry per project, keeping the highest-ranked role for display.
+    by_id: dict[str, tuple[Project, str]] = {}
+
+    def _merge(project: Project, role: str) -> None:
+        existing = by_id.get(project.id)
+        if existing is None or ROLE_RANK.get(role, 0) > ROLE_RANK.get(existing[1], 0):
+            by_id[project.id] = (project, role)
+
     for p in owned:
-        result.append(_serialize_project(p, "owner"))
+        _merge(p, OWNER_ROLE)
     for p, role in shared:
-        result.append(_serialize_project(p, role.value))
+        _merge(p, role.value)
+    for p, role in group_shared:
+        _merge(p, role.value)
 
-    return result
+    return [_serialize_project(p, role) for p, role in by_id.values()]
 
 
 @router.post("", status_code=201)
@@ -108,7 +130,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_create())
-    return _serialize_project(project, "owner")
+    return _serialize_project(project, OWNER_ROLE)
 
 
 @router.patch("/{project_id}/name", status_code=200)

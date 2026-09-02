@@ -67,3 +67,5 @@ AI_INSTRUCTIONS.md
 .agent
 .antigravity
 .antigravityignore
+
+*pnpm-lock.yaml

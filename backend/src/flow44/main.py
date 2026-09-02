@@ -12,6 +12,7 @@ from flow44.api import (
     admin,
     chat,
     data_source_api,
+    directory,
     errors,
     export,
     files,
@@ -114,6 +115,7 @@ auth_routes.include_router(data_source_api.router)
 auth_routes.include_router(chat.http_router)
 auth_routes.include_router(iaagent.router)
 auth_routes.include_router(members.router)
+auth_routes.include_router(directory.router)
 auth_routes.include_router(admin.router)
 app.include_router(auth_routes)
 

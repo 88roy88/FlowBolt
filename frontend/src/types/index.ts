@@ -79,9 +79,34 @@ export interface Project {
 
 export interface ProjectMember {
   user_id: string;
+  display_name: string;
   role: AssignableRole;
   created_at: string;
   invited_by: string;
+}
+
+export interface ProjectGroupGrant {
+  group_id: string;
+  group_name: string;
+  email: string;
+  role: AssignableRole;
+  created_at: string;
+  invited_by: string;
+}
+
+export interface PlatformUser {
+  user_id: string;
+  display_name: string;
+  invited_by: string;
+  created_at: string;
+}
+
+export interface PlatformGroup {
+  group_id: string;
+  group_name: string;
+  email: string;
+  invited_by: string;
+  created_at: string;
 }
 
 export interface UserStatus {
@@ -100,6 +125,24 @@ export interface DataSourceSearchResult {
   id: number;
   name: string;
   description?: string | null;
+}
+
+export interface AdUser {
+  cn: string;
+  displayName: string;
+  distinguishedName: string;
+  mail: string;
+  sAMAccountName: string;
+}
+
+export interface AdGroup {
+  cn: string;
+  displayName: string;
+  distinguishedName: string;
+  description: string;
+  mail: string;
+  sAMAccountName: string;
+  objectGUID: string;
 }
 
 // Agent types

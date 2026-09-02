@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, UserStatus } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
 
 const BASE = '/api';
 
@@ -230,10 +230,15 @@ export async function fetchProjectMembers(projectId: string): Promise<ProjectMem
   return request<ProjectMember[]>(`/projects/${projectId}/members`);
 }
 
-export async function addProjectMember(projectId: string, userId: string, role: AssignableRole): Promise<ProjectMember> {
+export async function addProjectMember(
+  projectId: string,
+  userId: string,
+  role: AssignableRole,
+  displayName = ''
+): Promise<ProjectMember> {
   return request<ProjectMember>(`/projects/${projectId}/members`, {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId, role }),
+    body: JSON.stringify({ user_id: userId, display_name: displayName, role }),
   });
 }
 
@@ -248,16 +253,50 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   await request(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
-// --- Admin ---
+// --- Project group grants (share a project with a whole directory group) ---
 
-export async function fetchPlatformUsers(): Promise<{ user_id: string; invited_by: string; created_at: string }[]> {
-  return request('/admin/users');
+export async function fetchProjectGroups(projectId: string): Promise<ProjectGroupGrant[]> {
+  return request<ProjectGroupGrant[]>(`/projects/${projectId}/members/groups`);
 }
 
-export async function invitePlatformUser(userId: string): Promise<{ user_id: string; invited_by: string; created_at: string }> {
-  return request('/admin/users', {
+export async function addProjectGroup(
+  projectId: string,
+  groupId: string,
+  groupName: string,
+  role: AssignableRole,
+  email = ''
+): Promise<ProjectGroupGrant> {
+  return request<ProjectGroupGrant>(`/projects/${projectId}/members/groups`, {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ group_id: groupId, group_name: groupName, email, role }),
+  });
+}
+
+export async function updateProjectGroupRole(
+  projectId: string,
+  groupId: string,
+  role: AssignableRole
+): Promise<ProjectGroupGrant> {
+  return request<ProjectGroupGrant>(`/projects/${projectId}/members/groups/${encodeURIComponent(groupId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeProjectGroup(projectId: string, groupId: string): Promise<void> {
+  await request(`/projects/${projectId}/members/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+}
+
+// --- Admin: platform user management ---
+
+export async function fetchPlatformUsers(): Promise<PlatformUser[]> {
+  return request<PlatformUser[]>('/admin/users');
+}
+
+export async function invitePlatformUser(userId: string, displayName = ''): Promise<PlatformUser> {
+  return request<PlatformUser>('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, display_name: displayName }),
   });
 }
 
@@ -274,4 +313,33 @@ export async function fetchPublishedApps(): Promise<{
   published_at: string;
 }[]> {
   return request('/admin/published-apps');
+}
+
+export async function fetchPlatformGroups(): Promise<PlatformGroup[]> {
+  return request<PlatformGroup[]>('/admin/groups');
+}
+
+export async function invitePlatformGroup(groupId: string, groupName: string, email = ''): Promise<PlatformGroup> {
+  return request<PlatformGroup>('/admin/groups', {
+    method: 'POST',
+    body: JSON.stringify({ group_id: groupId, group_name: groupName, email }),
+  });
+}
+
+export async function revokePlatformGroup(groupId: string): Promise<void> {
+  await request(`/admin/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+}
+
+// --- Directory (users & groups) search ---
+// Proxied through the backend (/api/directory/*) rather than hitting the directory
+// service directly: in production the directory service is internal-only and
+// doesn't serve CORS, so the browser can only reach it via our own authenticated backend.
+
+// The backend matches the term against sAMAccountName, displayName and mail.
+export async function searchAdUsers(query: string): Promise<AdUser[]> {
+  return request<AdUser[]>(`/directory/users?q=${encodeURIComponent(query)}`);
+}
+
+export async function searchAdGroups(query: string): Promise<AdGroup[]> {
+  return request<AdGroup[]>(`/directory/groups?q=${encodeURIComponent(query)}`);
 }

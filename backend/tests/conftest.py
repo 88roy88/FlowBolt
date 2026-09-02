@@ -112,3 +112,16 @@ async def test_db(setup_test_db):
 
         flow44.db.database.async_session = original_async_session
         await trans.rollback()
+
+
+@pytest.fixture
+async def async_client():
+    """HTTP client that drives the app on the test's own event loop.
+
+    The sync TestClient runs the app in a separate loop, which the asyncpg
+    connection `test_db` binds the session to can't be shared with.
+    """
+    from httpx import ASGITransport, AsyncClient  # noqa: PLC0415
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        yield client

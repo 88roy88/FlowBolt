@@ -1,5 +1,6 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
+from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -9,12 +10,17 @@ class PlatformUser(SQLModel, table=True):
     __tablename__ = "platform_users"
 
     user_id: str = Field(primary_key=True)
+    # display-only snapshot captured at invite time; never used for access decisions.
+    display_name: str = Field(default="")
     invited_by: str = Field(default="")
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
 
 
-async def add_platform_user(user_id: str, invited_by: str) -> PlatformUser:
-    user = PlatformUser(user_id=user_id, invited_by=invited_by)
+async def add_platform_user(user_id: str, invited_by: str, display_name: str = "") -> PlatformUser:
+    user = PlatformUser(user_id=user_id, invited_by=invited_by, display_name=display_name)
     async with database.async_session() as session:
         session.add(user)
         await session.commit()
