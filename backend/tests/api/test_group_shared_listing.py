@@ -33,7 +33,7 @@ class TestGroupSharedListingEndpoint:
         await add_group(project.id, GROUP_A, "Cloud Leads", Role.editor, "owner")
 
         with patch(
-            "flow44.api.projects.adapi_client.get_user_group_ids",
+            "flow44.api.projects.directory_client.get_user_group_ids",
             new=AsyncMock(return_value={GROUP_A}),
         ):
             resp = await async_client.get("/api/projects")
@@ -51,7 +51,7 @@ class TestGroupSharedListingEndpoint:
         await add_group(project.id, GROUP_A, "Cloud Leads", Role.editor, "owner")
 
         with patch(
-            "flow44.api.projects.adapi_client.get_user_group_ids",
+            "flow44.api.projects.directory_client.get_user_group_ids",
             new=AsyncMock(return_value={GROUP_B}),
         ):
             resp = await async_client.get("/api/projects")
@@ -66,7 +66,7 @@ class TestGroupSharedListingEndpoint:
         await add_group(project.id, GROUP_A, "Cloud Leads", Role.maintainer, "owner")
 
         with patch(
-            "flow44.api.projects.adapi_client.get_user_group_ids",
+            "flow44.api.projects.directory_client.get_user_group_ids",
             new=AsyncMock(return_value={GROUP_A}),
         ):
             resp = await async_client.get("/api/projects")

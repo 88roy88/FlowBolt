@@ -125,7 +125,7 @@
 
       <form id="loginForm">
         <div class="form-group">
-          <label for="memberSelect">Log in as member (from ADAPI mock)</label>
+          <label for="memberSelect">Log in as member (from directory mock)</label>
           <select id="memberSelect">
             <option value="">— manual entry below —</option>
           </select>
@@ -187,11 +187,11 @@
       // Parse URL parameters for pre-filled values
       const params = new URLSearchParams(window.location.search);
 
-      // Member picker: populate from the ADAPI directory mock so you can sign in
+      // Member picker: populate from the directory mock so you can sign in
       // as any listed user without typing their sAMAccountName. Override the mock
-      // location with ?adapiUrl=... ; defaults to the dev port. Falls back
+      // location with ?directoryUrl=... ; defaults to the dev port. Falls back
       // silently to manual entry if the mock isn't reachable.
-      const adapiUrl = (params.get('adapiUrl') || 'http://localhost:6666').replace(/\/$/, '');
+      const directoryUrl = (params.get('directoryUrl') || 'http://localhost:6666').replace(/\/$/, '');
       const memberSelect = document.getElementById('memberSelect');
       const memberHint = document.getElementById('memberHint');
 
@@ -206,11 +206,11 @@
       (async () => {
         let users;
         try {
-          const resp = await fetch(`${adapiUrl}/api/users`);
+          const resp = await fetch(`${directoryUrl}/api/users`);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           users = await resp.json();
         } catch {
-          memberHint.textContent = `Directory mock unavailable (${adapiUrl}) — use manual entry.`;
+          memberHint.textContent = `Directory mock unavailable (${directoryUrl}) — use manual entry.`;
           return;
         }
         if (!Array.isArray(users) || users.length === 0) {

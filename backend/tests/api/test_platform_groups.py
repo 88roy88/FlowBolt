@@ -28,25 +28,25 @@ class TestPlatformGroupDB:
 
 
 class TestPlatformAccessGate:
-    async def test_no_grants_short_circuits_without_adapi_call(self, test_db):
-        with patch("flow44.api.deps.adapi_client.get_user_group_ids", new=AsyncMock()) as mock_groups:
+    async def test_no_grants_short_circuits_without_directory_call(self, test_db):
+        with patch("flow44.api.deps.directory_client.get_user_group_ids", new=AsyncMock()) as mock_groups:
             assert await has_platform_access("nobody") is False
         mock_groups.assert_not_awaited()
 
     async def test_member_of_granted_group_gets_access(self, test_db):
         await add_platform_group(GUID, "Cloud Leads", "admin-user")
-        # A non-admin, non-platform user whose ADAPI groups include the granted one.
+        # A non-admin, non-platform user whose directory groups include the granted one.
         with patch(
-            "flow44.api.deps.adapi_client.get_user_group_ids",
+            "flow44.api.deps.directory_client.get_user_group_ids",
             new=AsyncMock(return_value={GUID}),
         ):
             assert await has_platform_access("group-member-user") is True
 
     async def test_non_member_is_denied(self, test_db):
         await add_platform_group(GUID, "Cloud Leads", "admin-user")
-        # A user whose ADAPI groups do not include any granted group.
+        # A user whose directory groups do not include any granted group.
         with patch(
-            "flow44.api.deps.adapi_client.get_user_group_ids",
+            "flow44.api.deps.directory_client.get_user_group_ids",
             new=AsyncMock(return_value={"other-guid"}),
         ):
             assert await has_platform_access("non-member-user") is False

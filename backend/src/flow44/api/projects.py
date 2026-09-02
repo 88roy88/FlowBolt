@@ -30,7 +30,7 @@ from flow44.db.project import (
 from flow44.db.project import list_user_projects as db_list_user_projects
 from flow44.db.project_member import list_shared_projects
 from flow44.db.project_member_group import list_group_shared_projects
-from flow44.integrations.adapi.client import adapi_client
+from flow44.integrations.directory.client import directory_client
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
@@ -94,7 +94,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
     owned, shared, user_group_ids = await asyncio.gather(
         db_list_user_projects(user_id),
         list_shared_projects(user_id),
-        adapi_client.get_user_group_ids(user_id),
+        directory_client.get_user_group_ids(user_id),
     )
     group_shared = await list_group_shared_projects(user_group_ids)
 

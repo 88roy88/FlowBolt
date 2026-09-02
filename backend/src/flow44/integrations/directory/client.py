@@ -9,10 +9,10 @@ from flow44.config import settings
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["AdGroup", "AdUser", "AdapiClient", "AdapiError", "adapi_client"]
+__all__ = ["AdGroup", "AdUser", "DirectoryClient", "DirectoryError", "directory_client"]
 
 
-class AdapiError(Exception):
+class DirectoryError(Exception):
     pass
 
 
@@ -35,7 +35,7 @@ class AdGroup(_AdRecord):
     object_guid: str = Field(default="", alias="objectGUID")
 
 
-class AdapiClient:
+class DirectoryClient:
     def __init__(
         self,
         base_url: str | None = None,
@@ -43,20 +43,20 @@ class AdapiClient:
         timeout_s: float | None = None,
         client_id: str | None = None,
     ) -> None:
-        self.base_url = (base_url or settings.ADAPI_BASE_URL).rstrip("/")
-        self._timeout = timeout_s if timeout_s is not None else settings.ADAPI_TIMEOUT_SECONDS
-        self._headers = {"ClientId": client_id if client_id is not None else settings.ADAPI_CLIENT_ID}
+        self.base_url = (base_url or settings.DIRECTORY_BASE_URL).rstrip("/")
+        self._timeout = timeout_s if timeout_s is not None else settings.DIRECTORY_TIMEOUT_SECONDS
+        self._headers = {"ClientId": client_id if client_id is not None else settings.DIRECTORY_CLIENT_ID}
 
     async def get_user_group_ids(self, user_id: str) -> set[str]:
         try:
             users = await self._search_users({"customFilter": f"(mail={user_id})"})
-        except AdapiError as exc:
-            logger.warning("ADAPI group lookup failed for user %s: %s", user_id, exc)
+        except DirectoryError as exc:
+            logger.warning("Directory group lookup failed for user %s: %s", user_id, exc)
             return set()
 
         match = next((u for u in users if u.mail.casefold() == user_id.casefold()), None)
         if match is None:
-            logger.warning("ADAPI user not found for group lookup: %s", user_id)
+            logger.warning("Directory user not found for group lookup: %s", user_id)
             return set()
         return {dn for dn in match.member_of if dn}
 
@@ -79,32 +79,32 @@ class AdapiClient:
 
     async def _search(self, path: str, params: dict[str, str]) -> list[dict[str, Any]]:
         # Params are pre-encoded and appended to the URL rather than passed via
-        # params=: httpx encodes the space inside customFilter as "+", which ADAPI
-        # rejects. quote encodes it as "%20", which httpx preserves verbatim.
+        # params=: httpx encodes the space inside customFilter as "+", which the
+        # directory service rejects. quote encodes it as "%20", which httpx preserves verbatim.
         query_string = urlencode(params, quote_via=quote)
         try:
             async with httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=self._timeout,
-                verify=settings.ADAPI_VERIFY_SSL,
+                verify=settings.DIRECTORY_VERIFY_SSL,
                 headers=self._headers,
             ) as http:
                 resp = await http.get(f"{path}?{query_string}")
-            # ADAPI answers a query that matches nothing with 404 rather than an
-            # empty list. That's "no results", not a failure — return [] so the
-            # UI shows "no results" instead of a directory-unavailable error.
+            # The directory service answers a query that matches nothing with 404
+            # rather than an empty list. That's "no results", not a failure — return
+            # [] so the UI shows "no results" instead of a directory-unavailable error.
             # Genuine faults (timeouts, connect errors, 5xx) still raise below.
             if resp.status_code == 404:
                 return []
             resp.raise_for_status()
             data = resp.json()
         except (httpx.HTTPError, ValueError) as exc:
-            logger.warning("ADAPI search failed for %s params=%r: %s", path, params, exc)
-            raise AdapiError(str(exc)) from exc
+            logger.warning("Directory search failed for %s params=%r: %s", path, params, exc)
+            raise DirectoryError(str(exc)) from exc
         if not isinstance(data, list):
-            logger.warning("ADAPI returned a non-list payload for %s", path)
-            raise AdapiError("ADAPI returned an unexpected payload")
+            logger.warning("Directory service returned a non-list payload for %s", path)
+            raise DirectoryError("Directory service returned an unexpected payload")
         return [r for r in data if isinstance(r, dict)]
 
 
-adapi_client = AdapiClient()
+directory_client = DirectoryClient()

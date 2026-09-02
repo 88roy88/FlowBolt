@@ -1,16 +1,16 @@
-.PHONY: dev dev-backend dev-frontend dev-mocks dev-adapi kill-ports build run install stop
+.PHONY: dev dev-backend dev-frontend dev-mocks dev-directory kill-ports build run install stop
 
-# Local dev: mocks (flapi-mock, adapi-mock), FastAPI, Vite — free these before (re)starting
+# Local dev: mocks (flapi-mock, directory-mock), FastAPI, Vite — free these before (re)starting
 DEV_PORT_BACKEND := 8000
 DEV_PORT_FRONTEND := 5173
 DEV_PORT_MOCKS := 6001
-DEV_PORT_ADAPI := 6666
-DEV_PORTS := $(DEV_PORT_BACKEND) $(DEV_PORT_FRONTEND) $(DEV_PORT_MOCKS) $(DEV_PORT_ADAPI)
+DEV_PORT_DIRECTORY := 6666
+DEV_PORTS := $(DEV_PORT_BACKEND) $(DEV_PORT_FRONTEND) $(DEV_PORT_MOCKS) $(DEV_PORT_DIRECTORY)
 
 # All at once: backend blocks forever if run sequentially, so we use parallel sub-makes (GNU Make).
-# Single service: make dev-backend | make dev-frontend | make dev-mocks | make dev-adapi
+# Single service: make dev-backend | make dev-frontend | make dev-mocks | make dev-directory
 dev: kill-ports
-	+$(MAKE) -j4 dev-backend dev-frontend dev-mocks dev-adapi
+	+$(MAKE) -j4 dev-backend dev-frontend dev-mocks dev-directory
 
 ifeq ($(OS),Windows_NT)
 kill-ports:
@@ -44,15 +44,15 @@ dev-frontend: kill-port-$(DEV_PORT_FRONTEND)
 dev-mocks: kill-port-$(DEV_PORT_MOCKS)
 	cd mocks/flapi-mock && pnpm install && MOCK_PORT=$(DEV_PORT_MOCKS) pnpm dev
 
-# ADAPI directory mock (users & groups) under mocks/adapi-mock; frontend proxies /adapi here
-dev-adapi: kill-port-$(DEV_PORT_ADAPI)
-	cd mocks/adapi-mock && pnpm install && MOCK_PORT=$(DEV_PORT_ADAPI) pnpm dev
+# Directory mock (users & groups) under mocks/directory-mock; frontend proxies /directory here
+dev-directory: kill-port-$(DEV_PORT_DIRECTORY)
+	cd mocks/directory-mock && pnpm install && MOCK_PORT=$(DEV_PORT_DIRECTORY) pnpm dev
 
 # Install dependencies (also installs Husky git hooks)
 install:
 	cd frontend && pnpm install
 	cd mocks/flapi-mock && pnpm clean --lockfile && pnpm install
-	cd mocks/adapi-mock && pnpm install
+	cd mocks/directory-mock && pnpm install
 	cd backend/pnpm-project-template && pnpm clean --lockfile && pnpm install
 	cd backend && uv sync
 

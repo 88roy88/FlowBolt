@@ -13,7 +13,7 @@ type Filter = 'all' | 'users' | 'groups';
 const MIN_QUERY_LENGTH = 3;
 const DEBOUNCE_MS = 300;
 
-interface AdapiSearchProps {
+interface DirectorySearchProps {
   onInviteUser?: (user: AdUser) => void;
   onInviteGroup?: (group: AdGroup) => void;
   // Lowercased ids already granted; matches are lifted out of results and reported
@@ -24,14 +24,14 @@ interface AdapiSearchProps {
   onExistingGroupsMatched?: (groupIds: string[]) => void;
 }
 
-export function AdapiSearch({
+export function DirectorySearch({
   onInviteUser,
   onInviteGroup,
   existingUserIds,
   onExistingUsersMatched,
   existingGroupIds,
   onExistingGroupsMatched,
-}: AdapiSearchProps) {
+}: DirectorySearchProps) {
   const { t } = useTranslation();
   const canUsers = !!onInviteUser;
   const canGroups = !!onInviteGroup;
@@ -81,8 +81,8 @@ export function AdapiSearch({
       ]);
       if (seq !== latestSeq.current) return;
 
-      if (usersRes.status === 'rejected') console.error('ADAPI user search failed:', usersRes.reason);
-      if (groupsRes.status === 'rejected') console.error('ADAPI group search failed:', groupsRes.reason);
+      if (usersRes.status === 'rejected') console.error('Directory user search failed:', usersRes.reason);
+      if (groupsRes.status === 'rejected') console.error('Directory group search failed:', groupsRes.reason);
 
       setUsers(usersRes.status === 'fulfilled' ? usersRes.value : []);
       setGroups(groupsRes.status === 'fulfilled' ? groupsRes.value : []);

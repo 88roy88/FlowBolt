@@ -4,7 +4,7 @@ import { Trash2, Crown, User, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { LoadingDots } from '../ui/loading-dots';
-import { AdapiSearch } from '../admin/AdapiSearch';
+import { DirectorySearch } from '../admin/DirectorySearch';
 import type { AssignableRole, ProjectMember, ProjectGroupGrant } from '../../types';
 import * as api from '../../services/api';
 
@@ -169,7 +169,7 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
             />
           </div>
 
-          <AdapiSearch
+          <DirectorySearch
             onInviteUser={(user) => handleInviteUser(user.mail, user.displayName)}
             onInviteGroup={(group) => handleInviteGroup(group.distinguishedName, group.displayName, group.mail)}
             existingUserIds={memberIds}

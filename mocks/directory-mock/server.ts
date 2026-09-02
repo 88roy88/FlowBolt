@@ -6,7 +6,7 @@ import type { AdGroup, AdUser } from "./types";
 
 const PORT = Number(process.env.MOCK_PORT) || 6666;
 
-// Artificial latency so local dev exercises the UI's loading states — real ADAPI
+// Artificial latency so local dev exercises the UI's loading states — the real directory service
 // is noticeably slow. Override with MOCK_DELAY_MS=0 to disable.
 const DELAY_MS = process.env.MOCK_DELAY_MS !== undefined ? Number(process.env.MOCK_DELAY_MS) : 2000;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,7 +34,7 @@ const [users, groups] = await Promise.all([
  * (|(displayName=*term*) (mail=*term*))`. All three carry the same wildcard-wrapped
  * term, so we recover it from `samAccountName` and match it (case-insensitively) as a
  * substring against `sAMAccountName`, `displayName` and `mail` — mirroring the OR that
- * real ADAPI applies. An empty/missing filter returns every record.
+ * the real directory service applies. An empty/missing filter returns every record.
  */
 function searchTerm(samAccountName?: string): string {
   // Strip the surrounding LDAP `*` wildcards the backend adds.
@@ -66,7 +66,7 @@ function matchesTerm(
 /**
  * Resolve the full (transitive) set of group DNs a user belongs to.
  *
- * Real AD/ADAPI computes nested membership server-side (via
+ * The real AD directory service computes nested membership server-side (via
  * LDAP_MATCHING_RULE_IN_CHAIN) and reports it on the user record's `memberOf`,
  * so callers never have to walk the nesting themselves. We mirror that: match
  * the user's `distinguishedName` against each group's `member` list, then expand
@@ -127,7 +127,7 @@ server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
 
 try {
   await server.listen({ port: PORT, host: "0.0.0.0" });
-  console.log(`ADAPI mock listening on http://localhost:${PORT}`);
+  console.log(`Directory mock listening on http://localhost:${PORT}`);
 } catch (err) {
   server.log.error(err);
   process.exit(1);

@@ -1,4 +1,4 @@
-/** Shape of a user record served by ADAPI (mirrors an Active Directory user). */
+/** Shape of a user record served by the directory service (mirrors an Active Directory user). */
 export interface AdUser {
   cn: string;
   displayName: string;
@@ -14,7 +14,7 @@ export interface AdUser {
   extensionAttribute10: string;
 }
 
-/** Shape of a group record served by ADAPI (mirrors an Active Directory group). */
+/** Shape of a group record served by the directory service (mirrors an Active Directory group). */
 export interface AdGroup {
   cn: string;
   displayName: string;

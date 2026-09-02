@@ -91,13 +91,13 @@ describe('fetchWithAuth (via fetchProjects)', () => {
   });
 });
 
-describe('ADAPI search', () => {
+describe('Directory search', () => {
   it('requests the backend users endpoint with an encoded query and a Bearer token', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, [{ cn: 'djenkins' }]));
 
     const users = await searchAdUsers('a b');
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/adapi/users?q=a%20b');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/directory/users?q=a%20b');
     // Proxied through the backend, so it carries auth like any other request.
     expect(authHeader()).toBe('Bearer tok');
     expect(users).toEqual([{ cn: 'djenkins' }]);
@@ -108,11 +108,11 @@ describe('ADAPI search', () => {
 
     await searchAdGroups('le');
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/adapi/groups?q=le');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/directory/groups?q=le');
   });
 
   it('throws on a non-ok response', async () => {
-    fetchMock.mockResolvedValue(response(502, 'ADAPI service unavailable'));
+    fetchMock.mockResolvedValue(response(502, 'Directory service unavailable'));
     await expect(searchAdUsers('dje')).rejects.toThrow(/API error 502/);
   });
 });

@@ -1,6 +1,6 @@
-# ADAPI Mock
+# Directory Mock
 
-A local TypeScript + Fastify mock of the ADAPI service, serving two search
+A local TypeScript + Fastify mock of the directory service, serving two search
 endpoints backed by static JSON fixtures. Run with `tsx` (same stack as
 `flapi-mock`).
 

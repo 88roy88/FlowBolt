@@ -330,16 +330,16 @@ export async function revokePlatformGroup(groupId: string): Promise<void> {
   await request(`/admin/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
 }
 
-// --- ADAPI (users & groups) search ---
-// Proxied through the backend (/api/adapi/*) rather than hitting ADAPI directly:
-// in production ADAPI is internal-only and doesn't serve CORS, so the browser
-// can only reach it via our own authenticated backend.
+// --- Directory (users & groups) search ---
+// Proxied through the backend (/api/directory/*) rather than hitting the directory
+// service directly: in production the directory service is internal-only and
+// doesn't serve CORS, so the browser can only reach it via our own authenticated backend.
 
 // The backend matches the term against sAMAccountName, displayName and mail.
 export async function searchAdUsers(query: string): Promise<AdUser[]> {
-  return request<AdUser[]>(`/adapi/users?q=${encodeURIComponent(query)}`);
+  return request<AdUser[]>(`/directory/users?q=${encodeURIComponent(query)}`);
 }
 
 export async function searchAdGroups(query: string): Promise<AdGroup[]> {
-  return request<AdGroup[]>(`/adapi/groups?q=${encodeURIComponent(query)}`);
+  return request<AdGroup[]>(`/directory/groups?q=${encodeURIComponent(query)}`);
 }

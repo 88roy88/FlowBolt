@@ -9,7 +9,7 @@ from flow44.db import database
 class PlatformUserGroup(SQLModel, table=True):
     __tablename__ = "platform_user_groups"
 
-    # group's AD distinguishedName — the id ADAPI reports in a user's memberOf.
+    # group's AD distinguishedName — the id the directory service reports in a user's memberOf.
     group_id: str = Field(primary_key=True)
     # display-only snapshots captured at invite time; never used for access decisions.
     group_name: str = Field(default="")

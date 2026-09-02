@@ -5,7 +5,7 @@ import { Trash2, User, Users, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { LoadingDots } from '../ui/loading-dots';
-import { AdapiSearch } from './AdapiSearch';
+import { DirectorySearch } from './DirectorySearch';
 import { cn } from '@/lib/utils';
 import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
@@ -141,7 +141,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           </div>
 
           {tab === 'users' && (
-            <AdapiSearch
+            <DirectorySearch
               onInviteUser={(u) => handleInviteUser(u.mail, u.displayName)}
               onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName, g.mail)}
               existingUserIds={memberIds}

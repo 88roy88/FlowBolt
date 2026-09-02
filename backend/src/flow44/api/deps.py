@@ -21,7 +21,7 @@ from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
 from flow44.db.project_member import get_project_member
 from flow44.db.project_member_group import list_project_groups
-from flow44.integrations.adapi.client import adapi_client
+from flow44.integrations.directory.client import directory_client
 from flow44.logging import _project_id as _log_project_id
 from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
@@ -128,7 +128,7 @@ async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permis
     if not grants:
         return set()
 
-    user_group_ids = await adapi_client.get_user_group_ids(user_id)
+    user_group_ids = await directory_client.get_user_group_ids(user_id)
     if not user_group_ids:
         return set()
 
@@ -157,7 +157,7 @@ async def _resolve_project_permissions(project: Project, user_id: str) -> set[Pe
 
 # Per-request cache: get_project and the permission dependencies both resolve the
 # same (project, user) set, so resolving once avoids a second member lookup and
-# ADAPI round-trip. ContextVars are per-task, so this never leaks across requests;
+# directory-service round-trip. ContextVars are per-task, so this never leaks across requests;
 # the key guards against reuse for a different project/user in the same task.
 _perm_cache_per_request: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar(
     "_perm_cache_per_request", default=None
@@ -211,7 +211,7 @@ async def _is_platform_group_member(user_id: str) -> bool:
     group_ids = await platform_group_ids()
     if not group_ids:
         return False
-    user_group_ids = await adapi_client.get_user_group_ids(user_id)
+    user_group_ids = await directory_client.get_user_group_ids(user_id)
     return bool(user_group_ids & group_ids)
 
 

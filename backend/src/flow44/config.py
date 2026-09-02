@@ -99,12 +99,12 @@ class FlapiSettings(BuildAppSettings):
 
 
 class DirectorySettings(BuildAppSettings):
-    # Defaults to the local adapi-mock in dev.
-    ADAPI_BASE_URL: str = "http://localhost:6666"
-    ADAPI_VERIFY_SSL: bool = True
-    ADAPI_TIMEOUT_SECONDS: float = 5.0
+    # Defaults to the local directory-mock in dev.
+    DIRECTORY_BASE_URL: str = "http://localhost:6666"
+    DIRECTORY_VERIFY_SSL: bool = True
+    DIRECTORY_TIMEOUT_SECONDS: float = 5.0
     # Sent as the ClientId header; the local mock ignores it.
-    ADAPI_CLIENT_ID: str = "default"
+    DIRECTORY_CLIENT_ID: str = "default"
 
 
 class S3Settings(BuildAppSettings):

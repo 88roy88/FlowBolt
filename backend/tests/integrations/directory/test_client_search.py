@@ -3,11 +3,11 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from flow44.integrations.adapi.client import AdapiClient, AdapiError
+from flow44.integrations.directory.client import DirectoryClient, DirectoryError
 
 
 def _resp(status_code: int, json_data: object) -> httpx.Response:
-    request = httpx.Request("GET", "http://adapi.local/api/users")
+    request = httpx.Request("GET", "http://directory.local/api/users")
     return httpx.Response(status_code, json=json_data, request=request)
 
 
@@ -24,13 +24,13 @@ class TestSearchUsers:
                 "whenCreated": "20240101",  # extra field must be ignored, not rejected
             }
         ]
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)) as mock_get:
             users = await client.search_users("dje")
 
         # The term is wildcard-wrapped and matched against account name, display name
         # and mail. The query rides in the URL, pre-encoded: the space inside
-        # customFilter must be %20 (not +, which ADAPI rejects).
+        # customFilter must be %20 (not +, which the directory service rejects).
         requested_url = mock_get.call_args.args[0]
         assert requested_url == (
             "/users?samAccountName=%2Adje%2A"
@@ -43,42 +43,42 @@ class TestSearchUsers:
 
     def test_sends_client_id_header(self):
         # Explicit override wins; otherwise it falls back to the configured default.
-        assert AdapiClient(base_url="http://adapi.local", client_id="acme")._headers == {"ClientId": "acme"}
-        assert "ClientId" in AdapiClient(base_url="http://adapi.local")._headers
+        assert DirectoryClient(base_url="http://directory.local", client_id="acme")._headers == {"ClientId": "acme"}
+        assert "ClientId" in DirectoryClient(base_url="http://directory.local")._headers
 
     @pytest.mark.asyncio
     async def test_empty_result_is_not_an_error(self):
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, [])):
             assert await client.search_users("nobody") == []
 
     @pytest.mark.asyncio
     async def test_not_found_is_no_results_not_an_error(self):
-        # ADAPI returns 404 when a query matches nothing. That's an empty result
+        # the directory service returns 404 when a query matches nothing. That's an empty result
         # set, not a failure — it must not surface as a directory-unavailable error.
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(404, {"error": "not found"})):
             assert await client.search_users("ghost") == []
 
     @pytest.mark.asyncio
-    async def test_http_error_raises_adapi_error(self):
-        client = AdapiClient(base_url="http://adapi.local")
+    async def test_http_error_raises_directory_error(self):
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(500, {"error": "boom"})), \
-             pytest.raises(AdapiError):
+             pytest.raises(DirectoryError):
             await client.search_users("dje")
 
     @pytest.mark.asyncio
-    async def test_transport_failure_raises_adapi_error(self):
-        client = AdapiClient(base_url="http://adapi.local")
+    async def test_transport_failure_raises_directory_error(self):
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("refused")), \
-             pytest.raises(AdapiError):
+             pytest.raises(DirectoryError):
             await client.search_users("dje")
 
     @pytest.mark.asyncio
-    async def test_non_list_payload_raises_adapi_error(self):
-        client = AdapiClient(base_url="http://adapi.local")
+    async def test_non_list_payload_raises_directory_error(self):
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, {"unexpected": "object"})), \
-             pytest.raises(AdapiError):
+             pytest.raises(DirectoryError):
             await client.search_users("dje")
 
 
@@ -96,7 +96,7 @@ class TestSearchGroups:
                 "objectGUID": "82e16f20-f05e-6d5c-3589-79cd6b398160",
             }
         ]
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
             groups = await client.search_groups("le")
 
@@ -123,8 +123,8 @@ class TestGetUserGroupIds:
     async def test_queries_by_exact_mail_only(self):
         # The auth path must not reuse the fuzzy samAccountName search — it looks the
         # user up by an exact (mail=…) filter, so the query works regardless of how
-        # ADAPI combines the samAccountName param with customFilter.
-        client = AdapiClient(base_url="http://adapi.local")
+        # the directory service combines the samAccountName param with customFilter.
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
             await client.get_user_group_ids("djenkins@corp.local")
 
@@ -138,13 +138,13 @@ class TestGetUserGroupIds:
         dns = ["CN=Legal,OU=Groups,DC=corp", "CN=Engineering,OU=Groups,DC=corp"]
         # A substring search can return several users; only the exact mail counts.
         payload = [self._user("djenkins", dns), self._user("djenkinson", ["CN=Other,OU=Groups,DC=corp"])]
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
             assert await client.get_user_group_ids("djenkins@corp.local") == set(dns)
 
     @pytest.mark.asyncio
     async def test_match_is_case_insensitive(self):
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         # Stored mail is DJenkins@corp.local; query with a different case must still match.
         payload = [self._user("DJenkins", ["CN=Legal,OU=Groups,DC=corp"])]
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
@@ -152,7 +152,7 @@ class TestGetUserGroupIds:
 
     @pytest.mark.asyncio
     async def test_no_exact_match_returns_empty_set(self):
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         # A substring hit that is not the requested account must not leak its groups.
         payload = [self._user("djenkinson", ["CN=Legal,OU=Groups,DC=corp"])]
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
@@ -160,12 +160,12 @@ class TestGetUserGroupIds:
 
     @pytest.mark.asyncio
     async def test_user_without_groups_returns_empty_set(self):
-        client = AdapiClient(base_url="http://adapi.local")
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, [self._user("djenkins", [])])):
             assert await client.get_user_group_ids("djenkins@corp.local") == set()
 
     @pytest.mark.asyncio
-    async def test_adapi_failure_soft_fails_to_empty_set(self):
-        client = AdapiClient(base_url="http://adapi.local")
+    async def test_directory_failure_soft_fails_to_empty_set(self):
+        client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("refused")):
             assert await client.get_user_group_ids("djenkins") == set()

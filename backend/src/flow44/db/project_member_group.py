@@ -17,7 +17,7 @@ class ProjectMemberGroup(SQLModel, table=True):
     project_id: str = Field(
         sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
     )
-    # group's AD distinguishedName — the id ADAPI reports in a user's memberOf.
+    # group's AD distinguishedName — the id the directory service reports in a user's memberOf.
     group_id: str = Field(index=True)
     # display-only snapshots captured at invite time; never used for access decisions.
     group_name: str = Field(default="")
