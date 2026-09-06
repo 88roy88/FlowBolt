@@ -19,10 +19,12 @@ interface VersionState {
   versions: string[];
   previewingVersion: string | null;
   pendingDirtyOp: PendingDirtyOp | null;
+  dirtyFiles: string[];
   previewVersion: (commit_sha: string) => void;
   exitPreview: () => void;
   restoreVersion: (commit_sha: string) => void;
   saveVersion: () => void;
+  discardEdits: () => void;
   resolveDirtyOp: (resolution: DirtyResolution) => void;
   dismissDirtyOp: () => void;
   reset: () => void;
@@ -68,6 +70,7 @@ export const useVersionStore = create<VersionState>((set, get) => ({
   versions: [],
   previewingVersion: null,
   pendingDirtyOp: null,
+  dirtyFiles: [],
 
   previewVersion(commit_sha: string) {
     issue({ op: 'preview', commit_sha }, { type: 'preview_version', commit_sha });
@@ -83,6 +86,10 @@ export const useVersionStore = create<VersionState>((set, get) => ({
 
   saveVersion() {
     send({ type: 'save_version' });
+  },
+
+  discardEdits() {
+    send({ type: 'discard_edits' });
   },
 
   resolveDirtyOp(resolution: DirtyResolution) {
@@ -102,7 +109,7 @@ export const useVersionStore = create<VersionState>((set, get) => ({
 
   reset() {
     pending = null;
-    set({ versions: [], previewingVersion: null, pendingDirtyOp: null });
+    set({ versions: [], previewingVersion: null, pendingDirtyOp: null, dirtyFiles: [] });
   },
 }));
 
@@ -175,6 +182,7 @@ const versionRoutes: { [M in WSMessage as M['type']]?: (msg: M) => void } = {
   version_preview_active: handleVersionPreviewActive,
   version_restored: handleVersionRestored,
   version_error: handleVersionError,
+  workspace_dirty: (msg) => useVersionStore.setState({ dirtyFiles: msg.files }),
   error: () => settle(false),
   phase: () => { if (pending?.op === 'send') settle(true); },
 };

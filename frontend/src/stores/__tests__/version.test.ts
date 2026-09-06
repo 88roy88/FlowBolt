@@ -168,3 +168,29 @@ describe('version_error handling', () => {
   });
 });
 
+describe('workspace_dirty handling', () => {
+  beforeEach(() => {
+    useVersionStore.setState({ dirtyFiles: [] });
+    socketSend.mockReset();
+  });
+
+  it('takes the dirty state from the server rather than mirroring writes locally', () => {
+    handleVersionMessage(msg({ type: 'workspace_dirty', files: ['src/App.tsx'] }));
+
+    expect(useVersionStore.getState().dirtyFiles).toEqual(['src/App.tsx']);
+
+    handleVersionMessage(msg({ type: 'workspace_dirty', files: [] }));
+
+    expect(useVersionStore.getState().dirtyFiles).toEqual([]);
+  });
+
+  it('sends a standalone discard with no follow-up op', () => {
+    const sent: unknown[] = [];
+    socketSend.mockImplementation((m: unknown) => sent.push(m));
+
+    useVersionStore.getState().discardEdits();
+
+    expect(sent).toEqual([{ type: 'discard_edits' }]);
+    expect(useVersionStore.getState().pendingDirtyOp).toBeNull();
+  });
+});

@@ -10,9 +10,9 @@ export function UserEditCard({ files }: { files: string[] }) {
     : t('version.youEdited', 'You edited {{files}}', { files: shown });
 
   return (
-    <CardWrapper accent="primary">
+    <CardWrapper accent="primary" className="px-2.5 py-1.5 text-[11px]">
       <div className="flex items-center gap-1.5 text-muted-foreground">
-        <Pencil size={13} className="text-primary/70 shrink-0" />
+        <Pencil size={11} className="text-primary/70 shrink-0" />
         <span className="truncate">{files.length ? label : t('version.youEditedFiles', 'You edited the project')}</span>
       </div>
     </CardWrapper>

@@ -31,6 +31,8 @@ export function useEditorPanelSave(
     (value: string | undefined) => {
       if (readOnly) return;
       if (!activeFilePath || value === undefined) return;
+      // Monaco echoes store-driven setValue() back as a change — that is a refresh, not an edit.
+      if (value === useFilesStore.getState().openFiles.get(activeFilePath)) return;
       updateFileContent(activeFilePath, value);
       debouncedSave(activeFilePath);
     },

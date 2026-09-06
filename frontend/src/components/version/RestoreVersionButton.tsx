@@ -36,7 +36,7 @@ export function RestoreVersionButton({ commit_sha, versionLabel, className }: Pr
         title={t('version.restoreDialogTitle', { version: versionLabel })}
         body={t('version.restoreDialogBody', { version: versionLabel })}
         confirmLabel={t('version.confirmRestore')}
-        confirmClassName="bg-warning text-background hover:bg-warning/90"
+        confirmVariant="warning"
         confirmIcon={<RotateCcw size={13} />}
         onConfirm={() => {
           restoreVersion(commit_sha);

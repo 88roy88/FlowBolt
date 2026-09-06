@@ -467,3 +467,53 @@ async def test_a_failed_op_re_emits_the_real_head(project_id: str, workspace: Pa
         unsubscribe(project_id, queue)
 
     assert queue.get_nowait() == {"type": "version_preview_active", "commit_sha": v0, "is_latest": False}
+
+
+async def test_discard_edits_tells_the_client_the_tree_moved(project_id: str, workspace: Path) -> None:
+    # A standalone Discard has no follow-up op, so the discard itself must resync the editor.
+    (workspace / "a.txt").write_text("one")
+    await Git(project_id).init("v0")
+    (workspace / "a.txt").write_text("two")
+    await versioning.commit_turn(project_id)
+    head = await Git(project_id).head_sha()
+    (workspace / "a.txt").write_text("MANUAL-EDIT")
+
+    queue = subscribe(project_id)
+    try:
+        await versioning.discard_edits(project_id)
+    finally:
+        unsubscribe(project_id, queue)
+
+    assert queue.get_nowait() == {"type": "version_preview_active", "commit_sha": head, "is_latest": True}
+    assert queue.get_nowait() == {"type": "workspace_dirty", "files": []}
+
+
+async def test_save_version_clears_the_dirty_flag(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("one")
+    await Git(project_id).init("v0")
+    (workspace / "a.txt").write_text("MANUAL-EDIT")
+
+    queue = subscribe(project_id)
+    try:
+        await versioning.save_version(project_id)
+    finally:
+        unsubscribe(project_id, queue)
+
+    assert queue.get_nowait()["type"] == "version_committed"
+    assert queue.get_nowait() == {"type": "workspace_dirty", "files": []}
+
+
+async def test_connect_broadcast_reports_an_unsaved_edit(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("one")
+    await Git(project_id).init("v0")
+    (workspace / "a.txt").write_text("MANUAL-EDIT")
+    (workspace / "scratch.txt").write_text("untracked")
+
+    queue = subscribe(project_id)
+    try:
+        await versioning.broadcast_current_version(project_id)
+    finally:
+        unsubscribe(project_id, queue)
+
+    assert queue.get_nowait()["type"] == "version_preview_active"
+    assert queue.get_nowait() == {"type": "workspace_dirty", "files": ["a.txt", "scratch.txt"]}

@@ -196,6 +196,7 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'version_preview_active'; commit_sha: string; is_latest: boolean }
   | { type: 'version_restored'; commit_sha: string }
   | { type: 'version_error'; message: string; code: VersionErrorCode; files?: string[] }
+  | { type: 'workspace_dirty'; files: string[] }
   | { type: 'preview_version'; commit_sha: string }
   | { type: 'exit_preview' }
   | { type: 'restore_version'; commit_sha: string }

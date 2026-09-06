@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from './button';
+import { Button, type ButtonProps } from './button';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from './dialog';
 
 interface ConfirmDialogProps {
@@ -10,9 +10,10 @@ interface ConfirmDialogProps {
   body: ReactNode;
   confirmLabel: string;
   onConfirm: () => void;
-  confirmClassName?: string;
+  confirmVariant?: ButtonProps['variant'];
   confirmIcon?: ReactNode;
   secondaryLabel?: string;
+  secondaryVariant?: ButtonProps['variant'];
   onSecondary?: () => void;
 }
 
@@ -23,9 +24,10 @@ export function ConfirmDialog({
   body,
   confirmLabel,
   onConfirm,
-  confirmClassName,
+  confirmVariant = 'default',
   confirmIcon,
   secondaryLabel,
+  secondaryVariant = 'outline',
   onSecondary,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
@@ -40,11 +42,11 @@ export function ConfirmDialog({
             {t('common.cancel')}
           </Button>
           {secondaryLabel && (
-            <Button variant="outline" size="sm" onClick={onSecondary}>
+            <Button variant={secondaryVariant} size="sm" onClick={onSecondary}>
               {secondaryLabel}
             </Button>
           )}
-          <Button variant="default" size="sm" className={confirmClassName} onClick={onConfirm}>
+          <Button variant={confirmVariant} size="sm" onClick={onConfirm}>
             {confirmIcon}
             {confirmLabel}
           </Button>

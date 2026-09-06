@@ -135,6 +135,10 @@ async def _emit_current_version(project_id: str, git: Git) -> None:
     await emit_transient(project_id, {"type": "version_preview_active", "commit_sha": head, "is_latest": is_latest})
 
 
+async def _emit_dirty(project_id: str, git: Git) -> None:
+    await emit_transient(project_id, {"type": "workspace_dirty", "files": await git.changed_files()})
+
+
 # -- Public API: the caller handles the errors these raise --
 
 
@@ -155,17 +159,18 @@ async def begin_turn(project_id: str) -> datetime | None:
 
 async def save_version(project_id: str) -> None:
     async with _workspace(project_id, _needs_writable) as git:
-        if not await git.is_dirty():
-            return
         files = await git.changed_files()
         sha = await git.commit_all(_USER_EDITS_MESSAGE)
         if sha:
             await _emit_committed(project_id, sha, author="user", files=files)
+        await _emit_dirty(project_id, git)
 
 
 async def discard_edits(project_id: str) -> None:
     async with _workspace(project_id, _needs_writable) as git:
         await git.discard_all()
+        await _emit_current_version(project_id, git)
+        await _emit_dirty(project_id, git)
 
 
 async def preview_version(project_id: str, commit_sha: str) -> None:
@@ -178,12 +183,14 @@ async def preview_version(project_id: str, commit_sha: str) -> None:
         else:
             await git.checkout(commit_sha)
         await _emit_current_version(project_id, git)
+        await _emit_dirty(project_id, git)
 
 
 async def exit_preview(project_id: str) -> None:
     async with _workspace(project_id) as git:
         await git.checkout_latest()
         await _emit_current_version(project_id, git)
+        await _emit_dirty(project_id, git)
 
 
 async def restore_version(project_id: str, commit_sha: str) -> None:
@@ -196,6 +203,7 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
         if target.created_at:
             await trim_messages_after(project_id, target.created_at.isoformat())
         await emit_transient(project_id, {"type": "version_restored", "commit_sha": commit_sha})
+        await _emit_dirty(project_id, git)
 
 
 # -- Public API: called from paths that must survive a versioning failure, so these swallow and log --
@@ -210,10 +218,19 @@ async def commit_turn(project_id: str) -> str | None:
             sha = await git.commit_all(_TURN_MESSAGE)
             if sha:
                 await _emit_committed(project_id, sha)
+            await _emit_dirty(project_id, git)
             return sha
     except Exception:
         logger.exception("[versioning] commit_turn failed for %s", project_id)
         return None
+
+
+async def broadcast_dirty(project_id: str) -> None:
+    try:
+        async with _workspace(project_id) as git:
+            await _emit_dirty(project_id, git)
+    except Exception:
+        logger.exception("[versioning] dirty broadcast failed for %s", project_id)
 
 
 async def broadcast_current_version(project_id: str, *, reset_orphaned_preview: bool = False) -> None:
@@ -222,5 +239,6 @@ async def broadcast_current_version(project_id: str, *, reset_orphaned_preview: 
             if reset_orphaned_preview and git.is_detached():
                 await git.checkout_latest()
             await _emit_current_version(project_id, git)
+            await _emit_dirty(project_id, git)
     except Exception:
         logger.exception("[versioning] version broadcast failed for %s", project_id)

@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
 import jwt
@@ -164,12 +165,14 @@ def require_permission(permission: Permission) -> Any:
     return Depends(_check)
 
 
-async def require_writable_workspace(project: ProjectDep) -> None:
+async def require_writable_workspace(project: ProjectDep) -> AsyncIterator[None]:
     """Gate: the working tree must not be owned by a run or a preview."""
     try:
         await versioning.require_writable(project.id)
     except versioning.WorkspaceLocked as exc:
         raise HTTPException(status_code=409, detail=exc.payload) from None
+    yield
+    await versioning.broadcast_dirty(project.id)
 
 
 async def require_platform_user(user_id: UserDep) -> str:

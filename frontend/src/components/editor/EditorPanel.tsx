@@ -7,7 +7,6 @@ loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useChatStore } from '../../stores/chat';
-import { useVersionStore } from '../../stores/version';
 import { useSessionStore } from '../../stores/session';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import { Resizer } from '../layout/Resizer';
@@ -45,7 +44,6 @@ export function EditorPanel() {
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
-  const saveVersion = useVersionStore((s) => s.saveVersion);
   const { code } = useWorkspaceLock();
   const editorReadOnly = code !== null || !buildCompleted;
   const readOnlyMessage = code ? t(LOCK_MESSAGES[code]) : t('editor.readOnlyUntilFirstAiResponse');
@@ -212,14 +210,6 @@ export function EditorPanel() {
           <div className="flex-1 min-w-0">
             <FileTabs />
           </div>
-          {!editorReadOnly && (
-            <button
-              onClick={saveVersion}
-              className="mx-3 h-5 px-2 text-[11px] shrink-0 rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
-            >
-              {t('version.saveAsVersion', 'Save as version')}
-            </button>
-          )}
           {saveStatus !== 'idle' && (
             <div className="flex items-center gap-1 px-3 text-[11px] text-muted-foreground shrink-0">
               {saveStatus === 'saving' ? (

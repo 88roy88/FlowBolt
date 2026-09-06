@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from flow44.api.deps import get_project, get_sandbox
 from flow44.config import settings
+from flow44.db.events import subscribe, unsubscribe
 from flow44.main import app
 from flow44.services.versioning.git import Git
 
@@ -80,3 +81,13 @@ def test_allowed_on_an_idle_attached_workspace(repo: Git) -> None:
 
     assert response.status_code == 200
     assert (Path(repo.workspace_dir) / "a.txt").read_text() == "two"
+
+
+def test_a_write_broadcasts_the_dirty_tree(repo: Git) -> None:
+    queue = subscribe(PROJECT_ID)
+    try:
+        _mutate("put", "/file/content", {"json": {"path": "/a.txt", "content": "two"}})
+    finally:
+        unsubscribe(PROJECT_ID, queue)
+
+    assert queue.get_nowait() == {"type": "workspace_dirty", "files": ["a.txt"]}
