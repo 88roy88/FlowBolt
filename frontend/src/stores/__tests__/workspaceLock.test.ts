@@ -2,19 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { lockCode } from '../workspaceLock';
 
 describe('lockCode', () => {
-  it('reports read_only before anything else', () => {
-    expect(lockCode(false, true, true)).toEqual('read_only');
-  });
+  it('applies read-only, running, previewing, then writable precedence', () => {
+    const cases = [
+      { canWrite: false, agentBusy: true, previewing: true, expected: 'read_only' },
+      { canWrite: true, agentBusy: true, previewing: true, expected: 'run_active' },
+      { canWrite: true, agentBusy: false, previewing: true, expected: 'previewing' },
+      { canWrite: true, agentBusy: false, previewing: false, expected: null },
+    ] as const;
 
-  it('reports run_active before previewing', () => {
-    expect(lockCode(true, true, true)).toEqual('run_active');
-  });
-
-  it('reports previewing when only previewing', () => {
-    expect(lockCode(true, false, true)).toEqual('previewing');
-  });
-
-  it('is null when the workspace is writable and idle', () => {
-    expect(lockCode(true, false, false)).toBeNull();
+    for (const { canWrite, agentBusy, previewing, expected } of cases) {
+      expect(lockCode(canWrite, agentBusy, previewing)).toBe(expected);
+    }
   });
 });

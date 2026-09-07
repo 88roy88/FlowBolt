@@ -1,5 +1,3 @@
-"""A refused turn must leave no trace — no chat row, no event, no destroyed pending plan (F-12)."""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -30,7 +28,6 @@ PREVIEWING = {
 
 @contextmanager
 def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
-    """A live chat WS with every write path mocked, so only ordering is under test."""
     project = MagicMock()
     project.id = PROJECT_ID
     project.user_id = "user-a"
@@ -51,7 +48,7 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
         patch("flow44.api.chat.delete_pending_plan", writes["delete_pending_plan"]),
     ):
         sandbox = MagicMock()
-        sandbox.project_id = PROJECT_ID  # the agents validate this, and would mask the assertions below
+        sandbox.project_id = PROJECT_ID
         mgr.wake_sandbox = AsyncMock(return_value=sandbox)
         yield writes
 
@@ -62,7 +59,7 @@ def _send(payload: dict[str, Any], claim: AsyncMock) -> tuple[dict[str, Any], di
             ws.send_json(payload)
             try:
                 reply = ws.receive_json()
-            except WebSocketDisconnect:  # pragma: no cover - only on an unexpected teardown
+            except WebSocketDisconnect:  # pragma: no cover
                 pytest.fail("socket closed instead of replying")
         return reply, writes
 
@@ -71,24 +68,27 @@ def _locked(code: str, files: list[str] | None = None) -> AsyncMock:
     return AsyncMock(side_effect=WorkspaceLocked(code, files))
 
 
-def test_message_refused_while_previewing_saves_nothing() -> None:
-    reply, writes = _send({"type": "message", "content": "change the header"}, _locked("previewing"))
+@pytest.mark.parametrize(
+    ("payload", "code", "files"),
+    [
+        ({"type": "message", "content": "change the header"}, "previewing", []),
+        ({"type": "fix_error", "error_message": "boom"}, "previewing", []),
+        ({"type": "message", "content": "change the header"}, "dirty_workspace", ["src/App.tsx"]),
+        ({"type": "fix_error", "error_message": "boom"}, "dirty_workspace", ["src/App.tsx"]),
+    ],
+)
+def test_message_and_fix_error_refusals_write_nothing(payload: dict[str, Any], code: str, files: list[str]) -> None:
+    reply, writes = _send(payload, _locked(code, files))
 
     writes["save_message"].assert_not_awaited()
     writes["emit_event"].assert_not_awaited()
-    assert reply == PREVIEWING
-
-
-def test_message_refused_over_unsaved_edits_reports_the_files() -> None:
-    reply, writes = _send({"type": "message", "content": "change the header"}, _locked("dirty_workspace", ["src/App.tsx"]))
-
-    writes["save_message"].assert_not_awaited()
-    assert reply == {
+    expected = {
         "type": "version_error",
-        "code": "dirty_workspace",
-        "message": "You have unsaved edits",
-        "files": ["src/App.tsx"],
+        "code": code,
+        "message": "You have unsaved edits" if code == "dirty_workspace" else "Restore this version before editing",
+        "files": files,
     }
+    assert reply == expected
 
 
 def test_message_refused_as_busy_saves_nothing() -> None:
@@ -98,13 +98,6 @@ def test_message_refused_as_busy_saves_nothing() -> None:
     writes["emit_event"].assert_not_awaited()
     assert reply["type"] == "error"
     assert "already running" in reply["message"]
-
-
-def test_fix_error_refused_while_previewing_saves_nothing() -> None:
-    reply, writes = _send({"type": "fix_error", "error_message": "boom"}, _locked("previewing"))
-
-    writes["save_message"].assert_not_awaited()
-    assert reply == PREVIEWING
 
 
 def test_refused_plan_accept_keeps_the_pending_plan() -> None:
@@ -123,15 +116,17 @@ def test_refused_plan_accept_keeps_the_pending_plan() -> None:
 
 def test_run_claim_released_when_a_side_effect_raises() -> None:
     claim = AsyncMock(return_value=CLAIMED_AT)
-    with _connected(claim) as writes:
+    with (
+        _connected(claim) as writes,
+        patch("flow44.api.chat.clear_heartbeat", new_callable=AsyncMock) as clear_heartbeat,
+    ):
         writes["save_message"].side_effect = RuntimeError("boom")
-        with patch("flow44.api.chat.clear_heartbeat", new_callable=AsyncMock) as clear_heartbeat:
-            with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
-                ws.send_json({"type": "message", "content": "change the header"})
-                try:
-                    reply = ws.receive_json()
-                except WebSocketDisconnect:  # pragma: no cover - only on an unexpected teardown
-                    pytest.fail("socket closed instead of replying")
+        with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
+            ws.send_json({"type": "message", "content": "change the header"})
+            try:
+                reply = ws.receive_json()
+            except WebSocketDisconnect:  # pragma: no cover
+                pytest.fail("socket closed instead of replying")
 
     assert reply == {"type": "error", "message": "Internal server error"}
     clear_heartbeat.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)

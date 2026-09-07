@@ -1,5 +1,3 @@
-"""The five mutating file endpoints refuse while a run owns the tree or a preview is active."""
-
 from __future__ import annotations
 
 import asyncio
@@ -42,7 +40,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Git]:
     root.mkdir()
     (root / "a.txt").write_text("one")
     git = Git(PROJECT_ID)
-    asyncio.run(git.init("v0"))  # already a repo, so the guard never has to reach the DB to make one
+    asyncio.run(git.init("v0"))
 
     project = MagicMock()
     project.id = PROJECT_ID
@@ -63,7 +61,12 @@ def test_refused_while_a_run_is_active(repo: Git, method: str, path: str, kwargs
     response = _mutate(method, path, kwargs, run_active=True)
 
     assert response.status_code == 409
-    assert response.json()["detail"]["code"] == "run_active"
+    assert response.json()["detail"] == {
+        "type": "version_error",
+        "code": "run_active",
+        "message": "Can't edit while the AI is working",
+        "files": [],
+    }
 
 
 @pytest.mark.parametrize(("method", "path", "kwargs"), MUTATIONS)
@@ -73,7 +76,12 @@ def test_refused_while_previewing(repo: Git, method: str, path: str, kwargs: dic
     response = _mutate(method, path, kwargs)
 
     assert response.status_code == 409
-    assert response.json()["detail"]["code"] == "previewing"
+    assert response.json()["detail"] == {
+        "type": "version_error",
+        "code": "previewing",
+        "message": "Restore this version before editing",
+        "files": [],
+    }
 
 
 def test_allowed_on_an_idle_attached_workspace(repo: Git) -> None:

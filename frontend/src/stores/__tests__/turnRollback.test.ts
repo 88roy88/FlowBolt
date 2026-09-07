@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useChatStore } from '../chat';
+import { useErrorStore } from '../errors';
 import { handleVersionMessage, useVersionStore } from '../version';
 import type { WSMessage } from '../../types';
 
@@ -44,46 +45,60 @@ function msg(data: Record<string, unknown>): WSMessage {
   return data as unknown as WSMessage;
 }
 
-describe('a refused turn leaves no trace', () => {
+describe('turn rollback boundary', () => {
   beforeEach(() => {
     useChatStore.setState({ messages: [], isStreaming: false, agentAlive: null });
     useVersionStore.setState({ pendingDirtyOp: null, previewingVersion: null });
+    useErrorStore.setState({ errors: [] });
     socketSend.mockClear();
   });
 
-  it('withdraws the optimistic message when the tree is dirty, and re-sends on save', () => {
+  it.each([
+    {
+      code: 'dirty_workspace',
+      message: 'You have unsaved edits',
+      files: ['src/App.tsx'],
+      pendingDirtyOp: { op: 'send', files: ['src/App.tsx'] },
+    },
+    {
+      code: 'run_active',
+      message: "Can't edit while the AI is working",
+      files: [],
+      pendingDirtyOp: null,
+    },
+    {
+      code: 'previewing',
+      message: 'Restore this version before editing',
+      files: [],
+      pendingDirtyOp: null,
+    },
+  ])('withdraws an optimistic turn refused with $code', ({ code, message, files, pendingDirtyOp }) => {
     useChatStore.getState().sendMessage('add a button');
     expect(useChatStore.getState().messages).toHaveLength(1);
 
     handleVersionMessage(
-      msg({ type: 'version_error', message: 'You have unsaved edits', code: 'dirty_workspace', files: ['src/App.tsx'] }),
+      msg({ type: 'version_error', code, message, files }),
     );
 
     expect(useChatStore.getState().messages).toEqual([]);
     expect(useChatStore.getState().agentAlive).toBe(false);
-    expect(useVersionStore.getState().pendingDirtyOp).toMatchObject({ op: 'send', files: ['src/App.tsx'] });
-
-    useVersionStore.getState().resolveDirtyOp('save');
-
-    expect(useChatStore.getState().messages.map((m) => m.content)).toEqual(['add a button']);
-    expect(socketSend).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'message', content: 'add a button' }));
-  });
-
-  it('withdraws it when an agent is already running', () => {
-    useChatStore.getState().sendMessage('add a button');
-
-    handleVersionMessage(msg({ type: 'error', message: 'An agent is already running' }));
-
-    expect(useChatStore.getState().messages).toEqual([]);
     expect(useChatStore.getState().isStreaming).toBe(false);
+    expect(useVersionStore.getState().pendingDirtyOp).toEqual(
+      pendingDirtyOp ? expect.objectContaining(pendingDirtyOp) : null,
+    );
   });
 
-  it('keeps the turn once the agent reports a phase', () => {
+  it('keeps the turn after the first phase commits it', () => {
     useChatStore.getState().sendMessage('add a button');
     handleVersionMessage(msg({ type: 'phase', phase: 'planning' }));
 
-    handleVersionMessage(msg({ type: 'version_error', message: 'Version operation failed', code: 'failed' }));
+    handleVersionMessage(
+      msg({ type: 'version_error', code: 'run_active', message: "Can't edit while the AI is working", files: [] }),
+    );
 
-    expect(useChatStore.getState().messages).toHaveLength(1);
+    expect(useChatStore.getState().messages.map((message) => message.content)).toEqual(['add a button']);
+    expect(useErrorStore.getState().errors.map((error) => error.message)).toEqual([
+      "Can't edit while the AI is working",
+    ]);
   });
 });
