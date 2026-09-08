@@ -17,9 +17,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["FlapiClient", "FlapiUpstreamError", "data_source_client"]
 
-# Flapi's run timeout is 25 minutes
-DEFAULT_FLAPI_CLIENT_TIMEOUT_S = 25 * 60 + 10
-
 
 class FlapiUpstreamError(RuntimeError):
     """FLAPI returned an error or was unreachable."""
@@ -30,11 +27,11 @@ class FlapiUpstreamError(RuntimeError):
 
 
 class FlapiClient:
-    def __init__(self, base_url: str | None = None, *, timeout_s: float = DEFAULT_FLAPI_CLIENT_TIMEOUT_S) -> None:
+    def __init__(self, base_url: str | None = None) -> None:
         self.base_url = base_url or settings.FLAPI_BASE_URL
         self._http = httpx.AsyncClient(
             base_url=self.base_url.rstrip("/"),
-            timeout=timeout_s,
+            timeout=settings.FLAPI_CLIENT_TIMEOUT_SEC,
             verify=settings.FLAPI_VERIFY_SSL,
         )
 
