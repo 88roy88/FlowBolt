@@ -9,9 +9,14 @@ from typing import IO
 
 from pydantic import BaseModel
 
+from flow44.config import settings
 from flow44.sandbox.pty import BasePTY
 
 logger = logging.getLogger(__name__)
+
+
+def workspace_path(project_id: str) -> str:
+    return os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
 
 
 class SandboxInfo(BaseModel, frozen=True):
