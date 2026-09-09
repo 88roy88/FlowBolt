@@ -19,6 +19,16 @@ def _mock_client_cm(client):
     return cm
 
 
+def _mock_paginator(client, pages):
+    async def _paginate(**_kwargs):
+        for page in pages:
+            yield page
+
+    paginator = MagicMock()
+    paginator.paginate = _paginate
+    client.get_paginator = MagicMock(return_value=paginator)
+
+
 def test_client_requires_setup(storage):
     with pytest.raises(RuntimeError):
         _ = storage.client
@@ -109,45 +119,100 @@ async def test_setup_propagates_close_error(storage):
 
 
 @pytest.mark.asyncio
-async def test_deploy_single_html(storage):
+async def test_deploy_dist(storage):
     client = AsyncMock()
+    _mock_paginator(client, [])  # nothing to clear
     storage._client = client
-    html_content = "<html>test</html>"
-    project_id = "proj-123"
+    files = [
+        ("index.html", b"<html></html>"),
+        ("assets/app-abc.js", b"console.log(1)"),
+        ("logo.png", b"\x89PNG"),
+    ]
 
     with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
-        with patch.object(settings, "S3_ENDPOINT_URL", "http://s3.local"):
-            url = await storage.deploy_single_html(html_content, project_id)
+        await storage.deploy_dist("proj-123", files)
 
-            expected_key = f"published/{project_id}.html"
-            client.put_object.assert_awaited_once_with(
-                Bucket="my-bucket",
-                Key=expected_key,
-                Body=html_content.encode("utf-8"),
-                ContentType="text/html",
-                ACL="public-read",
-                StorageClass=settings.S3_STORAGE_CLASS,
-            )
-            assert url == f"http://s3.local/my-bucket/{expected_key}"
+    calls = {c.kwargs["Key"]: c.kwargs for c in client.put_object.call_args_list}
+    assert set(calls) == {
+        "published/proj-123/index.html",
+        "published/proj-123/assets/app-abc.js",
+        "published/proj-123/logo.png",
+    }
+    assert calls["published/proj-123/index.html"]["ContentType"] == "text/html"
+    assert calls["published/proj-123/logo.png"]["ContentType"] == "image/png"
+    assert calls["published/proj-123/index.html"]["ACL"] == "public-read"
 
 
 @pytest.mark.asyncio
-async def test_delete_published_html(storage):
+async def test_delete_published_prefix(storage):
     client = AsyncMock()
+    _mock_paginator(
+        client,
+        [{"Contents": [{"Key": "published/proj-123/index.html"}, {"Key": "published/proj-123/logo.png"}]}],
+    )
     storage._client = client
-    project_id = "proj-123"
 
     with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
-        await storage.delete_published_html(project_id)
+        await storage.delete_published_prefix("proj-123")
 
-        client.delete_object.assert_awaited_once_with(Bucket="my-bucket", Key=f"published/{project_id}.html")
+    client.get_paginator.assert_called_once_with("list_objects_v2")
+    client.delete_objects.assert_awaited_once_with(
+        Bucket="my-bucket",
+        Delete={"Objects": [{"Key": "published/proj-123/index.html"}, {"Key": "published/proj-123/logo.png"}]},
+    )
 
 
 @pytest.mark.asyncio
-async def test_delete_published_html_swallows_client_error(storage):
+async def test_delete_published_prefix_empty_is_noop(storage):
     client = AsyncMock()
-    client.delete_object.side_effect = ClientError({"Error": {"Code": "NoSuchKey"}}, "DeleteObject")
+    _mock_paginator(client, [{"Contents": []}])
     storage._client = client
 
     with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
-        await storage.delete_published_html("proj-123")  # must not raise
+        await storage.delete_published_prefix("proj-123")
+
+    client.delete_objects.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_published_prefix_swallows_client_error(storage):
+    client = AsyncMock()
+    client.get_paginator = MagicMock(side_effect=ClientError({"Error": {"Code": "AccessDenied"}}, "ListObjectsV2"))
+    storage._client = client
+
+    with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
+        await storage.delete_published_prefix("proj-123")  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_get_asset_returns_s3object(storage):
+    client = AsyncMock()
+    body = AsyncMock()
+    body.read = AsyncMock(return_value=b"\x89PNG")
+    client.get_object = AsyncMock(
+        return_value={
+            "Body": body,
+            "ContentType": "image/png",
+            "ETag": '"abc"',
+        }
+    )
+    storage._client = client
+
+    with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
+        obj = await storage.get_asset("proj-123", "logo.png")
+
+    client.get_object.assert_awaited_once_with(Bucket="my-bucket", Key="published/proj-123/logo.png")
+    assert obj is not None
+    assert obj.body == b"\x89PNG"
+    assert obj.content_type == "image/png"
+    assert obj.etag == '"abc"'
+
+
+@pytest.mark.asyncio
+async def test_get_asset_missing_returns_none(storage):
+    client = AsyncMock()
+    client.get_object = AsyncMock(side_effect=ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject"))
+    storage._client = client
+
+    with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
+        assert await storage.get_asset("proj-123", "missing.png") is None
