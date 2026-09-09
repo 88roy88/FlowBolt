@@ -9,3 +9,4 @@ export { ErrorFixRequestCard } from './ErrorFixRequestCard';
 export { FixProgressCard } from './FixProgressCard';
 export { DiffBlock } from './DiffBlock';
 export { FollowUpProgress } from './FollowUpProgress';
+export { InterviewAnsweredCard } from './InterviewAnsweredCard';

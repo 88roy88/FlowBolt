@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
+import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff, InterviewQuestion, InterviewAnswer, InterviewMode } from '../types';
 import { WRITE_ROLES } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
@@ -19,6 +19,8 @@ export interface ChatState {
   selectedModel: string | null;
   agentPhase: AgentPhase;
   planOverview: PlanOverview | null;
+  interviewQuestions: InterviewQuestion[] | null;
+  interviewMode: InterviewMode;
   executionTasks: ExecutionTask[];
   fixSteps: FixStep[];
   followUpSteps: FollowUpStep[];
@@ -34,6 +36,8 @@ export interface ChatState {
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
+  respondToInterview: (action: 'submit' | 'skip', answers?: InterviewAnswer[]) => void;
+  setInterviewMode: (mode: InterviewMode) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
   loadHistory: (projectId: string) => Promise<void>;
@@ -81,7 +85,17 @@ const RESET_STATE = {
   error: null,
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
+  interviewQuestions: null,
   executionTasks: [] as ExecutionTask[],
+};
+
+const PROJECT_RESET_STATE = {
+  ...RESET_STATE,
+  messages: [] as Message[],
+  historyLoaded: false,
+  buildCompleted: false,
+  agentAlive: null,
+  interviewMode: 'interview' as InterviewMode,
 };
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -95,6 +109,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedModel: null,
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
+  interviewQuestions: null,
+  interviewMode: 'interview',
   executionTasks: [],
   fixSteps: [],
   followUpSteps: [],
@@ -178,6 +194,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.send({
       type: 'message',
       content,
+      mode: get().interviewMode,
       ...(selectedModel && { model: selectedModel }),
       ...(selectedDataSources.length > 0 && { dataSourceIds: selectedDataSources.map((c) => c.id) }),
     });
@@ -207,6 +224,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     startAgentAlivePolling(projectId);
   },
 
+  respondToInterview(action: 'submit' | 'skip', answers?: InterviewAnswer[]) {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+
+    const socket = getChatSocket(projectId);
+    socket.send({ type: 'interview_response', action, answers });
+
+    set({ isStreaming: true, agentAlive: true, agentPhase: AGENT_PHASE.interviewing, interviewQuestions: null });
+    startAgentAlivePolling(projectId);
+  },
+
+  setInterviewMode(mode: InterviewMode) {
+    set({ interviewMode: mode });
+  },
+
   addMessage(message: Message) {
     set((state) => ({ messages: [...state.messages, message] }));
   },
@@ -222,14 +254,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       // Reset state, then replay all events — events are the single source of truth
       // for both user messages and assistant messages/cards
-      set({
-        messages: [],
-        isStreaming: false,
-        historyLoaded: false,
-        buildCompleted: false,
-        agentAlive: null,
-        ...RESET_STATE,
-      });
+      set({ ...PROJECT_RESET_STATE, isStreaming: false });
 
       const currentProject = useSessionStore.getState().currentProject;
       const canWrite = !currentProject?.role || WRITE_ROLES.has(currentProject.role);
@@ -268,7 +293,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearMessages() {
     stopAgentAlivePolling();
-    set({ messages: [], historyLoaded: false, buildCompleted: false, agentAlive: null, ...RESET_STATE });
+    set(PROJECT_RESET_STATE);
   },
 
   clearError() {

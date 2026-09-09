@@ -21,7 +21,13 @@
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
     "retryConnection": "Retry Connection",
     "createFirstProject": "Create your first project to get started",
-    "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation."
+    "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation.",
+    "tagline": "Describe what you want to build and the AI will design, plan, and code it for you.",
+    "hints": {
+      "dashboard": "A dashboard with charts",
+      "todo": "A todo app with drag & drop",
+      "landing": "A landing page with animations"
+    }
   },
   "sidebar": {
     "collapseSidebar": "Collapse sidebar",
@@ -134,8 +140,7 @@
   },
   "chat": {
     "chat": "Chat",
-    "send": "send",
-    "newLine": "new line",
+    "model": "Model",
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -143,6 +148,7 @@
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept or modify",
+      "reviewInterview": "Answer the questions above, or skip",
       "working": "AI is working...",
       "readOnly": "View-only access",
       "default": "What do you want to build? Click on + to add flow packages."
@@ -150,6 +156,7 @@
     "phase": {
       "analyzing": "Analyzing",
       "fetchingDataSources": "Fetching data sources",
+      "interviewing": "Preparing questions",
       "designing": "Designing",
       "planning": "Planning",
       "building": "Building",
@@ -170,7 +177,23 @@
       "changeSomething": "Change something",
       "sendFeedback": "Send feedback"
     },
+    "interview": {
+      "title": "A few quick questions before I build",
+      "other": "Something else",
+      "submit": "Continue",
+      "skip": "Skip",
+      "skipAll": "Skip all",
+      "next": "Next",
+      "back": "Back",
+      "progress": "Question {{current}} of {{total}}",
+      "selectHint": "Select all that apply",
+      "modePlan": "Plan",
+      "modeBuild": "Build",
+      "modePlanHint": "A few questions before building",
+      "modeBuildHint": "Skip the questions and plan right away"
+    },
     "design": {
+      "designing": "Designing...",
       "designComplete": "Design complete",
       "architecture": "Architecture",
       "uiux": "UI/UX"

@@ -24,7 +24,8 @@ export type AgentCard =
   | { type: 'fix_progress'; steps: FixStep[]; diffs?: FileDiff[] }
   | { type: 'data_sources_fetched'; dataSources: { dataSourceId: string; dataSourceName: string; dataSchema: string; relevantFields?: string }[] }
 
-  | { type: 'followup_progress'; steps: FollowUpStep[]; answer?: string; filesChanged?: string[]; diffs?: FileDiff[] };
+  | { type: 'followup_progress'; steps: FollowUpStep[]; answer?: string; filesChanged?: string[]; diffs?: FileDiff[] }
+  | { type: 'interview_answered'; questions: InterviewQuestion[]; answers: InterviewAnswer[] };
 
 export interface Action {
   type: 'file' | 'shell';
@@ -106,6 +107,8 @@ export interface DataSourceSearchResult {
 export type AgentPhase =
   | 'idle'
   | 'fetching_data_sources'
+  | 'interviewing'
+  | 'awaiting_interview'
   | 'designing'
   | 'planning'
   | 'awaiting_approval'
@@ -134,6 +137,27 @@ export interface PlanOverview {
   features: PlanFeature[];
   decisions: PlanDecision[];
 }
+
+// Interview (clarifying questions before planning)
+export interface InterviewOption {
+  label: string;
+  description: string;
+}
+
+export interface InterviewQuestion {
+  id: string;
+  header: string;
+  question: string;
+  options: InterviewOption[];
+  multi_select: boolean;
+}
+
+export interface InterviewAnswer {
+  question_id: string;
+  values: string[];
+}
+
+export type InterviewMode = 'interview' | 'build';
 
 // Execution tasks (shown during build progress, title-only)
 export interface ExecutionTask {
@@ -165,7 +189,7 @@ export interface FollowUpStep {
 }
 
 export type WSMessage = { _ts?: string } & (
-  | { type: 'message'; content: string; model?: string; dataSourceIds?: number[] }
+  | { type: 'message'; content: string; model?: string; dataSourceIds?: number[]; mode?: 'interview' | 'build' }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }
@@ -177,6 +201,9 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'task_list'; tasks: ExecutionTask[] }
   | { type: 'task_update'; taskId: string; status: 'running' | 'completed' | 'failed'; file?: string }
   | { type: 'plan_response'; action: 'accept' | 'modify'; feedback?: string }
+  | { type: 'interview_questions'; questions: InterviewQuestion[] }
+  | { type: 'interview_answered'; questions: InterviewQuestion[]; answers: InterviewAnswer[] }
+  | { type: 'interview_response'; action: 'submit' | 'skip'; answers?: InterviewAnswer[]; model?: string }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'fix_step'; step: 'discover' | 'generate' | 'write' | 'validate' | 'retry'; status: 'running' | 'completed' | 'failed'; message: string }
   | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; model?: string }
