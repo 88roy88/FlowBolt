@@ -80,7 +80,10 @@ class TestRequiredParam:
             params_info=params,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in result
+        assert (
+            "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number; // Person\n}): Promise<PersonResults>"
+            in result
+        )
         assert "body['people']['person_id'] = personId;" in result
         assert "fetchDataSource('/api/data-source/7/run', body)" in result
 
@@ -138,7 +141,10 @@ class TestMixedParams:
             params_info=params,
             queries=_queries("mixed"),
         )
-        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };" in result
+        assert (
+            "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };"
+            in result
+        )
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) {\n    body['tasks']['priority'] = priority;\n  }" in result
         assert "if (createdAfter !== undefined) {\n    body['tasks']['created_after'] = createdAfter;\n  }" in result
@@ -648,8 +654,14 @@ class TestDatetimeFieldConversion:
         # Conversion loops emitted after envelope cast
         assert "  try {\n" in result
         assert "    for (const row of envelope.data['Events'])" in result
-        assert "      if (row['created_at'] != null) row['created_at'] = new Date(row['created_at'] as unknown as string);" in result
-        assert "      if (row['updated_at'] != null) row['updated_at'] = new Date(row['updated_at'] as unknown as string);" in result
+        assert (
+            "      if (row['created_at'] != null) row['created_at'] = new Date(row['created_at'] as unknown as string);"
+            in result
+        )
+        assert (
+            "      if (row['updated_at'] != null) row['updated_at'] = new Date(row['updated_at'] as unknown as string);"
+            in result
+        )
         assert "  } catch (e) {\n    console.warn('Failed to convert date fields', e);\n  }" in result
         # Non-datetime fields don't get a conversion line
         assert "row['id']" not in result

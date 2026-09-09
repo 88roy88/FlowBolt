@@ -18,9 +18,6 @@ def _to_dicts(messages: list[dict[str, Any] | Message]) -> list[dict[str, Any]]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]
 
 
-# TODO: move llmlite langfuse code here?
-
-
 @asynccontextmanager
 async def _handle_litellm_errors(model: str | None = None) -> AsyncIterator[None]:
     resolved_model = model or settings.AI_MODEL
@@ -115,7 +112,7 @@ async def stream_chat(
             api_base=settings.AI_BASE_URL,
             api_key=settings.AI_API_KEY,
             stream=True,
-            timeout=settings.AI_REQUEST_TIMEOUT,
+            timeout=settings.AI_STREAM_TIMEOUT,
             metadata=metadata or {},
         )
 

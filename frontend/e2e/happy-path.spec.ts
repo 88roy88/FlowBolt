@@ -66,7 +66,7 @@ test.describe('Happy path', () => {
     await ensureSidebar(page);
 
     // The chat textarea should be ready
-    const chatInput = page.getByPlaceholder(/describe what you want/i);
+    const chatInput = page.getByPlaceholder(/what do you want to build/i);
     await expect(chatInput).toBeVisible({ timeout: 5_000 });
 
     // Type a message

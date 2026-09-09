@@ -139,6 +139,19 @@ def tool(
     return decorator if func is None else decorator(func)
 
 
+MAX_ARG_LENGTH = 500
+
+
+def truncate_tool_args(args: dict[str, Any]) -> dict[str, Any]:
+    truncated: dict[str, Any] = {}
+    for key, value in args.items():
+        if isinstance(value, str) and len(value) > MAX_ARG_LENGTH:
+            truncated[key] = value[:MAX_ARG_LENGTH] + f"... ({len(value)} chars total)"
+        else:
+            truncated[key] = value
+    return truncated
+
+
 class ToolExecutor:
     def __init__(self, tools: Sequence[Tool]) -> None:
         self._tools = {t.schema.name: t for t in tools}
@@ -159,4 +172,4 @@ class ToolExecutor:
 
 
 # TODO: bring the parallel tool execution from primesrc
-# `/Users/roymezan/src/primesrc/code-validation-service/src/service/ai_logic`
+# `/Users/<username>/src/primesrc/code-validation-service/src/service/ai_logic`
