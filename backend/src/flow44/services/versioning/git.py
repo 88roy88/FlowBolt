@@ -21,9 +21,9 @@ class Git:
         self.git_dir = os.path.join(self.workspace_dir, ".git")
 
     async def _run(self, *args: str) -> str:
-        # Naming the repo is what contains git: under bare `-C`, a workspace without `.git` finds the enclosing one.
+        # Pin the git dir: under bare `-C`, a workspace with no `.git` walks up and finds FlowBolt's repo.
         repo = ["-C", self.workspace_dir, "--git-dir", self.git_dir, "--work-tree", self.workspace_dir]
-        # Thread, not create_subprocess_exec: uvicorn runs a Windows selector loop, which has no subprocess support.
+        # to_thread, not create_subprocess_exec: uvicorn's Windows selector loop has no subprocess support.
         result = await asyncio.to_thread(
             subprocess.run,
             ["git", *repo, *args],
@@ -66,7 +66,6 @@ class Git:
 
     async def init(self, message: str) -> str | None:
         await self._run("init")
-        # Set `main` before the first commit without depending on git >= 2.28 (`init -b`).
         await self._run("symbolic-ref", "HEAD", "refs/heads/main")
         await self._run("config", "user.name", _GIT_NAME)
         await self._run("config", "user.email", _GIT_EMAIL)
@@ -86,7 +85,6 @@ class Git:
         await self._run("checkout", "-f", "main")
 
     async def restore_main(self, sha: str) -> None:
-        # One command: a separate checkout can fail and leave `main` ahead, silently un-restoring later.
         await self._run("checkout", "-f", "-B", "main", sha)
 
     async def discard_all(self) -> None:

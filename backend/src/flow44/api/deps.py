@@ -166,7 +166,6 @@ def require_permission(permission: Permission) -> Any:
 
 
 async def require_writable_workspace(project: ProjectDep) -> AsyncIterator[None]:
-    """Gate: the working tree must not be owned by a run or a preview."""
     try:
         await versioning.require_writable(project.id)
     except versioning.WorkspaceLocked as exc:

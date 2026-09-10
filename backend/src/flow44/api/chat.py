@@ -117,7 +117,6 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
 
 
 async def _claim_run(project_id: str) -> datetime:
-    """Take the run lock up front, so a refused turn never reaches its side effects."""
     claimed_at = await versioning.begin_turn(project_id)
     if claimed_at is None:
         raise AgentAlreadyRunning
@@ -308,20 +307,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                         prepare=partial(_save_user_turn, project.id, error_desc, fix_event),
                     )
 
-                elif msg_type == "preview_version":
-                    await versioning.preview_version(project.id, data.get("commit_sha", ""))
-
-                elif msg_type == "restore_version":
-                    await versioning.restore_version(project.id, data.get("commit_sha", ""))
-
-                elif msg_type == "exit_preview":
-                    await versioning.exit_preview(project.id)
-
-                elif msg_type == "save_version":
-                    await versioning.save_version(project.id)
-
-                elif msg_type == "discard_edits":
-                    await versioning.discard_edits(project.id)
+                else:
+                    await versioning.handle_action(project.id, msg_type, data)
             except AgentAlreadyRunning:
                 await websocket.send_json(_AGENT_BUSY)
             except versioning.WorkspaceLocked as exc:

@@ -46,7 +46,6 @@ async def get_messages(project_id: str) -> list[ChatMessage]:
 
 
 async def trim_messages_after(project_id: str, created_at: str) -> None:
-    """Delete messages created after the given timestamp (used when a restore forks history)."""
     async with database.async_session() as session:
         await session.execute(
             delete(ChatMessage).where(

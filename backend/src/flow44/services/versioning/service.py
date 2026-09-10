@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import shutil
 from collections import defaultdict
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-from flow44.config import settings
 from flow44.db.chat import trim_messages_after
 from flow44.db.events import AgentEvent, emit_event, emit_transient, get_versions, trim_events_after
 from flow44.db.heartbeat import is_run_active, try_claim_run
@@ -49,57 +46,39 @@ class WorkspaceLocked(RuntimeError):
 # -- The lock --
 
 
-async def _refuse_if_busy(project_id: str) -> None:
+async def _not_busy(project_id: str, git: Git) -> None:
     if await is_run_active(project_id):
         raise WorkspaceLocked("run_active")
 
 
-async def _refuse_if_dirty(git: Git) -> None:
-    if await git.is_dirty():
-        raise WorkspaceLocked("dirty_workspace", await git.changed_files())
-
-
-async def _needs_writable(project_id: str, git: Git) -> None:
-    await _refuse_if_busy(project_id)
+async def _not_detached(project_id: str, git: Git) -> None:
     if git.is_detached():
         raise WorkspaceLocked("previewing")
 
 
-async def _needs_settled(project_id: str, git: Git) -> None:
-    await _refuse_if_busy(project_id)
-    await _refuse_if_dirty(git)
-
-
-async def _needs_turn(project_id: str, git: Git) -> None:
-    await _needs_writable(project_id, git)
-    await _refuse_if_dirty(git)
+async def _not_dirty(project_id: str, git: Git) -> None:
+    if await git.is_dirty():
+        raise WorkspaceLocked("dirty_workspace", await git.changed_files())
 
 
 Precondition = Callable[[str, Git], Awaitable[None]]
 
 
-def _seed_gitignore(workspace_dir: str) -> None:
-    target = Path(workspace_dir, ".gitignore")
-    if not target.exists():
-        shutil.copy(Path(settings.TEMPLATE_DIR, ".gitignore"), target)
-
-
 async def _ensure_repo(project_id: str, git: Git) -> None:
     if git.is_repo():
         return
-    _seed_gitignore(git.workspace_dir)
     sha = await git.init(_SCAFFOLD_MESSAGE)
     if sha:
         await _emit_committed(project_id, sha)
 
 
 @asynccontextmanager
-async def _workspace(project_id: str, needs: Precondition | None = None) -> AsyncIterator[Git]:
+async def _locked_workspace(project_id: str, preconditions: Sequence[Precondition] = ()) -> AsyncIterator[Git]:
     async with _locks[project_id]:
         git = Git(project_id)
         await _ensure_repo(project_id, git)
-        if needs:
-            await needs(project_id, git)
+        for check in preconditions:
+            await check(project_id, git)
         try:
             yield git
         except Exception:
@@ -143,22 +122,22 @@ async def _emit_dirty(project_id: str, git: Git) -> None:
 
 
 async def ensure_repo(project_id: str) -> None:
-    async with _workspace(project_id):
+    async with _locked_workspace(project_id):
         pass
 
 
 async def require_writable(project_id: str) -> None:
-    async with _workspace(project_id, _needs_writable):
+    async with _locked_workspace(project_id, [_not_busy, _not_detached]):
         pass
 
 
 async def begin_turn(project_id: str) -> datetime | None:
-    async with _workspace(project_id, _needs_turn):
+    async with _locked_workspace(project_id, [_not_busy, _not_detached, _not_dirty]):
         return await try_claim_run(project_id)
 
 
 async def save_version(project_id: str) -> None:
-    async with _workspace(project_id, _needs_writable) as git:
+    async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
         files = await git.changed_files()
         sha = await git.commit_all(_USER_EDITS_MESSAGE)
         if sha:
@@ -167,14 +146,14 @@ async def save_version(project_id: str) -> None:
 
 
 async def discard_edits(project_id: str) -> None:
-    async with _workspace(project_id, _needs_writable) as git:
+    async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
         await git.discard_all()
         await _emit_current_version(project_id, git)
         await _emit_dirty(project_id, git)
 
 
 async def preview_version(project_id: str, commit_sha: str) -> None:
-    async with _workspace(project_id, _needs_settled) as git:
+    async with _locked_workspace(project_id, [_not_busy, _not_dirty]) as git:
         versions = await get_versions(project_id)
         if _find(versions, commit_sha) is None:
             raise UnknownVersionError(commit_sha)  # never hand raw client input to git
@@ -187,14 +166,14 @@ async def preview_version(project_id: str, commit_sha: str) -> None:
 
 
 async def exit_preview(project_id: str) -> None:
-    async with _workspace(project_id) as git:
+    async with _locked_workspace(project_id) as git:
         await git.checkout_latest()
         await _emit_current_version(project_id, git)
         await _emit_dirty(project_id, git)
 
 
 async def restore_version(project_id: str, commit_sha: str) -> None:
-    async with _workspace(project_id, _needs_settled) as git:
+    async with _locked_workspace(project_id, [_not_busy, _not_dirty]) as git:
         target = _find(await get_versions(project_id), commit_sha)
         if target is None or target.id is None:
             raise UnknownVersionError(commit_sha)
@@ -206,12 +185,26 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
         await _emit_dirty(project_id, git)
 
 
+async def handle_action(project_id: str, msg_type: str, data: dict[str, Any]) -> None:
+    match msg_type:
+        case "preview_version":
+            await preview_version(project_id, data.get("commit_sha", ""))
+        case "restore_version":
+            await restore_version(project_id, data.get("commit_sha", ""))
+        case "exit_preview":
+            await exit_preview(project_id)
+        case "save_version":
+            await save_version(project_id)
+        case "discard_edits":
+            await discard_edits(project_id)
+
+
 # -- Public API: called from paths that must survive a versioning failure, so these swallow and log --
 
 
 async def commit_turn(project_id: str) -> str | None:
     try:
-        async with _workspace(project_id) as git:
+        async with _locked_workspace(project_id) as git:
             if git.is_detached():
                 logger.warning("[versioning] refusing to commit while detached for %s", project_id)
                 return None
@@ -227,7 +220,7 @@ async def commit_turn(project_id: str) -> str | None:
 
 async def broadcast_dirty(project_id: str) -> None:
     try:
-        async with _workspace(project_id) as git:
+        async with _locked_workspace(project_id) as git:
             await _emit_dirty(project_id, git)
     except Exception:
         logger.exception("[versioning] dirty broadcast failed for %s", project_id)
@@ -235,7 +228,7 @@ async def broadcast_dirty(project_id: str) -> None:
 
 async def broadcast_current_version(project_id: str, *, reset_orphaned_preview: bool = False) -> None:
     try:
-        async with _workspace(project_id) as git:
+        async with _locked_workspace(project_id) as git:
             if reset_orphaned_preview and git.is_detached():
                 await git.checkout_latest()
             await _emit_current_version(project_id, git)
