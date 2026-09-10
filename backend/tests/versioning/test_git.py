@@ -59,6 +59,38 @@ async def test_init_adopts_a_half_built_git_directory(project_id: str, workspace
     assert git.is_repo() is True
 
 
+async def test_commit_diffs_reports_one_hunk_set_per_file(repo: Git, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("changed\n")
+    (workspace / "new.txt").write_text("added\n")
+    sha = await repo.commit_all("edits")
+    assert sha
+
+    diffs = await repo.commit_diffs(sha, max_chars=10_000)
+
+    assert {d.path: d.is_new for d in diffs} == {"a.txt": False, "new.txt": True}
+    modified = next(d.diff for d in diffs if d.path == "a.txt")
+    assert modified.startswith("--- a/a.txt\n+++ b/a.txt\n@@")
+    assert "-zero" in modified
+    assert "+changed" in modified
+    assert "diff --git" not in modified
+
+
+async def test_commit_diffs_survives_a_body_that_looks_like_a_header(repo: Git, workspace: Path) -> None:
+    (workspace / "notes.md").write_text("diff --git a/fake b/fake\nnew file mode 100644\n")
+    sha = await repo.commit_all("prose about git")
+    assert sha
+
+    assert [d.path for d in await repo.commit_diffs(sha, max_chars=10_000)] == ["notes.md"]
+
+
+async def test_commit_diffs_skips_a_patch_over_the_cap(repo: Git, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("x" * 500)
+    sha = await repo.commit_all("bulky")
+    assert sha
+
+    assert await repo.commit_diffs(sha, max_chars=100) == []
+
+
 async def test_checkout_detaches_at_the_requested_version(version_chain: VersionChain) -> None:
     await version_chain.git.checkout(version_chain.shas[0])
 

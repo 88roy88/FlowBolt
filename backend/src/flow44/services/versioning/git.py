@@ -5,6 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from flow44.ai.agents.file_diffs import FileDiff
 from flow44.sandbox.base import workspace_path
 
 _GIT_NAME = "BuildApp AI"
@@ -13,6 +14,18 @@ _GIT_EMAIL = "ai@buildapp.local"
 
 class GitError(RuntimeError):
     pass
+
+
+def _split_file_diffs(show_output: str) -> list[FileDiff]:
+    diffs = []
+    for chunk in f"\n{show_output}".split("\ndiff --git ")[1:]:
+        meta, marker, body = chunk.partition("\n--- ")
+        if not marker:
+            continue
+        header, _, modes = meta.partition("\n")
+        path = header.removeprefix("a/").partition(" b/")[0]
+        diffs.append(FileDiff(path=path, diff=f"--- {body}", is_new="new file mode " in modes))
+    return diffs
 
 
 class Git:
@@ -61,6 +74,12 @@ class Git:
         tracked = await self._run("diff", "--name-only", "HEAD")
         untracked = await self._run("ls-files", "--others", "--exclude-standard")
         return sorted({*tracked.splitlines(), *untracked.splitlines()} - {""})
+
+    async def commit_diffs(self, sha: str, *, max_chars: int) -> list[FileDiff]:
+        out = await self._run("show", "--format=", "--no-color", sha)
+        if len(out) > max_chars:
+            return []
+        return _split_file_diffs(out)
 
     # -- Mutations --
 

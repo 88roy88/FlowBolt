@@ -45,7 +45,7 @@ function AgentCardRenderer({ message }: { message: Message }) {
         errorStack={card.errorStack}
       />;
     case 'user_edit':
-      return <UserEditCard files={card.files} />;
+      return <UserEditCard diffs={card.diffs} />;
     case 'fix_progress':
       return <FixProgressCard steps={card.steps} content={message.content} diffs={card.diffs} />;
     case 'followup_progress':
@@ -82,7 +82,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return null;
   }
 
-  const versionControl = !isUser && message.version && (
+  const versionControl = message.version && (
     <div className="max-w-[85%] px-1">
       <VersionControl commit_sha={message.version} />
     </div>

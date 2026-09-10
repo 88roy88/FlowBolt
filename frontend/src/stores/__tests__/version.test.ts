@@ -59,11 +59,12 @@ describe('version store wire contracts', () => {
       ],
     });
 
+    const diffs = [{ path: 'src/App.tsx', diff: '--- a/src/App.tsx\n+++ b/src/App.tsx\n@@ -1 +1 @@\n-a\n+b', is_new: false }];
     const userEdit = msg({
       type: 'version_committed',
       commit_sha: 'sha-user',
       author: 'user',
-      files: ['src/App.tsx'],
+      diffs,
       _ts: '2026-09-06T13:58:23.350895Z',
     });
     // Same order as loadHistory: the agent handler banks _ts before version.ts reads it back.
@@ -76,7 +77,8 @@ describe('version store wire contracts', () => {
 
     const messages = useChatStore.getState().messages;
     expect(messages.map((message) => message.version)).toEqual([undefined, 'sha-legacy', 'sha-user']);
-    expect(messages[2].agentCard).toEqual({ type: 'user_edit', files: ['src/App.tsx'] });
+    expect(messages[2].role).toBe('user');
+    expect(messages[2].agentCard).toEqual({ type: 'user_edit', diffs });
     expect(messages[2].timestamp).toBe(Date.parse('2026-09-06T13:58:23.350895Z'));
     expect(useVersionStore.getState().versions).toEqual(['sha-ai', 'sha-legacy', 'sha-user']);
   });

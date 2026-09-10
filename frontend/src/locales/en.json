@@ -223,9 +223,7 @@
     "unsavedRow_other": "Unsaved edits · {{count}} files",
     "saveAsVersion": "Save as version",
     "saveTooltip": "Save your edits as a version you can restore later",
-    "youEdited": "You edited {{files}}",
-    "youEditedMore": "You edited {{files}} and {{count}} more",
-    "youEditedFiles": "You edited the project"
+    "yourEdits": "Your edits"
   },
   "publish": {
     "publishFailed": "Publish Failed",

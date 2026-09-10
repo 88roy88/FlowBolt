@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, WSMessage } from '../types';
+import type { FileDiff, Message, WSMessage } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { useChatStore } from './chat';
@@ -113,25 +113,25 @@ export const useVersionStore = create<VersionState>((set, get) => ({
   },
 }));
 
-function userEditMessage(sha: string, files: string[]): Message {
+function userEditMessage(sha: string, diffs?: FileDiff[]): Message {
   return {
     id: crypto.randomUUID(),
-    role: 'assistant',
+    role: 'user',
     content: '',
     timestamp: getTimestamp(),
-    agentCard: { type: 'user_edit', files },
+    agentCard: { type: 'user_edit', diffs },
     version: sha,
   };
 }
 
-function handleVersionCommitted(msg: { commit_sha: string; author?: string; files?: string[] }) {
+function handleVersionCommitted(msg: { commit_sha: string; author?: string; diffs?: FileDiff[] }) {
   const sha = msg.commit_sha;
   useVersionStore.setState((s) => ({
     versions: s.versions.includes(sha) ? s.versions : [...s.versions, sha],
   }));
 
   if (msg.author === 'user') {
-    useChatStore.setState((s) => ({ messages: [...s.messages, userEditMessage(sha, msg.files ?? [])] }));
+    useChatStore.setState((s) => ({ messages: [...s.messages, userEditMessage(sha, msg.diffs)] }));
     return;
   }
 

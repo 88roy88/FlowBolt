@@ -191,9 +191,48 @@ async def test_saved_user_edits_stay_out_of_the_next_ai_version(project_id: str,
 
     versions = await get_versions(project_id)
     assert [event.payload["author"] for event in versions[-2:]] == ["user", "ai"]
-    assert versions[-2].payload["files"] == ["user.txt"]
+    assert [d["path"] for d in versions[-2].payload["diffs"]] == ["user.txt"]
     assert ai_sha
     assert (await version_chain.git._run("diff", "--name-only", f"{ai_sha}~1", ai_sha)).splitlines() == ["ai.txt"]
+
+
+async def test_save_version_records_diffs_and_tells_the_agent(project_id: str, version_chain: VersionChain) -> None:
+    (version_chain.workspace / "a.txt").write_text("edited by hand\n")
+    (version_chain.workspace / "new.txt").write_text("mine\n")
+
+    await versioning.save_version(project_id)
+
+    payload = (await get_versions(project_id))[-1].payload
+    assert {d["path"]: d["is_new"] for d in payload["diffs"]} == {"a.txt": False, "new.txt": True}
+    assert "+edited by hand" in next(d["diff"] for d in payload["diffs"] if d["path"] == "a.txt")
+    notes = await get_messages(project_id)
+    assert [(m.role, m.content) for m in notes] == [(ChatRole.user, "[I edited these files myself: a.txt, new.txt]")]
+    assert notes[0].created_at < payload["_ts"]
+
+
+async def test_save_version_drops_oversized_diffs(
+    project_id: str, version_chain: VersionChain, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(versioning, "_MAX_DIFF_CHARS", 10)
+    (version_chain.workspace / "a.txt").write_text("a much longer body than the cap allows\n")
+
+    await versioning.save_version(project_id)
+
+    assert "diffs" not in (await get_versions(project_id))[-1].payload
+
+
+@pytest.mark.parametrize(("restore_to_user_edit", "surviving_notes"), [(True, 1), (False, 0)])
+async def test_restore_keeps_the_edit_note_only_while_the_edits_survive(
+    project_id: str, version_chain: VersionChain, restore_to_user_edit: bool, surviving_notes: int
+) -> None:
+    (version_chain.workspace / "a.txt").write_text("edited by hand\n")
+    await versioning.save_version(project_id)
+    versions = await get_versions(project_id)
+    target = versions[-1] if restore_to_user_edit else versions[-2]
+
+    await versioning.restore_version(project_id, target.payload["commit_sha"])
+
+    assert len(await get_messages(project_id)) == surviving_notes
 
 
 async def test_discard_removes_tracked_and_untracked_edits_and_broadcasts(

@@ -25,7 +25,7 @@ export type AgentCard =
   | { type: 'task_progress'; tasks: ExecutionTask[] }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'error_fix_request'; errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string }
-  | { type: 'user_edit'; files: string[] }
+  | { type: 'user_edit'; diffs?: FileDiff[] }
   | { type: 'fix_progress'; steps: FixStep[]; diffs?: FileDiff[] }
   | { type: 'data_sources_fetched'; dataSources: { dataSourceId: string; dataSourceName: string; dataSchema: string; relevantFields?: string }[] }
 
@@ -192,7 +192,7 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'file_diffs'; diffs: FileDiff[] }
   | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
   | { type: 'plan_accepted'; overview: PlanOverview }
-  | { type: 'version_committed'; commit_sha: string; author?: VersionAuthor; files?: string[] }
+  | { type: 'version_committed'; commit_sha: string; author?: VersionAuthor; diffs?: FileDiff[] }
   | { type: 'version_preview_active'; commit_sha: string; is_latest: boolean }
   | { type: 'version_restored'; commit_sha: string }
   | { type: 'version_error'; message: string; code: VersionErrorCode; files?: string[] }

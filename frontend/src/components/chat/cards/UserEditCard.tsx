@@ -1,20 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { Pencil } from 'lucide-react';
+import type { FileDiff } from '../../../types';
 import { CardWrapper } from './CardWrapper';
+import { FileRows } from './FilesChangedSection';
 
-export function UserEditCard({ files }: { files: string[] }) {
+export function UserEditCard({ diffs }: { diffs?: FileDiff[] }) {
   const { t } = useTranslation();
-  const shown = files.slice(0, 3).join(', ');
-  const label = files.length > 3
-    ? t('version.youEditedMore', 'You edited {{files}} and {{count}} more', { files: shown, count: files.length - 3 })
-    : t('version.youEdited', 'You edited {{files}}', { files: shown });
 
   return (
-    <CardWrapper accent="primary" className="px-2.5 py-1.5 text-[11px]">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
+    <CardWrapper className="w-full border-primary/30 bg-user-bubble px-2.5 py-2">
+      <div className="flex items-center gap-1.5 mb-2 text-[11px] text-muted-foreground">
         <Pencil size={11} className="text-primary/70 shrink-0" />
-        <span className="truncate">{files.length ? label : t('version.youEditedFiles', 'You edited the project')}</span>
+        <span>{t('version.yourEdits', 'Your edits')}</span>
       </div>
+      <FileRows diffs={diffs} />
     </CardWrapper>
   );
 }

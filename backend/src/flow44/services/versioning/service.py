@@ -5,10 +5,12 @@ import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager, suppress
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
-from flow44.db.chat import trim_messages_after
+from flow44.ai.agents.file_diffs import FileDiff
+from flow44.db.chat import ChatRole, save_message, trim_messages_after
 from flow44.db.events import AgentEvent, emit_event, emit_transient, get_versions, trim_events_after
 from flow44.db.heartbeat import is_run_active, try_claim_run
 from flow44.services.versioning.git import Git
@@ -24,6 +26,8 @@ _MESSAGES = {
     "previewing": "Restore this version before editing",
     "dirty_workspace": "You have unsaved edits",
 }
+
+_MAX_DIFF_CHARS = 100_000
 
 _locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
@@ -101,10 +105,12 @@ def _newest_sha(versions: list[AgentEvent]) -> str | None:
 # -- Telling clients --
 
 
-async def _emit_committed(project_id: str, sha: str, *, author: str = "ai", files: list[str] | None = None) -> None:
+async def _emit_committed(
+    project_id: str, sha: str, *, author: str = "ai", diffs: list[FileDiff] | None = None
+) -> None:
     payload: dict[str, Any] = {"type": "version_committed", "commit_sha": sha, "author": author}
-    if files:
-        payload["files"] = files
+    if diffs:
+        payload["diffs"] = [asdict(d) for d in diffs]
     await emit_event(project_id, payload)
 
 
@@ -136,12 +142,17 @@ async def begin_turn(project_id: str) -> datetime | None:
         return await try_claim_run(project_id)
 
 
+def _edit_note(files: list[str]) -> str:
+    return f"[I edited these files myself: {', '.join(files)}]" if files else "[I edited the project files myself]"
+
+
 async def save_version(project_id: str) -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
-        files = await git.changed_files()
         sha = await git.commit_all(_USER_EDITS_MESSAGE)
         if sha:
-            await _emit_committed(project_id, sha, author="user", files=files)
+            diffs = await git.commit_diffs(sha, max_chars=_MAX_DIFF_CHARS)
+            await save_message(project_id, ChatRole.user, _edit_note([d.path for d in diffs]))
+            await _emit_committed(project_id, sha, author="user", diffs=diffs)
         await _emit_dirty(project_id, git)
 
 
