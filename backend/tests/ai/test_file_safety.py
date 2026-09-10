@@ -118,3 +118,7 @@ def test_file_safety_prompt_context_uses_contract_values() -> None:
 def test_gitignore_syncs_from_the_template() -> None:
     # Projects predating a template ignore rule must pick it up, or the dev server log lands in git.
     assert "**/.gitignore" in SYNCABLE_TEMPLATE_FILE_PATTERNS
+
+
+def test_git_internals_never_sync_from_the_template() -> None:
+    assert "**/.git/**" not in SYNCABLE_TEMPLATE_FILE_PATTERNS

@@ -172,4 +172,4 @@ class ToolExecutor:
 
 
 # TODO: bring the parallel tool execution from primesrc
-# `/Users/roymezan/src/primesrc/code-validation-service/src/service/ai_logic`
+# `/Users/<username>/src/primesrc/code-validation-service/src/service/ai_logic`

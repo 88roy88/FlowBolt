@@ -354,7 +354,10 @@
 
 .anchored-menu {
   position-anchor: var(--anchor);
+  /* Chrome 125-128 shipped the pre-rename draft names; keep both until the floor moves past 129 */
+  inset-area: block-end span-inline-start;
   position-area: block-end span-inline-start;
+  position-try-options: flip-block;
   position-try-fallbacks: flip-block;
   inset: auto;
   margin: 2px 0;

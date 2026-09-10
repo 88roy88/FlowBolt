@@ -62,6 +62,7 @@ class AIModelSettings(BuildAppSettings):
     AI_BASE_URL: str | None = "http://flow-44-models.com/openai/v1"
     AI_API_KEY: str | None = "default"
     AI_REQUEST_TIMEOUT: int = 300
+    AI_STREAM_TIMEOUT: int = 600
 
     # if ai_model starts with bedrock/ set base_url and api_key to None
     # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)
@@ -95,6 +96,7 @@ class FlapiSettings(BuildAppSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
     FLAPI_BASE_URL: str = "http://localhost:6001"
     FLAPI_VERIFY_SSL: bool = True
+    FLAPI_CLIENT_TIMEOUT_SEC: int = 25 * 60 + 10  # Flapi's default run timeout is 25 minutes
 
 
 class S3Settings(BuildAppSettings):

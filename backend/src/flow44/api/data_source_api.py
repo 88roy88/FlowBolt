@@ -93,6 +93,7 @@ async def run_data_source(
             data_source_id,
             authorization=authorization,
             params=quick_params,
+            execute_continued_process=True,
         )
     except ds_logic.FlapiUpstreamError as err:
         status = 401 if err.status_code == 401 else 502
