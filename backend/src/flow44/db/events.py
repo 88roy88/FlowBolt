@@ -73,12 +73,7 @@ async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = T
     event.setdefault("_ts", datetime.now(UTC).isoformat())
 
     async with database.async_session() as session:
-        row = AgentEvent(
-            project_id=project_id,
-            event_type=event.get("type", "unknown"),
-            payload=event,
-            created_at=datetime.now(UTC),
-        )
+        row = AgentEvent(project_id=project_id, event_type=event.get("type", "unknown"), payload=event)
         session.add(row)
         await session.commit()
 

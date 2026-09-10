@@ -124,7 +124,7 @@ async def test_restore_moves_git_and_trims_event_and_message_history(
 ) -> None:
     versions = await get_versions(project_id)
     target = versions[target_index]
-    assert target.created_at
+    assert target.payload["_ts"]
     async with database.async_session() as session:
         session.add(ChatMessage(project_id=project_id, role=ChatRole.user, content="keep", created_at="0001-01-01"))
         session.add(

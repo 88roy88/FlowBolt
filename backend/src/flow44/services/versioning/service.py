@@ -179,8 +179,7 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
             raise UnknownVersionError(commit_sha)
         await git.restore_main(commit_sha)
         await trim_events_after(project_id, target.id)
-        if target.created_at:
-            await trim_messages_after(project_id, target.created_at.isoformat())
+        await trim_messages_after(project_id, target.payload["_ts"])
         await emit_transient(project_id, {"type": "version_restored", "commit_sha": commit_sha})
         await _emit_dirty(project_id, git)
 
