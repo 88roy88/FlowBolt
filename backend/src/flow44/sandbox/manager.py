@@ -5,7 +5,7 @@ import shutil
 import socket
 
 from flow44.config import settings
-from flow44.sandbox.base import SandboxInfo
+from flow44.sandbox.base import SandboxInfo, workspace_path
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.main import PnpmSandbox, PnpmSandboxNamespace, PnpmSandboxUnix, PnpmSandboxWindows
 
@@ -61,7 +61,7 @@ class SandboxManager:
             async with self._lock:
                 port = self._take_available_port()
 
-            workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+            workspace_dir = workspace_path(project_id)
             info = SandboxInfo(project_id=project_id, workspace_dir=workspace_dir, port=port)
 
             sandbox = self._create_sandbox_instance(info)
@@ -106,7 +106,7 @@ class SandboxManager:
         """
         try:
             await self.suspend_sandbox(project_id)
-            workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
+            workspace_dir = workspace_path(project_id)
             await asyncio.to_thread(shutil.rmtree, workspace_dir, ignore_errors=True)
         except Exception:
             logger.exception("Failed to destroy sandbox %s", project_id)
