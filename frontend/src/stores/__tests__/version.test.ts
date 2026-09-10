@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WSMessage } from '../../types';
 import { useChatStore } from '../chat';
 import { useErrorStore } from '../errors';
+import { createSendMessageHandler } from '../chatHandlers';
 import { handleVersionMessage, useVersionStore } from '../version';
 
 vi.mock('../chat', () => {
@@ -58,15 +59,25 @@ describe('version store wire contracts', () => {
       ],
     });
 
+    const userEdit = msg({
+      type: 'version_committed',
+      commit_sha: 'sha-user',
+      author: 'user',
+      files: ['src/App.tsx'],
+      _ts: '2026-09-06T13:58:23.350895Z',
+    });
+    // Same order as loadHistory: the agent handler banks _ts before version.ts reads it back.
+    const replayEvent = createSendMessageHandler(useChatStore.setState, useChatStore.getState, () => {});
+
     handleVersionMessage(msg({ type: 'version_committed', commit_sha: 'sha-ai', author: 'ai' }));
     handleVersionMessage(msg({ type: 'version_committed', commit_sha: 'sha-legacy' }));
-    handleVersionMessage(
-      msg({ type: 'version_committed', commit_sha: 'sha-user', author: 'user', files: ['src/App.tsx'] }),
-    );
+    replayEvent(userEdit);
+    handleVersionMessage(userEdit);
 
     const messages = useChatStore.getState().messages;
     expect(messages.map((message) => message.version)).toEqual([undefined, 'sha-legacy', 'sha-user']);
     expect(messages[2].agentCard).toEqual({ type: 'user_edit', files: ['src/App.tsx'] });
+    expect(messages[2].timestamp).toBe(Date.parse('2026-09-06T13:58:23.350895Z'));
     expect(useVersionStore.getState().versions).toEqual(['sha-ai', 'sha-legacy', 'sha-user']);
   });
 

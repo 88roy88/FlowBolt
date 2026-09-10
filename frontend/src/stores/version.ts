@@ -5,7 +5,7 @@ import { useSessionStore } from './session';
 import { useChatStore } from './chat';
 import { useFilesStore } from './files';
 import { useErrorStore } from './errors';
-import { isReplaying } from './chatHandlers';
+import { getTimestamp, isReplaying } from './chatHandlers';
 
 type Attempt =
   | { op: 'preview'; commit_sha: string }
@@ -118,7 +118,7 @@ function userEditMessage(sha: string, files: string[]): Message {
     id: crypto.randomUUID(),
     role: 'assistant',
     content: '',
-    timestamp: Date.now(),
+    timestamp: getTimestamp(),
     agentCard: { type: 'user_edit', files },
     version: sha,
   };
