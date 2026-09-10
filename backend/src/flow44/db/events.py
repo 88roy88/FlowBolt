@@ -3,8 +3,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, func
-from sqlmodel import Field, SQLModel, select
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, delete, func
+from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
 
@@ -21,6 +21,10 @@ def subscribe(project_id: str) -> asyncio.Queue[dict[str, Any]]:
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
     _channels.setdefault(project_id, []).append(queue)
     return queue
+
+
+def has_subscribers(project_id: str) -> bool:
+    return bool(_channels.get(project_id))
 
 
 def unsubscribe(project_id: str, queue: asyncio.Queue[dict[str, Any]]) -> None:
@@ -66,16 +70,20 @@ class AgentEvent(SQLModel, table=True):
 
 
 async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
-    event_type = event.get("type", "unknown")
     event.setdefault("_ts", datetime.now(UTC).isoformat())
 
     async with database.async_session() as session:
-        row = AgentEvent(project_id=project_id, event_type=event_type, payload=event)
+        row = AgentEvent(project_id=project_id, event_type=event.get("type", "unknown"), payload=event)
         session.add(row)
         await session.commit()
 
     if notify:
         await _notify(project_id, event)
+
+
+async def emit_transient(project_id: str, event: dict[str, Any]) -> None:
+    # Live-only: never stored, so a history reload won't replay it.
+    await _notify(project_id, event)
 
 
 async def get_events(project_id: str, after_id: int = 0) -> list[AgentEvent]:
@@ -90,7 +98,23 @@ async def get_events(project_id: str, after_id: int = 0) -> list[AgentEvent]:
 
 async def clear_events(project_id: str) -> None:
     async with database.async_session() as session:
-        result = await session.execute(select(AgentEvent).where(AgentEvent.project_id == project_id))
-        for row in result.scalars().all():
-            await session.delete(row)
+        await session.execute(delete(AgentEvent).where(col(AgentEvent.project_id) == project_id))
+        await session.commit()
+
+
+async def get_versions(project_id: str) -> list[AgentEvent]:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(AgentEvent)
+            .where(AgentEvent.project_id == project_id, AgentEvent.event_type == "version_committed")
+            .order_by(AgentEvent.id.asc())  # type: ignore[union-attr]
+        )
+        return list(result.scalars().all())
+
+
+async def trim_events_after(project_id: str, event_id: int) -> None:
+    async with database.async_session() as session:
+        await session.execute(
+            delete(AgentEvent).where(col(AgentEvent.project_id) == project_id, col(AgentEvent.id) > event_id)
+        )
         await session.commit()

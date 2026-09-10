@@ -5,8 +5,10 @@ import contextlib
 import json
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -19,11 +21,13 @@ from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
 from flow44.db.chat import ChatRole, get_messages, save_message
-from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
-from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat, try_claim_run
+from flow44.db.events import emit_event, get_events, has_subscribers, subscribe, unsubscribe
+from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.versioning import service as versioning
+from flow44.services.versioning.git import GitError
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,7 @@ async def _is_new_project(project_id: str) -> bool:
 _RUNNING: set[asyncio.Task[None]] = set()
 
 _AGENT_BUSY = {"type": "error", "message": "An agent is already running for this project"}
+_VERSION_FAILED = {"type": "version_error", "message": "Version operation failed", "code": "failed"}
 
 
 class AgentAlreadyRunning(Exception):
@@ -95,6 +100,7 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
     try:
         await _heartbeat_until_done(project_id, run_task, beat)
         await run_task
+        await versioning.commit_turn(project_id)
     except _RunBudgetExceeded:
         logger.error(
             "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
@@ -110,14 +116,37 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         await clear_heartbeat(project_id, only_beat=beat.at)
 
 
-async def _start_agent(project_id: str, coro: Any) -> None:
-    claimed_at = await try_claim_run(project_id)
+async def _claim_run(project_id: str) -> datetime:
+    claimed_at = await versioning.begin_turn(project_id)
     if claimed_at is None:
-        coro.close()
         raise AgentAlreadyRunning
+    return claimed_at
+
+
+def _start_agent(project_id: str, coro: Any, claimed_at: datetime) -> None:
     task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at))
     _RUNNING.add(task)
     task.add_done_callback(_RUNNING.discard)
+
+
+async def _start_turn(
+    project_id: str,
+    make_coro: Callable[[], Any],
+    prepare: Callable[[], Awaitable[Any]] | None = None,
+) -> None:
+    claimed_at = await _claim_run(project_id)
+    try:
+        if prepare is not None:
+            await prepare()
+        _start_agent(project_id, make_coro(), claimed_at)
+    except Exception:
+        await clear_heartbeat(project_id, only_beat=claimed_at)
+        raise
+
+
+async def _save_user_turn(project_id: str, content: str, event: dict[str, Any]) -> None:
+    await save_message(project_id, ChatRole.user, content)
+    await emit_event(project_id, event, notify=False)
 
 
 @http_router.get("/{project_id}/history")
@@ -151,7 +180,9 @@ async def chat_ws(  # noqa: C901, PLR0915
         await websocket.close()
         return
 
+    had_subscribers = has_subscribers(project.id)
     queue = subscribe(project.id)
+    await versioning.broadcast_current_version(project.id, reset_orphaned_preview=not had_subscribers)
 
     async def _forward_events() -> None:
         try:
@@ -173,8 +204,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
 
-                    await save_message(project.id, ChatRole.user, user_content)
-
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                     if ds_ids:
                         ds_names: list[str] = []
@@ -187,40 +216,22 @@ async def chat_ws(  # noqa: C901, PLR0915
                         user_event["data_sources"] = [
                             {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                         ]
-                    await emit_event(project.id, user_event, notify=False)
 
-                    is_new = await _is_new_project(project.id)
-
-                    if is_new:
-                        plan_agent = PlanAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            model=selected_model,
-                            data_source_authorization=data_source_authorization,
-                            user_id=user_id,
-                        )
-                        await _start_agent(
-                            project.id,
-                            plan_agent.run(
-                                user_content,
-                                data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                            ),
-                        )
-                    else:
-                        followup_agent = FollowUpAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            model=selected_model,
-                            user_id=user_id,
-                            data_source_authorization=data_source_authorization,
-                        )
-                        await _start_agent(
-                            project.id,
-                            followup_agent.run(
-                                user_content,
-                                data_source_ids=[str(dsid) for dsid in ds_ids] if ds_ids else None,
-                            ),
-                        )
+                    agent_cls = PlanAgent if await _is_new_project(project.id) else FollowUpAgent
+                    agent = agent_cls(
+                        project_id=project.id,
+                        sandbox=sandbox,
+                        model=selected_model,
+                        user_id=user_id,
+                        data_source_authorization=data_source_authorization,
+                    )
+                    source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
+                    # Claim first: a refused turn must not leave the message behind.
+                    await _start_turn(
+                        project.id,
+                        partial(agent.run, user_content, data_source_ids=source_ids),
+                        prepare=partial(_save_user_turn, project.id, user_content, user_event),
+                    )
 
                 elif msg_type == "plan_response":
                     action = data.get("action")
@@ -235,7 +246,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
-                        await delete_pending_plan(project.id)
                         execute_agent = ExecuteAgent(
                             project_id=project.id,
                             sandbox=sandbox,
@@ -243,7 +253,12 @@ async def chat_ws(  # noqa: C901, PLR0915
                             model=selected_model or state.model,
                             user_id=user_id,
                         )
-                        await _start_agent(project.id, execute_agent.run())
+                        # before the delete: a refusal must not lose the plan
+                        await _start_turn(
+                            project.id,
+                            execute_agent.run,
+                            prepare=partial(delete_pending_plan, project.id),
+                        )
 
                     elif action == "modify" and feedback:
                         plan_agent = PlanAgent(
@@ -252,7 +267,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             model=selected_model or state.model,
                             user_id=user_id,
                         )
-                        await _start_agent(project.id, plan_agent.rebuild_with_feedback(state, feedback))
+                        await _start_turn(project.id, partial(plan_agent.rebuild_with_feedback, state, feedback))
 
                 elif msg_type == "fix_error":
                     error_message = data.get("error_message", "")
@@ -264,40 +279,43 @@ async def chat_ws(  # noqa: C901, PLR0915
                     error_desc = f"Fix error: {error_message}"
                     if error_file:
                         error_desc += f" in {error_file}"
-                    await save_message(project.id, ChatRole.user, error_desc)
-
-                    await emit_event(
-                        project.id,
-                        {
-                            "type": "user_message",
-                            "content": "",
-                            "error_fix_request": {
-                                "errorMessage": error_message,
-                                "errorFile": error_file,
-                                "errorLine": error_line,
-                                "errorStack": error_stack,
-                            },
+                    fix_event: dict[str, Any] = {
+                        "type": "user_message",
+                        "content": "",
+                        "error_fix_request": {
+                            "errorMessage": error_message,
+                            "errorFile": error_file,
+                            "errorLine": error_line,
+                            "errorStack": error_stack,
                         },
-                        notify=False,
-                    )
-
+                    }
                     fix_agent = FixErrorAgent(
                         project_id=project.id,
                         sandbox=sandbox,
                         model=selected_model,
                         user_id=user_id,
                     )
-                    await _start_agent(
+                    await _start_turn(
                         project.id,
-                        fix_agent.run(
+                        partial(
+                            fix_agent.run,
                             error_message=error_message,
                             error_file=error_file,
                             error_line=error_line,
                             error_stack=error_stack,
                         ),
+                        prepare=partial(_save_user_turn, project.id, error_desc, fix_event),
                     )
+
+                else:
+                    await versioning.handle_action(project.id, msg_type, data)
             except AgentAlreadyRunning:
                 await websocket.send_json(_AGENT_BUSY)
+            except versioning.WorkspaceLocked as exc:
+                await websocket.send_json(exc.payload)
+            except (GitError, versioning.UnknownVersionError):
+                logger.exception("[versioning] %s failed for %s", msg_type, project.id)
+                await websocket.send_json(_VERSION_FAILED)
 
     forward_task = asyncio.create_task(_forward_events())
 

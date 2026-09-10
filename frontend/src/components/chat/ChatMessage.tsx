@@ -14,7 +14,9 @@ import {
   ErrorFixRequestCard,
   FixProgressCard,
   FollowUpProgress,
+  UserEditCard,
 } from './cards';
+import { VersionControl } from './VersionControl';
 
 interface ChatMessageProps {
   message: Message;
@@ -42,6 +44,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
         errorLine={card.errorLine}
         errorStack={card.errorStack}
       />;
+    case 'user_edit':
+      return <UserEditCard diffs={card.diffs} />;
     case 'fix_progress':
       return <FixProgressCard steps={card.steps} content={message.content} diffs={card.diffs} />;
     case 'followup_progress':
@@ -78,6 +82,12 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return null;
   }
 
+  const versionControl = message.version && (
+    <div className="max-w-[85%] px-1">
+      <VersionControl commit_sha={message.version} />
+    </div>
+  );
+
   const timestamp = !isStreaming && (
     <span className="px-1 text-[11px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
       {formatClock(message.timestamp, i18n.language)}
@@ -89,6 +99,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return (
       <div className={`group flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} animate-message-in`}>
         <AgentCardRenderer message={message} />
+        {versionControl}
         {message.agentCard.type === 'error_fix_request' && timestamp}
       </div>
     );
@@ -157,6 +168,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
           </div>
         )}
       </div>
+      {versionControl}
       {timestamp}
     </div>
   );

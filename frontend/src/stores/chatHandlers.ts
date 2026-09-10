@@ -28,6 +28,10 @@ export function setReplayMode(replay: boolean) {
   _skipMessages = replay;
 }
 
+export function isReplaying() {
+  return _skipMessages;
+}
+
 let _lastEventTs = 0;
 
 /**
@@ -47,7 +51,7 @@ export function finalizeHistoryReplayState(
   return true;
 }
 
-function getTimestamp(msg?: { _ts?: string }): number {
+export function getTimestamp(msg?: { _ts?: string }): number {
   if (msg?._ts) {
     _lastEventTs = new Date(msg._ts).getTime();
     return _lastEventTs;

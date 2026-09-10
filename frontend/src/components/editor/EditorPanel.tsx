@@ -7,9 +7,8 @@ loader.config({ monaco });
 import { Check, Loader2 } from 'lucide-react';
 import { useFilesStore } from '../../stores/files';
 import { useChatStore } from '../../stores/chat';
-import { isAgentAlive } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
-import { WRITE_ROLES } from '../../types';
+import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import { Resizer } from '../layout/Resizer';
 import { FileTree } from './FileTree';
 import { FileTabs } from './FileTabs';
@@ -44,17 +43,10 @@ export function EditorPanel() {
     openFile,
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
-  const currentProject = useSessionStore((s) => s.currentProject);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
-  const aiFlowActive = useChatStore(isAgentAlive);
-  const noWritePermission = currentProject?.role ? !WRITE_ROLES.has(currentProject.role) : false;
-  const readOnlyUntilInitialBuildComplete = !buildCompleted;
-  const editorReadOnly = noWritePermission || readOnlyUntilInitialBuildComplete || aiFlowActive;
-  const readOnlyMessage = noWritePermission
-    ? t('editor.readOnlyNoPermission', 'View-only access')
-    : readOnlyUntilInitialBuildComplete
-      ? t('editor.readOnlyUntilFirstAiResponse')
-      : t('editor.readOnlyWhileAiWorking');
+  const { code } = useWorkspaceLock();
+  const editorReadOnly = code !== null || !buildCompleted;
+  const readOnlyMessage = code ? t(LOCK_MESSAGES[code]) : t('editor.readOnlyUntilFirstAiResponse');
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);
