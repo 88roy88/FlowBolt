@@ -24,7 +24,7 @@ Every log entry, for every event, must carry these fields. Event-specific fields
 | `user_id` | string | Yes | Enterprise ID of the user who caused the event. |
 | `session_id` | string | No | ID of the session in progress at event time. See Section 3. (Not yet implemented.) |
 | `project_id` | string | No | ID of the project in scope. Empty for the rare event with no project context. |
-| `source` | enum: `web_client`, `server`, `flapi_gateway` | Yes | Component that emitted the event. |
+| `source` | enum: `web_client`, `server` | Yes | Component that emitted the event. |
 | `client_app_version` | string | No | Version of the BuildApp web app. Present only when `source` is `web_client`. |
 | `properties` | object | Yes | Fields specific to this event. See Section 4. |
 
