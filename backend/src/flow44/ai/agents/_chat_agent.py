@@ -86,7 +86,6 @@ class ChatAgent(BaseAgent):
         self._log_file_diffs(diffs)
 
     def _log_file_diffs(self, diffs: list[FileDiff]) -> None:
-        """Log BI events for file changes: code_generated and file_created (model)."""
         if not diffs:
             return
 
@@ -112,7 +111,6 @@ class ChatAgent(BaseAgent):
 
         for diff in diffs:
             if diff.is_new:
-                # Extract file extension from path
                 file_type = diff.path.split(".")[-1] if "." in diff.path else ""
                 log_bi_event(
                     "file_created",
