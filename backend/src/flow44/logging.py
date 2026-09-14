@@ -13,7 +13,7 @@ __all__ = [
     "_project_name",
     "_source",
     "_user_id",
-    "emit_bi_event",
+    "log_bi_event",
     "setup_logging",
 ]
 
@@ -51,9 +51,7 @@ def setup_logging(log_file_path: str | None = None) -> None:
     handlers: list[logging.Handler] = [console]
 
     if log_file_path:
-        file = logging.handlers.RotatingFileHandler(
-            log_file_path, maxBytes=1024 * 1024, backupCount=5
-        )
+        file = logging.handlers.RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=5)
         format_str = (
             "%(asctime)s %(hostname)s %(name)s %(levelname)s %(user_id)s "
             "%(project_id)s %(project_name)s %(source)s %(client_app_version)s %(message)s"
@@ -72,7 +70,7 @@ def setup_logging(log_file_path: str | None = None) -> None:
     logging.basicConfig(level=logging.INFO, handlers=handlers)
 
 
-def emit_bi_event(
+def log_bi_event(
     event: str,
     properties: dict[str, Any] | None = None,
     *,

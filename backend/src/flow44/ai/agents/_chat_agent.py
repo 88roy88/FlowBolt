@@ -5,7 +5,7 @@ from typing import Any
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.file_diffs import DiffTracker, FileDiff
 from flow44.db.chat import ChatRole, save_message
-from flow44.logging import emit_bi_event
+from flow44.logging import log_bi_event
 
 
 class ChatAgent(BaseAgent):
@@ -100,7 +100,7 @@ class ChatAgent(BaseAgent):
                 elif line.startswith("-") and not line.startswith("---"):
                     line_count_removed += 1
 
-        emit_bi_event(
+        log_bi_event(
             "code_generated",
             {
                 "response_id": str(uuid.uuid4()),
@@ -114,7 +114,7 @@ class ChatAgent(BaseAgent):
             if diff.is_new:
                 # Extract file extension from path
                 file_type = diff.path.split(".")[-1] if "." in diff.path else ""
-                emit_bi_event(
+                log_bi_event(
                     "file_created",
                     {
                         "file_path": diff.path,

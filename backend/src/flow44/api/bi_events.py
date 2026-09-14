@@ -7,7 +7,7 @@ from flow44.logging import (
     _client_app_version,
     _project_name as _log_project_name,
     _source,
-    emit_bi_event,
+    log_bi_event,
 )
 
 router = APIRouter(prefix="/api/bi", tags=["bi_events"])
@@ -30,6 +30,6 @@ async def log_event(
         properties = event_data.get("properties", {})
         if project_name := event_data.get("project_name"):
             _log_project_name.set(project_name)
-        emit_bi_event(event_name, properties, event_version=event_version, level=level)
+        log_bi_event(event_name, properties, event_version=event_version, level=level)
 
     return {"status": "ok"}

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from flow44.api.deps import Permission, SandboxDep, require_permission
-from flow44.logging import emit_bi_event
+from flow44.logging import log_bi_event
 from flow44.sandbox.search_mixin import SearchToolError
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
@@ -102,7 +102,7 @@ async def post_create_file(
         await sandbox.create_file(body.path, body.content)
 
         file_type = body.path.split(".")[-1] if "." in body.path else ""
-        emit_bi_event(
+        log_bi_event(
             "file_created",
             {
                 "file_path": body.path,
@@ -126,7 +126,7 @@ async def patch_rename_file(
 ) -> dict[str, str]:
     try:
         await sandbox.rename_file(body.old_path, body.new_path)
-        emit_bi_event(
+        log_bi_event(
             "file_renamed",
             {
                 "old_path": body.old_path,
@@ -151,7 +151,7 @@ async def delete_entry(
     try:
         await sandbox.delete_file(path)
 
-        emit_bi_event(
+        log_bi_event(
             "file_deleted",
             {
                 "file_path": path,
