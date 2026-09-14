@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from flow44.ai.core.opik_utils import flush_opik_traces, setup_opik_tracing
 from flow44.api import (
     admin,
+    bi_events,
     chat,
     data_source_api,
     errors,
@@ -115,6 +116,7 @@ auth_routes.include_router(chat.http_router)
 auth_routes.include_router(iaagent.router)
 auth_routes.include_router(members.router)
 auth_routes.include_router(admin.router)
+auth_routes.include_router(bi_events.router)
 app.include_router(auth_routes)
 
 # Public HTTP routes
