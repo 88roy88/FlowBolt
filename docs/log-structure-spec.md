@@ -137,7 +137,6 @@ Trigger: the user edits generated code by hand in the code view.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `file_path` | string | Yes | Path of the file edited, relative to the project root. |
-| `lines_changed` | integer | Yes | Lines added or removed by this edit. |
 
 #### `file_created`
 Trigger: a new file appears in the project, from the model or the user.
@@ -155,6 +154,14 @@ Trigger: a file is removed from the project.
 |---|---|---|---|
 | `file_path` | string | Yes | Path of the deleted file. |
 | `deleted_by` | enum: `model`, `user` | Yes | Origin of the delete action. |
+
+#### `file_renamed`
+Trigger: a file is renamed in the project.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `old_path` | string | Yes | Original path of the file. |
+| `new_path` | string | Yes | New path of the file. |
 
 ### 4.4 Package and flapi Events
 

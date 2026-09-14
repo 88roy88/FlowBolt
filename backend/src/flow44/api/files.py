@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from flow44.api.deps import Permission, SandboxDep, require_permission
+from flow44.logging import emit_bi_event
 from flow44.sandbox.search_mixin import SearchToolError
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
@@ -99,6 +100,17 @@ async def post_create_file(
 ) -> dict[str, str]:
     try:
         await sandbox.create_file(body.path, body.content)
+
+        file_type = body.path.split(".")[-1] if "." in body.path else ""
+        emit_bi_event(
+            "file_created",
+            {
+                "file_path": body.path,
+                "file_type": file_type,
+                "created_by": "user",
+            },
+        )
+
         return {"status": "ok", "path": body.path}
     except FileExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
@@ -114,6 +126,13 @@ async def patch_rename_file(
 ) -> dict[str, str]:
     try:
         await sandbox.rename_file(body.old_path, body.new_path)
+        emit_bi_event(
+            "file_renamed",
+            {
+                "old_path": body.old_path,
+                "new_path": body.new_path,
+            },
+        )
         return {"status": "ok", "old_path": body.old_path, "new_path": body.new_path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -131,6 +150,15 @@ async def delete_entry(
 ) -> dict[str, str]:
     try:
         await sandbox.delete_file(path)
+
+        emit_bi_event(
+            "file_deleted",
+            {
+                "file_path": path,
+                "deleted_by": "user",
+            },
+        )
+
         return {"status": "ok", "path": path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
