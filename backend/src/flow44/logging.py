@@ -3,9 +3,12 @@ import logging.handlers
 import socket
 from contextvars import ContextVar
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pythonjsonlogger.json import JsonFormatter
+
+if TYPE_CHECKING:
+    from flow44.db.project_data_source import DataSourceContext
 
 __all__ = [
     "_client_app_version",
@@ -14,6 +17,7 @@ __all__ = [
     "_source",
     "_user_id",
     "log_bi_event",
+    "log_data_sources_added",
     "setup_logging",
 ]
 
@@ -87,3 +91,14 @@ def log_bi_event(
     }
 
     logger.log(getattr(logging, level.upper(), logging.INFO), payload)
+
+
+def log_data_sources_added(contexts: list["DataSourceContext"]) -> None:
+    for ctx in contexts:
+        log_bi_event(
+            "data_source_added",
+            {
+                "data_source_type": ctx.type,
+                "data_source_id": ctx.data_source_id,
+            },
+        )
