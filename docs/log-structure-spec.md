@@ -70,7 +70,7 @@ Trigger: the user opens an existing project.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `entry_point` | enum: `project_list`, `direct_link` | No | Where the open action started. Confirm with Engineering. |
+| `entry_point` | enum: `project_list`, `direct_link`, `auto_select` | Yes | How the project was opened: `project_list` for sidebar clicks, `direct_link` for URL navigation, `auto_select` for initial app load. |
 
 #### `project_deleted`
 Trigger: the user deletes a project.
