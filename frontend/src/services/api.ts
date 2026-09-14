@@ -1,14 +1,30 @@
-import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, UserStatus } from '../types';
+import { authSession, credentialsStore } from "../auth";
+import type {
+  AssignableRole,
+  FileEntry,
+  Project,
+  AIModel,
+  DataSourceSearchResult,
+  ProjectMember,
+  UserStatus,
+} from "../types";
+import type { LogEvent } from "./logger";
 
-const BASE = '/api';
+const BASE = "/api";
 
 // Fetch with a Bearer token; on a 401, re-acquire credentials and retry once.
-async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry = true): Promise<Response> {
+async function fetchWithAuth(
+  path: string,
+  options: RequestInit = {},
+  allowRetry = true,
+): Promise<Response> {
   const token = await authSession.ensureFreshToken();
   const headers = new Headers(options.headers);
   if (token) {
-    headers.set('Authorization', token.startsWith('Bearer ') ? token : `Bearer ${token}`);
+    headers.set(
+      "Authorization",
+      token.startsWith("Bearer ") ? token : `Bearer ${token}`,
+    );
   }
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
@@ -16,7 +32,7 @@ async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry
   if (res.status === 401 && allowRetry) {
     await authSession.refreshCredentials();
     if (!authSession.hasValidSession()) {
-      throw new Error('API error 401: authentication required');
+      throw new Error("API error 401: authentication required");
     }
     return fetchWithAuth(path, options, false);
   }
@@ -25,10 +41,11 @@ async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
-  const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
+  const isFormDataBody =
+    typeof FormData !== "undefined" && options?.body instanceof FormData;
   // Only set JSON Content-Type when body is not FormData.
   if (options?.body && !isFormDataBody) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
 
   const res = await fetchWithAuth(path, { ...options, headers });
@@ -44,46 +61,71 @@ export async function fetchFileTree(projectId: string): Promise<FileEntry[]> {
   return request<FileEntry[]>(`/files/${projectId}/tree`);
 }
 
-export async function fetchFileContent(projectId: string, path: string): Promise<string> {
+export async function fetchFileContent(
+  projectId: string,
+  path: string,
+): Promise<string> {
   const data = await request<{ path: string; content: string }>(
-    `/files/${projectId}/file/content?path=${encodeURIComponent(path)}`
+    `/files/${projectId}/file/content?path=${encodeURIComponent(path)}`,
   );
   return data.content;
 }
 
-export async function saveFileContent(projectId: string, path: string, content: string): Promise<void> {
+export async function saveFileContent(
+  projectId: string,
+  path: string,
+  content: string,
+): Promise<void> {
   await request(`/files/${projectId}/file/content`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify({ path, content }),
   });
 }
 
-export async function createFileEntry(projectId: string, path: string, content = ''): Promise<void> {
+export async function createFileEntry(
+  projectId: string,
+  path: string,
+  content = "",
+): Promise<void> {
   await request(`/files/${projectId}/file`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify({ path, content }),
   });
 }
 
-export async function renameFileEntry(projectId: string, oldPath: string, newPath: string): Promise<void> {
+export async function renameFileEntry(
+  projectId: string,
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
   await request(`/files/${projectId}/file`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
   });
 }
 
-export async function deleteFileEntry(projectId: string, path: string): Promise<void> {
+export async function deleteFileEntry(
+  projectId: string,
+  path: string,
+): Promise<void> {
   await request(`/files/${projectId}/file?path=${encodeURIComponent(path)}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
-export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
-  const res = await fetchWithAuth(`/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': file.type || 'application/octet-stream' },
-    body: file,
-  });
+export async function uploadFileEntry(
+  projectId: string,
+  path: string,
+  file: Blob,
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    },
+  );
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
@@ -96,53 +138,68 @@ export type SearchResult = { path: string; uri?: string; hits: SearchHit[] };
 export async function searchFiles(
   sessionId: string,
   query: string,
-  opts?: { caseSensitive?: boolean; wordMatch?: boolean; useRegex?: boolean; maxResults?: number; maxHitsPerFile?: number }
+  opts?: {
+    caseSensitive?: boolean;
+    wordMatch?: boolean;
+    useRegex?: boolean;
+    maxResults?: number;
+    maxHitsPerFile?: number;
+  },
 ): Promise<SearchResult[]> {
-  const data = await request<{ query: string; results: SearchResult[] }>(`/files/${sessionId}/search`, {
-    method: 'POST',
-    body: JSON.stringify({
-      query,
-      case_sensitive: opts?.caseSensitive ?? false,
-      word_match: opts?.wordMatch ?? false,
-      use_regex: opts?.useRegex ?? false,
-      max_results: opts?.maxResults ?? 2000,
-      max_hits_per_file: opts?.maxHitsPerFile ?? 200,
-    }),
-  });
+  const data = await request<{ query: string; results: SearchResult[] }>(
+    `/files/${sessionId}/search`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        query,
+        case_sensitive: opts?.caseSensitive ?? false,
+        word_match: opts?.wordMatch ?? false,
+        use_regex: opts?.useRegex ?? false,
+        max_results: opts?.maxResults ?? 2000,
+        max_hits_per_file: opts?.maxHitsPerFile ?? 200,
+      }),
+    },
+  );
   return data.results;
 }
 
 export async function fetchProjects(): Promise<Project[]> {
-  return request<Project[]>('/projects');
+  return request<Project[]>("/projects");
 }
 
 export async function createProject(name: string): Promise<Project> {
-  return request<Project>('/projects', {
-    method: 'POST',
+  return request<Project>("/projects", {
+    method: "POST",
     body: JSON.stringify({ name }),
   });
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await request(`/projects/${id}`, { method: 'DELETE' });
+  await request(`/projects/${id}`, { method: "DELETE" });
 }
 
-export async function renameProject(projectId: string, name: string): Promise<void> {
+export async function renameProject(
+  projectId: string,
+  name: string,
+): Promise<void> {
   await request(`/projects/${projectId}/name`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify({ name }),
   });
 }
 
-export async function updateProjectModel(projectId: string, model: string): Promise<void> {
+export async function updateProjectModel(
+  projectId: string,
+  model: string,
+): Promise<void> {
   await request(`/projects/${projectId}/model`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify({ model }),
   });
 }
 
 export async function reapProject(projectId: string): Promise<void> {
-  await request(`/projects/${projectId}/debug/reap`, { method: 'POST' });
+  await request(`/projects/${projectId}/debug/reap`, { method: "POST" });
 }
 
 export async function fetchPreviewPort(projectId: string): Promise<number> {
@@ -150,11 +207,17 @@ export async function fetchPreviewPort(projectId: string): Promise<number> {
   return data.port;
 }
 
-export async function fetchChatHistory(projectId: string): Promise<{ id: string; role: string; content: string; created_at: string }[]> {
+export async function fetchChatHistory(
+  projectId: string,
+): Promise<
+  { id: string; role: string; content: string; created_at: string }[]
+> {
   return request(`/chat/${projectId}/history`);
 }
 
-export async function fetchAgentEvents(projectId: string): Promise<Record<string, unknown>[]> {
+export async function fetchAgentEvents(
+  projectId: string,
+): Promise<Record<string, unknown>[]> {
   return request(`/chat/${projectId}/events`);
 }
 
@@ -163,49 +226,61 @@ export type AgentAliveResponse = {
   phase: string | null;
 };
 
-export async function fetchAgentAlive(projectId: string): Promise<AgentAliveResponse> {
+export async function fetchAgentAlive(
+  projectId: string,
+): Promise<AgentAliveResponse> {
   return request<AgentAliveResponse>(`/iaagent/${projectId}/alive`);
 }
 
 export async function fetchModels(): Promise<AIModel[]> {
-  return request<AIModel[]>('/models');
+  return request<AIModel[]>("/models");
 }
 
 export async function fetchDefaultModel(): Promise<string> {
-  const data = await request<{ model: string }>('/models/default');
+  const data = await request<{ model: string }>("/models/default");
   return data.model;
 }
 
-export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchResult[]> {
+export async function searchDataSources(
+  queryOrId: string,
+): Promise<DataSourceSearchResult[]> {
   // Backend strips the Bearer prefix before forwarding to FLAPI, so the shared helper is safe here.
-  return request<DataSourceSearchResult[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
+  return request<DataSourceSearchResult[]>(
+    `/data-source/search/${encodeURIComponent(queryOrId)}`,
+  );
 }
 
 export function downloadZip(projectId: string): void {
   credentialsStore.ensureCookie();
-  window.open(`${BASE}/export/${projectId}/zip`, '_blank');
+  window.open(`${BASE}/export/${projectId}/zip`, "_blank");
 }
 
 export function downloadSingleHtml(projectId: string): void {
   credentialsStore.ensureCookie();
-  window.open(`${BASE}/export/${projectId}/html`, '_blank');
+  window.open(`${BASE}/export/${projectId}/html`, "_blank");
 }
 
-export async function publishToS3(projectId: string, slug?: string): Promise<{ url: string; handle: string }> {
-  return request<{ url: string; handle: string }>(`/export/${projectId}/publish`, {
-    method: 'POST',
-    body: JSON.stringify({ slug: slug ?? null }),
-  });
+export async function publishToS3(
+  projectId: string,
+  slug?: string,
+): Promise<{ url: string; handle: string }> {
+  return request<{ url: string; handle: string }>(
+    `/export/${projectId}/publish`,
+    {
+      method: "POST",
+      body: JSON.stringify({ slug: slug ?? null }),
+    },
+  );
 }
 
 export async function checkSlugAvailability(
   projectId: string,
   slug: string,
-  options?: RequestInit
+  options?: RequestInit,
 ): Promise<{ available: boolean }> {
   return request<{ available: boolean }>(
     `/export/${projectId}/slug/check?slug=${encodeURIComponent(slug)}`,
-    options
+    options,
   );
 }
 
@@ -221,57 +296,99 @@ export async function checkBackendHealth(): Promise<boolean> {
 // --- User status & platform ---
 
 export async function fetchMe(): Promise<UserStatus> {
-  return request<UserStatus>('/projects/me');
+  return request<UserStatus>("/projects/me");
 }
 
 // --- Project members ---
 
-export async function fetchProjectMembers(projectId: string): Promise<ProjectMember[]> {
+export async function fetchProjectMembers(
+  projectId: string,
+): Promise<ProjectMember[]> {
   return request<ProjectMember[]>(`/projects/${projectId}/members`);
 }
 
-export async function addProjectMember(projectId: string, userId: string, role: AssignableRole): Promise<ProjectMember> {
+export async function addProjectMember(
+  projectId: string,
+  userId: string,
+  role: AssignableRole,
+): Promise<ProjectMember> {
   return request<ProjectMember>(`/projects/${projectId}/members`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify({ user_id: userId, role }),
   });
 }
 
-export async function updateProjectMemberRole(projectId: string, userId: string, role: AssignableRole): Promise<ProjectMember> {
-  return request<ProjectMember>(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ role }),
-  });
+export async function updateProjectMemberRole(
+  projectId: string,
+  userId: string,
+  role: AssignableRole,
+): Promise<ProjectMember> {
+  return request<ProjectMember>(
+    `/projects/${projectId}/members/${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    },
+  );
 }
 
-export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
-  await request(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+export async function removeProjectMember(
+  projectId: string,
+  userId: string,
+): Promise<void> {
+  await request(
+    `/projects/${projectId}/members/${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  );
 }
 
 // --- Admin ---
 
-export async function fetchPlatformUsers(): Promise<{ user_id: string; invited_by: string; created_at: string }[]> {
-  return request('/admin/users');
+export async function fetchPlatformUsers(): Promise<
+  { user_id: string; invited_by: string; created_at: string }[]
+> {
+  return request("/admin/users");
 }
 
-export async function invitePlatformUser(userId: string): Promise<{ user_id: string; invited_by: string; created_at: string }> {
-  return request('/admin/users', {
-    method: 'POST',
+export async function invitePlatformUser(
+  userId: string,
+): Promise<{ user_id: string; invited_by: string; created_at: string }> {
+  return request("/admin/users", {
+    method: "POST",
     body: JSON.stringify({ user_id: userId }),
   });
 }
 
 export async function revokePlatformUser(userId: string): Promise<void> {
-  await request(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+  await request(`/admin/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
 }
 
-export async function fetchPublishedApps(): Promise<{
-  project_id: string;
-  name: string;
-  owner_id: string;
-  project_url: string;
-  public_path: string;
-  published_at: string;
-}[]> {
-  return request('/admin/published-apps');
+export async function fetchPublishedApps(): Promise<
+  {
+    project_id: string;
+    name: string;
+    owner_id: string;
+    project_url: string;
+    public_path: string;
+    published_at: string;
+  }[]
+> {
+  return request("/admin/published-apps");
+}
+
+// --- Logging ---
+
+export async function sendLogs(events: LogEvent[]): Promise<void> {
+  try {
+    const version = import.meta.env.VITE_APP_VERSION || "unknown";
+    await request("/bi/events", {
+      method: "POST",
+      headers: { "X-Client-Version": version },
+      body: JSON.stringify(events),
+    });
+  } catch (error) {
+    console.warn("Log send failed:", error);
+  }
 }
