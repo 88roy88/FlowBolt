@@ -3,9 +3,9 @@ import uuid
 from typing import Any
 
 from flow44.ai.agents._base import BaseAgent
-from flow44.ai.agents.file_diffs import DiffTracker, FileDiff
+from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.db.chat import ChatRole, save_message
-from flow44.logging import log_bi_event
+from flow44.logging import log_file_diffs
 
 
 class ChatAgent(BaseAgent):
@@ -83,40 +83,4 @@ class ChatAgent(BaseAgent):
                 "diffs": [{"path": d.path, "diff": d.diff, "is_new": d.is_new} for d in diffs],
             }
         )
-        self._log_file_diffs(diffs)
-
-    def _log_file_diffs(self, diffs: list[FileDiff]) -> None:
-        if not diffs:
-            return
-
-        line_count_added = 0
-        line_count_removed = 0
-
-        for diff in diffs:
-            for line in diff.diff.splitlines():
-                if line.startswith("+") and not line.startswith("+++"):
-                    line_count_added += 1
-                elif line.startswith("-") and not line.startswith("---"):
-                    line_count_removed += 1
-
-        log_bi_event(
-            "code_generated",
-            {
-                "response_id": str(uuid.uuid4()),
-                "file_count": len(diffs),
-                "line_count_added": line_count_added,
-                "line_count_removed": line_count_removed,
-            },
-        )
-
-        for diff in diffs:
-            if diff.is_new:
-                file_type = diff.path.split(".")[-1] if "." in diff.path else ""
-                log_bi_event(
-                    "file_created",
-                    {
-                        "file_path": diff.path,
-                        "file_type": file_type,
-                        "created_by": "model",
-                    },
-                )
+        log_file_diffs(diffs)
