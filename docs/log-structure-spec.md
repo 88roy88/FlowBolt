@@ -88,7 +88,7 @@ Trigger: the user sends an instruction to the model.
 | `version_id` | string | Yes | The version ID the prompt was sent in. |
 
 
-#### `response_received`
+#### `response_received` || Not yet implemented
 Trigger: the model returns a response to a prompt.
 
 | Field | Type | Required | Description |
@@ -102,7 +102,7 @@ Trigger: the model returns a response to a prompt.
 | `model_version` | string | Yes | Identifier of the model version that produced the response. |
 | `generation_attempt` | integer | Yes | The number of attempts of regeneration for the current response. |
 
-#### `response_regenerated`
+#### `response_regenerated` || Not yet implemented
 Trigger: the user asks the model to try again on the same request.
 
 | Field | Type | Required | Description |
