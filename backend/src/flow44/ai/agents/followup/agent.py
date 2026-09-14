@@ -17,6 +17,7 @@ from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
+from flow44.logging import log_bi_event
 from flow44.sandbox.main import PnpmSandbox
 
 MAX_ITERATIONS = 15
@@ -167,6 +168,14 @@ class FollowUpAgent(ChatAgent):
             existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_ids]
             if updated_contexts:
                 await self._persist_data_sources(updated_contexts, stored_contexts)
+                for ctx in new_data_source_contexts:
+                    log_bi_event(
+                        "data_source_added",
+                        {
+                            "data_source_type": ctx.type,
+                            "data_source_id": ctx.data_source_id,
+                        },
+                    )
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context, history = await asyncio.gather(

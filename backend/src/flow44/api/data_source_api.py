@@ -1,8 +1,11 @@
+import time
+
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import ValidationError
 
 from flow44.api.deps import TokenDep as AuthDep
 from flow44.integrations.flapi.models import CubeId, QuickParams, QuickParamValue
+from flow44.logging import log_bi_event
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import (
     CanRunResponse,
@@ -87,15 +90,40 @@ async def run_data_source(
         examples=[{"cube-1": {"person_id": 2, "active": True, "tag_ids": [10, 11]}}],
     ),
 ) -> DataSourceResult:
+    start_time = time.monotonic()
     try:
         quick_params = QuickParams(root=params) if params else None
-        return await ds_logic.run_data_source(
+        result = await ds_logic.run_data_source(
             data_source_id,
             authorization=authorization,
             params=quick_params,
             execute_continued_process=True,
         )
+        duration_ms = int((time.monotonic() - start_time) * 1000)
+        log_bi_event(
+            "flapi_call_made",
+            {
+                "data_source_id": data_source_id,
+                "endpoint": "run",
+                "duration_ms": duration_ms,
+                "status_code": 200,
+                "is_error": False,
+            },
+        )
+        return result
     except ds_logic.FlapiUpstreamError as err:
+        duration_ms = int((time.monotonic() - start_time) * 1000)
+        log_bi_event(
+            "flapi_call_made",
+            {
+                "data_source_id": data_source_id,
+                "endpoint": "run",
+                "duration_ms": duration_ms,
+                "status_code": err.status_code,
+                "is_error": True,
+                "error_message": str(err),
+            },
+        )
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err
     except ValidationError as err:

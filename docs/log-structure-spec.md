@@ -173,7 +173,7 @@ Trigger: the user adds a data source to the project.
 | `data_source_type` | string | Yes | Type of data source, for now it is only `package`. |
 | `data_source_id` | string | Yes | ID of the underlying data source. |
 
-#### `data_source_removed`
+#### `data_source_removed` || Not yet implemented
 Trigger: the user removes a data source from the project.
 
 | Field | Type | Required | Description |
@@ -188,20 +188,10 @@ Trigger: the running app calls flapi.
 |---|---|---|---|
 | `data_source_id` | string | Yes | Package this call belongs to. |
 | `endpoint` | string | Yes | flapi endpoint called. |
-| `request_id` | string (UUID) | Yes | ID for tracing this call end to end. |
-| `latency_ms` | integer | Yes | Time from request to response. |
+| `duration_ms` | integer | Yes | Time from request to response. |
 | `status_code` | integer | Yes | HTTP status code of the response. |
-
-#### `flapi_call_failed`
-Trigger: a flapi call returns an error.
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `data_source_id` | string | Yes | Package this call belongs to. |
-| `endpoint` | string | Yes | flapi endpoint called. |
-| `request_id` | string (UUID) | Yes | ID matching the related `flapi_call_made` entry. |
-| `error_code` | string | Yes | flapi error code. |
-| `error_message` | string | No | Short, sanitized error text. |
+| `is_error` | boolean | Yes | True if the call failed, false if successful. |
+| `error_message` | string | No | Short, sanitized error text, present only when `is_error` is true. |
 
 ### 4.5 Preview Events
 
