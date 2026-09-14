@@ -23,7 +23,8 @@ Every log entry, for every event, must carry these fields. Event-specific fields
 | `timestamp` | string (ISO 8601, UTC) | Yes | Time the action happened, set by the component that saw it. |
 | `user_id` | string | Yes | Enterprise ID of the user who caused the event. |
 | `session_id` | string | No | ID of the session in progress at event time. See Section 3. (Not yet implemented.) |
-| `project_id` | string | No | ID of the project in scope. Empty for the rare event with no project context. |
+| `project_id` | string | No | ID of the project in scope, set automatically on backend or provided by client. |
+| `project_name` | string | No | Name of the project in scope, set automatically on backend or provided by client. |
 | `source` | enum: `web_client`, `server` | Yes | Component that emitted the event. |
 | `client_app_version` | string | No | Version of the BuildApp web app. Present only when `source` is `web_client`. |
 | `properties` | object | Yes | Fields specific to this event. See Section 4. |

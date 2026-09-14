@@ -5,12 +5,9 @@ export interface LogEvent {
   event: string;
   event_version?: number;
   project_id?: string;
+  project_name?: string;
   level?: 'debug' | 'info' | 'warning' | 'error';
   properties?: Record<string, unknown>;
-}
-
-function getProjectId(): string | undefined {
-  return useSessionStore.getState().projectId ?? undefined;
 }
 
 let eventQueue: LogEvent[] = [];
@@ -40,13 +37,15 @@ function scheduleFlush(): void {
 function log(
   event: string,
   properties?: Record<string, unknown>,
-  options: { level?: 'debug' | 'info' | 'warning' | 'error'; project_id?: string } = {}
+  options: { level?: 'debug' | 'info' | 'warning' | 'error' } = {}
 ): void {
+  const state = useSessionStore.getState();
   eventQueue.push({
     event,
     event_version: 1,
     level: options.level || 'info',
-    project_id: options.project_id,
+    project_id: state.projectId ?? undefined,
+    project_name: state.currentProject?.name ?? undefined,
     properties,
   });
   scheduleFlush();
@@ -54,13 +53,13 @@ function log(
 
 export const logger = {
   debug: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'debug', project_id: getProjectId() }),
+    log(event, properties, { level: 'debug' }),
   info: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'info', project_id: getProjectId() }),
+    log(event, properties, { level: 'info' }),
   warn: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'warning', project_id: getProjectId() }),
+    log(event, properties, { level: 'warning' }),
   error: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'error', project_id: getProjectId() }),
+    log(event, properties, { level: 'error' }),
 };
 
 export async function flush_logs(): Promise<void> {
