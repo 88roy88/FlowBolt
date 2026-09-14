@@ -31,10 +31,10 @@ from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import s3_storage
-from flow44.logging import setup_logging
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.heartbeat_reaper import heartbeat_reaper
+from flow44.services.logging import setup_logging
 
 if os.name == "posix":
     # Sandbox workspaces live on an NFS PVC written to by pods with varying uids; the default umask

@@ -4,8 +4,8 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from flow44.api.deps import Permission, SandboxDep, require_permission
-from flow44.logging import log_bi_event
 from flow44.sandbox.search_mixin import SearchToolError
+from flow44.services.logging import log_bi_event
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 

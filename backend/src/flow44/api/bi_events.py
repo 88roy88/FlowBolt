@@ -3,11 +3,13 @@ from typing import Any
 from fastapi import APIRouter, Header
 
 from flow44.api.deps import UserDep
-from flow44.logging import (
+from flow44.services.logging import (
     _client_app_version,
-    _project_name as _log_project_name,
     _source,
     log_bi_event,
+)
+from flow44.services.logging import (
+    _project_name as _log_project_name,
 )
 
 router = APIRouter(prefix="/api/bi", tags=["bi_events"])

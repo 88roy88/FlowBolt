@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from flow44.api.deps import TokenDep as AuthDep
 from flow44.integrations.flapi.models import CubeId, QuickParams, QuickParamValue
-from flow44.logging import log_bi_event
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import (
     CanRunResponse,
@@ -14,6 +13,7 @@ from flow44.logic.models import (
     DataSourceResult,
     DataSourceUsage,
 )
+from flow44.services.logging import log_bi_event
 
 router = APIRouter(prefix="/api/data-source", tags=["data-source"])
 

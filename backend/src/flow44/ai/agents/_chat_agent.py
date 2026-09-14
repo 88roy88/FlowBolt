@@ -5,7 +5,7 @@ from typing import Any
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.db.chat import ChatRole, save_message
-from flow44.logging import log_file_diffs
+from flow44.services.logging.helpers import log_file_diffs
 
 
 class ChatAgent(BaseAgent):

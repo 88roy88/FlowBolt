@@ -17,8 +17,8 @@ from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
-from flow44.logging import log_data_sources_added
 from flow44.sandbox.main import PnpmSandbox
+from flow44.services.logging.helpers import log_data_sources_added
 
 MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000

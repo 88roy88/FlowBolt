@@ -20,8 +20,8 @@ from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
 from flow44.db.pending_plan import save_pending_plan
-from flow44.logging import log_data_sources_added
 from flow44.sandbox.main import PnpmSandbox
+from flow44.services.logging.helpers import log_data_sources_added
 
 logger = logging.getLogger(__name__)
 
