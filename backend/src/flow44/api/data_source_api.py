@@ -99,26 +99,24 @@ async def run_data_source(
             params=quick_params,
             execute_continued_process=True,
         )
-        duration_ms = int((time.monotonic() - start_time) * 1000)
         log_bi_event(
             "flapi_call_made",
             {
                 "data_source_id": data_source_id,
                 "endpoint": "run",
-                "duration_ms": duration_ms,
+                "duration_ms": int((time.monotonic() - start_time) * 1000),
                 "status_code": 200,
                 "is_error": False,
             },
         )
         return result
     except ds_logic.FlapiUpstreamError as err:
-        duration_ms = int((time.monotonic() - start_time) * 1000)
         log_bi_event(
             "flapi_call_made",
             {
                 "data_source_id": data_source_id,
                 "endpoint": "run",
-                "duration_ms": duration_ms,
+                "duration_ms": int((time.monotonic() - start_time) * 1000),
                 "status_code": err.status_code,
                 "is_error": True,
                 "error_message": str(err),
