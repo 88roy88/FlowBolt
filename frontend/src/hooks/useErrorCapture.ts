@@ -59,7 +59,7 @@ export function useErrorCapture() {
       });
       logger.error('preview_error', {
         error_type: 'build',
-        error_message: d.message || undefined,
+        error_message: d.message,
       });
     });
 
@@ -82,7 +82,7 @@ export function useErrorCapture() {
         if (d.file && !file) return; // node_modules — skip
         logger.error('preview_error', {
           error_type: 'runtime',
-          error_message: msg || undefined,
+          error_message: msg,
         });
         // Stack trace line numbers are from transformed code — resolve real line from source
         if (file) {
