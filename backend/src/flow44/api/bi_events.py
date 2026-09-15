@@ -8,9 +8,7 @@ from flow44.services.logging import (
     _source,
     log_bi_event,
 )
-from flow44.services.logging import (
-    _project_name as _log_project_name,
-)
+from flow44.services.logging import _project_name as _log_project_name
 
 router = APIRouter(prefix="/api/bi", tags=["bi_events"])
 

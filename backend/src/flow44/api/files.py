@@ -150,7 +150,6 @@ async def delete_entry(
 ) -> dict[str, str]:
     try:
         await sandbox.delete_file(path)
-
         log_bi_event(
             "file_deleted",
             {
@@ -158,7 +157,6 @@ async def delete_entry(
                 "deleted_by": "user",
             },
         )
-
         return {"status": "ok", "path": path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None

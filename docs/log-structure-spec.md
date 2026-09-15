@@ -4,7 +4,6 @@
 |---|---|
 | Owner | Product Management |
 | Version | 0.1 |
-| Related document | BuildApp — Logs and BI Infrastructure PRD |
 
 **Note on language.** This document follows the writing rules of ASD-STE100: short sentences, active voice, and one idea per sentence, with technical nomenclature kept as-is.
 

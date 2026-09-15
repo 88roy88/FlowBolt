@@ -380,13 +380,14 @@ export async function fetchPublishedApps(): Promise<
 
 // --- Logging ---
 
-export async function sendLogs(events: LogEvent[]): Promise<void> {
+export async function sendLogs(events: LogEvent[], options?: { keepalive?: boolean }): Promise<void> {
   try {
     const version = import.meta.env.VITE_APP_VERSION || "unknown";
     await request("/bi/events", {
       method: "POST",
       headers: { "X-Client-Version": version },
       body: JSON.stringify(events),
+      keepalive: options?.keepalive,
     });
   } catch (error) {
     console.warn("Log send failed:", error);

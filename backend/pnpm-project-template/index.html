@@ -54,7 +54,8 @@
       window.parent.postMessage(msg,'*');
     };
   });
-  // interaction reporting (click / input / navigation)
+  // Report user interactions (click / input / navigation) for BI logging
+  // (emits a "preview-interaction" event)
   function nearestId(el){
     try{
       while(el && el.nodeType===1){

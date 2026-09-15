@@ -59,7 +59,7 @@ export function useErrorCapture() {
       });
       logger.error('preview_error', {
         error_type: 'build',
-        error_message: d.message ? d.message.slice(0, 500) : undefined,
+        error_message: d.message || undefined,
       });
     });
 
@@ -82,7 +82,7 @@ export function useErrorCapture() {
         if (d.file && !file) return; // node_modules — skip
         logger.error('preview_error', {
           error_type: 'runtime',
-          error_message: msg ? msg.slice(0, 500) : undefined,
+          error_message: msg || undefined,
         });
         // Stack trace line numbers are from transformed code — resolve real line from source
         if (file) {
@@ -112,7 +112,7 @@ export function useErrorCapture() {
           if (errorMsg.includes('The above error occurred in')) return;
           logger.error('preview_error', {
             error_type: 'console',
-            error_message: errorMsg.slice(0, 500),
+            error_message: errorMsg,
           });
           const file = event.data.file || undefined;
           // Resolve the real source line by searching the file content
