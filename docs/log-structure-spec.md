@@ -173,7 +173,7 @@ Trigger: the user adds a data source to the project.
 | `data_source_type` | string | Yes | Type of data source, for now it is only `package`. |
 | `data_source_id` | string | Yes | ID of the underlying data source. |
 
-#### `data_source_removed` || Not yet implemented
+#### `data_source_removed` || Not yet implemented (no way to manually remove a data source)
 Trigger: the user removes a data source from the project.
 
 | Field | Type | Required | Description |
@@ -218,6 +218,8 @@ Trigger: the user interacts with the running preview, for example a click or a f
 |---|---|---|---|
 | `interaction_type` | enum: `click`, `input`, `navigation` | Yes | Kind of interaction. |
 | `element_id` | string | No | ID of the element interacted with, if the preview exposes one. |
+| `element_type` | string | No | Tag name of the interacted element, for example `button` or `input`. Not present for `navigation`. |
+| `class_name` | string | No | CSS class attribute of the interacted element, if any. Not present for `navigation`. |
 
 ### 4.6 Publish Events
 

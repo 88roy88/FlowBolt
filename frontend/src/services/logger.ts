@@ -37,12 +37,12 @@ function scheduleFlush(): void {
 function log(
   event: string,
   properties?: Record<string, unknown>,
-  options: { level?: 'debug' | 'info' | 'warning' | 'error' } = {}
+  options: { level?: 'debug' | 'info' | 'warning' | 'error'; eventVersion?: number } = {}
 ): void {
   const state = useSessionStore.getState();
   eventQueue.push({
     event,
-    event_version: 1,
+    event_version: options.eventVersion ?? 1,
     level: options.level || 'info',
     project_id: state.projectId ?? undefined,
     project_name: state.currentProject?.name ?? undefined,
@@ -52,14 +52,14 @@ function log(
 }
 
 export const logger = {
-  debug: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'debug' }),
-  info: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'info' }),
-  warn: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'warning' }),
-  error: (event: string, properties?: Record<string, unknown>) =>
-    log(event, properties, { level: 'error' }),
+  debug: (event: string, properties?: Record<string, unknown>, eventVersion?: number) =>
+    log(event, properties, { level: 'debug', eventVersion }),
+  info: (event: string, properties?: Record<string, unknown>, eventVersion?: number) =>
+    log(event, properties, { level: 'info', eventVersion }),
+  warn: (event: string, properties?: Record<string, unknown>, eventVersion?: number) =>
+    log(event, properties, { level: 'warning', eventVersion }),
+  error: (event: string, properties?: Record<string, unknown>, eventVersion?: number) =>
+    log(event, properties, { level: 'error', eventVersion }),
 };
 
 export async function flush_logs(): Promise<void> {
