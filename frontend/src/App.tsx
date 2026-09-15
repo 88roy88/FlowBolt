@@ -12,6 +12,7 @@ import { pollFileTree } from './utils/pollFileTree';
 import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
+import { logger } from './services/logger';
 
 function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
@@ -64,13 +65,17 @@ export default function App() {
   const [checkingBackend, setCheckingBackend] = useState(true);
   const hasCache = hasProjectsCache();
 
-  const selectProject = useCallback((project: typeof projects[number]) => {
-    setCurrentProject(project);
-    window.location.hash = `#/project/${project.id}`;
-    resetFiles();
-    loadHistory(project.id);
-    loadFileTree();
-  }, [setCurrentProject, resetFiles, loadHistory, loadFileTree]);
+  const selectProject = useCallback(
+    (project: typeof projects[number], source: 'auto_select' | 'direct_link' | 'project_list' = 'auto_select') => {
+      setCurrentProject(project);
+      window.location.hash = `#/project/${project.id}`;
+      resetFiles();
+      loadHistory(project.id);
+      loadFileTree();
+      logger.info('project_opened', { entry_point: source });
+    },
+    [setCurrentProject, resetFiles, loadHistory, loadFileTree]
+  );
 
   useEffect(() => {
     async function checkBackend() {
@@ -120,7 +125,7 @@ export default function App() {
       ? projects.find((p) => p.id === hashProjectId)
       : null;
     const target = match ?? projects[0];
-    selectProject(target);
+    selectProject(target, match ? 'direct_link' : 'auto_select');
   }, [loading, projects, currentProject, selectProject]);
 
   // Listen for hash changes (back/forward)
@@ -130,7 +135,7 @@ export default function App() {
       if (!hashProjectId) return;
       const match = projects.find((p) => p.id === hashProjectId);
       if (match && match.id !== currentProject?.id) {
-        selectProject(match);
+        selectProject(match, 'direct_link');
       }
     }
     window.addEventListener('hashchange', onHashChange);

@@ -21,6 +21,7 @@ from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
 from flow44.db.pending_plan import save_pending_plan
 from flow44.sandbox.main import PnpmSandbox
+from flow44.services.logging.helpers import log_data_sources_added
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,7 @@ class PlanAgent(BaseAgent):
             from flow44.db.project_data_source import update_project_data_sources  # noqa: PLC0415
 
             await update_project_data_sources(state.project_id, state.build_state.data_source_contexts)
+            log_data_sources_added(state.build_state.data_source_contexts)
             await state.emit_fn(
                 {
                     "type": "data_sources_fetched",

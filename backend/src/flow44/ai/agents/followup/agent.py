@@ -18,6 +18,7 @@ from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
+from flow44.services.logging.helpers import log_data_sources_added
 
 MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
@@ -167,6 +168,7 @@ class FollowUpAgent(ChatAgent):
             existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_ids]
             if updated_contexts:
                 await self._persist_data_sources(updated_contexts, stored_contexts)
+                log_data_sources_added(new_data_source_contexts)
 
         await self.emit({"type": "phase", "phase": "exploring"})
         context, history = await asyncio.gather(

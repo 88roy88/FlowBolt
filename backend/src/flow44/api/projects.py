@@ -25,6 +25,7 @@ from flow44.db.project_member import list_shared_projects
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.logging import log_bi_event
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
 @router.post("", status_code=201)
 async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
     project = await create_project(body.name, user_id)
+    log_bi_event("project_created", {"project_id": project.id, "project_name": body.name})
 
     async def _create() -> None:
         from flow44.db.events import emit_event  # noqa: PLC0415
@@ -143,6 +145,7 @@ async def delete_existing_project(
     idle_reaper.remove(project.id)
     await s3_storage.delete_published_html(project.id)
     await delete_project(project.id)
+    log_bi_event("project_deleted")
     background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)
 
 

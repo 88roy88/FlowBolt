@@ -1,5 +1,6 @@
 import { authSession, credentialsStore } from '../auth';
 import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, UserStatus } from '../types';
+import type { LogEvent } from './logger';
 
 const BASE = '/api';
 
@@ -274,4 +275,20 @@ export async function fetchPublishedApps(): Promise<{
   published_at: string;
 }[]> {
   return request('/admin/published-apps');
+}
+
+// --- Logging ---
+
+export async function sendLogs(events: LogEvent[], options?: { keepalive?: boolean }): Promise<void> {
+  try {
+    const version = import.meta.env.VITE_APP_VERSION || 'unknown';
+    await request('/bi/events', {
+      method: 'POST',
+      headers: { 'X-Client-Version': version },
+      body: JSON.stringify(events),
+      keepalive: options?.keepalive,
+    });
+  } catch (error) {
+    console.warn('Log send failed:', error);
+  }
 }

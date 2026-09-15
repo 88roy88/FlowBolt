@@ -9,6 +9,9 @@ import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
+import { logger } from '../../services/logger';
+
+type PreviewLoadTrigger = 'manual_refresh' | 'auto_on_code_change';
 
 export function Preview() {
   const { t } = useTranslation();
@@ -38,18 +41,21 @@ export function Preview() {
 
   const clearConsole = useConsoleStore((s) => s.clear);
 
-  const reloadPreview = useCallback((reason: string) => {
+  const pendingLoadRef = useRef<{ trigger: PreviewLoadTrigger; startedAt: number } | null>(null);
+
+  const reloadPreview = useCallback((trigger: PreviewLoadTrigger) => {
     const frame = iframeRef.current?.contentWindow;
     if (!frame) return;
-    console.debug(`[Preview] refresh — reason: ${reason}`);
+    console.debug(`[Preview] refresh — trigger: ${trigger}`);
     clearConsole();
     setLoading(true);
+    pendingLoadRef.current = { trigger, startedAt: performance.now() };
     frame.location.reload();
   }, [clearConsole]);
 
   const saveVersionRef = useRef(saveVersion);
   const debouncedRefresh = useDebouncedCallback(() => {
-    reloadPreview('files saved');
+    reloadPreview('auto_on_code_change');
   }, 2000, { maxWait: 8000 });
   useEffect(() => {
     if (saveVersion === saveVersionRef.current) return;
@@ -57,7 +63,7 @@ export function Preview() {
     debouncedRefresh();
   }, [saveVersion, debouncedRefresh]);
 
-  const handleRefresh = () => reloadPreview('manual');
+  const handleRefresh = () => reloadPreview('manual_refresh');
 
   const handlePublish = useCallback(() => {
     if (projectId) {
@@ -125,7 +131,17 @@ export function Preview() {
           <iframe
             ref={iframeRef}
             src={previewUrl}
-            onLoad={() => setLoading(false)}
+            onLoad={() => {
+              setLoading(false);
+              const pending = pendingLoadRef.current;
+              if (pending) {
+                pendingLoadRef.current = null;
+                logger.info('preview_loaded', {
+                  load_time_ms: Math.round(performance.now() - pending.startedAt),
+                  trigger: pending.trigger,
+                });
+              }
+            }}
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
             className="absolute inset-0 w-full h-full border-none"
             style={{ background: 'var(--preview-bg)' }}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { DialogTitle } from '../../ui/dialog';
 import { BTN_PRIMARY, BTN_SECONDARY } from '../styles';
+import { logger } from '../../../services/logger';
 
 interface SuccessPhaseProps {
   resultUrl: string;
@@ -18,6 +19,7 @@ export function SuccessPhase({ resultUrl, onClose }: SuccessPhaseProps) {
     navigator.clipboard.writeText(displayUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    logger.info('app_shared', { share_method: 'link_copy' });
   };
 
   return (

@@ -1,0 +1,34 @@
+# Filebeat that tails backend/app.log (AIB_LOG_FILE_PATH) and writes to a local OpenObserve instance.
+filebeat.inputs:
+  - type: filestream
+    id: buildapp-dev
+    paths:
+      - /logs/app.log
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+          # false, not true: our JSON's own "@timestamp" (Python's "%z" format, e.g.
+          # +0300) can't overwrite libbeat's reserved @timestamp field — with
+          # overwrite_keys:true it tries anyway, fails, and stamps a spurious
+          # error_message/error_type onto every single line (not just real errors,
+          # which would make filtering on error_type useless). false just leaves
+          # libbeat's own ingest-time @timestamp alone instead. _timestamp in
+          # OpenObserve ends up as ingest time either way; for a live tail that's
+          # within ~1-2s of the real log time, so ordering is still correct.
+          overwrite_keys: false
+
+# OpenObserve speaks the Elasticsearch bulk ingest API under /api/<org>/.
+output.elasticsearch:
+  # Trailing slash matters — OpenObserve's ES-compat cluster-info probe 404s without it.
+  hosts: ["http://openobserve:5080/api/default/"]
+  username: "${OPENOBSERVE_USER}"
+  password: "${OPENOBSERVE_PASSWORD}"
+  index: "buildapp-dev"
+
+# OpenObserve doesn't implement ES index-template/ILM admin APIs — skip them.
+setup.template.enabled: false
+setup.ilm.enabled: false
+
+logging.level: info
+logging.to_stderr: true

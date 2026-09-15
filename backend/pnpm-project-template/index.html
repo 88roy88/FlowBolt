@@ -54,6 +54,54 @@
       window.parent.postMessage(msg,'*');
     };
   });
+  // Report user interactions (click / input / navigation) for BI logging
+  // (emits a "preview-interaction" event)
+  function nearestId(el){
+    try{
+      while(el && el.nodeType===1){
+        if(el.id) return el.id;
+        el=el.parentElement;
+      }
+    }catch(e){}
+    return undefined;
+  }
+  function elementType(el){
+    return el && el.tagName ? el.tagName.toLowerCase() : undefined;
+  }
+  function className(el){
+    try{
+      var c=el && el.getAttribute && el.getAttribute('class');
+      return c ? c.slice(0,200) : undefined;
+    }catch(e){}
+    return undefined;
+  }
+  function reportInteraction(interactionType, target){
+    if(!window.parent||window.parent===window)return;
+    var msg={type:'preview-interaction',interaction_type:interactionType};
+    if(target){
+      var id=nearestId(target);
+      if(id)msg.element_id=id;
+      var type=elementType(target);
+      if(type)msg.element_type=type;
+      var cls=className(target);
+      if(cls)msg.class_name=cls;
+    }
+    window.parent.postMessage(msg,'*');
+  }
+  document.addEventListener('click',function(e){
+    reportInteraction('click', e.target);
+  }, true);
+  document.addEventListener('change',function(e){
+    reportInteraction('input', e.target);
+  }, true);
+  (function(){
+    var origPush=history.pushState;
+    var origReplace=history.replaceState;
+    function onNav(){ reportInteraction('navigation'); }
+    history.pushState=function(){ var r=origPush.apply(this,arguments); onNav(); return r; };
+    history.replaceState=function(){ var r=origReplace.apply(this,arguments); onNav(); return r; };
+    window.addEventListener('popstate', onNav);
+  })();
 })()
 </script>
 </head>

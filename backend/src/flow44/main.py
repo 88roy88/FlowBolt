@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from flow44.ai.core.opik_utils import flush_opik_traces, setup_opik_tracing
 from flow44.api import (
     admin,
+    bi_events,
     chat,
     data_source_api,
     errors,
@@ -30,10 +31,10 @@ from flow44.config import settings
 from flow44.db.database import init_db
 from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import s3_storage
-from flow44.logging import setup_logging
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.heartbeat_reaper import heartbeat_reaper
+from flow44.services.logging import setup_logging
 
 if os.name == "posix":
     # Sandbox workspaces live on an NFS PVC written to by pods with varying uids; the default umask
@@ -115,6 +116,7 @@ auth_routes.include_router(chat.http_router)
 auth_routes.include_router(iaagent.router)
 auth_routes.include_router(members.router)
 auth_routes.include_router(admin.router)
+auth_routes.include_router(bi_events.router)
 app.include_router(auth_routes)
 
 # Public HTTP routes

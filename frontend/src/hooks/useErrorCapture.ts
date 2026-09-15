@@ -4,6 +4,7 @@ import { useConsoleStore } from '../stores/console';
 import { useSessionStore } from '../stores/session';
 import { createErrorSocket } from '../services/websocket';
 import { fetchFileContent } from '../services/api';
+import { logger } from '../services/logger';
 
 /** Parse file:line:col from a stack trace, preferring /src/ frames over node_modules. */
 function parseStack(stack: string | undefined): { file: string; line: number; column?: number } | undefined {
@@ -56,6 +57,10 @@ export function useErrorCapture() {
         column: d.column,
         stack: d.stack,
       });
+      logger.error('preview_error', {
+        error_type: 'build',
+        error_message: d.message,
+      });
     });
 
     return () => {
@@ -75,6 +80,10 @@ export function useErrorCapture() {
         const fromStack = parseStack(d.stack);
         const file = fromStack?.file ?? extractSourceFile(d.file);
         if (d.file && !file) return; // node_modules — skip
+        logger.error('preview_error', {
+          error_type: 'runtime',
+          error_message: msg,
+        });
         // Stack trace line numbers are from transformed code — resolve real line from source
         if (file) {
           const pid = useSessionStore.getState().projectId;
@@ -101,6 +110,10 @@ export function useErrorCapture() {
           if (errorMsg.includes('[vite] failed to connect to websocket')) return;
           // React error boundaries repeat the actual error — skip them
           if (errorMsg.includes('The above error occurred in')) return;
+          logger.error('preview_error', {
+            error_type: 'console',
+            error_message: errorMsg,
+          });
           const file = event.data.file || undefined;
           // Resolve the real source line by searching the file content
           // (parseCaller stack traces give transformed line numbers)
@@ -123,6 +136,13 @@ export function useErrorCapture() {
           }
           pushError({ source: 'console', message: errorMsg, file });
         }
+      } else if (event.data.type === 'preview-interaction') {
+        logger.info('preview_interaction', {
+          interaction_type: event.data.interaction_type,
+          element_id: event.data.element_id,
+          element_type: event.data.element_type,
+          class_name: event.data.class_name,
+        });
       }
     }
 

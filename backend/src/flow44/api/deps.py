@@ -18,10 +18,11 @@ from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
 from flow44.db.project_member import get_project_member
-from flow44.logging import _project_id as _log_project_id
-from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.logging import _project_id as _log_project_id
+from flow44.services.logging import _project_name as _log_project_name
+from flow44.services.logging import _user_id as _log_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     _log_project_id.set(project.id)
+    _log_project_name.set(project.name)
     return project
 
 
