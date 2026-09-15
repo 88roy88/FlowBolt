@@ -141,7 +141,7 @@ async def delete_existing_project(
     _perms: set[Permission] = require_permission(Permission.delete),
 ) -> None:
     idle_reaper.remove(project.id)
-    await s3_storage.delete_published_html(project.id)
+    await s3_storage.delete_published_prefix(project.id)
     await delete_project(project.id)
     background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)
 

@@ -1,7 +1,9 @@
 import contextlib
 import json
 import logging
-from collections.abc import AsyncIterator
+import mimetypes
+from collections.abc import AsyncIterator, Iterable
+from dataclasses import dataclass
 from typing import Any
 
 import aioboto3
@@ -10,6 +12,15 @@ from botocore.exceptions import ClientError
 from flow44.config import settings
 
 logger = logging.getLogger(__name__)
+
+_MISSING_OBJECT_CODES = {"NoSuchKey", "NoSuchBucket", "404"}
+
+
+@dataclass(frozen=True)
+class S3Object:
+    body: bytes
+    content_type: str
+    etag: str | None
 
 
 class S3Storage:
@@ -68,29 +79,48 @@ class S3Storage:
         )
 
     @staticmethod
-    def _key(project_id: str) -> str:
-        return f"published/{project_id}.html"
+    def _prefix(project_id: str) -> str:
+        return f"published/{project_id}/"
 
-    def published_url(self, project_id: str) -> str:
-        return f"{settings.S3_ENDPOINT_URL}/{settings.S3_BUCKET_NAME}/{self._key(project_id)}"
+    async def deploy_dist(self, project_id: str, files: Iterable[tuple[str, bytes]]) -> None:
+        await self.delete_published_prefix(project_id)
+        for rel_path, body in files:
+            content_type = mimetypes.guess_type(rel_path)[0] or "application/octet-stream"
+            await self.client.put_object(
+                Bucket=settings.S3_BUCKET_NAME,
+                Key=f"{self._prefix(project_id)}{rel_path}",
+                Body=body,
+                ContentType=content_type,
+                ACL="public-read",
+                StorageClass=settings.S3_STORAGE_CLASS,
+            )
 
-    async def deploy_single_html(self, html_content: str, project_id: str) -> str:
-        await self.client.put_object(
-            Bucket=settings.S3_BUCKET_NAME,
-            Key=self._key(project_id),
-            Body=html_content.encode("utf-8"),
-            ContentType="text/html",
-            ACL="public-read",
-            StorageClass=settings.S3_STORAGE_CLASS,
-        )
-        return self.published_url(project_id)
-
-    async def delete_published_html(self, project_id: str) -> None:
-        key = self._key(project_id)
+    async def get_asset(self, project_id: str, path: str) -> S3Object | None:
         try:
-            await self.client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
+            response = await self.client.get_object(
+                Bucket=settings.S3_BUCKET_NAME, Key=f"{self._prefix(project_id)}{path}"
+            )
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] in _MISSING_OBJECT_CODES:
+                return None
+            raise
+        return S3Object(
+            body=await response["Body"].read(),
+            content_type=response.get("ContentType") or "application/octet-stream",
+            etag=response.get("ETag"),
+        )
+
+    async def delete_published_prefix(self, project_id: str) -> None:
+        prefix = self._prefix(project_id)
+        bucket = settings.S3_BUCKET_NAME
+        try:
+            paginator = self.client.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+                keys = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+                if keys:
+                    await self.client.delete_objects(Bucket=bucket, Delete={"Objects": keys})
         except ClientError:
-            logger.warning("Failed to delete S3 object %s", key)
+            logger.warning("Failed to delete S3 objects under %s", prefix)
 
 
 s3_storage = S3Storage()
