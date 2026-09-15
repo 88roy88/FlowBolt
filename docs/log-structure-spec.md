@@ -231,7 +231,7 @@ Trigger: a publish action completes with success.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `publish_duration_ms` | integer | Yes | Time from `publish_started` to success. |
+| `duration_ms` | integer | Yes | Time from `publish_started` to success. |
 | `published_url` | string | Yes | URL of the published app. |
 
 #### `publish_failed`
@@ -239,8 +239,8 @@ Trigger: a publish action ends in failure.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `error_type` | string | Yes | Category of the publish failure. |
-| `publish_duration_ms` | integer | Yes | Time from `publish_started` to failure. |
+| `error_message` | string | Yes | Error text describing the publish failure. |
+| `duration_ms` | integer | Yes | Time from `publish_started` to failure. |
 
 #### `app_shared`
 Trigger: a user shares the link to a published app.
