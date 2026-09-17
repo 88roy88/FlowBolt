@@ -9,21 +9,21 @@ from flow44.logic.publish import (
 )
 
 
+@pytest.mark.parametrize(
+    "expected",
+    [SlugStatus.invalid, SlugStatus.taken, SlugStatus.available],
+)
 @pytest.mark.asyncio
-async def test_resolve_slug_status_invalid():
-    assert await resolve_slug_status("A!", "proj-1") == SlugStatus.invalid
+async def test_resolve_slug_status(expected: SlugStatus):
+    if expected is SlugStatus.invalid:
+        slug, handle_taken = "A!", False
+    elif expected is SlugStatus.taken:
+        slug, handle_taken = "my-slug", True
+    else:
+        slug, handle_taken = "my-slug", False
 
-
-@pytest.mark.asyncio
-async def test_resolve_slug_status_taken():
-    with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=True)):
-        assert await resolve_slug_status("my-slug", "proj-1") == SlugStatus.taken
-
-
-@pytest.mark.asyncio
-async def test_resolve_slug_status_available():
-    with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=False)):
-        assert await resolve_slug_status("my-slug", "proj-1") == SlugStatus.available
+    with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=handle_taken)):
+        assert await resolve_slug_status(slug, "proj-1") == expected
 
 
 @pytest.mark.asyncio
