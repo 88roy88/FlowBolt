@@ -27,11 +27,11 @@ class FlapiUpstreamError(RuntimeError):
 
 
 class FlapiClient:
-    def __init__(self, base_url: str | None = None, *, timeout_s: float = 30.0) -> None:
+    def __init__(self, base_url: str | None = None) -> None:
         self.base_url = base_url or settings.FLAPI_BASE_URL
         self._http = httpx.AsyncClient(
             base_url=self.base_url.rstrip("/"),
-            timeout=timeout_s,
+            timeout=settings.FLAPI_CLIENT_TIMEOUT_SEC,
             verify=settings.FLAPI_VERIFY_SSL,
         )
 
