@@ -20,22 +20,41 @@ def _serve(asset):
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_headers():
-    asset = S3Object(body=b"<html>Testing headers</html>", content_type="text/html", etag='"12345"')
+    asset = S3Object(path="index.html", body=b"<html>Testing headers</html>", content_type="text/html", etag='"12345"')
 
     p_project, p_asset = _serve(asset)
     with p_project, p_asset:
         response = client.get("/shared/test-project")
 
     assert response.status_code == 200
-    assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
     assert response.headers["ETag"] == '"12345"'
     assert "Last-Modified" not in response.headers
     assert response.text == "<html>Testing headers</html>"
 
 
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("assets/app-abc.js", "public, max-age=31536000, immutable"),
+        ("index.html", "no-cache"),
+        ("favicon.ico", f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_cache_control_per_asset_class(path: str, expected: str):
+    asset = S3Object(path=path, body=b"data", content_type="application/octet-stream", etag=None)
+
+    p_project, p_asset = _serve(asset)
+    with p_project, p_asset:
+        response = client.get(f"/shared/test-project/{path}")
+
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == expected
+
+
 @pytest.mark.asyncio
 async def test_matching_if_none_match_returns_304():
-    asset = S3Object(body=b"<html>Testing headers</html>", content_type="text/html", etag='"12345"')
+    asset = S3Object(path="index.html", body=b"<html>Testing headers</html>", content_type="text/html", etag='"12345"')
 
     p_project, p_asset = _serve(asset)
     with p_project, p_asset:
@@ -48,7 +67,7 @@ async def test_matching_if_none_match_returns_304():
 
 @pytest.mark.asyncio
 async def test_stale_if_none_match_returns_200():
-    asset = S3Object(body=b"<html>Testing headers</html>", content_type="text/html", etag='"12345"')
+    asset = S3Object(path="index.html", body=b"<html>Testing headers</html>", content_type="text/html", etag='"12345"')
 
     p_project, p_asset = _serve(asset)
     with p_project, p_asset:

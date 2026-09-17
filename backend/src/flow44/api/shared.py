@@ -8,8 +8,16 @@ from flow44.services.shared_service import AppNotPublishedError, get_published_a
 router = APIRouter(prefix="/shared", tags=["shared"])
 
 
+def _cache_control(path: str) -> str:
+    if path.startswith("assets/"):
+        return "public, max-age=31536000, immutable"
+    if path.endswith(".html"):
+        return "no-cache"
+    return f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
+
+
 def _cache_headers(asset: S3Object) -> dict[str, str]:
-    headers = {"Cache-Control": f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"}
+    headers = {"Cache-Control": _cache_control(asset.path)}
     if asset.etag:
         headers["ETag"] = asset.etag
     return headers

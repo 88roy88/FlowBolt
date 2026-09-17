@@ -8,7 +8,6 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from flow44.api.deps import get_project, get_sandbox
-from flow44.config import settings
 from flow44.integrations.s3 import S3Object
 from flow44.main import app
 
@@ -166,7 +165,7 @@ def _patch_serving(project, asset):
 
 @pytest.mark.asyncio
 async def test_proxy_published_app_basic():
-    asset = S3Object(body=b"<html>S3 Content</html>", content_type="text/html", etag="tag123")
+    asset = S3Object(path="index.html", body=b"<html>S3 Content</html>", content_type="text/html", etag="tag123")
     p_project, p_asset = _patch_serving(_published_project("published-proj"), asset)
     with p_project, p_asset:
         response = client.get("/shared/published-proj")
@@ -174,7 +173,7 @@ async def test_proxy_published_app_basic():
     assert response.status_code == 200
     assert response.text == "<html>S3 Content</html>"
     assert response.headers["ETag"] == "tag123"
-    assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
+    assert response.headers["Cache-Control"] == "no-cache"
 
 
 @pytest.mark.asyncio
@@ -187,7 +186,7 @@ async def test_proxy_published_app_not_found():
 
 @pytest.mark.asyncio
 async def test_proxy_asset_passes_through_content_type():
-    asset = S3Object(body=b"\x89PNG\r\n\x1a\n", content_type="image/png", etag=None)
+    asset = S3Object(path="assets/logo.png", body=b"\x89PNG\r\n\x1a\n", content_type="image/png", etag=None)
     p_project, p_asset = _patch_serving(_published_project(), asset)
     with p_project, p_asset:
         response = client.get("/shared/my-app/assets/logo.png")

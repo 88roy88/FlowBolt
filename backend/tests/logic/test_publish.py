@@ -10,18 +10,15 @@ from flow44.logic.publish import (
 
 
 @pytest.mark.parametrize(
-    "expected",
-    [SlugStatus.invalid, SlugStatus.taken, SlugStatus.available],
+    ("slug", "handle_taken", "expected"),
+    [
+        ("A!", False, SlugStatus.invalid),
+        ("my-slug", True, SlugStatus.taken),
+        ("my-slug", False, SlugStatus.available),
+    ],
 )
 @pytest.mark.asyncio
-async def test_resolve_slug_status(expected: SlugStatus):
-    if expected is SlugStatus.invalid:
-        slug, handle_taken = "A!", False
-    elif expected is SlugStatus.taken:
-        slug, handle_taken = "my-slug", True
-    else:
-        slug, handle_taken = "my-slug", False
-
+async def test_resolve_slug_status(slug: str, handle_taken: bool, expected: SlugStatus):
     with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=handle_taken)):
         assert await resolve_slug_status(slug, "proj-1") == expected
 

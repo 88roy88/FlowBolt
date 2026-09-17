@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import validate_token
-from flow44.config import settings
 from flow44.integrations.s3 import S3Object
 from flow44.main import app
 
@@ -103,14 +102,14 @@ class TestShareBySlug:
     @pytest.mark.asyncio
     async def test_share_returns_proxied_html(self):
         project = MagicMock(id="proj-123", published_at="2026-04-18T21:00:00Z")
-        asset = S3Object(body=b"<html>Shared App</html>", content_type="text/html", etag='"abc"')
+        asset = S3Object(path="index.html", body=b"<html>Shared App</html>", content_type="text/html", etag='"abc"')
         p_project, p_asset = self._patch_serving(project, asset)
         with p_project, p_asset:
             response = client.get("/shared/my-app")
 
         assert response.status_code == 200
         assert response.text == "<html>Shared App</html>"
-        assert response.headers["Cache-Control"] == f"public, max-age={settings.S3_CACHE_TTL}, must-revalidate"
+        assert response.headers["Cache-Control"] == "no-cache"
         assert response.headers["ETag"] == '"abc"'
 
     @pytest.mark.asyncio
@@ -124,7 +123,7 @@ class TestShareBySlug:
     async def test_share_route_is_public(self):
         """The share route must serve without a token — it backs public links."""
         project = MagicMock(id="proj-123", published_at="2026-04-18T21:00:00Z")
-        asset = S3Object(body=b"<html>Shared App</html>", content_type="text/html", etag=None)
+        asset = S3Object(path="index.html", body=b"<html>Shared App</html>", content_type="text/html", etag=None)
         saved = app.dependency_overrides.pop(validate_token, None)
         try:
             p_project, p_asset = self._patch_serving(project, asset)

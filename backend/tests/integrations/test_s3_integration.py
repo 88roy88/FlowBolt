@@ -203,6 +203,7 @@ async def test_get_asset_returns_s3object(storage):
 
     client.get_object.assert_awaited_once_with(Bucket="my-bucket", Key="published/proj-123/logo.png")
     assert obj is not None
+    assert obj.path == "logo.png"
     assert obj.body == b"\x89PNG"
     assert obj.content_type == "image/png"
     assert obj.etag == '"abc"'

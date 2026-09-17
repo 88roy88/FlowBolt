@@ -18,6 +18,7 @@ _MISSING_OBJECT_CODES = {"NoSuchKey", "NoSuchBucket", "404"}
 
 @dataclass(frozen=True)
 class S3Object:
+    path: str
     body: bytes
     content_type: str
     etag: str | None
@@ -105,6 +106,7 @@ class S3Storage:
                 return None
             raise
         return S3Object(
+            path=path,
             body=await response["Body"].read(),
             content_type=response.get("ContentType") or "application/octet-stream",
             etag=response.get("ETag"),

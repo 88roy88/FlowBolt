@@ -10,8 +10,8 @@ def _published_project():
     return MagicMock(id="proj-1", published_at="2026-04-18T21:00:00Z")
 
 
-def _asset(content_type="text/html"):
-    return S3Object(body=b"data", content_type=content_type, etag=None)
+def _asset(content_type="text/html", path="index.html"):
+    return S3Object(path=path, body=b"data", content_type=content_type, etag=None)
 
 
 @pytest.mark.asyncio
