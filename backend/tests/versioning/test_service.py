@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ from flow44.db import database
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.events import emit_event, get_versions, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat
+from flow44.services.maintenance.template_sync import sync_protected_template_files
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git, GitError
 
@@ -210,7 +212,7 @@ async def test_save_version_records_diffs_and_tells_the_agent(project_id: str, v
     assert notes[0].created_at < payload["_ts"]
 
 
-async def test_save_version_drops_oversized_diffs(
+async def test_save_version_keeps_file_names_of_oversized_diffs(
     project_id: str, version_chain: VersionChain, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(versioning, "_MAX_DIFF_CHARS", 10)
@@ -218,7 +220,8 @@ async def test_save_version_drops_oversized_diffs(
 
     await versioning.save_version(project_id)
 
-    assert "diffs" not in (await get_versions(project_id))[-1].payload
+    assert (await get_versions(project_id))[-1].payload["diffs"] == [{"path": "a.txt", "diff": "", "is_new": False}]
+    assert [m.content for m in await get_messages(project_id)] == ["[I edited these files myself: a.txt]"]
 
 
 @pytest.mark.parametrize(("restore_to_user_edit", "surviving_notes"), [(True, 1), (False, 0)])
@@ -273,3 +276,53 @@ async def test_legacy_nested_workspace_gets_its_own_baseline(project_id: str, wo
     assert git.is_repo()
     assert await git.head_sha() != outer_head
     assert [event.payload["commit_sha"] for event in versions] == [await git.head_sha()]
+
+
+async def _platform_file_at_head(project_id: str, chain: VersionChain) -> Path:
+    client = chain.workspace / "src" / "api" / "client.ts"
+    client.parent.mkdir(parents=True)
+    client.write_text("platform v1\n")
+    assert await versioning.commit_turn(project_id)
+    return client
+
+
+def _platform_sync(workspace: Path, tmp_path: Path) -> Callable[[], str]:
+    template = tmp_path / "template"
+    (template / "src" / "api").mkdir(parents=True)
+    (template / "src" / "api" / "client.ts").write_text("platform v2\n")
+    return partial(sync_protected_template_files, str(workspace), str(template))
+
+
+async def test_platform_update_commits_as_a_system_version(
+    project_id: str, version_chain: VersionChain, tmp_path: Path
+) -> None:
+    client = await _platform_file_at_head(project_id, version_chain)
+
+    summary = _platform_sync(version_chain.workspace, tmp_path)()
+    await versioning.save_version(project_id, message=versioning.PLATFORM_UPDATE_MESSAGE, author="system")
+
+    payload = (await get_versions(project_id))[-1].payload
+    assert summary.startswith("updated 1")
+    assert payload["author"] == "system"
+    assert [d["path"] for d in payload["diffs"]] == ["src/api/client.ts"]
+    assert await version_chain.git._run("log", "-1", "--format=%s") == "Platform update"
+    assert client.read_text() == "platform v2\n"
+    assert await get_messages(project_id) == []
+
+
+async def test_template_sync_without_a_repo_writes_files_and_commits_nothing(
+    project_id: str, workspace: Path, tmp_path: Path
+) -> None:
+    summary = _platform_sync(workspace, tmp_path)()
+
+    assert summary.endswith("created [src/api/client.ts]")
+    assert (workspace / "src" / "api" / "client.ts").read_text() == "platform v2\n"
+    assert not Git(project_id).is_repo()
+    assert await get_versions(project_id) == []
+
+
+async def test_template_sync_skips_a_workspace_that_is_not_on_this_pod(project_id: str, tmp_path: Path) -> None:
+    summary = _platform_sync(tmp_path / "gone", tmp_path)()
+
+    assert summary == "workspace not present on this pod, skipped"
+    assert not (tmp_path / "gone").exists()

@@ -9,7 +9,7 @@ export interface Message {
   version?: string; // commit_sha
 }
 
-export type VersionAuthor = 'ai' | 'user';
+export type VersionAuthor = 'ai' | 'user' | 'system';
 export type VersionErrorCode = 'run_active' | 'dirty_workspace' | 'previewing' | 'failed';
 
 export interface ProjectSummary {
@@ -25,7 +25,7 @@ export type AgentCard =
   | { type: 'task_progress'; tasks: ExecutionTask[] }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'error_fix_request'; errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string }
-  | { type: 'user_edit'; diffs?: FileDiff[] }
+  | { type: 'user_edit'; diffs?: FileDiff[]; author?: VersionAuthor }
   | { type: 'fix_progress'; steps: FixStep[]; diffs?: FileDiff[] }
   | { type: 'data_sources_fetched'; dataSources: { dataSourceId: string; dataSourceName: string; dataSchema: string; relevantFields?: string }[] }
 

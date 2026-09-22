@@ -45,7 +45,7 @@ function AgentCardRenderer({ message }: { message: Message }) {
         errorStack={card.errorStack}
       />;
     case 'user_edit':
-      return <UserEditCard diffs={card.diffs} />;
+      return <UserEditCard diffs={card.diffs} author={card.author} />;
     case 'fix_progress':
       return <FixProgressCard steps={card.steps} content={message.content} diffs={card.diffs} />;
     case 'followup_progress':

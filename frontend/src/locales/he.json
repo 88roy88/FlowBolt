@@ -224,7 +224,8 @@
     "unsavedRow_other": "עריכות שלא נשמרו · {{count}} קבצים",
     "saveAsVersion": "שמור כגרסה",
     "saveTooltip": "שמירת העריכות כגרסה שניתן לשחזר בהמשך",
-    "yourEdits": "העריכות שלך"
+    "yourEdits": "העריכות שלך",
+    "platformUpdate": "עדכון פלטפורמה"
   },
   "publish": {
     "publishFailed": "הפרסום נכשל",

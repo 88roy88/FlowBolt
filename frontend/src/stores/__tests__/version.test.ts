@@ -78,9 +78,20 @@ describe('version store wire contracts', () => {
     const messages = useChatStore.getState().messages;
     expect(messages.map((message) => message.version)).toEqual([undefined, 'sha-legacy', 'sha-user']);
     expect(messages[2].role).toBe('user');
-    expect(messages[2].agentCard).toEqual({ type: 'user_edit', diffs });
+    expect(messages[2].agentCard).toEqual({ type: 'user_edit', diffs, author: 'user' });
     expect(messages[2].timestamp).toBe(Date.parse('2026-09-06T13:58:23.350895Z'));
     expect(useVersionStore.getState().versions).toEqual(['sha-ai', 'sha-legacy', 'sha-user']);
+  });
+
+  it('shows a platform update as a system card on the assistant side', () => {
+    const diffs = [{ path: 'src/api/client.ts', diff: '', is_new: false }];
+
+    handleVersionMessage(msg({ type: 'version_committed', commit_sha: 'sha-platform', author: 'system', diffs }));
+
+    const [message] = useChatStore.getState().messages;
+    expect(message.role).toBe('assistant');
+    expect(message.version).toBe('sha-platform');
+    expect(message.agentCard).toEqual({ type: 'user_edit', diffs, author: 'system' });
   });
 
   it.each([

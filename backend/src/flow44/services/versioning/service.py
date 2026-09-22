@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 _SCAFFOLD_MESSAGE = "Version 0 — blank scaffold"
 _TURN_MESSAGE = "Version"
 _USER_EDITS_MESSAGE = "Your edits"
+PLATFORM_UPDATE_MESSAGE = "Platform update"
 
 _MESSAGES = {
     "run_active": "Can't edit while the AI is working",
@@ -146,13 +147,14 @@ def _edit_note(files: list[str]) -> str:
     return f"[I edited these files myself: {', '.join(files)}]" if files else "[I edited the project files myself]"
 
 
-async def save_version(project_id: str) -> None:
+async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, author: str = "user") -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
-        sha = await git.commit_all(_USER_EDITS_MESSAGE)
+        sha = await git.commit_all(message)
         if sha:
             diffs = await git.commit_diffs(sha, max_chars=_MAX_DIFF_CHARS)
-            await save_message(project_id, ChatRole.user, _edit_note([d.path for d in diffs]))
-            await _emit_committed(project_id, sha, author="user", diffs=diffs)
+            if author == "user":
+                await save_message(project_id, ChatRole.user, _edit_note([d.path for d in diffs]))
+            await _emit_committed(project_id, sha, author=author, diffs=diffs)
         await _emit_dirty(project_id, git)
 
 

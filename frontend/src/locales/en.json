@@ -223,7 +223,8 @@
     "unsavedRow_other": "Unsaved edits · {{count}} files",
     "saveAsVersion": "Save as version",
     "saveTooltip": "Save your edits as a version you can restore later",
-    "yourEdits": "Your edits"
+    "yourEdits": "Your edits",
+    "platformUpdate": "Platform update"
   },
   "publish": {
     "publishFailed": "Publish Failed",
