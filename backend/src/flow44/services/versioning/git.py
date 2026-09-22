@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 from flow44.ai.agents.file_diffs import FileDiff
@@ -20,11 +21,10 @@ def _split_file_diffs(show_output: str) -> list[FileDiff]:
     diffs = []
     for chunk in f"\n{show_output}".split("\ndiff --git ")[1:]:
         meta, marker, body = chunk.partition("\n--- ")
-        if not marker:
-            continue
         header, _, modes = meta.partition("\n")
         path = header.removeprefix("a/").partition(" b/")[0]
-        diffs.append(FileDiff(path=path, diff=f"--- {body}", is_new="new file mode " in modes))
+        diff = f"--- {body}" if marker else ""
+        diffs.append(FileDiff(path=path, diff=diff, is_new="new file mode " in modes))
     return diffs
 
 
@@ -76,10 +76,11 @@ class Git:
         return sorted({*tracked.splitlines(), *untracked.splitlines()} - {""})
 
     async def commit_diffs(self, sha: str, *, max_chars: int) -> list[FileDiff]:
-        out = await self._run("show", "--format=", "--no-color", sha)
+        out = await self._run("show", "--format=", "--no-color", "--no-renames", sha)
+        diffs = _split_file_diffs(out)
         if len(out) > max_chars:
-            return []
-        return _split_file_diffs(out)
+            return [replace(d, diff="") for d in diffs]
+        return diffs
 
     # -- Mutations --
 

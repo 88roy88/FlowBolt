@@ -83,12 +83,25 @@ async def test_commit_diffs_survives_a_body_that_looks_like_a_header(repo: Git, 
     assert [d.path for d in await repo.commit_diffs(sha, max_chars=10_000)] == ["notes.md"]
 
 
-async def test_commit_diffs_skips_a_patch_over_the_cap(repo: Git, workspace: Path) -> None:
+async def test_commit_diffs_lists_binary_files_and_both_sides_of_a_rename(repo: Git, workspace: Path) -> None:
+    (workspace / "a.txt").rename(workspace / "b.txt")
+    (workspace / "pixel.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00")
+    sha = await repo.commit_all("upload and rename")
+    assert sha
+
+    diffs = {d.path: d for d in await repo.commit_diffs(sha, max_chars=10_000)}
+
+    assert {path: d.is_new for path, d in diffs.items()} == {"a.txt": False, "b.txt": True, "pixel.png": True}
+    assert diffs["pixel.png"].diff == ""
+    assert "+zero" in diffs["b.txt"].diff
+
+
+async def test_commit_diffs_keeps_file_names_over_the_cap(repo: Git, workspace: Path) -> None:
     (workspace / "a.txt").write_text("x" * 500)
     sha = await repo.commit_all("bulky")
     assert sha
 
-    assert await repo.commit_diffs(sha, max_chars=100) == []
+    assert [(d.path, d.diff) for d in await repo.commit_diffs(sha, max_chars=100)] == [("a.txt", "")]
 
 
 async def test_checkout_detaches_at_the_requested_version(version_chain: VersionChain) -> None:
