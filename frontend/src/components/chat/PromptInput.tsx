@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import { isAwaitingPlanApproval } from '../../stores/chatAgentState';
@@ -11,11 +11,12 @@ import { Badge } from '../ui/badge';
 
 export function PromptInput() {
   const { t } = useTranslation();
-  const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const [showDsSelector, setShowDsSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const value = useChatStore((s) => s.draft);
+  const setValue = useChatStore((s) => s.setDraft);
   const agentPhase = useChatStore((s) => s.agentPhase);
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
@@ -24,24 +25,17 @@ export function PromptInput() {
   const { code, agentBusy } = useWorkspaceLock();
   const inputBlocked = code !== null || awaitingPlan;
 
-  const adjustHeight = useCallback(() => {
+  useLayoutEffect(() => {
     const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
-    }
-  }, []);
-
-  const submitMessage = useCallback((content: string) => {
-    sendMessage(content);
-    setValue('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
-  }, [sendMessage]);
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  }, [value]);
 
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || inputBlocked || !projectId) return;
-    submitMessage(trimmed);
+    sendMessage(trimmed);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -133,7 +127,7 @@ export function PromptInput() {
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => { setValue(e.target.value); adjustHeight(); }}
+          onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

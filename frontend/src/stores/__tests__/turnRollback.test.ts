@@ -47,7 +47,7 @@ function msg(data: Record<string, unknown>): WSMessage {
 
 describe('turn rollback boundary', () => {
   beforeEach(() => {
-    useChatStore.setState({ messages: [], isStreaming: false, agentAlive: null });
+    useChatStore.setState({ messages: [], isStreaming: false, agentAlive: null, draft: '' });
     useVersionStore.setState({ pendingDirtyOp: null, previewingVersion: null });
     useErrorStore.setState({ errors: [] });
     socketSend.mockClear();
@@ -81,6 +81,7 @@ describe('turn rollback boundary', () => {
     );
 
     expect(useChatStore.getState().messages).toEqual([]);
+    expect(useChatStore.getState().draft).toBe('add a button');
     expect(useChatStore.getState().agentAlive).toBe(false);
     expect(useChatStore.getState().isStreaming).toBe(false);
     expect(useVersionStore.getState().pendingDirtyOp).toEqual(
@@ -97,6 +98,7 @@ describe('turn rollback boundary', () => {
     );
 
     expect(useChatStore.getState().messages.map((message) => message.content)).toEqual(['add a button']);
+    expect(useChatStore.getState().draft).toBe('');
     expect(useErrorStore.getState().errors.map((error) => error.message)).toEqual([
       "Can't edit while the AI is working",
     ]);

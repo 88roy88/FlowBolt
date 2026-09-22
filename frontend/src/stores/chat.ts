@@ -32,6 +32,8 @@ export interface ChatState {
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
   agentAlive: boolean | null;
   agentAlivePollId: number;
+  draft: string;
+  setDraft: (draft: string) => void;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   rollbackTurn: (id: string) => void;
@@ -107,6 +109,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   buildCompleted: false,
   agentAlive: null,
   agentAlivePollId: 0,
+  draft: '',
+
+  setDraft(draft: string) {
+    set({ draft });
+  },
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const projectId = useSessionStore.getState().projectId;
@@ -173,6 +180,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
       agentAlive: true,
+      draft: '',
       ...RESET_STATE,
       designProgress: { architecture: null, ux: null },
     }));
@@ -196,7 +204,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     set({ selectedDataSources: [] });
-    armTurn(() => get().sendMessage(content), () => get().rollbackTurn(userMessage.id));
+    armTurn(
+      () => get().sendMessage(content),
+      () => {
+        get().rollbackTurn(userMessage.id);
+        set({ draft: content });
+      },
+    );
   },
 
   rollbackTurn(id: string) {
@@ -247,6 +261,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         historyLoaded: false,
         buildCompleted: false,
         agentAlive: null,
+        draft: '',
         ...RESET_STATE,
       });
       useVersionStore.getState().reset();

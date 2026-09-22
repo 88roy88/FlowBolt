@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,14 +12,15 @@ interface DialogProps {
 function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-overlay"
-      onClick={() => onOpenChange(false)}
+  return (
+    <dialog
+      ref={(node) => { if (node && !node.open) node.showModal(); }}
+      className="m-auto max-h-none max-w-none border-0 bg-transparent p-0 text-inherit backdrop:bg-overlay"
+      onCancel={(e) => { e.preventDefault(); onOpenChange(false); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onOpenChange(false); }}
     >
       {children}
-    </div>,
-    document.body,
+    </dialog>
   );
 }
 
