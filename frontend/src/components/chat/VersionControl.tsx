@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { History, Eye, CheckCircle } from 'lucide-react';
 import { useVersionStore, formatVersionLabel } from '../../stores/version';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
-import { ActionButton } from '../ui/action-button';
+import { Button } from '../ui/button';
 import { RestoreVersionButton } from '../version/RestoreVersionButton';
 
 type Props = {
@@ -44,15 +44,17 @@ export function VersionControl({ commit_sha }: Props) {
     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
       <History size={11} className="text-muted-foreground/50 shrink-0" />
       <span className="text-[11px] text-muted-foreground/60 select-none">{versionLabel}</span>
-      <ActionButton
+      <Button
+        variant="outline"
+        size="sm"
         title={previewTitle}
         className="h-5 px-2 text-[11px] gap-1"
-        disabled={agentBusy}
+        aria-disabled={agentBusy}
         onClick={isPreviewing ? exitPreview : () => previewVersionAction(commit_sha)}
       >
         <Eye size={10} />
         {isPreviewing ? t('version.exitPreview') : t('version.preview')}
-      </ActionButton>
+      </Button>
       {isPreviewing && (
         <RestoreVersionButton
           commit_sha={commit_sha}

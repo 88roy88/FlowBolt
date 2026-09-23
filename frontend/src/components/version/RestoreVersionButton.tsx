@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { RotateCcw } from 'lucide-react';
 import { useVersionStore } from '../../stores/version';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
-import { ActionButton } from '../ui/action-button';
-import { ConfirmDialog } from '../ui/confirm-dialog';
+import { Button } from '../ui/button';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '../ui/dialog';
 
 type Props = {
   commit_sha: string;
@@ -20,29 +20,43 @@ export function RestoreVersionButton({ commit_sha, versionLabel, className }: Pr
 
   return (
     <>
-      <ActionButton
+      <Button
+        variant="outline"
+        size="sm"
         title={agentBusy ? t('version.busyTooltip') : t('version.restoreTooltip')}
         className={className}
-        disabled={agentBusy}
+        aria-disabled={agentBusy}
         onClick={() => setOpen(true)}
       >
         <RotateCcw size={10} />
         {t('version.restoreHere')}
-      </ActionButton>
+      </Button>
 
-      <ConfirmDialog
-        open={open}
-        onOpenChange={setOpen}
-        title={t('version.restoreDialogTitle', { version: versionLabel })}
-        body={t('version.restoreDialogBody', { version: versionLabel })}
-        confirmLabel={t('version.confirmRestore')}
-        confirmVariant="warning"
-        confirmIcon={<RotateCcw size={13} />}
-        onConfirm={() => {
-          restoreVersion(commit_sha);
-          setOpen(false);
-        }}
-      />
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogClose onClose={() => setOpen(false)} />
+          <DialogTitle>{t('version.restoreDialogTitle', { version: versionLabel })}</DialogTitle>
+          <div className="text-sm text-muted-foreground mt-2 mb-4">
+            {t('version.restoreDialogBody', { version: versionLabel })}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="warning"
+              size="sm"
+              onClick={() => {
+                restoreVersion(commit_sha);
+                setOpen(false);
+              }}
+            >
+              <RotateCcw size={13} />
+              {t('version.confirmRestore')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

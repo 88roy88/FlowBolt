@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Save } from 'lucide-react';
 import { useVersionStore } from '../../stores/version';
-import { ConfirmDialog } from '../ui/confirm-dialog';
+import { Button } from '../ui/button';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '../ui/dialog';
 import { DirtyFileList } from './DirtyFileList';
 
 export function UnsavedEditsDialog() {
@@ -11,22 +12,27 @@ export function UnsavedEditsDialog() {
   const dismissDirtyOp = useVersionStore((s) => s.dismissDirtyOp);
 
   return (
-    <ConfirmDialog
-      open={pendingDirtyOp !== null}
-      onOpenChange={(open) => !open && dismissDirtyOp()}
-      title={t('version.unsavedTitle')}
-      body={
-        <>
+    <Dialog open={pendingDirtyOp !== null} onOpenChange={(open) => !open && dismissDirtyOp()}>
+      <DialogContent>
+        <DialogClose onClose={dismissDirtyOp} />
+        <DialogTitle>{t('version.unsavedTitle')}</DialogTitle>
+        <div className="text-sm text-muted-foreground mt-2 mb-4">
           {t('version.unsavedBody')}
           <DirtyFileList files={pendingDirtyOp?.files ?? []} />
-        </>
-      }
-      confirmLabel={t('version.saveAndContinue')}
-      confirmIcon={<Save size={13} />}
-      onConfirm={() => resolveDirtyOp('save')}
-      secondaryLabel={t('version.discardEdits')}
-      secondaryVariant="destructive"
-      onSecondary={() => resolveDirtyOp('discard')}
-    />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={dismissDirtyOp}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => resolveDirtyOp('discard')}>
+            {t('version.discardEdits')}
+          </Button>
+          <Button size="sm" onClick={() => resolveDirtyOp('save')}>
+            <Save size={13} />
+            {t('version.saveAndContinue')}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

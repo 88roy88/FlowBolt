@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { History, X } from 'lucide-react';
 import { useVersionStore, formatVersionLabel } from '../../stores/version';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
-import { ActionButton } from '../ui/action-button';
+import { Button } from '../ui/button';
 import { RestoreVersionButton } from '../version/RestoreVersionButton';
 
 export function PreviewVersionBanner() {
@@ -27,15 +27,17 @@ export function PreviewVersionBanner() {
       </span>
       {canWrite && (
         <>
-          <ActionButton
+          <Button
+            variant="outline"
+            size="sm"
             title={agentBusy ? t(LOCK_MESSAGES.run_active) : t('version.exitPreviewTooltip')}
             className="h-6 px-2 text-[11px] gap-1 border-warning/40 text-warning hover:bg-warning/10"
-            disabled={agentBusy}
+            aria-disabled={agentBusy}
             onClick={exitPreview}
           >
             <X size={10} />
             {t('version.returnToLatest')}
-          </ActionButton>
+          </Button>
           <RestoreVersionButton
             commit_sha={previewingVersion}
             versionLabel={versionLabel}
