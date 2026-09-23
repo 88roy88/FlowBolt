@@ -24,7 +24,7 @@ export function useWorkspaceLock() {
   const agentBusy = useChatStore(isAgentAlive);
   const previewing = useVersionStore((s) => s.previewingVersion !== null);
   const canWrite = !role || WRITE_ROLES.has(role);
-  return { code: lockCode(canWrite, agentBusy, previewing), agentBusy, canWrite };
+  return { lock: lockCode(canWrite, agentBusy, previewing), agentBusy, canWrite };
 }
 
 export function workspaceLocked(): LockCode {

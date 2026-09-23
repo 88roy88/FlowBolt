@@ -24,7 +24,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
   const { t } = useTranslation();
   const dismissError = useErrorStore((s) => s.dismissError);
   const sendFixError = useChatStore((s) => s.sendFixError);
-  const { code } = useWorkspaceLock();
+  const { lock } = useWorkspaceLock();
   const openFile = useFilesStore((s) => s.openFile);
   const loadProjects = useSessionStore((s) => s.loadProjects);
 
@@ -71,7 +71,7 @@ function SingleErrorToast({ error }: { error: AppError }) {
             {t('errors.retry')}
           </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={handleFix} disabled={code !== null} className="mt-2.5 ms-auto">
+          <Button variant="outline" size="sm" onClick={handleFix} disabled={lock !== null} className="mt-2.5 ms-auto">
             <Wrench size={12} />
             {t('errors.fixWithAI')}
           </Button>

@@ -22,8 +22,8 @@ export function PromptInput() {
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const projectId = useSessionStore((s) => s.projectId);
-  const { code, agentBusy } = useWorkspaceLock();
-  const inputBlocked = code !== null || awaitingPlan;
+  const { lock, agentBusy } = useWorkspaceLock();
+  const inputBlocked = lock !== null || awaitingPlan;
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
@@ -64,7 +64,7 @@ export function PromptInput() {
   const placeholderText = () => {
     if (!projectId) return t('chat.placeholder.selectProject');
     if (awaitingPlan) return t('chat.placeholder.reviewPlan');
-    if (code) return t(LOCK_MESSAGES[code]);
+    if (lock) return t(LOCK_MESSAGES[lock]);
     return t('chat.placeholder.default');
   };
   const placeholder = placeholderText();

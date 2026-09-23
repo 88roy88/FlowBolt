@@ -78,7 +78,7 @@ export function AppShell() {
   };
 
   // Shared state
-  const { code } = useWorkspaceLock();
+  const { lock } = useWorkspaceLock();
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
@@ -238,7 +238,7 @@ export function AppShell() {
                   <button
                     key={hint}
                     onClick={() => useChatStore.getState().sendMessage(hint)}
-                    disabled={code !== null}
+                    disabled={lock !== null}
                     className="px-3 py-1.5 text-xs bg-primary/5 text-primary/60 border border-primary/20 rounded-full hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
                   >
                     {hint}

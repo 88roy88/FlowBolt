@@ -44,9 +44,9 @@ export function EditorPanel() {
   } = useFilesStore();
   const projectId = useSessionStore((s) => s.projectId);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
-  const { code } = useWorkspaceLock();
-  const editorReadOnly = code !== null || !buildCompleted;
-  const readOnlyMessage = code ? t(LOCK_MESSAGES[code]) : t('editor.readOnlyUntilFirstAiResponse');
+  const { lock } = useWorkspaceLock();
+  const editorReadOnly = lock !== null || !buildCompleted;
+  const readOnlyMessage = lock ? t(LOCK_MESSAGES[lock]) : t('editor.readOnlyUntilFirstAiResponse');
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const importNavigationDisposableRef = useRef<{ dispose(): void } | null>(null);
   const [fileTreeWidth, setFileTreeWidth] = useState(180);

@@ -32,7 +32,7 @@ interface FilesState {
 
 let _fileTreeRequestSerial = 0;
 
-// The UI already blocks these, so a 409 is a real race the user has to see.
+// Editing controls are disabled while the workspace is locked, so a 409 here is a race the user must see.
 function reportWorkspaceLock(err: unknown): never {
   const detail = err instanceof api.ApiError ? (err.detail as { type?: string; message?: string }) : null;
   if (detail?.type === 'version_error') {

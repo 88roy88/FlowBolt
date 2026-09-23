@@ -56,7 +56,7 @@ function issue(attempt: Attempt & { undo?: () => void }, message: WSMessage) {
   if (!send(message)) settle(false);
 }
 
-export function armTurn(run: () => void, undo: () => void) {
+export function armTurn({ run, undo }: { run: () => void; undo: () => void }) {
   settle(false);
   pending = { op: 'send', run, undo };
 }

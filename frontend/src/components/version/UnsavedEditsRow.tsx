@@ -12,10 +12,10 @@ export function UnsavedEditsRow() {
   const dirtyFiles = useVersionStore((s) => s.dirtyFiles);
   const saveVersion = useVersionStore((s) => s.saveVersion);
   const discardEdits = useVersionStore((s) => s.discardEdits);
-  const { code } = useWorkspaceLock();
+  const { lock } = useWorkspaceLock();
   const [confirming, setConfirming] = useState(false);
 
-  if (code !== null || !dirtyFiles.length) return null;
+  if (lock !== null || !dirtyFiles.length) return null;
 
   return (
     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">

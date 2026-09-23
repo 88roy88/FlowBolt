@@ -155,10 +155,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updateProjectModel(currentProject.id, selectedModel).catch(() => {});
     }
 
-    armTurn(
-      () => get().sendFixError(errorMessage, errorFile, errorLine, errorStack),
-      () => get().rollbackTurn(userMessage.id),
-    );
+    armTurn({
+      run: () => get().sendFixError(errorMessage, errorFile, errorLine, errorStack),
+      undo: () => get().rollbackTurn(userMessage.id),
+    });
   },
 
   sendMessage(content: string) {
@@ -204,13 +204,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     set({ selectedDataSources: [] });
-    armTurn(
-      () => get().sendMessage(content),
-      () => {
+    armTurn({
+      run: () => get().sendMessage(content),
+      undo: () => {
         get().rollbackTurn(userMessage.id);
         set({ draft: content });
       },
-    );
+    });
   },
 
   rollbackTurn(id: string) {

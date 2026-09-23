@@ -121,7 +121,7 @@ async def _emit_current_version(project_id: str, git: Git) -> None:
     await emit_transient(project_id, {"type": "version_preview_active", "commit_sha": head, "is_latest": is_latest})
 
 
-async def _emit_dirty(project_id: str, git: Git) -> None:
+async def _emit_dirty_files(project_id: str, git: Git) -> None:
     await emit_transient(project_id, {"type": "workspace_dirty", "files": await git.changed_files()})
 
 
@@ -155,14 +155,14 @@ async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, a
             if author == "user":
                 await save_message(project_id, ChatRole.user, _edit_note([d.path for d in diffs]))
             await _emit_committed(project_id, sha, author=author, diffs=diffs)
-        await _emit_dirty(project_id, git)
+        await _emit_dirty_files(project_id, git)
 
 
 async def discard_edits(project_id: str) -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
         await git.discard_all()
         await _emit_current_version(project_id, git)
-        await _emit_dirty(project_id, git)
+        await _emit_dirty_files(project_id, git)
 
 
 async def preview_version(project_id: str, commit_sha: str) -> None:
@@ -175,14 +175,14 @@ async def preview_version(project_id: str, commit_sha: str) -> None:
         else:
             await git.checkout(commit_sha)
         await _emit_current_version(project_id, git)
-        await _emit_dirty(project_id, git)
+        await _emit_dirty_files(project_id, git)
 
 
 async def exit_preview(project_id: str) -> None:
     async with _locked_workspace(project_id) as git:
         await git.checkout_latest()
         await _emit_current_version(project_id, git)
-        await _emit_dirty(project_id, git)
+        await _emit_dirty_files(project_id, git)
 
 
 async def restore_version(project_id: str, commit_sha: str) -> None:
@@ -194,7 +194,7 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
         await trim_events_after(project_id, target.id)
         await trim_messages_after(project_id, target.payload["_ts"])
         await emit_transient(project_id, {"type": "version_restored", "commit_sha": commit_sha})
-        await _emit_dirty(project_id, git)
+        await _emit_dirty_files(project_id, git)
 
 
 async def handle_action(project_id: str, msg_type: str, data: dict[str, Any]) -> None:
@@ -223,7 +223,7 @@ async def commit_turn(project_id: str) -> str | None:
             sha = await git.commit_all(_TURN_MESSAGE)
             if sha:
                 await _emit_committed(project_id, sha)
-            await _emit_dirty(project_id, git)
+            await _emit_dirty_files(project_id, git)
             return sha
     except Exception:
         logger.exception("[versioning] commit_turn failed for %s", project_id)
@@ -233,7 +233,7 @@ async def commit_turn(project_id: str) -> str | None:
 async def broadcast_dirty(project_id: str) -> None:
     try:
         async with _locked_workspace(project_id) as git:
-            await _emit_dirty(project_id, git)
+            await _emit_dirty_files(project_id, git)
     except Exception:
         logger.exception("[versioning] dirty broadcast failed for %s", project_id)
 
@@ -244,6 +244,6 @@ async def broadcast_current_version(project_id: str, *, reset_orphaned_preview: 
             if reset_orphaned_preview and git.is_detached():
                 await git.checkout_latest()
             await _emit_current_version(project_id, git)
-            await _emit_dirty(project_id, git)
+            await _emit_dirty_files(project_id, git)
     except Exception:
         logger.exception("[versioning] version broadcast failed for %s", project_id)
