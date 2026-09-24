@@ -5,8 +5,7 @@ import base64
 import logging
 import os
 import re
-
-from opik import track
+from pathlib import Path
 
 from flow44.config import settings
 from flow44.sandbox.manager import sandbox_manager
@@ -114,19 +113,15 @@ def _inline_favicon(html: str, dist_dir: str, workspace_dir: str) -> str:
     )
 
 
-@track(name="build-single-html")  # type: ignore[untyped-decorator]
-async def build_single_html(project_id: str) -> str:
-    """Build the project and return a single self-contained HTML string."""
+async def _build_dist_dir(project_id: str, vite_base: str) -> str:
     sandbox = await sandbox_manager.get_sandbox(project_id)
-
     workspace_dir = sandbox.workspace_dir
 
-    # Write a temporary .env.production.local so vite picks up overrides
     api_base = settings.EXPORT_API_BASE_URL
     env_file = os.path.join(workspace_dir, ".env.production.local")
     try:
         with open(env_file, "w", encoding="utf-8") as f:  # noqa: ASYNC230
-            f.write(f"VITE_BASE=/\nVITE_API_BASE={api_base}\n")
+            f.write(f"VITE_BASE={vite_base}\nVITE_API_BASE={api_base}\n")
 
         build_output_lines: list[str] = []
         async for line in sandbox.exec("pnpm build"):
@@ -139,12 +134,25 @@ async def build_single_html(project_id: str) -> str:
             pass
 
     dist_dir = os.path.join(workspace_dir, "dist")
-    index_path = os.path.join(dist_dir, "index.html")
-
-    if not os.path.isfile(index_path):  # noqa: ASYNC240
+    if not os.path.isfile(os.path.join(dist_dir, "index.html")):  # noqa: ASYNC240
         raise BuildError(f"Build failed or dist/index.html not found.\n\n{build_output}")
+    return dist_dir
 
-    with open(index_path, encoding="utf-8", errors="replace") as f:  # noqa: ASYNC230
+
+async def build_dist(project_id: str) -> list[tuple[str, bytes]]:
+    dist_dir = Path(await _build_dist_dir(project_id, vite_base="./"))
+    return [
+        (p.relative_to(dist_dir).as_posix(), p.read_bytes())
+        for p in dist_dir.rglob("*")  # noqa: ASYNC240
+        if p.is_file()
+    ]
+
+
+async def build_single_html(project_id: str) -> str:
+    """Build the project and return a single self-contained HTML string."""
+    dist_dir = await _build_dist_dir(project_id, vite_base="/")
+
+    with open(os.path.join(dist_dir, "index.html"), encoding="utf-8", errors="replace") as f:  # noqa: ASYNC230
         html = f.read()
 
     # --- Inline CSS ---
@@ -154,7 +162,7 @@ async def build_single_html(project_id: str) -> str:
     html = _inline_js_assets(html, dist_dir)
 
     # --- Inline favicon as data URI ---
-    html = _inline_favicon(html, dist_dir, workspace_dir)
+    html = _inline_favicon(html, dist_dir, os.path.dirname(dist_dir))
 
     # --- Strip the error reporter script (only useful inside the builder iframe) ---
     html = re.sub(
