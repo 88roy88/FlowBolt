@@ -103,7 +103,10 @@ async def test_db(setup_test_db):
 
     async with engine.connect() as conn:
         trans = await conn.begin()
-        bound_factory = async_sessionmaker(bind=conn, class_=AsyncSession, expire_on_commit=False)
+        # Savepoints: a session rolling back (e.g. a failed locked operation) must not undo the whole test.
+        bound_factory = async_sessionmaker(
+            bind=conn, class_=AsyncSession, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
 
         flow44.db.database.async_session = lambda: bound_factory()  # noqa: PLW0108
 

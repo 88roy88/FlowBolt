@@ -7,6 +7,7 @@ import { useFilesStore } from './stores/files';
 import { useErrorStore } from './stores/errors';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorToast } from './components/errors/ErrorToast';
+import { UnsavedEditsDialog } from './components/version/UnsavedEditsDialog';
 import { useErrorCapture } from './hooks/useErrorCapture';
 import { pollFileTree } from './utils/pollFileTree';
 import { Loader2 } from 'lucide-react';
@@ -245,6 +246,7 @@ export default function App() {
     <>
       <AppShell />
       <ErrorToast />
+      <UnsavedEditsDialog />
     </>
   );
 }

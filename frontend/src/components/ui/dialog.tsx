@@ -13,12 +13,14 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-overlay"
-      onClick={() => onOpenChange(false)}
+    <dialog
+      ref={(node) => { if (node && !node.open) node.showModal(); }}
+      className="m-auto max-h-none max-w-none border-0 bg-transparent p-0 text-inherit backdrop:bg-overlay"
+      onCancel={(e) => { e.preventDefault(); onOpenChange(false); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onOpenChange(false); }}
     >
       {children}
-    </div>
+    </dialog>
   );
 }
 

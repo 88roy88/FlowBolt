@@ -23,6 +23,20 @@ async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry
   return res;
 }
 
+export class ApiError extends Error {
+  constructor(readonly status: number, readonly detail: unknown, text: string) {
+    super(`API error ${status}: ${text}`);
+  }
+}
+
+function apiError(status: number, text: string): ApiError {
+  try {
+    return new ApiError(status, JSON.parse(text).detail, text);
+  } catch {
+    return new ApiError(status, text, text);
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
   const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
@@ -34,7 +48,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetchWithAuth(path, { ...options, headers });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${text}`);
+    throw apiError(res.status, text);
   }
   if (!text) return undefined as T; // 204 No Content or empty body
   return JSON.parse(text) as T;
@@ -85,8 +99,7 @@ export async function uploadFileEntry(projectId: string, path: string, file: Blo
     body: file,
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text}`);
+    throw apiError(res.status, await res.text());
   }
 }
 
