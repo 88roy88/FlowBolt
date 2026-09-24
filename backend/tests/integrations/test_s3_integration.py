@@ -68,6 +68,9 @@ async def test_setup_ensures_bucket(storage):
             _, kwargs = client.put_bucket_policy.call_args
             assert kwargs["Bucket"] == bucket_name
             assert "Statement" in kwargs["Policy"]
+            [rule] = client.put_bucket_lifecycle_configuration.call_args.kwargs["LifecycleConfiguration"]["Rules"]
+            assert rule["Filter"] == {"Tag": {"Key": "pending-deletion", "Value": "true"}}
+            assert rule["Expiration"] == {"Days": 7}
 
 
 @pytest.mark.asyncio
@@ -121,7 +124,7 @@ async def test_setup_propagates_close_error(storage):
 @pytest.mark.asyncio
 async def test_deploy_dist(storage):
     client = AsyncMock()
-    _mock_paginator(client, [])  # nothing to clear
+    _mock_paginator(client, [])
     storage._client = client
     files = [
         ("index.html", b"<html></html>"),
@@ -141,6 +144,42 @@ async def test_deploy_dist(storage):
     assert calls["published/proj-123/index.html"]["ContentType"] == "text/html"
     assert calls["published/proj-123/logo.png"]["ContentType"] == "image/png"
     assert calls["published/proj-123/index.html"]["ACL"] == "public-read"
+
+
+@pytest.mark.asyncio
+async def test_deploy_dist_tags_only_newly_dropped_files(storage):
+    client = AsyncMock()
+    keys = ["index.html", "already-pending.js", "dropped.png"]
+    _mock_paginator(client, [{"Contents": [{"Key": f"published/proj-123/{key}"} for key in keys]}])
+    deletion_tag = {"Key": "pending-deletion", "Value": "true"}
+    client.get_object_tagging.side_effect = lambda Key, **_: {
+        "TagSet": [deletion_tag] if Key.endswith("already-pending.js") else []
+    }
+    storage._client = client
+
+    with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
+        await storage.deploy_dist("proj-123", [("index.html", b"<html></html>")])
+
+    client.copy_object.assert_awaited_once()
+    copy = client.copy_object.call_args.kwargs
+    assert copy["Key"] == "published/proj-123/dropped.png"
+    assert copy["CopySource"] == {"Bucket": "my-bucket", "Key": "published/proj-123/dropped.png"}
+    assert copy["Tagging"] == "pending-deletion=true"
+    assert copy["ContentType"] == "image/png"
+    client.delete_objects.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_deploy_dist_survives_tagging_error(storage):
+    client = AsyncMock()
+    _mock_paginator(client, [{"Contents": [{"Key": "published/proj-123/old.png"}]}])
+    client.get_object_tagging.side_effect = ClientError({"Error": {"Code": "AccessDenied"}}, "GetObjectTagging")
+    storage._client = client
+
+    with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
+        await storage.deploy_dist("proj-123", [("index.html", b"<html></html>")])
+
+    client.put_object.assert_awaited_once()
 
 
 @pytest.mark.asyncio

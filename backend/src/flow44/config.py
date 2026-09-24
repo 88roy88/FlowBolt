@@ -107,6 +107,7 @@ class S3Settings(BuildAppSettings):
     S3_BUCKET_NAME: str
     S3_CACHE_TTL: int = 3600
     S3_STORAGE_CLASS: str = "STANDARD_IA"
+    S3_PENDING_DELETION_DAYS: int = 7
 
 
 class LoggerSettings(BuildAppSettings):
