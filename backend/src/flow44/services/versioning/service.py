@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict
@@ -13,6 +11,7 @@ from flow44.ai.agents.file_diffs import FileDiff
 from flow44.db.chat import ChatRole, save_message, trim_messages_after
 from flow44.db.events import AgentEvent, emit_event, emit_transient, get_versions, trim_events_after
 from flow44.db.heartbeat import is_run_active, try_claim_run
+from flow44.db.locks import LockNamespace, LockTimeout, advisory_lock
 from flow44.services.versioning.git import Git
 
 logger = logging.getLogger(__name__)
@@ -26,11 +25,10 @@ _MESSAGES = {
     "run_active": "Can't edit while the AI is working",
     "previewing": "Restore this version before editing",
     "dirty_workspace": "You have unsaved edits",
+    "busy": "Another change is in progress, try again",
 }
 
 _MAX_DIFF_CHARS = 100_000
-
-_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 
 class UnknownVersionError(RuntimeError):
@@ -78,8 +76,17 @@ async def _ensure_repo(project_id: str, git: Git) -> None:
 
 
 @asynccontextmanager
+async def _workspace_lock(project_id: str) -> AsyncIterator[None]:
+    try:
+        async with advisory_lock(LockNamespace.workspace, project_id):
+            yield
+    except LockTimeout:
+        raise WorkspaceLocked("busy") from None
+
+
+@asynccontextmanager
 async def _locked_workspace(project_id: str, preconditions: Sequence[Precondition] = ()) -> AsyncIterator[Git]:
-    async with _locks[project_id]:
+    async with _workspace_lock(project_id):
         git = Git(project_id)
         await _ensure_repo(project_id, git)
         for check in preconditions:
@@ -239,11 +246,9 @@ async def broadcast_dirty(project_id: str) -> None:
         logger.exception("[versioning] dirty broadcast failed for %s", project_id)
 
 
-async def broadcast_current_version(project_id: str, *, reset_orphaned_preview: bool = False) -> None:
+async def broadcast_current_version(project_id: str) -> None:
     try:
         async with _locked_workspace(project_id) as git:
-            if reset_orphaned_preview and git.is_detached():
-                await git.checkout_latest()
             await _emit_current_version(project_id, git)
             await _emit_dirty_files(project_id, git)
     except Exception:

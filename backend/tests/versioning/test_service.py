@@ -3,11 +3,14 @@ from functools import partial
 from pathlib import Path
 
 import pytest
+from sqlalchemy import func, select
 
+from flow44.config import settings
 from flow44.db import database
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.events import emit_event, get_versions, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat
+from flow44.db.locks import LockNamespace
 from flow44.services.maintenance.template_sync import sync_protected_template_files
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git, GitError
@@ -102,22 +105,31 @@ async def test_begin_turn_refuses_a_detached_workspace(project_id: str, version_
     assert excinfo.value.payload["code"] == "previewing"
 
 
-@pytest.mark.parametrize("reset_orphaned", [False, True])
-async def test_reconnect_preserves_live_preview_or_resets_orphan(
-    project_id: str, version_chain: VersionChain, reset_orphaned: bool
-) -> None:
+async def test_reconnect_keeps_a_detached_preview(project_id: str, version_chain: VersionChain) -> None:
     await version_chain.git.checkout(version_chain.shas[0])
     queue = subscribe(project_id)
     try:
-        await versioning.broadcast_current_version(project_id, reset_orphaned_preview=reset_orphaned)
+        await versioning.broadcast_current_version(project_id)
     finally:
         unsubscribe(project_id, queue)
 
     current = queue.get_nowait()
     assert current["type"] == "version_preview_active"
-    assert current["is_latest"] is reset_orphaned
-    assert version_chain.git.is_detached() is (not reset_orphaned)
-    assert (version_chain.workspace / "a.txt").read_text() == ("two" if reset_orphaned else "zero")
+    assert current["is_latest"] is False
+    assert version_chain.git.is_detached()
+    assert (version_chain.workspace / "a.txt").read_text() == "zero"
+
+
+async def test_workspace_reports_busy_while_another_pod_holds_the_lock(
+    project_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "ADVISORY_LOCK_WAIT_TIMEOUT", 1)
+    async with database.get_engine().connect() as other_pod:
+        await other_pod.execute(select(func.pg_advisory_xact_lock(LockNamespace.workspace, func.hashtext(project_id))))
+        with pytest.raises(versioning.WorkspaceLocked) as excinfo:
+            await versioning.require_writable(project_id)
+
+    assert excinfo.value.payload["code"] == "busy"
 
 
 @pytest.mark.parametrize("target_index", [0, 1])

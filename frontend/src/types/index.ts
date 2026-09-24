@@ -10,7 +10,7 @@ export interface Message {
 }
 
 export type VersionAuthor = 'ai' | 'user' | 'system';
-export type VersionErrorCode = 'run_active' | 'dirty_workspace' | 'previewing' | 'failed';
+export type VersionErrorCode = 'run_active' | 'dirty_workspace' | 'previewing' | 'busy' | 'failed';
 
 export interface ProjectSummary {
   summary: string;

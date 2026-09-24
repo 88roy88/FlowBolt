@@ -34,7 +34,7 @@ MUTATIONS: list[tuple[str, str, dict[str, Any]]] = [
 
 
 @pytest.fixture
-def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Git]:
+def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, setup_test_db: None) -> Iterator[Git]:
     monkeypatch.setattr(settings, "WORKSPACE_BASE_DIR", str(tmp_path))
     root = tmp_path / PROJECT_ID
     root.mkdir()

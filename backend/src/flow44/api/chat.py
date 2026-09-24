@@ -21,7 +21,7 @@ from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
 from flow44.db.chat import ChatRole, get_messages, save_message
-from flow44.db.events import emit_event, get_events, has_subscribers, subscribe, unsubscribe
+from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
@@ -180,9 +180,8 @@ async def chat_ws(  # noqa: C901, PLR0915
         await websocket.close()
         return
 
-    had_subscribers = has_subscribers(project.id)
     queue = subscribe(project.id)
-    await versioning.broadcast_current_version(project.id, reset_orphaned_preview=not had_subscribers)
+    await versioning.broadcast_current_version(project.id)
 
     async def _forward_events() -> None:
         try:
