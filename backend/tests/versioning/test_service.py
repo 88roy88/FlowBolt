@@ -180,7 +180,7 @@ async def test_failed_restore_keeps_history_and_resynchronizes_the_real_head(
     assert queue.get_nowait() == {
         "type": "version_preview_active",
         "commit_sha": version_chain.shas[2],
-        "is_latest": False,
+        "is_latest": True,
     }
 
 
@@ -250,7 +250,7 @@ async def test_discard_removes_tracked_and_untracked_edits_and_broadcasts(
     assert (dirty_chain.workspace / "a.txt").read_text() == "two"
     assert not (dirty_chain.workspace / "scratch.txt").exists()
     assert not await dirty_chain.git.is_dirty()
-    assert queue.get_nowait()["type"] == "version_preview_active"
+    assert queue.get_nowait() == {"type": "workspace_reset"}
     assert queue.get_nowait() == {"type": "workspace_dirty", "files": []}
 
 

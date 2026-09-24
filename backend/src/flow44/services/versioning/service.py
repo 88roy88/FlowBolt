@@ -117,8 +117,9 @@ async def _emit_committed(
 
 async def _emit_current_version(project_id: str, git: Git) -> None:
     head = await git.head_sha()
-    is_latest = head == _newest_sha(await get_versions(project_id))
-    await emit_transient(project_id, {"type": "version_preview_active", "commit_sha": head, "is_latest": is_latest})
+    await emit_transient(
+        project_id, {"type": "version_preview_active", "commit_sha": head, "is_latest": not git.is_detached()}
+    )
 
 
 async def _emit_dirty_files(project_id: str, git: Git) -> None:
@@ -161,7 +162,7 @@ async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, a
 async def discard_edits(project_id: str) -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
         await git.discard_all()
-        await _emit_current_version(project_id, git)
+        await emit_transient(project_id, {"type": "workspace_reset"})
         await _emit_dirty_files(project_id, git)
 
 

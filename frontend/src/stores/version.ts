@@ -184,6 +184,7 @@ const versionRoutes: { [M in WSMessage as M['type']]?: (msg: M) => void } = {
   version_restored: handleVersionRestored,
   version_error: handleVersionError,
   workspace_dirty: (msg) => useVersionStore.setState({ dirtyFiles: msg.files }),
+  workspace_reset: refreshEditorFiles,
   error: () => settle(false),
   phase: () => { if (pending?.op === 'send') settle(true); },
 };
