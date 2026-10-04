@@ -28,7 +28,7 @@ def render(
     template_name: Literal["merge.jinja2"],
     *,
     has_data_sources: bool,
-    selected_packages: list[str] | None,
+    available_packages: list[str] | None,
     package_rules: list[str] | None,
     file_safety: ProtectedFileRules,
 ) -> str: ...
@@ -82,7 +82,7 @@ def render_merge(
     return render(
         "merge.jinja2",
         has_data_sources=has_data_sources,
-        selected_packages=selected_packages or None,
+        available_packages=selected_packages or None,
         package_rules=render_package_rules(selected_packages or [], PackageRuleset.MERGE) or None,
         file_safety=protected_file_rules(),
     )

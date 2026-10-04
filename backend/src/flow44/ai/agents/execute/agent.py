@@ -81,7 +81,6 @@ class ExecuteAgent(BaseAgent):
 
         await self.sandbox.install_optional_packages(npm_dependencies(self._build_state.selected_packages))
 
-        # Initialize execution state
         current_span = opik_context.get_current_span_data()
         exec_state = ExecutionState(
             build_state=self._build_state,

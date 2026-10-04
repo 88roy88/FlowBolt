@@ -177,7 +177,7 @@ class TestPromptInjection:
             ux_design={},
             selected_packages=names,
         )
-        assert "Selected Package Rules" in prompt
+        assert "Package usage rules" in prompt
         assert "date-fns" in prompt
         assert "react-hook-form" not in prompt
 
@@ -186,13 +186,13 @@ class TestPromptInjection:
             task_title="t", task_description="d", task_files=["a.tsx"], architecture={}, ux_design={}
         )
         assert "no axios, lodash" in prompt
-        assert "Selected Package Rules" not in prompt
+        assert "Package usage rules" not in prompt
 
     def test_merge_allow_list_vs_strict(self) -> None:
         names = ["lucide-react"]
         with_pkgs = render_merge(selected_packages=names)
         assert "lucide-react" in with_pkgs and "Package usage rules" in with_pkgs
-        assert "only the pre-configured" in render_merge()
+        assert "no axios, lodash" in render_merge()
 
     def test_fix_errors_injects_rules_only_when_present(self) -> None:
         names = ["react-hook-form"]

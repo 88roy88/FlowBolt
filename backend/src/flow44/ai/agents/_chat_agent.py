@@ -16,8 +16,8 @@ class ChatAgent(BaseAgent):
         try:
             manifest = json.loads(await self.sandbox.read_file("package.json"))
             deps = {**manifest.get("dependencies", {}), **manifest.get("devDependencies", {})}
-        except (OSError, ValueError, AttributeError, TypeError):
-            logger.warning("[chat-agent] Could not read package.json for %s", self.project_id)
+        except (OSError, ValueError, AttributeError, TypeError) as e:
+            logger.warning("[chat-agent] Could not read package.json for %s: %s", self.project_id, e)
             return []
         return [pkg.name for pkg in installed_packages(deps)]
 

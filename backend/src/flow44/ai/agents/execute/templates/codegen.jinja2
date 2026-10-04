@@ -100,15 +100,8 @@ When implementing components that use data source data:
 ```
 {% endfor %}
 {% endif %}
-{% if package_rules %}
 
-## Selected Package Rules
-{% for rule_block in package_rules %}
-
-{{ rule_block }}
-{% endfor %}
-{% endif %}
-
+{% include "_package_rules.jinja2" %}
 ## Output Format
 
 Respond using the flowArtifact XML format. Write COMPLETE file contents — no

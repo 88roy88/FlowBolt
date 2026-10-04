@@ -8,11 +8,11 @@ PACKAGE = OptionalPackage(
     packages=("date-fns",),
     templates_dir=Path(__file__).parent / "templates",
     use_when=(
-        "Formatting dates/times for display, relative times ('3 days ago'), due dates, "
-        "calendars, timelines, or date math (add/subtract/compare)."
+        "Date logic the native Date/Intl APIs lack and would otherwise be hand-rolled: "
+        "interval math (add/subtract/difference), week/month boundaries, calendar grids, "
+        "relative times ('3 days ago'), or parsing custom date formats."
     ),
     avoid_when=(
-        "Only showing raw ISO strings, or a single simple date where "
-        "Intl.DateTimeFormat / toLocaleDateString already suffices."
+        "Formatting or displaying dates and times — Intl.DateTimeFormat / toLocaleDateString already cover it."
     ),
 )
