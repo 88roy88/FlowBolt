@@ -19,4 +19,4 @@ __all__ = [
 ]
 
 
-# TODO: bring the tracing code from `/Users/roymezan/src/primesrc/code-validation-service/src/service/ai_logic`
+# TODO: bring the tracing code from `/Users/<username>/src/primesrc/code-validation-service/src/service/ai_logic`

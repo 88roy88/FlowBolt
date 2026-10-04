@@ -42,7 +42,7 @@ FieldType = (
     ]
     | str
 )
-# OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
+# OntologyType = Literal["TEXT", "LOCATION", "ENTITY_ID", "CONTACT_INFO", "DEVICE_ID", "TIMESTAMP"]
 
 type CubeId = str
 type QueryDisplayName = str
@@ -195,6 +195,6 @@ class Query(PascalCaseBaseModel):
 class PackageMetadata(PascalCaseBaseModel):
     id_: int = Field(alias="Id")
     name: str
-    description: str
+    description: str | None = None
     # output_queries_id: list[Any]
     queries: list[Query]

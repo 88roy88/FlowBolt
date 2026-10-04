@@ -26,12 +26,11 @@ const ParamType = Type.Union([
 
 const OntologyType = Type.Union([
   Type.Literal('TEXT'),
-  Type.Literal('GEOMETRY'),
-  Type.Literal('TOOLID'),
-  Type.Literal('PSTN'),
-  Type.Literal('IMEI'),
-  Type.Literal('IMSI'),
-  Type.Literal('TIME'),
+  Type.Literal('LOCATION'),
+  Type.Literal('ENTITY_ID'),
+  Type.Literal('CONTACT_INFO'),
+  Type.Literal('DEVICE_ID'),
+  Type.Literal('TIMESTAMP'),
 ]);
 
 const SearchResultType = Type.Literal('Package');

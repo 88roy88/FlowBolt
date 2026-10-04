@@ -94,7 +94,7 @@ const run = async () => {
   const personRun = await post('/package/v3/20', { 'person-query-1': { personId: 2 } });
   assert(personRun.status === 200, `POST run with quick params expected 200, got ${personRun.status}`);
   const personBody = await personRun.body as { results?: { Person?: { name?: string } } };
-  assert(personBody?.results?.Person?.name === 'Noa T', `Expected person name 'Noa T', got ${personBody?.results?.Person?.name}`);
+  assert(personBody?.results?.Person?.name === 'Nora T', `Expected person name 'Nora T', got ${personBody?.results?.Person?.name}`);
   console.log('✓ POST /package/v3/20 with quick params OK');
 
   // Auth required

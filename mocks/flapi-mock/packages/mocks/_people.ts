@@ -204,7 +204,7 @@ export const people: PersonDetail[] = [
     bio: 'Builds churn models.',
   }),
   makePerson({
-    name: 'Noa T',
+    name: 'Nora Turner',
     title: 'Data Scientist',
     department: 'Analytics',
     phone: '+972-3-555-0022',
@@ -236,7 +236,7 @@ export const people: PersonDetail[] = [
     bio: 'Runs the red-team program.',
   }),
   makePerson({
-    name: 'Rivky Katz',
+    name: 'Rachel Kim',
     title: 'Frontend Engineer',
     department: 'Web',
     phone: '+972-3-555-0033',
@@ -244,7 +244,7 @@ export const people: PersonDetail[] = [
     bio: 'Owns the design-system component library.',
   }),
   makePerson({
-    name: 'Roy Mezan',
+    name: 'Ryan Miller',
     title: 'Software Engineer',
     department: 'AI Builder',
     phone: '+972-3-555-0044',

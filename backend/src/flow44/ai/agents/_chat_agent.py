@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from typing import Any
 
 from flow44.ai.agents._base import BaseAgent
@@ -11,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class ChatAgent(BaseAgent):
-    """Base for agents that participate in the chat history (followup, fix_error)."""
-
     async def _installed_optional_package_names(self) -> list[str]:
         try:
             manifest = json.loads(await self.sandbox.read_file("package.json"))
@@ -27,29 +26,48 @@ class ChatAgent(BaseAgent):
         answer: str,
         steps: list[dict[str, Any]],
     ) -> None:
-        """Persist the agent's turn to chat history: reasoning, tool calls/results, and the final answer."""
         for step in steps:
-            if step.get("type") == "reasoning":
-                await save_message(self.project_id, ChatRole.reasoning, step["content"])
+            if step.get("type") == "assistant_turn":
+                tools_label = ", ".join(tc["function"]["name"] for tc in step["raw_message"].get("tool_calls") or [])
+                await save_message(self.project_id, ChatRole.assistant, tools_label, raw_message=step["raw_message"])
                 continue
-
-            tool = step.get("tool", "?")
-            args = step.get("args", {})
-            primary_arg = next((v for k, v in args.items() if k not in ("content",)), "")
-            call_content = f"{tool} on {primary_arg!r}" if primary_arg else tool
-            await save_message(self.project_id, ChatRole.tool_call, call_content)
 
             preview = step.get("short_preview") or step.get("result_preview", "")
             result_short = preview[:80].replace("\n", " ").strip()
             if len(preview) > 80:
                 result_short += "..."
-            await save_message(self.project_id, ChatRole.tool_result, result_short)
+
+            if step.get("raw_message") is not None:
+                await save_message(self.project_id, ChatRole.tool, result_short, raw_message=step["raw_message"])
+                continue
+
+            # FixErrorAgent's synthetic pseudo-tool step
+            tool = step.get("tool", "?")
+            args = step.get("args", {})
+            primary_arg = next((v for k, v in args.items() if k not in ("content",)), "")
+            call_content = f"{tool} on {primary_arg!r}" if primary_arg else tool
+
+            tool_call_id = str(uuid.uuid4())
+            call_raw_message = {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {"name": tool, "arguments": json.dumps(args)},
+                    }
+                ],
+            }
+            result_raw_message = {"role": "tool", "tool_call_id": tool_call_id, "content": result_short}
+
+            await save_message(self.project_id, ChatRole.assistant, call_content, raw_message=call_raw_message)
+            await save_message(self.project_id, ChatRole.tool, result_short, raw_message=result_raw_message)
 
         if answer.strip():
             await save_message(self.project_id, ChatRole.assistant, answer)
 
     async def _write_file_and_emit_diff(self, tracker: DiffTracker, path: str, content: str) -> None:
-        """Write a file to the sandbox, emit a live `file` event, and record the change in the tracker."""
         try:
             old_content = await self.sandbox.read_file(path)
             is_new = False
@@ -61,10 +79,6 @@ class ChatAgent(BaseAgent):
         await self.emit({"type": "file", "path": path, "content": content})
 
     async def _edit_file_and_emit_diff(self, tracker: DiffTracker, path: str, search: str, replace: str) -> None:
-        """Apply a search-and-replace edit in the sandbox, emit a live `file` event, and record the change.
-
-        Raises `FileNotFoundError` if the file doesn't exist and `ValueError` if `search` doesn't match.
-        """
         old_content = await self.sandbox.read_file(path)
         await self.sandbox.edit_file(path, search, replace)
         new_content = await self.sandbox.read_file(path)
@@ -72,7 +86,6 @@ class ChatAgent(BaseAgent):
         await self.emit({"type": "file", "path": path, "content": new_content})
 
     async def _emit_file_diffs_summary(self, tracker: DiffTracker) -> None:
-        """Emit a single `file_diffs` event with one combined diff per file changed during the run."""
         diffs = tracker.combined_diffs()
         if not diffs:
             return

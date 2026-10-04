@@ -1,14 +1,14 @@
 import { MockPackage, buildMetadata, quickParamsQuery } from '../package-base.js';
 
 const peopleData = {
-  1: { id: 'p12345', name: 'Roy M' },
-  2: { id: 'p22345', name: 'Noa T' },
-  3: { id: 'p32345', name: 'Rivky K' },
-  4: { id: 'p42345', name: 'Shalom R' },
-  5: { id: 'p52345', name: 'Ori C' },
+  1: { id: 'p12345', name: 'Ryan M' },
+  2: { id: 'p22345', name: 'Nora T' },
+  3: { id: 'p32345', name: 'Rachel K' },
+  4: { id: 'p42345', name: 'Sam R' },
+  5: { id: 'p52345', name: 'Owen C' },
 };
 
-const data = { Person: { id: 'p12345', name: 'Roy M' } };
+const data = { Person: { id: 'p12345', name: 'Ryan M' } };
 
 export default new MockPackage({
   metadata: buildMetadata(20, 'Get Person by ID', data),

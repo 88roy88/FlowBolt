@@ -139,12 +139,13 @@
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
+    "model": "Model",
     "placeholder": {
       "selectProject": "Select a project first",
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
       "readOnly": "View-only access",
-      "default": "Describe what you want to build..."
+      "default": "What do you want to build? Click on + to add flow packages."
     },
     "phase": {
       "analyzing": "Analyzing",
@@ -188,10 +189,13 @@
     "noMembers": "No members yet"
   },
   "admin": {
-    "title": "Platform Users",
+    "title": "Admin",
+    "usersTab": "Platform Users",
+    "publishedTab": "Published Apps",
     "userIdPlaceholder": "User ID to invite",
     "invite": "Invite",
-    "noUsers": "No platform users yet"
+    "noUsers": "No platform users yet",
+    "noPublished": "No published apps yet"
   },
   "publish": {
     "publishFailed": "Publish Failed",

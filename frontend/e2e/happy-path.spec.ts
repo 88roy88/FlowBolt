@@ -66,7 +66,7 @@ test.describe('Happy path', () => {
     await ensureSidebar(page);
 
     // The chat textarea should be ready
-    const chatInput = page.getByPlaceholder(/describe what you want/i);
+    const chatInput = page.getByPlaceholder(/what do you want to build/i);
     await expect(chatInput).toBeVisible({ timeout: 5_000 });
 
     // Type a message
@@ -80,8 +80,8 @@ test.describe('Happy path', () => {
 
   test('model selector shows mock model', async ({ page }) => {
     await gotoHomeReady(page);
-    // The model selector should display our mock model
-    await expect(page.getByText('Test Model')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Model' }).click({ timeout: 30_000 });
+    await expect(page.getByText('Test Model')).toBeVisible();
   });
 
   test('suggestion buttons are visible', async ({ page }) => {

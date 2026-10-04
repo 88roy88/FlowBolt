@@ -28,17 +28,19 @@ def _param(
     options: list[tuple[str, str]] | None = None,
     description: str | None = None,
 ) -> flapi_models.QuickParamDefinition:
-    return flapi_models.QuickParamDefinition.model_validate({
-        "Name": name,
-        "DisplayName": name.title(),
-        "Description": description,
-        "Type": type_,
-        # "OntologyType": "TEXT",
-        "IsSingleValue": is_single_value,
-        "IsRequired": is_required,
-        "IsRequireAny": is_require_any,
-        "Value": [{"Name": n, "Value": v} for n, v in (options or [])],
-    })
+    return flapi_models.QuickParamDefinition.model_validate(
+        {
+            "Name": name,
+            "DisplayName": name.title(),
+            "Description": description,
+            "Type": type_,
+            # "OntologyType": "TEXT",
+            "IsSingleValue": is_single_value,
+            "IsRequired": is_required,
+            "IsRequireAny": is_require_any,
+            "Value": [{"Name": n, "Value": v} for n, v in (options or [])],
+        }
+    )
 
 
 class TestToParamsInfo:
@@ -46,9 +48,7 @@ class TestToParamsInfo:
         info = _flapi_info(
             _param("status", is_required=True, options=[("Active", "Active")]),
         )
-        monkeypatch.setattr(
-            ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info)
-        )
+        monkeypatch.setattr(ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info))
 
         result = await ds_logic.get_params_info("1")
         assert len(result.parameters) == 1
@@ -66,9 +66,7 @@ class TestToParamsInfo:
             _param("region", is_require_any=True, options=[("North", "North")]),
             _param("dept", is_require_any=True, options=[]),
         )
-        monkeypatch.setattr(
-            ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info)
-        )
+        monkeypatch.setattr(ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info))
 
         result = await ds_logic.get_params_info("1")
         assert result.require_any is True
@@ -76,9 +74,7 @@ class TestToParamsInfo:
 
     async def test_require_any_false_when_no_param_has_flag(self, monkeypatch: pytest.MonkeyPatch) -> None:
         info = _flapi_info(_param("status", is_required=True, options=[("A", "A")]))
-        monkeypatch.setattr(
-            ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info)
-        )
+        monkeypatch.setattr(ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info))
 
         result = await ds_logic.get_params_info("1")
         assert result.require_any is False
@@ -101,18 +97,14 @@ class TestToParamsInfo:
                 "q2": [_param("b"), _param("c")],
             }
         )
-        monkeypatch.setattr(
-            ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info)
-        )
+        monkeypatch.setattr(ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info))
 
         result = await ds_logic.get_params_info("1")
         assert sorted(p.name for p in result.parameters) == ["a", "b", "c"]
 
     async def test_nullable_description_survives(self, monkeypatch: pytest.MonkeyPatch) -> None:
         info = _flapi_info(_param("status", description=None))
-        monkeypatch.setattr(
-            ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info)
-        )
+        monkeypatch.setattr(ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info))
 
         result = await ds_logic.get_params_info("1")
         assert result.parameters[0].description is None

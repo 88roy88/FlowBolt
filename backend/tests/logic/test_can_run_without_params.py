@@ -14,7 +14,7 @@ class TestCanRunWithoutParams:
     async def test_no_params_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with no params can run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(parameters=[], require_any=False)
 
         monkeypatch.setattr(ds_logic, "get_params_info", _fake_get_params)
@@ -27,7 +27,7 @@ class TestCanRunWithoutParams:
     async def test_all_optional_params_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with only optional params can run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -53,7 +53,7 @@ class TestCanRunWithoutParams:
     async def test_required_param_with_default_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with required param that has default value can run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -82,7 +82,7 @@ class TestCanRunWithoutParams:
     async def test_required_param_without_options_cannot_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with required param but no default values cannot run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -107,7 +107,7 @@ class TestCanRunWithoutParams:
     async def test_mixed_params_with_defaults_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with mix of optional and required (with defaults) can run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -142,7 +142,7 @@ class TestCanRunWithoutParams:
     async def test_integer_param_converted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Integer type params are converted to int."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -169,7 +169,7 @@ class TestCanRunWithoutParams:
     async def test_boolean_param_converted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Boolean type params are converted to bool."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -196,7 +196,7 @@ class TestCanRunWithoutParams:
     async def test_invalid_integer_cannot_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """If integer param value cannot be parsed, cannot run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -221,7 +221,7 @@ class TestCanRunWithoutParams:
     async def test_require_any_with_defaults_can_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with RequireAny where at least one has default can run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -258,7 +258,7 @@ class TestCanRunWithoutParams:
     async def test_multi_value_required_param_emits_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """is_single_value=False on a required param yields a one-element list default."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -287,7 +287,7 @@ class TestCanRunWithoutParams:
     async def test_multi_value_require_any_emits_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Multi-value require_any group default is also wrapped in a list."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(
@@ -314,7 +314,7 @@ class TestCanRunWithoutParams:
     async def test_require_any_without_defaults_cannot_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Data source with RequireAny where none have defaults cannot run."""
 
-        async def _fake_get_params(*_a, **_kw):  # noqa: ANN001, ANN002, ANN003, ARG001
+        async def _fake_get_params(*_a, **_kw):
             return DataSourceParamsInfo(
                 parameters=[
                     ParamDefinition(

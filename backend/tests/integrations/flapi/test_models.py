@@ -1,7 +1,9 @@
 """Unit tests for flow44.integrations.flapi.models — no mock server required."""
+
 from __future__ import annotations
 
 import pytest
+
 from flow44.integrations.flapi.models import PackageMetadata, QuickParamsInfo
 
 # ---------------------------------------------------------------------------
@@ -147,6 +149,20 @@ class TestPackageMetadataFieldType:
     def test_unknown_field_type_does_not_raise(self) -> None:
         result = PackageMetadata.model_validate(_package_with_field_type("html"))
         assert result.queries[0].fields[0].type_ == "html"
+
+
+class TestPackageMetadataDescription:
+    def test_null_description_does_not_raise(self) -> None:
+        payload = _package_with_field_type("string")
+        payload["Description"] = None
+        result = PackageMetadata.model_validate(payload)
+        assert result.description is None
+
+    def test_missing_description_does_not_raise(self) -> None:
+        payload = _package_with_field_type("string")
+        del payload["Description"]
+        result = PackageMetadata.model_validate(payload)
+        assert result.description is None
 
 
 class TestQuickParamUnknownType:

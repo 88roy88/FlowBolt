@@ -1,5 +1,3 @@
-import { getAppSuffix } from '../../utils/easterEgg';
-
 interface FlowLogoProps {
   size?: number;
   className?: string;
@@ -32,14 +30,12 @@ export function FlowBrand({ size = 'md', className }: FlowBrandProps) {
     lg: { icon: 28, text: 'text-[28px]', gap: 'gap-2' },
   }[size];
 
-  const suffix = getAppSuffix();
-
   return (
     <div className={`flex items-center ${config.gap} ${className ?? ''}`}>
       <FlowLogo size={config.icon} className="text-brand" />
       <span className={`font-bold tracking-tight ${config.text}`}>
-        <span className="text-brand">FLOW</span>
-        <span className="text-foreground">{suffix}</span>
+        <span className="text-brand">Build</span>
+        <span className="text-foreground">App</span>
       </span>
     </div>
   );

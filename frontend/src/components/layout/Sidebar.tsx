@@ -8,9 +8,8 @@ import { FlowBrand } from '../ui/flow-logo';
 import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { ShareModal } from '../sharing/ShareModal';
-import { reapProject } from '../../services/api';
-import { isSpecialUser } from '../../utils/easterEgg';
 import { pollFileTree } from '../../utils/pollFileTree';
+import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
@@ -54,8 +53,8 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
   const [searchQuery, setSearchQuery] = useState('');
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
-  const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
-  const [shareModal, setShareModal] = useState<{ projectId: string; projectName: string; ownerUserId?: string } | null>(null);
+  const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary; } | null>(null);
+  const [shareModal, setShareModal] = useState<{ projectId: string; projectName: string; ownerUserId?: string; } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -227,9 +226,8 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
               <div
                 onClick={() => handleSelect(project)}
                 data-testid={`project-item-${project.id}`}
-                className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${
-                  isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
-                }`}
+                className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
+                  }`}
               >
                 <div className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${colorClass}`}>
                   {getInitials(project.name)}
@@ -326,7 +324,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
                 {t('sharing.share', 'Share')}
               </button>
             )}
-            {isSpecialUser() && (
+            {userStatus?.is_admin && (
               <button
                 onClick={async () => {
                   closeMenu();
@@ -343,11 +341,10 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
             {(!menuProject.role || DELETE_ROLES.has(menuProject.role)) && (
               <button
                 onClick={() => handleDelete(menuProject.id)}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
-                  pendingDeleteId === menuProject.id
-                    ? 'text-destructive bg-destructive/10'
-                    : 'text-foreground hover:bg-muted/50'
-                }`}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${pendingDeleteId === menuProject.id
+                  ? 'text-destructive bg-destructive/10'
+                  : 'text-foreground hover:bg-muted/50'
+                  }`}
               >
                 <Trash2 size={13} className={pendingDeleteId === menuProject.id ? 'text-destructive' : 'text-muted-foreground'} />
                 {pendingDeleteId === menuProject.id ? t('sidebar.confirmDelete') : t('common.delete')}
