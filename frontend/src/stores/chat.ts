@@ -275,11 +275,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const socket = getChatSocket(projectId);
         turnHandler = createSendMessageHandler(set, get, () => detachHandler(socket, turnHandler!));
         attachHandler(projectId, socket, turnHandler);
-        // Turn handler detaches after each turn; version handler stays for the session.
         socket.onMessage(handleVersionMessage);
       }
 
-      // Replay history: turn handler rebuilds messages/cards, version handler stamps versions.
+      // Kept separate: the turn handler detaches after each turn, the version handler stays for the session.
       const events = await fetchAgentEvents(projectId);
       const replayHandler = turnHandler ?? createSendMessageHandler(set, get, () => {});
       for (const evt of events) {
