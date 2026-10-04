@@ -269,18 +269,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const currentProject = useSessionStore.getState().currentProject;
       const canWrite = !currentProject?.role || WRITE_ROLES.has(currentProject.role);
 
-      let handler: ((msg: WSMessage) => void) | null = null;
+      let turnHandler: ((msg: WSMessage) => void) | null = null;
 
       if (canWrite) {
         const socket = getChatSocket(projectId);
-        handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler!));
-        attachHandler(projectId, socket, handler);
+        turnHandler = createSendMessageHandler(set, get, () => detachHandler(socket, turnHandler!));
+        attachHandler(projectId, socket, turnHandler);
+        // Turn handler detaches after each turn; version handler stays for the session.
         socket.onMessage(handleVersionMessage);
       }
 
-      // Replay history: agent handler rebuilds messages/cards, version handler stamps versions.
+      // Replay history: turn handler rebuilds messages/cards, version handler stamps versions.
       const events = await fetchAgentEvents(projectId);
-      const replayHandler = handler ?? createSendMessageHandler(set, get, () => {});
+      const replayHandler = turnHandler ?? createSendMessageHandler(set, get, () => {});
       for (const evt of events) {
         replayHandler(evt as WSMessage);
         handleVersionMessage(evt as WSMessage);
