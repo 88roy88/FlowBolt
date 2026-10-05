@@ -6,6 +6,7 @@ import type { Message } from '../../types';
 import { useChatStore } from '../../stores/chat';
 import { isAgentAlive } from '../../stores/chatAgentState';
 import { ChatMessage } from './ChatMessage';
+import { UnsavedEditsRow } from '../version/UnsavedEditsRow';
 import { PromptInput } from './PromptInput';
 import { WorkPlanView } from './WorkPlanView';
 import { TaskProgress } from './TaskProgress';
@@ -145,6 +146,8 @@ export function ChatPanel() {
             isStreaming
           />
         )}
+
+        <UnsavedEditsRow />
 
         </div>
       </div>

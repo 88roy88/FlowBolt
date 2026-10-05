@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
-from flow44.api.deps import get_sandbox
+from flow44.api.deps import get_sandbox, require_writable_workspace
 from flow44.main import app
 from flow44.sandbox.base import BaseSandbox, SandboxInfo
 from flow44.sandbox.filesystem_mixin import FileSystemMixin
@@ -41,6 +42,14 @@ def _override_sandbox(workspace_dir: Path) -> APITestSandbox:
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _unlocked_workspace():
+    # The lock has its own suite; these tests are about file CRUD.
+    app.dependency_overrides[require_writable_workspace] = lambda: None
+    yield
+    app.dependency_overrides.pop(require_writable_workspace, None)
 
 
 def test_create_entry_and_conflict(tmp_path: Path) -> None:
