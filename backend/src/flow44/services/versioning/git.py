@@ -57,8 +57,12 @@ class Git:
         except OSError:
             return None
 
-    def is_repo(self) -> bool:
-        return self._head() is not None
+    async def is_repo(self) -> bool:
+        try:
+            await self._run("rev-parse", "--verify", "HEAD")
+        except GitError:
+            return False
+        return True
 
     def is_detached(self) -> bool:
         head = self._head()
@@ -83,6 +87,9 @@ class Git:
         return diffs
 
     # -- Mutations --
+
+    def clear_stale_lock(self) -> None:
+        Path(self.git_dir, "index.lock").unlink(missing_ok=True)
 
     async def init(self, message: str) -> str | None:
         await self._run("init")

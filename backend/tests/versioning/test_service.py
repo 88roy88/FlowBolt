@@ -15,7 +15,7 @@ from flow44.services.maintenance.template_sync import sync_protected_template_fi
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git, GitError
 
-from .conftest import VersionChain, outer_repo, requires_git
+from .conftest import VersionChain, git_out, outer_repo, requires_git
 
 pytestmark = [pytest.mark.asyncio, requires_git]
 
@@ -285,9 +285,27 @@ async def test_legacy_nested_workspace_gets_its_own_baseline(project_id: str, wo
 
     git = Git(project_id)
     versions = await get_versions(project_id)
-    assert git.is_repo()
+    assert await git.is_repo()
     assert await git.head_sha() != outer_head
     assert [event.payload["commit_sha"] for event in versions] == [await git.head_sha()]
+
+
+async def test_init_interrupted_before_its_commit_is_finished_on_next_access(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("x")
+    git_out(workspace, "init")
+    git_out(workspace, "add", "-A")
+
+    await versioning.ensure_repo(project_id)
+
+    versions = await get_versions(project_id)
+    assert [event.payload["commit_sha"] for event in versions] == [await Git(project_id).head_sha()]
+
+
+async def test_lock_left_by_a_killed_git_does_not_block_commits(project_id: str, version_chain: VersionChain) -> None:
+    (version_chain.workspace / ".git" / "index.lock").write_text("")
+    (version_chain.workspace / "a.txt").write_text("three")
+
+    assert await versioning.commit_turn(project_id)
 
 
 async def _platform_file_at_head(project_id: str, chain: VersionChain) -> Path:
@@ -329,7 +347,7 @@ async def test_template_sync_without_a_repo_writes_files_and_commits_nothing(
 
     assert summary.endswith("created [src/api/client.ts]")
     assert (workspace / "src" / "api" / "client.ts").read_text() == "platform v2\n"
-    assert not Git(project_id).is_repo()
+    assert not await Git(project_id).is_repo()
     assert await get_versions(project_id) == []
 
 
