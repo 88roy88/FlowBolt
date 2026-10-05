@@ -1,9 +1,9 @@
-import { Loader2, CheckCircle2, FileText } from 'lucide-react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { FollowUpStep, FileDiff } from '../../../types';
 import { CardWrapper } from './CardWrapper';
-import { DiffBlock } from './DiffBlock';
+import { FilesChangedSection } from './FilesChangedSection';
 import { getFollowUpToolIcon, getFollowUpToolLabel } from './icons';
 
 export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }: {
@@ -15,7 +15,6 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
 }) {
   const completed = steps.filter((s) => s.status === 'completed').length;
   const inProgress = isLive || steps.some((s) => s.status === 'running');
-  const hasDiffs = diffs && diffs.length > 0;
 
   return (
     <CardWrapper accent="primary">
@@ -63,30 +62,7 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
         })}
       </div>
 
-      {/* Files changed with diffs */}
-      {hasDiffs && (
-        <div className="mt-2.5 border-t border-border pt-2.5">
-          <div className="text-xs font-medium text-muted-foreground mb-2">Files changed</div>
-          <div className="flex flex-col gap-1.5">
-            {diffs.map((d, i) => <DiffBlock key={`${d.path}-${i}`} fileDiff={d} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Fallback file list */}
-      {!hasDiffs && filesChanged && filesChanged.length > 0 && (
-        <div className="mt-2.5 border-t border-border pt-2.5">
-          <div className="text-xs font-medium text-muted-foreground mb-1.5">Files changed</div>
-          <div className="flex flex-col gap-0.5">
-            {filesChanged.map((filePath) => (
-              <div key={filePath} className="flex items-center gap-1.5 px-2 py-1 rounded text-xs">
-                <FileText size={12} className="text-primary shrink-0" />
-                <span className="font-mono">{filePath}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <FilesChangedSection diffs={diffs} files={filesChanged} />
 
       {/* Answer */}
       {answer && (
