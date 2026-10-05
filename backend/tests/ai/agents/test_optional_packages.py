@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from flow44.ai.agents import optional_packages as op
+from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.execute.prompts import render_codegen, render_feedback, render_merge
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.fix_error.prompts import render_feedback as render_fix_feedback
@@ -17,6 +18,7 @@ from flow44.ai.agents.optional_packages import (
     OPTIONAL_PACKAGES,
     OptionalPackage,
     PackageRuleset,
+    imported_packages,
     installed_packages,
     npm_dependencies,
     packages_by_name,
@@ -315,7 +317,8 @@ def _plan_state(agent: plan_agent.PlanAgent, content: str) -> PlanState:
 class TestDecidePackagesStep:
     async def test_selects_and_validates(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_complete(*_a: object, **_kw: object) -> str:
-            return '{"selected": [{"name": "date-fns", "reason": "timeline"}, {"name": "bogus", "reason": "x"}]}'
+            selected = [{"name": "date-fns", "reason": "timeline"}, {"name": "bogus", "reason": "x"}, {"name": ["x"]}]
+            return json.dumps({"selected": selected})
 
         monkeypatch.setattr(plan_agent, "complete_chat", _fake_complete)
 
@@ -354,3 +357,72 @@ def test_build_state_roundtrips_selection() -> None:
 
 def test_public_api_exports() -> None:
     assert hasattr(op, "OPTIONAL_PACKAGES")
+
+
+class TestImportedPackages:
+    def test_counts_double_and_single_quoted_imports(self) -> None:
+        sources = ['import { LineChart } from "recharts";', "import { Home } from 'lucide-react';"]
+        assert imported_packages(["lucide-react", "recharts"], sources) == ["lucide-react", "recharts"]
+
+    def test_counts_subpath_side_effect_and_dynamic_imports(self) -> None:
+        sources = [
+            'import { enUS } from "date-fns/locale";',
+            'import "recharts/style.css";',
+            'const icons = await import("lucide-react");',
+        ]
+        names = ["date-fns", "lucide-react", "recharts"]
+        assert imported_packages(names, sources) == names
+
+    def test_ignores_bare_mentions(self) -> None:
+        assert imported_packages(["recharts"], ['{"dependencies": {"recharts": "^2"}}']) == []
+
+    def test_ignores_unselected_packages(self) -> None:
+        assert imported_packages(["date-fns"], ['import { LineChart } from "recharts";']) == []
+
+
+class _InstallSandbox(_ManifestSandbox):
+    project_id = "p"
+
+    def __init__(self, payload: str) -> None:
+        super().__init__(payload)
+        self.installed: list[str] = []
+
+    async def install_optional_packages(self, names: list[str]) -> None:
+        self.installed = names
+
+
+async def _run_execute(
+    monkeypatch: pytest.MonkeyPatch, sandbox: _InstallSandbox, selected: list[str]
+) -> tuple[list[str], dict[str, Any]]:
+    agent = ExecuteAgent("p", sandbox, BuildState(project_id="p", selected_packages=selected), user_id="u")  # type: ignore[arg-type]
+    seen: list[str] = []
+
+    async def _fake_run(exec_state: Any, start: str) -> Any:
+        seen.extend(exec_state.build_state.selected_packages)
+        exec_state.build_state.completed_files = {"a.tsx": 'import { Home } from "lucide-react";'}
+        return exec_state
+
+    async def _noop_emit(_event: dict[str, Any]) -> None:
+        return None
+
+    outputs: list[dict[str, Any]] = []
+    monkeypatch.setattr(agent._flow, "run", _fake_run)
+    monkeypatch.setattr(agent, "emit", _noop_emit)
+    monkeypatch.setattr(agent, "_set_trace_output", outputs.append)
+    await agent.run()
+    return seen, outputs[0]
+
+
+class TestExecuteInstallVerification:
+    async def test_prunes_failed_installs_and_records_usage(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        sandbox = _InstallSandbox(json.dumps({"dependencies": {"lucide-react": "^0.3"}}))
+        codegen_packages, output = await _run_execute(monkeypatch, sandbox, ["recharts", "lucide-react"])
+
+        assert sandbox.installed == ["recharts", "lucide-react"]
+        assert codegen_packages == ["lucide-react"]
+        assert output["selected_packages"] == ["recharts", "lucide-react"]
+        assert output["failed_packages"] == ["recharts"]
+        assert output["used_packages"] == ["lucide-react"]
+        assert "failed to install" in caplog.text

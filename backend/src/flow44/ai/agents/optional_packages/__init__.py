@@ -4,6 +4,7 @@ from flow44.ai.agents.optional_packages.base import (
 )
 from flow44.ai.agents.optional_packages.registry import (
     OPTIONAL_PACKAGES,
+    imported_packages,
     installed_packages,
     npm_dependencies,
     packages_by_name,
@@ -15,6 +16,7 @@ __all__ = [
     "OPTIONAL_PACKAGES",
     "OptionalPackage",
     "PackageRuleset",
+    "imported_packages",
     "installed_packages",
     "npm_dependencies",
     "packages_by_name",

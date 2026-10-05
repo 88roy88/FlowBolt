@@ -1,8 +1,13 @@
+import json
+import logging
 from typing import Any
 
+from flow44.ai.agents.optional_packages import installed_packages
 from flow44.ai.core.opik_utils import llm_metadata, set_trace_input, set_trace_output, setup_trace
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAgent:
@@ -42,3 +47,12 @@ class BaseAgent:
         extra_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return llm_metadata(self._trace_id, generation_name, parent_span_id, extra_metadata)
+
+    async def _installed_optional_package_names(self) -> list[str]:
+        try:
+            manifest = json.loads(await self.sandbox.read_file("package.json"))
+            deps = {**manifest.get("dependencies", {}), **manifest.get("devDependencies", {})}
+        except (OSError, ValueError, AttributeError, TypeError) as e:
+            logger.warning("[agent] Could not read package.json for %s: %s", self.project_id, e)
+            return []
+        return [pkg.name for pkg in installed_packages(deps)]

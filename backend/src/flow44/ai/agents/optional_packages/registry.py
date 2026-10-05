@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import logging
 import pkgutil
+import re
 from collections.abc import Iterable
 
 import flow44.ai.agents.optional_packages as _pkg
@@ -49,6 +50,15 @@ def packages_by_name(names: list[str]) -> list[OptionalPackage]:
 def installed_packages(dependencies: Iterable[str]) -> list[OptionalPackage]:
     present = set(dependencies)
     return [pkg for pkg in OPTIONAL_PACKAGES.values() if present.issuperset(pkg.packages)]
+
+
+def imported_packages(names: list[str], sources: Iterable[str]) -> list[str]:
+    code = "\n".join(sources)
+    return [
+        package.name
+        for package in packages_by_name(names)
+        if any(re.search(rf"(?:from|import)\s*\(?\s*['\"]{re.escape(npm)}['\"/]", code) for npm in package.packages)
+    ]
 
 
 def npm_dependencies(names: list[str]) -> list[str]:

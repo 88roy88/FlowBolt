@@ -17,7 +17,7 @@ from flow44.ai.agents.plan.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import record_span_error
+from flow44.ai.core.opik_utils import add_trace_tags, record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
@@ -79,7 +79,12 @@ class PlanAgent(BaseAgent):
         start_step = "fetch_data_sources" if self._state.data_source_ids else "decide_packages"
         await self._flow.run(plan_state, start=start_step)
 
-        self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
+        self._set_trace_output(
+            {
+                "user_plan_overview": self._state.user_plan_overview.model_dump(),
+                "selected_packages": self._state.selected_packages,
+            }
+        )
 
     # -- Flow Steps --
 
@@ -152,6 +157,14 @@ class PlanAgent(BaseAgent):
 
     async def _step_decide_packages(self, state: PlanState) -> PlanState:
         """Step: Let the model select optional npm packages for the app."""
+        selected = validate_selection(await self._decide_packages())
+        logger.info("[plan] Selected optional packages for %s: %s", self.project_id, selected)
+        add_trace_tags([f"pkg:{name}" for name in selected])
+        state.build_state.selected_packages = selected
+        return state
+
+    @track(name="decide-packages")  # type: ignore[untyped-decorator]
+    async def _decide_packages(self) -> list[str]:
         try:
             raw = await complete_chat(
                 [Message.user(self._state.user_content)],
@@ -160,13 +173,11 @@ class PlanAgent(BaseAgent):
                 metadata=self._llm_metadata("decide_packages"),
             )
             selected = parse_json_response(raw).get("selected", [])
-            raw_names = [item["name"] for item in selected if item.get("name")]
-            state.build_state.selected_packages = validate_selection(raw_names)
-        except Exception:
+            return [item["name"] for item in selected if isinstance(item.get("name"), str)]
+        except Exception as exc:
             logger.exception("[plan] Optional package decision failed")
-            state.build_state.selected_packages = []
-
-        return state
+            record_span_error(exc)
+            return []
 
     async def _step_design(self, state: PlanState) -> PlanState:
         """Step: Design architecture and UX in parallel."""
