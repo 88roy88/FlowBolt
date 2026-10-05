@@ -15,9 +15,10 @@ from flow44.ai.agents.execute.prompts import (
     render_feedback,
     render_merge,
 )
+from flow44.ai.agents.optional_packages import imported_packages, npm_dependencies
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import create_span, error_info, record_span_error
+from flow44.ai.core.opik_utils import add_trace_tags, create_span, error_info, record_span_error
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
@@ -78,6 +79,11 @@ class ExecuteAgent(BaseAgent):
 
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_plan_overview.model_dump()})
 
+        selected = self._build_state.selected_packages
+        failed = await self._install_and_drop_failed_packages()
+        if failed:
+            logger.error("[execute] Optional packages failed to install for %s: %s", self.project_id, failed)
+
         current_span = opik_context.get_current_span_data()
         exec_state = ExecutionState(
             build_state=self._build_state,
@@ -92,18 +98,35 @@ class ExecuteAgent(BaseAgent):
 
         final_state = await self._flow.run(exec_state, start="build_plan")
 
+        kept = final_state.build_state.selected_packages
+        used = imported_packages(kept, final_state.build_state.completed_files.values())
         self._set_trace_output(
             {
                 "files_written": list(final_state.build_state.completed_files.keys()),
                 "fix_attempts": final_state.fix_attempts,
                 "rejected_files": [str(r) for r in final_state.rejected_files],
+                "selected_packages": selected,
+                "failed_packages": failed,
+                "used_packages": used,
             }
+        )
+        add_trace_tags(
+            [f"pkg:{name}" for name in kept]
+            + [f"pkg-install-failed:{name}" for name in failed]
+            + [f"pkg-unused:{name}" for name in kept if name not in used]
         )
 
         final_state.build_state.phase = "idle"
         final_state.build_state.work_plan = None
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
+
+    async def _install_and_drop_failed_packages(self) -> list[str]:
+        selected = self._build_state.selected_packages
+        await self.sandbox.install_optional_packages(npm_dependencies(selected))
+        installed = await self._installed_optional_package_names()
+        self._build_state.selected_packages = [name for name in selected if name in installed]
+        return [name for name in selected if name not in installed]
 
     # -- Flow Steps (sequential — use @track for automatic span lifecycle) --
 
@@ -200,7 +223,10 @@ class ExecuteAgent(BaseAgent):
             input={"errors": state.all_errors, "fix_attempt": state.fix_attempts},
         )
 
-        prompt = render_feedback(files=state.build_state.completed_files)
+        prompt = render_feedback(
+            files=state.build_state.completed_files,
+            selected_packages=state.build_state.selected_packages,
+        )
         messages: list[dict[str, Any] | Message] = [
             Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
         ]
@@ -301,7 +327,10 @@ class ExecuteAgent(BaseAgent):
 
         raw = await complete_chat(
             [Message.user(json.dumps(merge_data, indent=2))],
-            render_merge(has_data_sources=bool(state.build_state.data_source_contexts)),
+            render_merge(
+                has_data_sources=bool(state.build_state.data_source_contexts),
+                selected_packages=state.build_state.selected_packages,
+            ),
             model=state.model,
             metadata=state.llm_metadata_fn("build_technical_plan", parent_span_id=state.observation_id),
         )
@@ -370,6 +399,7 @@ class ExecuteAgent(BaseAgent):
                 other_completed_files={p: c for p, c in state.build_state.completed_files.items() if p not in dep_paths}
                 or None,
                 data_source_contexts=state.build_state.data_source_contexts or None,
+                selected_packages=state.build_state.selected_packages,
             )
 
             generated: list[tuple[str, str]] = []

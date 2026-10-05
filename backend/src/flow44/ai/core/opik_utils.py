@@ -89,6 +89,11 @@ def set_trace_output(output: dict[str, Any]) -> None:
         opik_context.update_current_trace(output=output)
 
 
+def add_trace_tags(tags: list[str]) -> None:
+    if tags and opik_context.get_current_trace_data() is not None:
+        opik_context.update_current_trace(tags=tags)
+
+
 def create_span(**kwargs: Any) -> Span:
     return get_global_client().span(**kwargs)
 

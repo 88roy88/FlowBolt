@@ -18,6 +18,7 @@ class BuildState(BaseModel):
     data_source_ids: list[str] = Field(default_factory=list)
     data_source_contexts: list[DataSourceContext] = Field(default_factory=list)
     generated_data_source_files: dict[str, str] = Field(default_factory=dict)
+    selected_packages: list[str] = Field(default_factory=list)
     architecture: ArchitectureDesign = Field(default_factory=ArchitectureDesign)
     ux_design: UXDesign = Field(default_factory=UXDesign)
     user_plan_overview: UserPlanOverview = Field(default_factory=UserPlanOverview)

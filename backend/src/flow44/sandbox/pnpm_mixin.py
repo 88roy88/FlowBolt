@@ -1,5 +1,6 @@
 import logging
 import os
+import shlex
 import shutil
 from abc import ABC
 
@@ -41,6 +42,14 @@ class PnpmMixin(BaseSandbox, ABC):
 
         async for line in self.exec("pnpm install 2>&1"):
             logger.info("[scaffold] %s", line.rstrip())
+
+    async def install_optional_packages(self, package_names: list[str]) -> None:
+        if not package_names:
+            return
+        command = "pnpm add " + " ".join(shlex.quote(name) for name in package_names) + " 2>&1"
+        logger.info("Installing optional packages for %s: %s", self.project_id, package_names)
+        async for line in self.exec(command):
+            logger.info("[pnpm add] %s", line.rstrip())
 
     def _stamp_vite_config(self, template_dir: str) -> None:
         template_path = os.path.join(template_dir, "vite.config.ts")

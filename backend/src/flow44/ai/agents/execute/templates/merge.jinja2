@@ -37,11 +37,12 @@ Rules:
 - Component tasks depend on their type definitions
 - The final App.tsx integration task depends on all component tasks
 - Keep the total number of tasks reasonable (3-10 for most projects)
-- Do NOT create tasks for modifying package.json - only the pre-configured packages are available (React, TypeScript, Vite, Tailwind CSS)
-- Do NOT include tasks for installing dependencies or running the dev server
+- {% include "_available_packages.jinja2" %}
+- Do NOT include tasks for modifying package.json, installing dependencies, or running the dev server (already handled)
 - Do NOT include `src/config.ts` in any task's files — it is pre-configured and must not be overwritten
 - Any file containing JSX (a React component, or a hook that returns JSX) MUST be named `.tsx`; use `.ts` only for pure TypeScript with no JSX (types, constants, non-JSX utilities and hooks). A `.ts` file containing JSX will not compile and cannot be renamed later
 
+{% include "_package_rules.jinja2" %}
 {% include "_file_safety_rules.jinja2" %}
 {% if has_data_sources %}
 

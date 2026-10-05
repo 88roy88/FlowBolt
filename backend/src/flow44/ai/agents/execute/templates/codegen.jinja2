@@ -19,6 +19,9 @@ as part of a larger project.
 ```json
 {{ ux_json }}
 ```
+
+The UI/UX context is authoritative on visuals only: if it names a library or icon set, treat that as
+intent and build the visual with the packages allowed under General Rules below.
 {% if data_source_contexts %}
 
 ## Data Source Integration
@@ -98,6 +101,7 @@ When implementing components that use data source data:
 {% endfor %}
 {% endif %}
 
+{% include "_package_rules.jinja2" %}
 ## Output Format
 
 Respond using the flowArtifact XML format. Write COMPLETE file contents — no
@@ -118,7 +122,7 @@ placeholders or ellipses.
 3. Tailwind runs with an empty `theme.extend` - every class you use must come from Tailwind's built-in utilities and default color palette.
 4. Write clean, production-quality code with modern, polished UI/UX.
 5. Only output the files listed above — do not create extra files.
-6. **CRITICAL**: Only React, TypeScript, and Tailwind CSS are available. Do NOT use or import other npm packages (no axios, lodash, zustand, date-fns, clsx, etc.). All functionality must be implemented using built-in browser APIs and the pre-installed packages only.
+6. {% include "_available_packages.jinja2" %}
 7. Import from already-completed files using their exact export names.
 8. Do NOT include shell actions — only file actions.
 9. Any file containing JSX must use the `.tsx` extension; `.ts` is for pure TypeScript only. If a file listed above has a `.ts` extension, its contents must contain no JSX.

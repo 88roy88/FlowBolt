@@ -180,6 +180,7 @@ class FollowUpAgent(ChatAgent):
             file_tree=context["file_tree"],
             new_data_source_contexts=new_data_source_contexts or None,
             existing_data_source_contexts=existing_data_source_contexts or None,
+            installed_packages=context["installed_packages"] or None,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -279,7 +280,11 @@ class FollowUpAgent(ChatAgent):
         except Exception:
             file_tree = "(unable to list files)"
 
-        return {"summary": summary, "file_tree": file_tree}
+        return {
+            "summary": summary,
+            "file_tree": file_tree,
+            "installed_packages": await self._installed_optional_package_names(),
+        }
 
     async def _emit_react_step(self, event: dict[str, Any]) -> None:
         if event["type"] == "react_assistant_turn":
