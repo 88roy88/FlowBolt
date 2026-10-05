@@ -54,6 +54,8 @@ class DatabaseSettings(BuildAppSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_RECYCLE: int = 3600
     DB_POOL_PRE_PING: bool = True
+    ADVISORY_LOCK_WAIT_TIMEOUT: int = 30
+    ADVISORY_LOCK_HOLD_TIMEOUT: int = 300
 
 
 class AIModelSettings(BuildAppSettings):
