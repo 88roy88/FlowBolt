@@ -38,7 +38,7 @@ from flow44.ai.agents.optional_packages.base import OptionalPackage
 
 PACKAGE = OptionalPackage(
     name="date-fns",                                    # exact npm name (installed via `pnpm add`)
-    capability="date_formatting",                       # short slug used in the selection prompt
+    capability="date_math",                             # short slug used in the selection prompt
     packages=("date-fns",),                             # npm names to install (usually just `name`)
     templates_dir=Path(__file__).parent / "templates",  # anchors the rule-fragment lookup
     use_when="...",                                     # one line: when the model SHOULD pick this

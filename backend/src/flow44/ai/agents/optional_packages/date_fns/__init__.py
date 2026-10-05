@@ -4,7 +4,7 @@ from flow44.ai.agents.optional_packages.base import OptionalPackage
 
 PACKAGE = OptionalPackage(
     name="date-fns",
-    capability="date_formatting",
+    capability="date_math",
     packages=("date-fns",),
     templates_dir=Path(__file__).parent / "templates",
     use_when=(
