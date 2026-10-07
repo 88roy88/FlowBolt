@@ -1,13 +1,20 @@
 """Tests for the paginated, searchable GET /api/projects listing."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from flow44.auth.permissions import Role
+from flow44.config import settings
 from flow44.db.project import create_project
 from flow44.db.project_member import add_member
 from flow44.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture
+def as_admin(monkeypatch):
+    monkeypatch.setattr(settings, "SYSTEM_ADMIN_IDS", ["test-user"])
 
 
 def _list(**params: str | int) -> dict:
@@ -67,6 +74,16 @@ class TestListProjects:
         assert [p["id"] for p in first["projects"] + second["projects"]] == [p.id for p in reversed(matches)]
         assert second["next_cursor"] is None
 
+    async def test_admin_sees_all_projects_as_admin_even_when_a_member(self, test_db, as_admin):
+        owned = await create_project("Mine", user_id="test-user")
+        unrelated = await create_project("Unrelated", user_id="someone-else")
+        member_of = await create_project("Shared", user_id="someone-else")
+        await add_member(member_of.id, "test-user", Role.viewer, invited_by="someone-else")
+
+        roles = {p["id"]: p["role"] for p in _list()["projects"]}
+
+        assert roles == {owned.id: "owner", unrelated.id: "admin", member_of.id: "admin"}
+
     def test_rejects_malformed_cursor(self):
         assert client.get("/api/projects", params={"cursor": "not-a-cursor"}).status_code == 400
 
@@ -85,3 +102,9 @@ class TestGetProject:
         project = await create_project("Private", user_id="someone-else")
 
         assert client.get(f"/api/projects/{project.id}").status_code == 404
+
+    async def test_admin_member_gets_admin_role(self, test_db, as_admin):
+        project = await create_project("Shared", user_id="someone-else")
+        await add_member(project.id, "test-user", Role.viewer, invited_by="someone-else")
+
+        assert client.get(f"/api/projects/{project.id}").json()["role"] == "admin"

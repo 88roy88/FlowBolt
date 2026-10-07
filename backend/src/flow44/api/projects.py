@@ -88,7 +88,9 @@ def _decode_cursor(cursor: str) -> tuple[str, str]:
 def _role_for(project: Project, user_id: str, member_role: Role | None) -> str:
     if project.user_id == user_id:
         return "owner"
-    return member_role.value if member_role is not None else "admin"
+    if is_admin(user_id) or member_role is None:
+        return "admin"
+    return member_role.value
 
 
 class ProjectListResponse(BaseModel):
@@ -120,7 +122,7 @@ async def list_user_projects(
 
 @router.get("/{project_id}")
 async def get_single_project(project: ProjectDep, user_id: UserDep) -> ProjectResponse:
-    member = None if project.user_id == user_id else await get_project_member(project.id, user_id)
+    member = None if project.user_id == user_id or is_admin(user_id) else await get_project_member(project.id, user_id)
     return _serialize_project(project, _role_for(project, user_id, Role(member.role) if member else None))
 
 
