@@ -151,7 +151,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     if (options.failProjectsOnce && projectsGetCount === 1) {
       return route.fulfill({ status: 401, body: 'unauthorized' });
     }
-    return route.fulfill({ json: [...projects] });
+    return route.fulfill({ json: { projects: [...projects], next_cursor: null } });
   });
 
   await page.route('**/api/projects/*', async (route) => {
@@ -175,7 +175,8 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
       if (idx >= 0) projects.splice(idx, 1);
       return route.fulfill({ status: 204, body: '' });
     }
-    return route.fulfill({ json: projects[0] ?? MOCK_PROJECT });
+    const requestedId = new URL(url).pathname.split('/').pop();
+    return route.fulfill({ json: projects.find((p) => p.id === requestedId) ?? projects[0] ?? MOCK_PROJECT });
   });
 
   // --- Files ---

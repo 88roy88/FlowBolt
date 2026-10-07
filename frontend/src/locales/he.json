@@ -33,7 +33,8 @@
     "sleep": "השהה",
     "confirmDelete": "אשר מחיקה?",
     "searchPlaceholder": "חפש פרויקטים...",
-    "noProjectsMatch": "אין פרויקטים תואמים"
+    "noProjectsMatch": "אין פרויקטים תואמים",
+    "loadMore": "טען עוד"
   },
   "settings": {
     "title": "הגדרות",
