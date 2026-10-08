@@ -100,7 +100,6 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
     try:
         await _heartbeat_until_done(project_id, run_task, beat)
         await run_task
-        await versioning.commit_turn(project_id)
     except _RunBudgetExceeded:
         logger.error(
             "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
@@ -113,6 +112,7 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         await _report_run_failure(project_id, "AI processing failed")
     finally:
         await _cancel_task(run_task)
+        await versioning.commit_turn(project_id)
         await clear_heartbeat(project_id, only_beat=beat.at)
 
 

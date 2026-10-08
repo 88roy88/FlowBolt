@@ -42,7 +42,7 @@ async def test_success_commits_and_emits_no_error(monkeypatch: pytest.MonkeyPatc
     commit.assert_awaited_once_with(PROJECT_ID)
 
 
-async def test_failure_emits_error_without_committing(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_failure_emits_error_and_commits_partial_work(monkeypatch: pytest.MonkeyPatch) -> None:
     emit, clear, commit = _patch_boundary(monkeypatch)
 
     async def fail() -> None:
@@ -54,10 +54,10 @@ async def test_failure_emits_error_without_committing(monkeypatch: pytest.Monkey
     assert {"type": "phase", "phase": "idle"} in emitted
     assert {"type": "error", "message": "AI processing failed"} in emitted
     clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
-    commit.assert_not_awaited()
+    commit.assert_awaited_once_with(PROJECT_ID)
 
 
-async def test_supervisor_timeout_cancels_and_clears(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_supervisor_timeout_cancels_commits_and_clears(monkeypatch: pytest.MonkeyPatch) -> None:
     emit, clear, commit = _patch_boundary(monkeypatch)
     monkeypatch.setattr(chat.settings, "AGENT_RUN_TIMEOUT", 0.05)
     monkeypatch.setattr(chat.settings, "AGENT_RUN_STALE_TIMEOUT", 0.8)
@@ -77,7 +77,7 @@ async def test_supervisor_timeout_cancels_and_clears(monkeypatch: pytest.MonkeyP
     assert {"type": "error", "message": "AI processing timed out"} in emitted
     assert cancelled.is_set()
     clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
-    commit.assert_not_awaited()
+    commit.assert_awaited_once_with(PROJECT_ID)
 
 
 async def test_supervisor_beats_while_running(monkeypatch: pytest.MonkeyPatch) -> None:
