@@ -68,7 +68,7 @@ Precondition = Callable[[str, Git], Awaitable[None]]
 
 
 async def _ensure_repo(project_id: str, git: Git) -> None:
-    if git.is_repo():
+    if await git.is_repo():
         return
     sha = await git.init(_SCAFFOLD_MESSAGE)
     if sha:
@@ -88,6 +88,8 @@ async def _workspace_lock(project_id: str) -> AsyncIterator[None]:
 async def _locked_workspace(project_id: str, preconditions: Sequence[Precondition] = ()) -> AsyncIterator[Git]:
     async with _workspace_lock(project_id):
         git = Git(project_id)
+        # Under this lock no live git of ours can hold it; one left behind was SIGKILLed mid-command (pod restart).
+        git.clear_stale_lock()
         await _ensure_repo(project_id, git)
         for check in preconditions:
             await check(project_id, git)

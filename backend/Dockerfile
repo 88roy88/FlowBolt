@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libnl-route-3-200 \
     curl \
     ca-certificates \
+    git \
     ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
@@ -40,7 +41,7 @@ COPY --from=nsjail-builder /usr/bin/nsjail /usr/bin/nsjail
 # Install Node.js 20 + pnpm
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g pnpm \
+    && npm install -g pnpm@10.33.0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
