@@ -117,20 +117,21 @@ async def proxy_to_sandbox(
 @router.websocket("/{project_id}/proxy")
 async def proxy_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandboxDep) -> None:
     """Proxy WebSocket connections for Vite HMR."""
-    await websocket.accept()
+    await websocket.accept(subprotocol="vite-hmr")
 
     import asyncio  # noqa: PLC0415
 
     import websockets  # noqa: PLC0415
+    from websockets.typing import Subprotocol  # noqa: PLC0415
 
-    proxy_prefix = f"/api/preview/{project.id}/proxy"
+    # Vite upgrades only an exact match of its base (trailing slash included) carrying the vite-hmr subprotocol.
+    target_url = f"ws://127.0.0.1:{sandbox.port}/api/preview/{project.id}/proxy/"
     query = websocket.scope.get("query_string", b"").decode()
-    target_url = f"ws://127.0.0.1:{sandbox.port}{proxy_prefix}"
     if query:
         target_url += f"?{query}"
 
     try:
-        async with websockets.connect(target_url) as upstream:
+        async with websockets.connect(target_url, subprotocols=[Subprotocol("vite-hmr")]) as upstream:
 
             async def client_to_upstream() -> None:
                 try:
