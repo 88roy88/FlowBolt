@@ -6,3 +6,8 @@ dist-ssr
 .bashrc
 .*.log
 .nfs*
+vite.config.*.timestamp-*
+.*_history
+.cache
+.config
+.npm
