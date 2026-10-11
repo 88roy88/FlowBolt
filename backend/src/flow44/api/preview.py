@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import Response
 
 from flow44.api.deps import ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
+from flow44.db.locks import LockNamespace, advisory_lock
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -144,7 +145,9 @@ async def proxy_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandb
             async def upstream_to_client() -> None:
                 try:
                     async for msg in upstream:
-                        await websocket.send_text(str(msg))
+                        # Checkouts hold this lock; an update sent mid-checkout refetches half-written files.
+                        async with advisory_lock(LockNamespace.workspace, project.id):
+                            await websocket.send_text(str(msg))
                 except Exception:
                     logger.debug("HMR upstream→client relay ended")
 
