@@ -204,7 +204,7 @@
     "returnToLatest": "חזור לגרסה האחרונה",
     "previewingBanner": "מציג תצוגה מקדימה של {{version}}",
     "restoreDialogTitle": "לשחזר את גרסה {{version}}?",
-    "restoreDialogBody": "פעולה זו תמחק את כל הגרסאות שאחרי {{version}}. ניתן לשחזר אותן דרך התמיכה. לא ניתן לבטל פעולה זו.",
+    "restoreDialogBody": "פעולה זו תמחק את כל הגרסאות שאחרי {{version}}. לא ניתן לבטל פעולה זו.",
     "previewReadOnly": "חזור לגרסה האחרונה כדי לערוך",
     "previewTooltip": "צפייה בגרסה ללא שחזור",
     "exitPreviewTooltip": "חזרה לגרסה האחרונה",

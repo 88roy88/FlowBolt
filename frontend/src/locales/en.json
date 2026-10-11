@@ -204,7 +204,7 @@
     "returnToLatest": "Return to latest",
     "previewingBanner": "Previewing {{version}}",
     "restoreDialogTitle": "Restore version {{version}}?",
-    "restoreDialogBody": "This will discard all versions after {{version}}. They can be recovered by support. This action cannot be undone.",
+    "restoreDialogBody": "This will discard all versions after {{version}}. This action cannot be undone.",
     "previewReadOnly": "Return to latest to edit",
     "previewTooltip": "View version without restoring",
     "exitPreviewTooltip": "Back to latest",
