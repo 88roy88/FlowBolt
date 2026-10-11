@@ -110,7 +110,7 @@ async def sync_protected_files(user_id: AdminDep) -> list[ProjectMaintenanceResu
 
     async def sync_files(project: Project) -> str:
         git = Git(project.id)
-        has_repo = git.is_repo()
+        has_repo = await git.is_repo()
         if has_repo and (git.is_detached() or await git.is_dirty()):
             return "skipped: previewing or unsaved edits"
         workspace_dir = workspace_path(project.id)

@@ -27,7 +27,7 @@ async def test_operations_cannot_reach_an_enclosing_repo(project_id: str, worksp
     outer_head = outer_repo(tmp_path)
     git = Git(project_id)
 
-    assert git.is_repo() is False
+    assert await git.is_repo() is False
     assert git.is_detached() is False
 
     operations = [
@@ -54,9 +54,9 @@ async def test_init_adopts_a_half_built_git_directory(project_id: str, workspace
     (workspace / ".git" / "objects").mkdir(parents=True)
     git = Git(project_id)
 
-    assert git.is_repo() is False
+    assert await git.is_repo() is False
     assert await git.init("v0")
-    assert git.is_repo() is True
+    assert await git.is_repo() is True
 
 
 async def test_commit_diffs_reports_one_hunk_set_per_file(repo: Git, workspace: Path) -> None:
