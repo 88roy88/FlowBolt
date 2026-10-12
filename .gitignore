@@ -38,7 +38,10 @@ npm-debug.log*
 docker-compose.override.yml
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/opik/
 CLAUDE.md
 
 # Cursor
