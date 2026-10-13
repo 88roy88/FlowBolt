@@ -122,6 +122,13 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
+                table({ children, ...props }) {
+                  return (
+                    <div className="overflow-x-auto max-w-full">
+                      <table {...props}>{children}</table>
+                    </div>
+                  );
+                },
                 code({ children, className, ...props }) {
                   const isInline = !className;
                   if (isInline) {
