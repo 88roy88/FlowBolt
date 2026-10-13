@@ -100,7 +100,7 @@ export function DirectorySearch({
     const fresh: AdUser[] = [];
     const matched: string[] = [];
     for (const u of users) {
-      if (u.sAMAccountName && existingUserIds?.has(u.sAMAccountName.toLowerCase())) matched.push(u.sAMAccountName);
+      if (u.uniqueId && existingUserIds?.has(u.uniqueId.toLowerCase())) matched.push(u.uniqueId);
       else fresh.push(u);
     }
     return { newUsers: fresh, matchedExistingIds: matched };
@@ -196,10 +196,10 @@ export function DirectorySearch({
                   key={`u:${u.distinguishedName}`}
                   icon={<User size={14} className="shrink-0 text-muted-foreground" />}
                   title={u.displayName}
-                  subtitle={u.mail || u.sAMAccountName}
+                  subtitle={u.mail || u.uniqueId}
                   inviteLabel={t('admin.searchInvite', 'Invite')}
                   onInvite={() => onInviteUser?.(u)}
-                  canInvite={!!u.sAMAccountName}
+                  canInvite={!!u.uniqueId}
                 />
               ))}
             {showGroups &&

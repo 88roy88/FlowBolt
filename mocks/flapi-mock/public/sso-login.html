@@ -203,6 +203,9 @@
         };
       };
 
+      const idDomain = params.get('domain') || 'corp';
+      const uniqueIdOf = (u) => (u.sAMAccountName ? `${u.sAMAccountName}@${idDomain}` : '');
+
       (async () => {
         let users;
         try {
@@ -220,8 +223,8 @@
         users.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
         for (const u of users) {
           const opt = document.createElement('option');
-          opt.value = u.sAMAccountName;
-          opt.textContent = `${u.displayName} (${u.sAMAccountName})`;
+          opt.value = uniqueIdOf(u);
+          opt.textContent = `${u.displayName} (${opt.value})`;
           opt.dataset.mail = u.mail || '';
           const { givenName, surname } = nameParts(u);
           opt.dataset.givenName = givenName;

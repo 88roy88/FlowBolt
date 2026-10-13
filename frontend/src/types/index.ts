@@ -133,6 +133,7 @@ export interface AdUser {
   distinguishedName: string;
   mail: string;
   sAMAccountName: string;
+  uniqueId: string;
 }
 
 export interface AdGroup {

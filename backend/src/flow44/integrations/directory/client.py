@@ -3,13 +3,21 @@ from typing import Any
 from urllib.parse import quote, urlencode
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from flow44.config import settings
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["AdGroup", "AdUser", "DirectoryClient", "DirectoryError", "directory_client"]
+__all__ = [
+    "AdGroup",
+    "AdUser",
+    "DirectoryClient",
+    "DirectoryError",
+    "directory_client",
+    "domain_from_user",
+    "unique_id_from_user",
+]
 
 
 class DirectoryError(Exception):
@@ -28,6 +36,24 @@ class _AdRecord(BaseModel):
 
 class AdUser(_AdRecord):
     member_of: list[str] = Field(default=[], alias="memberOf")
+
+    @computed_field(alias="uniqueId")  # type: ignore[prop-decorator]
+    @property
+    def unique_id(self) -> str:
+        return unique_id_from_user(self)
+
+
+def domain_from_user(user: AdUser) -> str:
+    mail_domain = user.mail.partition("@")[2].casefold()
+    domain_map = {k.casefold(): v for k, v in settings.DIRECTORY_MAIL_DOMAIN_MAP.items()}
+    return domain_map.get(mail_domain, settings.DIRECTORY_DEFAULT_DOMAIN)
+
+
+def unique_id_from_user(user: AdUser) -> str:
+    domain = domain_from_user(user)
+    if not user.sam_account_name or not domain:
+        return ""
+    return f"{user.sam_account_name}@{domain}"
 
 
 class AdGroup(_AdRecord):
@@ -48,13 +74,14 @@ class DirectoryClient:
         self._headers = {"ClientId": client_id if client_id is not None else settings.DIRECTORY_CLIENT_ID}
 
     async def get_user_group_ids(self, user_id: str) -> set[str]:
+        sam_account_name = user_id.partition("@")[0]
         try:
-            users = await self._search_users({"customFilter": f"(sAMAccountName={user_id})"})
+            users = await self._search_users({"customFilter": f"(sAMAccountName={sam_account_name})"})
         except DirectoryError as exc:
             logger.warning("Directory group lookup failed for user %s: %s", user_id, exc)
             return set()
 
-        match = next((u for u in users if u.sam_account_name.casefold() == user_id.casefold()), None)
+        match = next((u for u in users if u.unique_id.casefold() == user_id.casefold()), None)
         if match is None:
             logger.warning("Directory user not found for group lookup: %s", user_id)
             return set()

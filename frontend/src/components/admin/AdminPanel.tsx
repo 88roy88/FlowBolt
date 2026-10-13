@@ -30,7 +30,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [highlightedGroupIds, setHighlightedGroupIds] = useState<string[]>([]);
 
   // Lowercased for case-insensitive matching: stored user_id comes from the token
-  // UniqueID claim, whose casing can differ from the directory sAMAccountName.
+  // UniqueID claim, whose casing can differ from the directory-derived uniqueId.
   const memberIds = useMemo(() => new Set(users.map((u) => u.user_id.toLowerCase())), [users]);
   const groupIds = useMemo(() => new Set(groups.map((g) => g.group_id.toLowerCase())), [groups]);
   const highlightedUserSet = useMemo(
@@ -142,7 +142,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
           {tab === 'users' && (
             <DirectorySearch
-              onInviteUser={(u) => handleInviteUser(u.sAMAccountName, u.displayName)}
+              onInviteUser={(u) => handleInviteUser(u.uniqueId, u.displayName)}
               onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName, g.mail)}
               existingUserIds={memberIds}
               onExistingUsersMatched={setHighlightedUserIds}

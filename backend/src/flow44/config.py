@@ -105,6 +105,10 @@ class DirectorySettings(BuildAppSettings):
     DIRECTORY_TIMEOUT_SECONDS: float = 5.0
     # Sent as the ClientId header; the local mock ignores it.
     DIRECTORY_CLIENT_ID: str = "default"
+    # Mail domain -> domain used in the user id ({sAMAccountName}@{domain}). Keys match case-insensitively.
+    DIRECTORY_MAIL_DOMAIN_MAP: dict[str, str] = {}
+    # Used when the user's mail domain is missing or not in DIRECTORY_MAIL_DOMAIN_MAP.
+    DIRECTORY_DEFAULT_DOMAIN: str = "corp"
 
 
 class S3Settings(BuildAppSettings):

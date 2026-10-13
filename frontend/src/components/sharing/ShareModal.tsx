@@ -56,7 +56,7 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
   const [highlightedGroupIds, setHighlightedGroupIds] = useState<string[]>([]);
 
   // Lowercased for case-insensitive matching: stored user_id comes from the token
-  // UniqueID claim, whose casing can differ from the directory's sAMAccountName.
+  // UniqueID claim, whose casing can differ from the directory-derived uniqueId.
   const memberIds = useMemo(() => new Set(members.map((m) => m.user_id.toLowerCase())), [members]);
   const groupIds = useMemo(() => new Set(groups.map((g) => g.group_id.toLowerCase())), [groups]);
   const highlightedUserSet = useMemo(
@@ -170,7 +170,7 @@ export function ShareModal({ projectId, projectName, ownerUserId, onClose }: {
           </div>
 
           <DirectorySearch
-            onInviteUser={(user) => handleInviteUser(user.sAMAccountName, user.displayName)}
+            onInviteUser={(user) => handleInviteUser(user.uniqueId, user.displayName)}
             onInviteGroup={(group) => handleInviteGroup(group.distinguishedName, group.displayName, group.mail)}
             existingUserIds={memberIds}
             onExistingUsersMatched={setHighlightedUserIds}
