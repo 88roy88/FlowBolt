@@ -4,6 +4,7 @@ import { useSessionStore } from "../stores/session";
 export interface LogEvent {
   event: string;
   event_version?: number;
+  timestamp: string;
   project_id?: string;
   project_name?: string;
   level?: "debug" | "info" | "warning" | "error";
@@ -46,6 +47,7 @@ function log(
   eventQueue.push({
     event,
     event_version: options.eventVersion ?? 1,
+    timestamp: new Date().toISOString(),
     level: options.level || "info",
     project_id: state.projectId ?? undefined,
     project_name: state.currentProject?.name ?? undefined,

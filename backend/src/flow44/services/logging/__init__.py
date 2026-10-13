@@ -76,6 +76,7 @@ def log_bi_event(
     *,
     event_version: int = 1,
     level: int = logging.INFO,
+    timestamp: datetime | None = None,
     **properties: Any,
 ) -> None:
     logger = logging.getLogger("bi_events")
@@ -83,7 +84,7 @@ def log_bi_event(
     payload = {
         "event": event,
         "event_version": event_version,
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": (timestamp or datetime.now(UTC)).isoformat(),
         **properties,
     }
 
