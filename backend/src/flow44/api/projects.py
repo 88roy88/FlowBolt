@@ -98,7 +98,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
 @router.post("", status_code=201)
 async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
     project = await create_project(body.name, user_id)
-    log_bi_event("project_created", {"project_id": project.id, "project_name": body.name})
+    log_bi_event("project_created", project_id=project.id, project_name=body.name)
 
     async def _create() -> None:
         from flow44.db.events import emit_event  # noqa: PLC0415

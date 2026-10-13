@@ -13,13 +13,7 @@ __all__ = ["BiLogger", "bi_logger"]
 class BiLogger:
     def data_sources_added(self, contexts: list["DataSourceContext"]) -> None:
         for ctx in contexts:
-            log_bi_event(
-                "data_source_added",
-                {
-                    "data_source_type": ctx.type,
-                    "data_source_id": ctx.data_source_id,
-                },
-            )
+            log_bi_event("data_source_added", data_source_type=ctx.type, data_source_id=ctx.data_source_id)
 
     def file_diffs(self, diffs: list["FileDiff"]) -> None:
         if not diffs:
@@ -37,25 +31,16 @@ class BiLogger:
 
         log_bi_event(
             "code_generated",
-            {
-                "response_id": str(uuid.uuid4()),
-                "file_count": len(diffs),
-                "line_count_added": line_count_added,
-                "line_count_removed": line_count_removed,
-            },
+            response_id=str(uuid.uuid4()),
+            file_count=len(diffs),
+            line_count_added=line_count_added,
+            line_count_removed=line_count_removed,
         )
 
         for diff in diffs:
             if diff.is_new:
                 file_type = diff.path.split(".")[-1] if "." in diff.path else ""
-                log_bi_event(
-                    "file_created",
-                    {
-                        "file_path": diff.path,
-                        "file_type": file_type,
-                        "created_by": "model",
-                    },
-                )
+                log_bi_event("file_created", file_path=diff.path, file_type=file_type, created_by="model")
 
 
 bi_logger = BiLogger()

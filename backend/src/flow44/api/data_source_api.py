@@ -101,26 +101,22 @@ async def run_data_source(
         )
         log_bi_event(
             "flapi_call_made",
-            {
-                "data_source_id": data_source_id,
-                "endpoint": "run",
-                "duration_ms": int((time.monotonic() - start_time) * 1000),
-                "status_code": 200,
-                "is_error": False,
-            },
+            data_source_id=data_source_id,
+            endpoint="run",
+            duration_ms=int((time.monotonic() - start_time) * 1000),
+            status_code=200,
+            is_error=False,
         )
         return result
     except ds_logic.FlapiUpstreamError as err:
         log_bi_event(
             "flapi_call_made",
-            {
-                "data_source_id": data_source_id,
-                "endpoint": "run",
-                "duration_ms": int((time.monotonic() - start_time) * 1000),
-                "status_code": err.status_code,
-                "is_error": True,
-                "error_message": str(err),
-            },
+            data_source_id=data_source_id,
+            endpoint="run",
+            duration_ms=int((time.monotonic() - start_time) * 1000),
+            status_code=err.status_code,
+            is_error=True,
+            error_message=str(err),
         )
         status = 401 if err.status_code == 401 else 502
         raise HTTPException(status_code=status, detail=str(err)) from err

@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Header
@@ -26,10 +27,10 @@ async def log_event(
     for event_data in events:
         event_name = event_data.get("event", "unknown")
         event_version = event_data.get("event_version", 1)
-        level = event_data.get("level", "info")
-        properties = event_data.get("properties", {})
+        level = logging.getLevelNamesMapping().get(str(event_data.get("level", "info")).upper(), logging.INFO)
+        properties = {k: v for k, v in event_data.get("properties", {}).items() if k not in ("event_version", "level")}
         if project_name := event_data.get("project_name"):
             _log_project_name.set(project_name)
-        log_bi_event(event_name, properties, event_version=event_version, level=level)
+        log_bi_event(event_name, event_version=event_version, level=level, **properties)
 
     return {"status": "ok"}

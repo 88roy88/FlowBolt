@@ -178,10 +178,8 @@ async def chat_ws(  # noqa: C901, PLR0915
 
                     log_bi_event(
                         "prompt_submitted",
-                        {
-                            "prompt_length": len(user_content),
-                            "prompt_sequence_number": await count_user_messages(project.id),
-                        },
+                        prompt_length=len(user_content),
+                        prompt_sequence_number=await count_user_messages(project.id),
                     )
 
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}

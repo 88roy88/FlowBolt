@@ -72,10 +72,11 @@ def setup_logging(log_file_path: str | None = None) -> None:
 
 def log_bi_event(
     event: str,
-    properties: dict[str, Any] | None = None,
+    /,
     *,
     event_version: int = 1,
-    level: str = "info",
+    level: int = logging.INFO,
+    **properties: Any,
 ) -> None:
     logger = logging.getLogger("bi_events")
 
@@ -83,7 +84,7 @@ def log_bi_event(
         "event": event,
         "event_version": event_version,
         "timestamp": datetime.now(UTC).isoformat(),
-        **(properties or {}),
+        **properties,
     }
 
-    logger.log(getattr(logging, level.upper(), logging.INFO), payload)
+    logger.log(level, payload)
