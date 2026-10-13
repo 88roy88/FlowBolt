@@ -112,7 +112,13 @@ def get_user_id(token: TokenDep) -> str:
     return payload.unique_id
 
 
-UserDep = Annotated[str, Depends(get_user_id)]
+async def resolve_user_id(token: TokenDep) -> str:
+    # async so it runs in the request's context: a sync dependency runs in a threadpool,
+    # and the log user_id that get_user_id sets would not reach the endpoint.
+    return get_user_id(token)
+
+
+UserDep = Annotated[str, Depends(resolve_user_id)]
 
 
 def is_admin(user_id: str) -> bool:
