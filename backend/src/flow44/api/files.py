@@ -161,6 +161,8 @@ async def post_upload_entry(
 ) -> dict[str, str]:
     try:
         await sandbox.write_binary_file(path, body)
+        file_type = path.rsplit(".", maxsplit=1)[-1] if "." in path else ""
+        log_bi_event("file_created", file_path=path, file_type=file_type, created_by="user")
         return {"status": "ok", "path": path}
     except FileExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
