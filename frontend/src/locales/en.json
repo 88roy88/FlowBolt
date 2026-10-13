@@ -202,7 +202,15 @@
     "userIdPlaceholder": "User ID to invite",
     "invite": "Invite",
     "noUsers": "No platform users yet",
-    "noPublished": "No published apps yet"
+    "noPublished": "No published apps yet",
+    "colName": "Project",
+    "colOwner": "Owner",
+    "colUrl": "URL",
+    "colCreated": "Created",
+    "colPublished": "Published",
+    "openProject": "Open project",
+    "searchApps": "Search by project, owner or URL",
+    "noMatches": "No matching apps"
   },
   "version": {
     "currentVersion": "Current version",

@@ -202,7 +202,15 @@
     "userIdPlaceholder": "מזהה משתמש להזמנה",
     "invite": "הזמן",
     "noUsers": "אין משתמשי פלטפורמה עדיין",
-    "noPublished": "אין אפליקציות שפורסמו עדיין"
+    "noPublished": "אין אפליקציות שפורסמו עדיין",
+    "colName": "פרויקט",
+    "colOwner": "בעלים",
+    "colUrl": "כתובת",
+    "colCreated": "נוצר",
+    "colPublished": "פורסם",
+    "openProject": "פתח פרויקט",
+    "searchApps": "חיפוש לפי פרויקט, בעלים או כתובת",
+    "noMatches": "אין אפליקציות תואמות"
   },
   "version": {
     "currentVersion": "גרסה נוכחית",
