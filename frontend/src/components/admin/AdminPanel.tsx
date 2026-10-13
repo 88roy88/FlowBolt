@@ -29,8 +29,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [highlightedUserIds, setHighlightedUserIds] = useState<string[]>([]);
   const [highlightedGroupIds, setHighlightedGroupIds] = useState<string[]>([]);
 
-  // Lowercased for case-insensitive matching: stored user_id comes from a token
-  // email claim, whose casing can differ from the directory mail.
+  // Lowercased for case-insensitive matching: stored user_id comes from the token
+  // UniqueID claim, whose casing can differ from the directory sAMAccountName.
   const memberIds = useMemo(() => new Set(users.map((u) => u.user_id.toLowerCase())), [users]);
   const groupIds = useMemo(() => new Set(groups.map((g) => g.group_id.toLowerCase())), [groups]);
   const highlightedUserSet = useMemo(
@@ -66,10 +66,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   });
   const apps = appsQuery.data ?? [];
 
-  const handleInviteUser = async (email: string, displayName: string) => {
+  const handleInviteUser = async (userId: string, displayName: string) => {
     setError('');
     try {
-      const user = await api.invitePlatformUser(email, displayName);
+      const user = await api.invitePlatformUser(userId, displayName);
       setUsers((prev) => [user, ...prev.filter((u) => u.user_id !== user.user_id)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite user');
@@ -142,7 +142,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
           {tab === 'users' && (
             <DirectorySearch
-              onInviteUser={(u) => handleInviteUser(u.mail, u.displayName)}
+              onInviteUser={(u) => handleInviteUser(u.sAMAccountName, u.displayName)}
               onInviteGroup={(g) => handleInviteGroup(g.distinguishedName, g.displayName, g.mail)}
               existingUserIds={memberIds}
               onExistingUsersMatched={setHighlightedUserIds}

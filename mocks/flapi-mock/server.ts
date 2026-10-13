@@ -195,8 +195,8 @@ server.post(
       return reply.status(422).send(errorBody('validation_failed', 'uniqueId is required'));
     }
     const claimPrefix = 'https://issuer.example/v1/claims/';
-    // The backend identifies the user by an exact-match on this claim key, so the
-    // mock must emit the identical URI the production IdP uses (deps.get_user_id).
+    // Emitted with the identical URI the production IdP uses. The backend identifies
+    // the user by the UniqueID claim; the email is informational only.
     const emailClaimKey = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress';
     const expSeconds = Number.isFinite(Number(expiresInSeconds)) ? Number(expiresInSeconds) : 3600;
     const claims: Record<string, unknown> = {

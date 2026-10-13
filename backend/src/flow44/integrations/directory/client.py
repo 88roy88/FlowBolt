@@ -49,12 +49,12 @@ class DirectoryClient:
 
     async def get_user_group_ids(self, user_id: str) -> set[str]:
         try:
-            users = await self._search_users({"customFilter": f"(mail={user_id})"})
+            users = await self._search_users({"customFilter": f"(sAMAccountName={user_id})"})
         except DirectoryError as exc:
             logger.warning("Directory group lookup failed for user %s: %s", user_id, exc)
             return set()
 
-        match = next((u for u in users if u.mail.casefold() == user_id.casefold()), None)
+        match = next((u for u in users if u.sam_account_name.casefold() == user_id.casefold()), None)
         if match is None:
             logger.warning("Directory user not found for group lookup: %s", user_id)
             return set()

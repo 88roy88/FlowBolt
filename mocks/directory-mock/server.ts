@@ -42,7 +42,7 @@ function searchTerm(samAccountName?: string): string {
 }
 
 /**
- * The auth path resolves a single user's groups with an exact `?customFilter=(mail=email)`
+ * The auth path resolves a single user's groups with an exact `?customFilter=(sAMAccountName=id)`
  * lookup (no `samAccountName` param). Pull the value of an `attr=value` clause out of a
  * customFilter, case-folded, or undefined if absent.
  */
@@ -103,14 +103,14 @@ server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
   async (request) => {
     await delay(DELAY_MS);
     const { samAccountName, customFilter } = request.query;
-    // Auth path: an exact `(mail=…)` lookup with no `samAccountName` param — mirror
-    // how the backend resolves a single user's groups. Otherwise fall back to the
-    // free-text substring OR used by the share/admin UI.
-    const mail =
-      samAccountName === undefined ? filterValue(customFilter, "mail") : undefined;
+    // Auth path: an exact `(sAMAccountName=…)` lookup with no `samAccountName` param —
+    // mirror how the backend resolves a single user's groups. Otherwise fall back to
+    // the free-text substring OR used by the share/admin UI.
+    const account =
+      samAccountName === undefined ? filterValue(customFilter, "sAMAccountName") : undefined;
     const filtered =
-      mail !== undefined
-        ? users.filter((u) => u.mail.toLowerCase() === mail)
+      account !== undefined
+        ? users.filter((u) => u.sAMAccountName.toLowerCase() === account)
         : users.filter((u) => matchesTerm(u, searchTerm(samAccountName)));
     return filtered.map((u) => ({ ...u, memberOf: resolveUserGroupDns(u, groups) }));
   },

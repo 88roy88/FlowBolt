@@ -120,35 +120,35 @@ class TestGetUserGroupIds:
         }
 
     @pytest.mark.asyncio
-    async def test_queries_by_exact_mail_only(self):
-        # The auth path must not reuse the fuzzy samAccountName search — it looks the
-        # user up by an exact (mail=…) filter, so the query works regardless of how
-        # the directory service combines the samAccountName param with customFilter.
+    async def test_queries_by_exact_sam_account_name_only(self):
+        # The auth path must not reuse the fuzzy search — it looks the user up by an
+        # exact (sAMAccountName=…) filter, so the query works regardless of how the
+        # directory service combines the samAccountName param with customFilter.
         client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
-            await client.get_user_group_ids("djenkins@corp.local")
+            await client.get_user_group_ids("djenkins")
 
         url = mock_get.call_args.args[0]
         assert url.startswith("/users?customFilter=")
-        assert "samAccountName" not in url
-        assert "mail%3Ddjenkins%40corp.local" in url
+        assert "samAccountName=" not in url
+        assert "sAMAccountName%3Ddjenkins%29" in url
 
     @pytest.mark.asyncio
     async def test_returns_member_of_dns_for_exact_match(self):
         dns = ["CN=Legal,OU=Groups,DC=corp", "CN=Engineering,OU=Groups,DC=corp"]
-        # A substring search can return several users; only the exact mail counts.
+        # A substring search can return several users; only the exact account counts.
         payload = [self._user("djenkins", dns), self._user("djenkinson", ["CN=Other,OU=Groups,DC=corp"])]
         client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
-            assert await client.get_user_group_ids("djenkins@corp.local") == set(dns)
+            assert await client.get_user_group_ids("djenkins") == set(dns)
 
     @pytest.mark.asyncio
     async def test_match_is_case_insensitive(self):
         client = DirectoryClient(base_url="http://directory.local")
-        # Stored mail is DJenkins@corp.local; query with a different case must still match.
+        # Stored account is DJenkins; query with a different case must still match.
         payload = [self._user("DJenkins", ["CN=Legal,OU=Groups,DC=corp"])]
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
-            assert await client.get_user_group_ids("djenkins@corp.local") == {"CN=Legal,OU=Groups,DC=corp"}
+            assert await client.get_user_group_ids("djenkins") == {"CN=Legal,OU=Groups,DC=corp"}
 
     @pytest.mark.asyncio
     async def test_no_exact_match_returns_empty_set(self):
@@ -156,13 +156,13 @@ class TestGetUserGroupIds:
         # A substring hit that is not the requested account must not leak its groups.
         payload = [self._user("djenkinson", ["CN=Legal,OU=Groups,DC=corp"])]
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
-            assert await client.get_user_group_ids("djenkins@corp.local") == set()
+            assert await client.get_user_group_ids("djenkins") == set()
 
     @pytest.mark.asyncio
     async def test_user_without_groups_returns_empty_set(self):
         client = DirectoryClient(base_url="http://directory.local")
         with patch("httpx.AsyncClient.get", return_value=_resp(200, [self._user("djenkins", [])])):
-            assert await client.get_user_group_ids("djenkins@corp.local") == set()
+            assert await client.get_user_group_ids("djenkins") == set()
 
     @pytest.mark.asyncio
     async def test_directory_failure_soft_fails_to_empty_set(self):

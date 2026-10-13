@@ -133,12 +133,12 @@
         </div>
 
         <div class="form-group">
-          <label for="uniqueId">Unique ID</label>
+          <label for="uniqueId">Unique ID (identifies the user to the backend)</label>
           <input type="text" id="uniqueId" placeholder="dev-user" value="dev-user" />
         </div>
 
         <div class="form-group">
-          <label for="emailAddress">Email (identifies the user to the backend)</label>
+          <label for="emailAddress">Email (optional)</label>
           <input type="email" id="emailAddress" placeholder="dev-user@corp.example.com" value="dev-user@corp.example.com" />
         </div>
 
@@ -241,9 +241,7 @@
         document.getElementById('emailAddress').value = opt.dataset.mail || '';
         document.getElementById('givenName').value = opt.dataset.givenName || '';
         document.getElementById('surname').value = opt.dataset.surname || '';
-        memberHint.textContent = opt.dataset.mail
-          ? `Signing in as ${opt.dataset.mail}`
-          : `Signing in as ${opt.value}`;
+        memberHint.textContent = `Signing in as ${opt.value}`;
       });
 
       if (params.has('uniqueId')) {

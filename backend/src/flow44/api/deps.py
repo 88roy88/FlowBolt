@@ -106,14 +106,13 @@ def validate_token(token: TokenDep) -> TokenPayload:
 
 
 def get_user_id(token: TokenDep) -> str:
-    """Resolve a token to a user_id; a valid signed JWT with an ``/emailaddress`` claim is required."""
+    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
     payload = validate_token(token)
-    user_id = payload.email
-    if not user_id:
+    if not payload.unique_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
 
-    _log_user_id.set(user_id)
-    return user_id
+    _log_user_id.set(payload.unique_id)
+    return payload.unique_id
 
 
 UserDep = Annotated[str, Depends(get_user_id)]
