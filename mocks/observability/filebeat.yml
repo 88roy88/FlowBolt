@@ -8,14 +8,8 @@ filebeat.inputs:
       - ndjson:
           target: ""
           add_error_key: true
-          # false, not true: our JSON's own "@timestamp" (Python's "%z" format, e.g.
-          # +0300) can't overwrite libbeat's reserved @timestamp field — with
-          # overwrite_keys:true it tries anyway, fails, and stamps a spurious
-          # error_message/error_type onto every single line (not just real errors,
-          # which would make filtering on error_type useless). false just leaves
-          # libbeat's own ingest-time @timestamp alone instead. _timestamp in
-          # OpenObserve ends up as ingest time either way; for a live tail that's
-          # within ~1-2s of the real log time, so ordering is still correct.
+          # true would fail to overwrite the reserved @timestamp with ours (+0300 offset)
+          # and tag every line with error_type. Ingest time is ~1-2s off, which is fine.
           overwrite_keys: false
 
 # OpenObserve speaks the Elasticsearch bulk ingest API under /api/<org>/.
