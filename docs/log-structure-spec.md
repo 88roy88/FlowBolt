@@ -137,6 +137,14 @@ Trigger: the code view saves a file that the user edited by hand. The editor sav
 |---|---|---|---|
 | `file_path` | string | Yes | Path of the file edited, relative to the project root. |
 
+#### `manual_edits_committed`
+Trigger: the user saves their manual edits as a new version.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `version_id` | string | Yes | ID of the new version (the git commit SHA). |
+| `file_count` | integer | Yes | Number of files changed in the version. |
+
 #### `file_created`
 Trigger: a new file appears in the project, from the model or the user.
 

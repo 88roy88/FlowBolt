@@ -12,6 +12,7 @@ from flow44.db.chat import ChatRole, save_message, trim_messages_after
 from flow44.db.events import AgentEvent, emit_event, emit_transient, get_versions, trim_events_after
 from flow44.db.heartbeat import is_run_active, try_claim_run
 from flow44.db.locks import LockNamespace, LockTimeout, advisory_lock
+from flow44.services.logging import log_bi_event
 from flow44.services.versioning.git import Git
 
 logger = logging.getLogger(__name__)
@@ -164,6 +165,7 @@ async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, a
             diffs = await git.commit_diffs(sha, max_chars=_MAX_DIFF_CHARS)
             if author == "user":
                 await save_message(project_id, ChatRole.user, _edit_note([d.path for d in diffs]))
+                log_bi_event("manual_edits_committed", version_id=sha, file_count=len(diffs))
             await _emit_committed(project_id, sha, author=author, diffs=diffs)
         await _emit_dirty_files(project_id, git)
 
