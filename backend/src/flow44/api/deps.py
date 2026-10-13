@@ -102,8 +102,11 @@ def validate_token(token: TokenDep) -> TokenPayload:
     return payload
 
 
-def get_user_id(token: TokenDep) -> str:
-    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
+async def get_user_id(token: TokenDep) -> str:
+    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required.
+
+    async so the log user_id set here reaches the endpoint (sync deps run in a threadpool).
+    """
     payload = validate_token(token)
     if not payload.unique_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
@@ -112,13 +115,7 @@ def get_user_id(token: TokenDep) -> str:
     return payload.unique_id
 
 
-async def resolve_user_id(token: TokenDep) -> str:
-    # async so it runs in the request's context: a sync dependency runs in a threadpool,
-    # and the log user_id that get_user_id sets would not reach the endpoint.
-    return get_user_id(token)
-
-
-UserDep = Annotated[str, Depends(resolve_user_id)]
+UserDep = Annotated[str, Depends(get_user_id)]
 
 
 def is_admin(user_id: str) -> bool:
@@ -210,7 +207,7 @@ async def get_ws_user_id(
 ) -> str:
     """WS variant of get_user_id: raises WebSocketException so FastAPI rejects the handshake before accept."""
     try:
-        return get_user_id(flow44_token)
+        return await get_user_id(flow44_token)
     except HTTPException:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
 

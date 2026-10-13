@@ -17,8 +17,8 @@ import flow44.config  # noqa: E402
 import flow44.db.database  # noqa: E402
 from flow44.api.deps import (  # noqa: E402
     TokenPayload,
+    get_user_id,
     get_user_permissions,
-    resolve_user_id,
     validate_token,
     validate_ws_token,
 )
@@ -48,12 +48,12 @@ def authenticated_user():
     # HTTP/WS tests act as a signed-in user with full permissions;
     # auth/permission tests call the deps directly and bypass this.
     payload = TokenPayload(exp=9_999_999_999, unique_id="test-user")
-    app.dependency_overrides[resolve_user_id] = lambda: "test-user"
+    app.dependency_overrides[get_user_id] = lambda: "test-user"
     app.dependency_overrides[validate_token] = lambda: payload
     app.dependency_overrides[validate_ws_token] = lambda: payload
     app.dependency_overrides[get_user_permissions] = lambda: get_owner_permissions()
     yield
-    app.dependency_overrides.pop(resolve_user_id, None)
+    app.dependency_overrides.pop(get_user_id, None)
     app.dependency_overrides.pop(validate_token, None)
     app.dependency_overrides.pop(validate_ws_token, None)
     app.dependency_overrides.pop(get_user_permissions, None)
