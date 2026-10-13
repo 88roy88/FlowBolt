@@ -65,6 +65,17 @@ export function Preview() {
 
   const handleRefresh = () => reloadPreview('manual_refresh');
 
+  const handleFrameLoad = () => {
+    setLoading(false);
+    const pending = pendingLoadRef.current;
+    if (!pending) return;
+    pendingLoadRef.current = null;
+    logger.info('preview_loaded', {
+      load_time_ms: Math.round(performance.now() - pending.startedAt),
+      trigger: pending.trigger,
+    });
+  };
+
   const handlePublish = useCallback(() => {
     if (projectId) {
       usePublishStore.getState().open(projectId, currentProject?.published_url);
@@ -131,17 +142,7 @@ export function Preview() {
           <iframe
             ref={iframeRef}
             src={previewUrl}
-            onLoad={() => {
-              setLoading(false);
-              const pending = pendingLoadRef.current;
-              if (pending) {
-                pendingLoadRef.current = null;
-                logger.info('preview_loaded', {
-                  load_time_ms: Math.round(performance.now() - pending.startedAt),
-                  trigger: pending.trigger,
-                });
-              }
-            }}
+            onLoad={handleFrameLoad}
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
             className="absolute inset-0 w-full h-full border-none"
             style={{ background: 'var(--preview-bg)' }}
