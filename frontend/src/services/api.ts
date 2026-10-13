@@ -25,11 +25,11 @@ async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers = new Headers(options?.headers);
   const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   // Only set JSON Content-Type when body is not FormData.
   if (options?.body && !isFormDataBody) {
-    headers['Content-Type'] = 'application/json';
+    headers.set('Content-Type', 'application/json');
   }
 
   const res = await fetchWithAuth(path, { ...options, headers });
