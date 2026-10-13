@@ -10,6 +10,7 @@ from flow44.services.logging import (
     _source,
     log_bi_event,
 )
+from flow44.services.logging import _project_id as _log_project_id
 from flow44.services.logging import _project_name as _log_project_name
 
 router = APIRouter(prefix="/api/bi", tags=["bi_events"])
@@ -42,8 +43,8 @@ async def log_event(
         level = logging.getLevelNamesMapping().get(str(event_data.get("level", "info")).upper(), logging.INFO)
         timestamp = _parse_timestamp(event_data.get("timestamp"))
         properties = {k: v for k, v in event_data.get("properties", {}).items() if k not in _RESERVED_PROPERTIES}
-        if project_name := event_data.get("project_name"):
-            _log_project_name.set(project_name)
+        _log_project_id.set(event_data.get("project_id"))
+        _log_project_name.set(event_data.get("project_name"))
         log_bi_event(event_name, event_version=event_version, level=level, timestamp=timestamp, **properties)
 
     return {"status": "ok"}
