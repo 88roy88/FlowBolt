@@ -136,13 +136,6 @@ export function useErrorCapture() {
           }
           pushError({ source: 'console', message: errorMsg, file });
         }
-      } else if (event.data.type === 'preview-interaction') {
-        logger.info('preview_interaction', {
-          interaction_type: event.data.interaction_type,
-          element_id: event.data.element_id,
-          element_type: event.data.element_type,
-          class_name: event.data.class_name,
-        });
       }
     }
 

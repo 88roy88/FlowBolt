@@ -210,7 +210,7 @@ Trigger: the preview window fails to render.
 | `error_type` | string | Yes | Category of the render failure. |
 | `error_message` | string | No | Short, sanitized error text. |
 
-#### `preview_interaction`
+#### `preview_interaction` || Not yet implemented
 Trigger: the user interacts with the running preview, for example a click or a form entry.
 
 | Field | Type | Required | Description |
