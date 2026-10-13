@@ -1,7 +1,7 @@
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import type { FixStep, FileDiff } from '../../../types';
 import { CardWrapper } from './CardWrapper';
-import { DiffBlock } from './DiffBlock';
+import { FilesChangedSection } from './FilesChangedSection';
 import { getStepIcon } from './icons';
 
 export function FixProgressCard({ steps, content, diffs, isLive }: {
@@ -69,14 +69,7 @@ export function FixProgressCard({ steps, content, diffs, isLive }: {
         })}
       </div>
 
-      {diffs && diffs.length > 0 && (
-        <div className="mt-2.5 border-t border-border pt-2.5">
-          <div className="text-xs font-medium text-muted-foreground mb-2">Files changed</div>
-          <div className="flex flex-col gap-1.5">
-            {diffs.map((d, i) => <DiffBlock key={`${d.path}-${i}`} fileDiff={d} />)}
-          </div>
-        </div>
-      )}
+      <FilesChangedSection diffs={diffs} />
     </CardWrapper>
   );
 }

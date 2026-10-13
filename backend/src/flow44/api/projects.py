@@ -26,6 +26,7 @@ from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
+from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
 
         try:
             await sandbox_manager.create_sandbox(project.id)
+            await versioning.ensure_repo(project.id)
         except Exception:
             logger.exception("[projects] Sandbox creation failed for project %s", project.id)
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
@@ -143,7 +145,7 @@ async def delete_existing_project(
     _perms: set[Permission] = require_permission(Permission.delete),
 ) -> None:
     idle_reaper.remove(project.id)
-    await s3_storage.delete_published_html(project.id)
+    await s3_storage.delete_published_prefix(project.id)
     await delete_project(project.id)
     log_bi_event("project_deleted")
     background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)

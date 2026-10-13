@@ -1,9 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from flow44.api.deps import Permission, SandboxDep, require_permission
+from flow44.api.deps import Permission, SandboxDep, require_permission, require_writable_workspace
 from flow44.sandbox.search_mixin import SearchToolError
 from flow44.services.logging import log_bi_event
 
@@ -82,6 +82,7 @@ async def put_file_content(
     sandbox: SandboxDep,
     body: WriteFileRequest,
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
@@ -97,6 +98,7 @@ async def post_create_file(
     sandbox: SandboxDep,
     body: CreateFileRequest,
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.create_file(body.path, body.content)
@@ -116,6 +118,7 @@ async def patch_rename_file(
     sandbox: SandboxDep,
     body: RenamePathRequest,
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.rename_file(body.old_path, body.new_path)
@@ -134,6 +137,7 @@ async def delete_entry(
     sandbox: SandboxDep,
     path: str = Query(...),
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.delete_file(path)
@@ -153,6 +157,7 @@ async def post_upload_entry(
     path: str = Query(...),
     body: bytes = Body(...),
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.write_binary_file(path, body)
