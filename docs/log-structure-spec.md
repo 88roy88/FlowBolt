@@ -131,7 +131,7 @@ Trigger: the model writes or changes code in response to a prompt.
 | `line_count_removed` | integer | Yes | Lines removed, summed across files. |
 
 #### `code_edited_manually`
-Trigger: the user edits generated code by hand in the code view.
+Trigger: the code view saves a file that the user edited by hand. The editor saves 1 second after the user stops typing, and on Ctrl+S. Thus one editing session can emit many events for the same file.
 
 | Field | Type | Required | Description |
 |---|---|---|---|

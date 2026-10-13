@@ -86,6 +86,7 @@ async def put_file_content(
 ) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
+        log_bi_event("code_edited_manually", file_path=body.path)
         return {"status": "ok", "path": body.path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
