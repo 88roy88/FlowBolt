@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, Eye, Menu } from 'lucide-react';
 import { ChatPanel } from '../chat/ChatPanel';
 import { Preview } from '../preview/Preview';
@@ -13,6 +14,7 @@ import { useSessionStore } from '../../stores/session';
 type MobileTab = 'chat' | 'preview';
 
 export function MobileLayout() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<MobileTab>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -50,7 +52,7 @@ export function MobileLayout() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground text-center leading-relaxed">
-              Describe what you want to build and the AI will generate it for you.
+              {t('onboarding.taglineMobile')}
             </p>
             <div className="w-full">
               <PromptInput />
