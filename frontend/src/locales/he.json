@@ -33,7 +33,9 @@
     "sleep": "השהה",
     "confirmDelete": "אשר מחיקה?",
     "searchPlaceholder": "חפש פרויקטים...",
-    "noProjectsMatch": "אין פרויקטים תואמים"
+    "noProjectsMatch": "אין פרויקטים תואמים",
+    "untitledProject": "ללא שם",
+    "createProjectError": "יצירת הפרויקט נכשלה. אנא נסה שוב."
   },
   "settings": {
     "title": "הגדרות",
@@ -140,6 +142,7 @@
     "model": "מודל",
     "placeholder": {
       "selectProject": "בחר פרויקט תחילה",
+      "creatingProject": "יוצר פרויקט...",
       "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר או שנה",
       "working": "הבינה המלאכותית עובדת...",
       "readOnly": "גישת צפייה בלבד",

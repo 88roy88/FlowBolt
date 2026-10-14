@@ -8,6 +8,7 @@ import { PreviewVersionBanner } from '../preview/PreviewVersionBanner';
 import { FlowBrand } from '../ui/flow-logo';
 import { PromptInput } from '../chat/PromptInput';
 import { useChatStore } from '../../stores/chat';
+import { useSessionStore } from '../../stores/session';
 
 type MobileTab = 'chat' | 'preview';
 
@@ -18,8 +19,9 @@ export function MobileLayout() {
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
+  const projectId = useSessionStore((s) => s.projectId);
 
-  const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
+  const isEmptyState = !projectId || (historyLoaded && messages.length === 0 && !isStreaming);
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">

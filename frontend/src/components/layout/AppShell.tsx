@@ -18,6 +18,7 @@ import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { startProjectFromPrompt } from '../../utils/newProject';
 
 const SIDEBAR_WIDTH = 280;
 const RAIL_WIDTH = 56;
@@ -85,6 +86,8 @@ export function AppShell() {
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
   const userStatus = useSessionStore((s) => s.userStatus);
+  const isCreating = useSessionStore((s) => s.isCreating);
+  const canCreate = userStatus?.is_platform_user || userStatus?.is_admin;
 
   // Use cache to determine layout before history loads to prevent flicker
   // Read project ID from URL hash immediately (don't wait for currentProject to be set)
@@ -104,6 +107,11 @@ export function AppShell() {
       setProjectHasMessages(currentProject.id, hasMessages);
     }
   }, [historyLoaded, messages.length, currentProject?.id]);
+
+  const handleHint = (hint: string) => {
+    if (currentProject) useChatStore.getState().sendMessage(hint);
+    else void startProjectFromPrompt(hint);
+  };
 
 
   // Project colors + initials for icon rail
@@ -237,8 +245,8 @@ export function AppShell() {
                 {['A dashboard with charts', 'A todo app with drag & drop', 'A landing page with animations'].map((hint) => (
                   <button
                     key={hint}
-                    onClick={() => useChatStore.getState().sendMessage(hint)}
-                    disabled={lock !== null}
+                    onClick={() => handleHint(hint)}
+                    disabled={lock !== null || isCreating || (!currentProject && !canCreate)}
                     className="px-3 py-1.5 text-xs bg-primary/5 text-primary/60 border border-primary/20 rounded-full hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
                   >
                     {hint}

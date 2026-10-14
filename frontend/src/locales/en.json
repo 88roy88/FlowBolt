@@ -33,7 +33,9 @@
     "sleep": "Sleep",
     "confirmDelete": "Confirm delete?",
     "searchPlaceholder": "Search projects...",
-    "noProjectsMatch": "No projects match"
+    "noProjectsMatch": "No projects match",
+    "untitledProject": "Untitled",
+    "createProjectError": "Failed to create project. Please try again."
   },
   "settings": {
     "title": "Settings",
@@ -140,6 +142,7 @@
     "model": "Model",
     "placeholder": {
       "selectProject": "Select a project first",
+      "creatingProject": "Creating project...",
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
       "readOnly": "View-only access",

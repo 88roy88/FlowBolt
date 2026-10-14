@@ -11,6 +11,7 @@ interface SessionState {
   isCreating: boolean;
   userStatus: UserStatus | null;
   setCurrentProject: (project: Project) => void;
+  goHome: () => void;
   loadUserStatus: () => Promise<void>;
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
@@ -33,6 +34,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       useChatStore.setState({ selectedModel: project.selected_model });
     }
     useChatStore.getState().clearDataSources();
+  },
+
+  goHome() {
+    set({ currentProject: null, projectId: null });
+    useChatStore.getState().clearMessages();
+    window.location.hash = '';
   },
 
   async loadUserStatus() {
@@ -70,12 +77,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // Optimistically update the UI before the network round-trip, rolling back on failure.
     const projects = prevProjects.filter((p) => p.id !== id);
     if (prevCurrent?.id === id) {
-      const next = projects[0] ?? null;
-      set({
-        projects,
-        currentProject: next,
-        projectId: next?.id ?? null,
-      });
+      set({ projects, currentProject: null, projectId: null });
     } else {
       set({ projects });
     }
