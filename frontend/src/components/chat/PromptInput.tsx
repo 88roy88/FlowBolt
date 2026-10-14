@@ -147,7 +147,7 @@ export function PromptInput() {
 
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}
-          {projectId && (
+          {(projectId || startsProject) && (
             <button
               onClick={() => setShowDsSelector((v) => !v)}
               disabled={disabled}

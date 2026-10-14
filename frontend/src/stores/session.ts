@@ -39,6 +39,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   goHome() {
     set({ currentProject: null, projectId: null });
     useChatStore.getState().clearMessages();
+    useChatStore.getState().clearDataSources();
     window.location.hash = '';
   },
 
