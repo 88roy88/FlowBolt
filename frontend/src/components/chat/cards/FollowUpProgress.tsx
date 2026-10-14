@@ -34,7 +34,6 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
   isLive?: boolean;
 }) {
   const inProgress = isLive || steps.some((s) => s.status === 'running');
-  // Steps stay visible while the agent works, then collapse to a one-line summary
   const [userExpanded, setUserExpanded] = useState(false);
   const expanded = inProgress || userExpanded;
 
