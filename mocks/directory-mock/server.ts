@@ -30,37 +30,54 @@ const [users, groups] = await Promise.all([
 ]);
 
 /**
- * The share/admin free-text search queries with `?samAccountName=*term*&customFilter=
- * (|(displayName=*term*) (mail=*term*))`. All three carry the same wildcard-wrapped
- * term, so we recover it from `samAccountName` and match it (case-insensitively) as a
- * substring against `sAMAccountName`, `displayName` and `mail` — mirroring the OR that
- * the real directory service applies. An empty/missing filter returns every record.
+ * User search queries with `?aNR=term` — AD's Ambiguous Name Resolution, which
+ * prefix-matches the term (case-insensitively) against the naming attributes, and
+ * also matches a "first last" term against givenName + sn in either order.
+ * An empty/missing term returns every user.
  */
-function searchTerm(samAccountName?: string): string {
-  // Strip the surrounding LDAP `*` wildcards the backend adds.
-  return (samAccountName ?? "").replace(/^\*|\*$/g, "").toLowerCase();
+function matchesAnr(user: AdUser, anr: string): boolean {
+  const term = anr.trim().toLowerCase();
+  if (!term) return true;
+  const startsWith = (value: string | undefined, prefix: string) =>
+    (value ?? "").toLowerCase().startsWith(prefix);
+  if (
+    [user.sAMAccountName, user.displayName, user.givenName, user.sn, user.mail].some((v) =>
+      startsWith(v, term),
+    )
+  ) {
+    return true;
+  }
+  const [first, ...rest] = term.split(/\s+/);
+  const last = rest.join(" ");
+  return (
+    last !== "" &&
+    ((startsWith(user.givenName, first) && startsWith(user.sn, last)) ||
+      (startsWith(user.sn, first) && startsWith(user.givenName, last)))
+  );
+}
+
+/**
+ * Group search queries with `?customFilter=(&(|(displayName=*term*)(samAccountName=*term*))
+ * (groupType<=0))`. Recover the term from the displayName clause (undoing the RFC 4515
+ * `\xx` escapes the backend applies) and whether only security groups — whose groupType
+ * has the sign bit set — were asked for. A missing filter returns every group.
+ */
+function parseGroupFilter(customFilter?: string): { term: string; securityOnly: boolean } {
+  const raw = customFilter?.match(/displayName=\*((?:[^*()\\]|\\[0-9a-f]{2})*)\*/i)?.[1] ?? "";
+  const term = raw.replace(/\\([0-9a-f]{2})/gi, (_, hex: string) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  );
+  return { term: term.toLowerCase(), securityOnly: /\(groupType<=0\)/i.test(customFilter ?? "") };
 }
 
 /**
  * The auth path resolves a single user's groups with an exact `?customFilter=(sAMAccountName=id)`
- * lookup (no `samAccountName` param). Pull the value of an `attr=value` clause out of a
+ * lookup (no `aNR` param). Pull the value of an `attr=value` clause out of a
  * customFilter, case-folded, or undefined if absent.
  */
 function filterValue(customFilter: string | undefined, attr: string): string | undefined {
   const match = customFilter?.match(new RegExp(`${attr}=([^()*]+)`, "i"));
   return match ? match[1].toLowerCase() : undefined;
-}
-
-function matchesTerm(
-  record: { sAMAccountName: string; displayName: string; mail: string },
-  term: string,
-): boolean {
-  if (!term) return true;
-  return (
-    record.sAMAccountName.toLowerCase().includes(term) ||
-    record.displayName.toLowerCase().includes(term) ||
-    record.mail.toLowerCase().includes(term)
-  );
 }
 
 /**
@@ -98,30 +115,35 @@ await server.register(cors);
  * the user's full (transitive) group membership — which is how the backend
  * resolves group-based access (`get_user_group_ids` reads it off the match).
  */
-server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
+server.get<{ Querystring: { aNR?: string; customFilter?: string } }>(
   "/users",
   async (request) => {
     await delay(DELAY_MS);
-    const { samAccountName, customFilter } = request.query;
-    // Auth path: an exact `(sAMAccountName=…)` lookup with no `samAccountName` param —
-    // mirror how the backend resolves a single user's groups. Otherwise fall back to
-    // the free-text substring OR used by the share/admin UI.
-    const account =
-      samAccountName === undefined ? filterValue(customFilter, "sAMAccountName") : undefined;
+    const { aNR, customFilter } = request.query;
+    // Auth path: an exact `(sAMAccountName=…)` lookup with no `aNR` param — mirror how
+    // the backend resolves a single user's groups. Otherwise it's the share/admin
+    // free-text search.
+    const account = aNR === undefined ? filterValue(customFilter, "sAMAccountName") : undefined;
     const filtered =
       account !== undefined
         ? users.filter((u) => u.sAMAccountName.toLowerCase() === account)
-        : users.filter((u) => matchesTerm(u, searchTerm(samAccountName)));
+        : users.filter((u) => matchesAnr(u, aNR ?? ""));
     return filtered.map((u) => ({ ...u, memberOf: resolveUserGroupDns(u, groups) }));
   },
 );
 
-server.get<{ Querystring: { samAccountName?: string; customFilter?: string } }>(
+server.get<{ Querystring: { customFilter?: string } }>(
   "/groups",
   async (request) => {
     await delay(DELAY_MS);
-    const term = searchTerm(request.query.samAccountName);
-    return groups.filter((g) => matchesTerm(g, term));
+    const { term, securityOnly } = parseGroupFilter(request.query.customFilter);
+    return groups.filter(
+      (g) =>
+        (!securityOnly || Number(g.groupType) <= 0) &&
+        (!term ||
+          g.displayName.toLowerCase().includes(term) ||
+          g.sAMAccountName.toLowerCase().includes(term)),
+    );
   },
 );
 

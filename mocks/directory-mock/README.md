@@ -8,12 +8,14 @@ endpoints backed by static JSON fixtures. Run with `tsx` (same stack as
 
 | Method | Path                    | Description                                  |
 | ------ | ----------------------- | -------------------------------------------- |
-| GET    | `/users?samAccountName=*<value>*&customFilter=(\|(displayName=*<value>*) (mail=*<value>*))` | Search users, matching `<value>` (case-insensitive substring) against `sAMAccountName`, `displayName` or `mail`. Each record carries a `memberOf` array of the user's (transitive) group DNs. |
-| GET    | `/groups?samAccountName=*<value>*&customFilter=(\|(displayName=*<value>*) (mail=*<value>*))` | Search groups, matching `<value>` against `sAMAccountName`, `displayName` or `mail`. |
+| GET    | `/users?aNR=<value>` | Search users by Ambiguous Name Resolution: `<value>` is prefix-matched (case-insensitive) against `sAMAccountName`, `displayName`, `givenName`, `sn` and `mail`, and a `first last` value also matches `givenName` + `sn` in either order. Each record carries a `memberOf` array of the user's (transitive) group DNs. |
+| GET    | `/users?customFilter=(sAMAccountName=<account>)` | Exact account lookup, used by the backend to resolve a user's groups. |
+| GET    | `/groups?customFilter=(&(\|(displayName=*<value>*)(samAccountName=*<value>*))(groupType<=0))` | Search security groups, matching `<value>` (case-insensitive substring) against `displayName` or `sAMAccountName`. |
 
-The search is optional — omitting the query returns every record. The mock
-recovers the term from the `*`-wrapped `samAccountName` param and ORs it across
-`sAMAccountName`, `displayName` and `mail`, mimicking the real LDAP filter.
+The search is optional — omitting the query returns every record. For groups,
+the mock recovers the term from the `displayName` clause (undoing RFC 4515 `\xx`
+escapes) and, when `(groupType<=0)` is present, keeps only security groups
+(negative `groupType`), mimicking the real LDAP filter.
 
 Group membership rides on the user record's `memberOf`: the mock resolves nested
 membership server-side (mirroring AD's `LDAP_MATCHING_RULE_IN_CHAIN`) by matching
@@ -49,6 +51,6 @@ MOCK_PORT=7000 pnpm dev
 ### Examples
 
 ```sh
-curl "http://localhost:6002/users?samAccountName=*dje*&customFilter=(|(displayName=*dje*)%20(mail=*dje*))"
-curl "http://localhost:6002/groups?samAccountName=*le*&customFilter=(|(displayName=*le*)%20(mail=*le*))"
+curl "http://localhost:6002/users?aNR=dje"
+curl "http://localhost:6002/groups?customFilter=(%26(|(displayName=*le*)(samAccountName=*le*))(groupType<=0))"
 ```

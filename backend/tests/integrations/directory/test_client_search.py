@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
@@ -35,15 +36,7 @@ class TestSearchUsers:
         with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)) as mock_get:
             users = await client.search_users("dje")
 
-        # The term is wildcard-wrapped and matched against account name, display name
-        # and mail. The query rides in the URL, pre-encoded: the space inside
-        # customFilter must be %20 (not +, which the directory service rejects).
-        requested_url = mock_get.call_args.args[0]
-        assert requested_url == (
-            "/users?samAccountName=%2Adje%2A"
-            "&customFilter=%28%7C%28displayName%3D%2Adje%2A%29%20%28mail%3D%2Adje%2A%29%29"
-        )
-        assert "+" not in requested_url
+        assert mock_get.call_args.args[0] == "/users?aNR=dje"
         assert len(users) == 1
         assert users[0].cn == "djenkins"
         assert users[0].display_name == "Dana Jenkins"
@@ -52,6 +45,16 @@ class TestSearchUsers:
         # Explicit override wins; otherwise it falls back to the configured default.
         assert DirectoryClient(base_url="http://directory.local", client_id="acme")._headers == {"ClientId": "acme"}
         assert "ClientId" in DirectoryClient(base_url="http://directory.local")._headers
+
+    @pytest.mark.asyncio
+    async def test_space_in_query_is_percent_encoded(self):
+        # The query rides in the URL, pre-encoded: a space must be %20, not +,
+        # which the directory service rejects.
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
+            await client.search_users("Tom Turner")
+
+        assert mock_get.call_args.args[0] == "/users?aNR=Tom%20Turner"
 
     @pytest.mark.asyncio
     async def test_empty_result_is_not_an_error(self):
@@ -112,6 +115,28 @@ class TestSearchGroups:
         assert groups[0].description == "Legal department"
         # objectGUID is surfaced as a stable directory id, alongside the DN used for grants.
         assert groups[0].object_guid == "82e16f20-f05e-6d5c-3589-79cd6b398160"
+
+    @staticmethod
+    async def _requested_filter(query: str) -> str:
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
+            await client.search_groups(query)
+        path, _, query_string = mock_get.call_args.args[0].partition("?")
+        assert path == "/groups"
+        params = parse_qs(query_string)
+        assert list(params) == ["customFilter"]
+        return params["customFilter"][0]
+
+    @pytest.mark.asyncio
+    async def test_filters_security_groups_by_display_name_or_account(self):
+        assert await self._requested_filter("le") == "(&(|(displayName=*le*)(samAccountName=*le*))(groupType<=0))"
+
+    @pytest.mark.asyncio
+    async def test_escapes_filter_metacharacters_in_query(self):
+        # A crafted term must not be able to close the OR and drop the groupType clause.
+        assert await self._requested_filter("a*)(x") == (
+            r"(&(|(displayName=*a\2a\29\28x*)(samAccountName=*a\2a\29\28x*))(groupType<=0))"
+        )
 
 
 class TestGetUserGroupIds:

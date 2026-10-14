@@ -56,6 +56,11 @@ def unique_id_from_user(user: AdUser) -> str:
     return f"{user.sam_account_name}@{domain}"
 
 
+def _escape_filter_value(value: str) -> str:
+    """Escape LDAP filter metacharacters (RFC 4515) so a search term can't alter the filter."""
+    return "".join(f"\\{ord(c):02x}" if c in "\\*()\0" else c for c in value)
+
+
 class AdGroup(_AdRecord):
     description: str = ""
     object_guid: str = Field(default="", alias="objectGUID")
@@ -87,27 +92,22 @@ class DirectoryClient:
             return set()
         return {dn for dn in match.member_of if dn}
 
-    async def search_users(self, account_or_email_or_name: str) -> list[AdUser]:
-        return await self._search_users(self._fuzzy_params(account_or_email_or_name))
+    async def search_users(self, query: str) -> list[AdUser]:
+        return await self._search_users({"aNR": query})
 
     async def _search_users(self, params: dict[str, str]) -> list[AdUser]:
         return [AdUser.model_validate(r) for r in await self._search("/users", params)]
 
     async def search_groups(self, query: str) -> list[AdGroup]:
-        return [AdGroup.model_validate(r) for r in await self._search("/groups", self._fuzzy_params(query))]
-
-    @staticmethod
-    def _fuzzy_params(query: str) -> dict[str, str]:
-        wrapped = f"*{query}*"
-        return {
-            "samAccountName": wrapped,
-            "customFilter": f"(|(displayName={wrapped}) (mail={wrapped}))",
-        }
+        wrapped = f"*{_escape_filter_value(query)}*"
+        # groupType <= 0 keeps security groups and drops distribution lists.
+        custom_filter = f"(&(|(displayName={wrapped})(samAccountName={wrapped}))(groupType<=0))"
+        return [AdGroup.model_validate(r) for r in await self._search("/groups", {"customFilter": custom_filter})]
 
     async def _search(self, path: str, params: dict[str, str]) -> list[dict[str, Any]]:
         # Params are pre-encoded and appended to the URL rather than passed via
-        # params=: httpx encodes the space inside customFilter as "+", which the
-        # directory service rejects. quote encodes it as "%20", which httpx preserves verbatim.
+        # params=: httpx encodes a space in a query as "+", which the directory
+        # service rejects. quote encodes it as "%20", which httpx preserves verbatim.
         query_string = urlencode(params, quote_via=quote)
         try:
             async with httpx.AsyncClient(
