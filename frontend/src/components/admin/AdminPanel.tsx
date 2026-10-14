@@ -64,15 +64,14 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [appsSort, setAppsSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'published_at', dir: 'desc' });
 
   const visibleApps = useMemo(() => {
-    const q = appsSearch.trim().toLowerCase();
-    const filtered = q
-      ? apps.filter((a) => [a.name, a.owner_id, a.project_url].some((v) => v.toLowerCase().includes(q)))
-      : apps;
-    const sign = appsSort.dir === 'asc' ? 1 : -1;
-    // ISO timestamps compare correctly as strings, so one comparator covers every column.
-    return [...filtered].sort(
-      (a, b) => sign * a[appsSort.key].localeCompare(b[appsSort.key], undefined, { sensitivity: 'base' }),
-    );
+    const query = appsSearch.trim().toLowerCase();
+    const matchingApps = apps.filter((app) =>
+      [app.name, app.owner_id, app.project_url].some((field) => field.toLowerCase().includes(query)));
+
+    return matchingApps.sort((a, b) => {
+      const order = a[appsSort.key].localeCompare(b[appsSort.key], undefined, { sensitivity: 'base' });
+      return appsSort.dir === 'asc' ? order : -order;
+    });
   }, [apps, appsSearch, appsSort]);
 
   const toggleSort = (key: SortKey) => setAppsSort((prev) => (prev.key === key
