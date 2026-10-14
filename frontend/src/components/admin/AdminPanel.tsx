@@ -17,6 +17,15 @@ interface PlatformUser {
 type Tab = 'users' | 'published';
 
 type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at';
+type SortDir = 'asc' | 'desc';
+
+const INITIAL_SORT_DIR: Record<SortKey, SortDir> = {
+  name: 'asc',
+  owner_id: 'asc',
+  project_url: 'asc',
+  created_at: 'desc',
+  published_at: 'desc',
+};
 
 const APPS_GRID ='grid grid-cols-[1fr_130px_150px_80px_80px] gap-2';
 
@@ -52,7 +61,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const appsData = appsQuery.data;
   const apps = useMemo(() => appsData ?? [], [appsData]);
   const [appsSearch, setAppsSearch] = useState('');
-  const [appsSort, setAppsSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'published_at', dir: 'desc' });
+  const [appsSort, setAppsSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'published_at', dir: 'desc' });
 
   const visibleApps = useMemo(() => {
     const q = appsSearch.trim().toLowerCase();
@@ -66,16 +75,17 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     );
   }, [apps, appsSearch, appsSort]);
 
+  const toggleSort = (key: SortKey) => setAppsSort((prev) => (prev.key === key
+    ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: INITIAL_SORT_DIR[key] }));
+
   const sortHeader = (key: SortKey, label: string) => {
     const active = appsSort.key === key;
     const SortIcon = appsSort.dir === 'asc' ? ArrowUp : ArrowDown;
     return (
       <button
         type="button"
-        // Dates start newest-first, text columns A→Z; clicking the active column flips it.
-        onClick={() => setAppsSort(active
-          ? { key, dir: appsSort.dir === 'asc' ? 'desc' : 'asc' }
-          : { key, dir: key.endsWith('_at') ? 'desc' : 'asc' })}
+        onClick={() => toggleSort(key)}
         className={cn('flex items-center gap-0.5 text-start hover:text-foreground', active && 'text-foreground')}
       >
         {label}
