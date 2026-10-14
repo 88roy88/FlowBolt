@@ -120,9 +120,6 @@ async def revoke_user(user_id: AdminDep, target_user_id: str) -> None:
         raise HTTPException(status_code=404, detail="User not found")
 
 
-# --- Platform group grants (grant platform access to a whole directory group) ---
-
-
 @router.get("/groups")
 async def list_groups(user_id: AdminDep) -> list[PlatformGroupResponse]:
     groups = await list_platform_groups()
