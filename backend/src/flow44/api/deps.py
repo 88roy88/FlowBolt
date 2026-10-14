@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 from contextvars import ContextVar
 from typing import Annotated, Any
 
@@ -26,6 +27,7 @@ from flow44.logging import _project_id as _log_project_id
 from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +206,15 @@ def require_permission(permission: Permission) -> Any:
         return user_permissions
 
     return Depends(_check)
+
+
+async def require_writable_workspace(project: ProjectDep) -> AsyncIterator[None]:
+    try:
+        await versioning.require_writable(project.id)
+    except versioning.WorkspaceLocked as exc:
+        raise HTTPException(status_code=409, detail=exc.payload) from None
+    yield
+    await versioning.broadcast_dirty(project.id)
 
 
 async def _is_platform_group_member(user_id: str) -> bool:

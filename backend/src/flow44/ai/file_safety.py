@@ -26,6 +26,8 @@ _PROTECTED_APP_FILE_PATHS: tuple[str, ...] = (
 )
 
 _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
+    "**/.git/**",
+    "**/.gitignore",
     "src/api/**",
     "src/auth/**",
     "src/platform/**",
@@ -42,6 +44,7 @@ _PROTECTED_APP_FILE_PATTERNS: tuple[str, ...] = (
 # Protected paths that can diverge per project.
 _SYNC_EXCLUDED_PATTERNS: frozenset[str] = frozenset(
     {
+        "**/.git/**",
         "**/index.html",
         "**/package.json",
         "**/pnpm-lock.yaml",

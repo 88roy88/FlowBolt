@@ -164,11 +164,13 @@ class TestListFiles:
     async def test_skips_skip_dirs(self, sandbox: DummySandbox, tmp_path) -> None:  # type: ignore[type-arg]
         (tmp_path / "node_modules").mkdir()
         (tmp_path / "node_modules" / "pkg.js").write_text("")
+        (tmp_path / ".git").mkdir()
         (tmp_path / "src").mkdir()
         (tmp_path / "src" / "App.tsx").write_text("")
         entries = await sandbox.list_files("/")
         names = [e.name for e in entries]
         assert "node_modules" not in names
+        assert ".git" not in names
         assert "src" in names
 
     async def test_not_a_directory_raises(self, sandbox: DummySandbox) -> None:

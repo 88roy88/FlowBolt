@@ -1,5 +1,4 @@
 import asyncio
-import os
 from datetime import datetime
 from typing import Annotated
 
@@ -20,9 +19,12 @@ from flow44.db.platform_user_group import (
     remove_platform_group,
 )
 from flow44.db.project import Project, list_published_projects
+from flow44.sandbox.base import workspace_path
 from flow44.services.maintenance.runner import ProjectMaintenanceResult, run_over_projects
 from flow44.services.maintenance.sandbox_file_permissions import fix_file_permissions
 from flow44.services.maintenance.template_sync import sync_protected_template_files
+from flow44.services.versioning import service as versioning
+from flow44.services.versioning.git import Git
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -164,7 +166,7 @@ async def fix_workspace_file_permissions(user_id: AdminDep) -> list[ProjectMaint
     """Make all workspace files world-writable. (new files will be world-writable already after os.umask(0))"""
 
     async def fix_permissions(project: Project) -> str:
-        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project.id)
+        workspace_dir = workspace_path(project.id)
         return await asyncio.to_thread(fix_file_permissions, workspace_dir)
 
     return await run_over_projects(fix_permissions)
@@ -175,7 +177,14 @@ async def sync_protected_files(user_id: AdminDep) -> list[ProjectMaintenanceResu
     """Overwrite each project's template files with the up-to-date template if they differ."""
 
     async def sync_files(project: Project) -> str:
-        workspace_dir = os.path.join(settings.WORKSPACE_BASE_DIR, project.id)
-        return await asyncio.to_thread(sync_protected_template_files, workspace_dir, settings.TEMPLATE_DIR)
+        git = Git(project.id)
+        has_repo = await git.is_repo()
+        if has_repo and (git.is_detached() or await git.is_dirty()):
+            return "skipped: previewing or unsaved edits"
+        workspace_dir = workspace_path(project.id)
+        summary = await asyncio.to_thread(sync_protected_template_files, workspace_dir, settings.TEMPLATE_DIR)
+        if has_repo:
+            await versioning.save_version(project.id, message=versioning.PLATFORM_UPDATE_MESSAGE, author="system")
+        return summary
 
     return await run_over_projects(sync_files)

@@ -34,6 +34,7 @@ from flow44.integrations.directory.client import directory_client
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
 
@@ -91,12 +92,12 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
             result.append(_serialize_project(p, role))
         return result
 
-    owned, shared, user_group_ids = await asyncio.gather(
-        db_list_user_projects(user_id),
-        list_shared_projects(user_id),
-        directory_client.get_user_group_ids(user_id),
-    )
-    group_shared = await list_group_shared_projects(user_group_ids)
+    # Overlap the slow directory lookup with the DB queries. The DB queries themselves run
+    # one after another: concurrent sessions can't share a connection (as they do in tests).
+    group_lookup = asyncio.create_task(directory_client.get_user_group_ids(user_id))
+    owned = await db_list_user_projects(user_id)
+    shared = await list_shared_projects(user_id)
+    group_shared = await list_group_shared_projects(await group_lookup)
 
     # Collapse to one entry per project, keeping the highest-ranked role for display.
     by_id: dict[str, tuple[Project, str]] = {}
@@ -125,6 +126,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
 
         try:
             await sandbox_manager.create_sandbox(project.id)
+            await versioning.ensure_repo(project.id)
         except Exception:
             logger.exception("[projects] Sandbox creation failed for project %s", project.id)
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
@@ -163,7 +165,7 @@ async def delete_existing_project(
     _perms: set[Permission] = require_permission(Permission.delete),
 ) -> None:
     idle_reaper.remove(project.id)
-    await s3_storage.delete_published_html(project.id)
+    await s3_storage.delete_published_prefix(project.id)
     await delete_project(project.id)
     background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)
 

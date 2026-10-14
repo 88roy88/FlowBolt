@@ -54,6 +54,8 @@ class DatabaseSettings(BuildAppSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_RECYCLE: int = 3600
     DB_POOL_PRE_PING: bool = True
+    ADVISORY_LOCK_WAIT_TIMEOUT: int = 30
+    ADVISORY_LOCK_HOLD_TIMEOUT: int = 300
 
 
 class AIModelSettings(BuildAppSettings):
@@ -96,6 +98,7 @@ class FlapiSettings(BuildAppSettings):
     # FLAPI base URL. In dev you can point to the local mock (default).
     FLAPI_BASE_URL: str = "http://localhost:6001"
     FLAPI_VERIFY_SSL: bool = True
+    FLAPI_CLIENT_TIMEOUT_SEC: int = 25 * 60 + 10  # Flapi's default run timeout is 25 minutes
 
 
 class DirectorySettings(BuildAppSettings):
@@ -119,6 +122,7 @@ class S3Settings(BuildAppSettings):
     S3_BUCKET_NAME: str
     S3_CACHE_TTL: int = 3600
     S3_STORAGE_CLASS: str = "STANDARD_IA"
+    S3_PENDING_DELETION_DAYS: int = 7
 
 
 class LoggerSettings(BuildAppSettings):

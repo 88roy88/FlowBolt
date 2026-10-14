@@ -1,4 +1,6 @@
 import { useFilesStore } from '../../stores/files';
+import { useErrorStore } from '../../stores/errors';
+import { LOCK_MESSAGES, workspaceLocked } from '../../stores/workspaceLock';
 import type { FileEntry } from '../../types';
 import { Folder } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -66,6 +68,12 @@ export function FileTree({ readOnly }: FileTreeProps) {
   const handleUploadSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = event.target.files ? Array.from(event.target.files) : [];
     if (selectedFiles.length === 0) return;
+    const locked = workspaceLocked();
+    if (locked) {
+      event.target.value = '';
+      useErrorStore.getState().pushError({ source: 'connection', message: t(LOCK_MESSAGES[locked]) });
+      return;
+    }
     setDialogError(null);
     setIsSubmitting(true);
     try {
@@ -122,6 +130,11 @@ export function FileTree({ readOnly }: FileTreeProps) {
 
   const submitDialogAction = async () => {
     if (!dialogState) return;
+    const locked = workspaceLocked();
+    if (locked) {
+      setDialogError(t(LOCK_MESSAGES[locked]));
+      return;
+    }
     setDialogError(null);
     setIsSubmitting(true);
     try {

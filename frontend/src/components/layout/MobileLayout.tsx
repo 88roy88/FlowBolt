@@ -4,6 +4,7 @@ import { ChatPanel } from '../chat/ChatPanel';
 import { Preview } from '../preview/Preview';
 import { Sidebar } from './Sidebar';
 import { GlobalProgress } from './GlobalProgress';
+import { PreviewVersionBanner } from '../preview/PreviewVersionBanner';
 import { FlowBrand } from '../ui/flow-logo';
 import { PromptInput } from '../chat/PromptInput';
 import { useChatStore } from '../../stores/chat';
@@ -32,6 +33,7 @@ export function MobileLayout() {
       </div>
 
       <GlobalProgress />
+      <PreviewVersionBanner />
 
       {/* Content */}
       {isEmptyState ? (

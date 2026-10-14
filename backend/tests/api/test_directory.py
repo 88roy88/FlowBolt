@@ -1,10 +1,9 @@
-
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from flow44.integrations.directory.client import DirectoryError, AdGroup, AdUser
+from flow44.integrations.directory.client import AdGroup, AdUser, DirectoryError
 from flow44.main import app
 
 client = TestClient(app)
@@ -46,12 +45,15 @@ class TestDirectorySearch:
 
     @pytest.mark.parametrize("path", ["/api/directory/users", "/api/directory/groups"])
     def test_missing_cn_defaults_to_empty_search(self, path):
-        with patch(
-            "flow44.api.directory.directory_client.search_users",
-            new=AsyncMock(return_value=[]),
-        ), patch(
-            "flow44.api.directory.directory_client.search_groups",
-            new=AsyncMock(return_value=[]),
+        with (
+            patch(
+                "flow44.api.directory.directory_client.search_users",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "flow44.api.directory.directory_client.search_groups",
+                new=AsyncMock(return_value=[]),
+            ),
         ):
             resp = client.get(path)
 
