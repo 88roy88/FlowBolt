@@ -1,6 +1,6 @@
 {
   "search_users": {
-    "request": "curl 'http://localhost:6666/users?samAccountName=*dje*&customFilter=(|(displayName=*dje*) (mail=*dje*))'",
+    "request": "curl 'http://localhost:6002/users?samAccountName=*dje*&customFilter=(|(displayName=*dje*) (mail=*dje*))'",
     "response": [
       {
         "cn": "djenkins",
@@ -42,7 +42,7 @@
     ]
   },
   "search_groups": {
-    "request": "curl 'http://localhost:6666/groups?samAccountName=*le*&customFilter=(|(displayName=*le*) (mail=*le*))'",
+    "request": "curl 'http://localhost:6002/groups?samAccountName=*le*&customFilter=(|(displayName=*le*) (mail=*le*))'",
     "response": [
       {
         "cn": "Quality Assurance Contractors",

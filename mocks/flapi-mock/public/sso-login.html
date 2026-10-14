@@ -191,7 +191,7 @@
       // as any listed user without typing their sAMAccountName. Override the mock
       // location with ?directoryUrl=... ; defaults to the dev port. Falls back
       // silently to manual entry if the mock isn't reachable.
-      const directoryUrl = (params.get('directoryUrl') || 'http://localhost:6666').replace(/\/$/, '');
+      const directoryUrl = (params.get('directoryUrl') || 'http://localhost:6002').replace(/\/$/, '');
       const memberSelect = document.getElementById('memberSelect');
       const memberHint = document.getElementById('memberHint');
 
@@ -209,7 +209,7 @@
       (async () => {
         let users;
         try {
-          const resp = await fetch(`${directoryUrl}/api/users`);
+          const resp = await fetch(`${directoryUrl}/users`);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           users = await resp.json();
         } catch {

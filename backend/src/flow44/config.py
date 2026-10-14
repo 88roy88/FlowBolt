@@ -100,7 +100,7 @@ class FlapiSettings(BuildAppSettings):
 
 class DirectorySettings(BuildAppSettings):
     # Defaults to the local directory-mock in dev.
-    DIRECTORY_BASE_URL: str = "http://localhost:6666"
+    DIRECTORY_BASE_URL: str = "http://localhost:6002"
     DIRECTORY_VERIFY_SSL: bool = True
     DIRECTORY_TIMEOUT_SECONDS: float = 5.0
     # Sent as the ClientId header; the local mock ignores it.

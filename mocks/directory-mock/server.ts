@@ -4,7 +4,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import type { AdGroup, AdUser } from "./types";
 
-const PORT = Number(process.env.MOCK_PORT) || 6666;
+const PORT = Number(process.env.MOCK_PORT) || 6002;
 
 // Artificial latency so local dev exercises the UI's loading states — the real directory service
 // is noticeably slow. Override with MOCK_DELAY_MS=0 to disable.

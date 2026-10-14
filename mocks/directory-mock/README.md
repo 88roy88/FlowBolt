@@ -37,7 +37,7 @@ The fixtures are loaded once at startup, so restart the server to pick up edits.
 
 ```sh
 pnpm install
-pnpm dev          # serves on http://localhost:6666
+pnpm dev          # serves on http://localhost:6002
 ```
 
 Override the port with `MOCK_PORT`:
@@ -49,6 +49,6 @@ MOCK_PORT=7000 pnpm dev
 ### Examples
 
 ```sh
-curl "http://localhost:6666/users?samAccountName=*dje*&customFilter=(|(displayName=*dje*)%20(mail=*dje*))"
-curl "http://localhost:6666/groups?samAccountName=*le*&customFilter=(|(displayName=*le*)%20(mail=*le*))"
+curl "http://localhost:6002/users?samAccountName=*dje*&customFilter=(|(displayName=*dje*)%20(mail=*dje*))"
+curl "http://localhost:6002/groups?samAccountName=*le*&customFilter=(|(displayName=*le*)%20(mail=*le*))"
 ```

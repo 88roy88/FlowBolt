@@ -4,7 +4,7 @@
 DEV_PORT_BACKEND := 8000
 DEV_PORT_FRONTEND := 5173
 DEV_PORT_MOCKS := 6001
-DEV_PORT_DIRECTORY := 6666
+DEV_PORT_DIRECTORY := 6002
 DEV_PORTS := $(DEV_PORT_BACKEND) $(DEV_PORT_FRONTEND) $(DEV_PORT_MOCKS) $(DEV_PORT_DIRECTORY)
 
 # All at once: backend blocks forever if run sequentially, so we use parallel sub-makes (GNU Make).
