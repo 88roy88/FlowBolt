@@ -102,7 +102,7 @@ class DirectorySettings(BuildAppSettings):
     # Defaults to the local directory-mock in dev.
     DIRECTORY_BASE_URL: str = "http://localhost:6002"
     DIRECTORY_VERIFY_SSL: bool = True
-    DIRECTORY_TIMEOUT_SECONDS: float = 5.0
+    DIRECTORY_TIMEOUT_SECONDS: float = 10.0
     # Sent as the ClientId header; the local mock ignores it.
     DIRECTORY_CLIENT_ID: str = "default"
     # Mail domain -> domain used in the user id ({sAMAccountName}@{domain}). Keys match case-insensitively.
