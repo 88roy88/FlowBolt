@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, String, UniqueConstraint, and_, or_
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.auth.permissions import Role
@@ -102,3 +102,35 @@ async def list_shared_projects(user_id: str) -> list[tuple[Project, Role]]:
             .order_by(col(Project.created_at).desc())
         )
         return [(row[0], Role(row[1])) for row in result.all()]
+
+
+async def list_accessible_projects(
+    user_id: str,
+    *,
+    include_all: bool = False,
+    name_query: str = "",
+    before: tuple[str, str] | None = None,
+    limit: int,
+) -> list[tuple[Project, Role | None]]:
+    query = select(Project, ProjectMember.role).outerjoin(
+        ProjectMember,
+        and_(col(ProjectMember.project_id) == col(Project.id), col(ProjectMember.user_id) == user_id),
+    )
+    if not include_all:
+        query = query.where(or_(col(Project.user_id) == user_id, col(ProjectMember.id).is_not(None)))
+    if name_query:
+        escaped = name_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.where(col(Project.name).ilike(f"%{escaped}%", escape="\\"))
+    if before is not None:
+        created_at, project_id = before
+        query = query.where(
+            or_(
+                col(Project.created_at) < created_at,
+                and_(col(Project.created_at) == created_at, col(Project.id) < project_id),
+            )
+        )
+    query = query.order_by(col(Project.created_at).desc(), col(Project.id).desc()).limit(limit)
+
+    async with database.async_session() as session:
+        result = await session.execute(query)
+        return [(row[0], Role(row[1]) if row[1] is not None else None) for row in result.all()]

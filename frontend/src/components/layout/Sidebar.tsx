@@ -1,4 +1,4 @@
-import { useState, useRef, type CSSProperties } from 'react';
+import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
@@ -37,6 +37,8 @@ function getProjectColor(name: string) {
   return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
 }
 
+const SEARCH_DEBOUNCE_MS = 250;
+
 const anchorName = (id: string) => `--a${id.replace(/-/g, '')}`;
 
 function getInitials(name: string) {
@@ -47,10 +49,14 @@ function getInitials(name: string) {
 
 export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProps) {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus } = useSessionStore();
+  const {
+    projects, projectsCursor, projectSearch, isLoadingMoreProjects, loadMoreProjects, searchProjects,
+    currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus,
+  } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [failedSearch, setFailedSearch] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary; } | null>(null);
@@ -138,12 +144,23 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
     }
   };
 
-  const menuProject = projects.find((p) => p.id === menuProjectId);
-  const canSearchProjects = projects.length > 10;
-  const normalizedSearch = canSearchProjects ? searchQuery.trim().toLowerCase() : '';
-  const visibleProjects = normalizedSearch
-    ? projects.filter((p) => p.name.toLowerCase().includes(normalizedSearch))
-    : projects;
+  const canSearchProjects = projects.length > 10 || projectsCursor !== null;
+  const trimmedSearch = canSearchProjects ? searchQuery.trim() : '';
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchProjects(trimmedSearch).catch((err) => {
+        console.error('Project search failed:', err);
+        setFailedSearch(trimmedSearch);
+      });
+    }, trimmedSearch ? SEARCH_DEBOUNCE_MS : 0);
+    return () => clearTimeout(timer);
+  }, [trimmedSearch, searchProjects]);
+
+  const isSearching = trimmedSearch !== '' && trimmedSearch !== projectSearch?.query && trimmedSearch !== failedSearch;
+  const visibleProjects = projectSearch?.results ?? projects;
+  const hasMoreProjects = !isSearching && (projectSearch ? projectSearch.cursor : projectsCursor) !== null;
+  const menuProject = visibleProjects.find((p) => p.id === menuProjectId);
 
   return (
     <div className="flex flex-col h-full">
@@ -203,11 +220,16 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
       {canSearchProjects && (
         <div className="px-3 mb-2">
           <div className="flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-lg">
-            <Search size={14} className="shrink-0 text-muted-foreground" />
+            {isSearching
+              ? <Loader2 size={14} className="shrink-0 animate-spin text-muted-foreground" data-testid="project-search-loading" />
+              : <Search size={14} className="shrink-0 text-muted-foreground" />}
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setFailedSearch(null);
+              }}
               placeholder={t('sidebar.searchPlaceholder')}
               data-testid="project-search"
               className="flex-1 text-[13px] bg-transparent"
@@ -217,7 +239,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
       )}
 
       {/* Project list */}
-      <div className="flex-1 overflow-auto px-2">
+      <div className={`flex-1 overflow-auto px-2 transition-opacity ${isSearching ? 'opacity-50' : ''}`} aria-busy={isSearching}>
         {visibleProjects.map((project) => {
           const isActive = currentProject?.id === project.id;
           const colorClass = getProjectColor(project.name);
@@ -275,10 +297,23 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
             </div>
           );
         })}
-        {normalizedSearch && visibleProjects.length === 0 && (
+        {projectSearch && !isSearching && visibleProjects.length === 0 && (
           <div className="px-2 py-2 text-[13px] text-muted-foreground">
             {t('sidebar.noProjectsMatch')}
           </div>
+        )}
+        {hasMoreProjects && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadMoreProjects().catch((err) => console.error('Failed to load more projects:', err))}
+            disabled={isLoadingMoreProjects}
+            data-testid="load-more-projects"
+            className="w-full my-1 text-[13px] text-muted-foreground hover:text-foreground"
+          >
+            {isLoadingMoreProjects && <Loader2 size={14} className="animate-spin" />}
+            {t('sidebar.loadMore')}
+          </Button>
         )}
       </div>
 

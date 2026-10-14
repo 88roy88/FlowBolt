@@ -55,13 +55,13 @@ describe('fetchWithAuth (via fetchProjects)', () => {
   it('retries once after a 401 and returns the retried result', async () => {
     fetchMock
       .mockResolvedValueOnce(response(401, 'unauthorized'))
-      .mockResolvedValueOnce(response(200, '[{"id":"p1"}]'));
+      .mockResolvedValueOnce(response(200, '{"projects":[{"id":"p1"}],"next_cursor":null}'));
 
-    const projects = await fetchProjects();
+    const page = await fetchProjects();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(authSession.refreshCredentials).toHaveBeenCalledOnce();
-    expect(projects).toEqual([{ id: 'p1' }]);
+    expect(page.projects).toEqual([{ id: 'p1' }]);
   });
 
   it('throws without retrying the request body when the refresh yields no session', async () => {

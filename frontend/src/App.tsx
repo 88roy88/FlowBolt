@@ -13,10 +13,22 @@ import { pollFileTree } from './utils/pollFileTree';
 import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
+import type { Project } from './types';
 
 function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
   return match ? match[1] : null;
+}
+
+async function findProject(id: string): Promise<Project | null> {
+  const { projects, projectSearch } = useSessionStore.getState();
+  const loaded = projects.find((p) => p.id === id) ?? projectSearch?.results.find((p) => p.id === id);
+  if (loaded) return loaded;
+  try {
+    return await api.fetchProject(id);
+  } catch {
+    return null;
+  }
 }
 
 function hasProjectsCache(): boolean {
@@ -116,27 +128,28 @@ export default function App() {
     }
     if (currentProject) return;
 
+    let cancelled = false;
     const hashProjectId = getProjectIdFromHash();
-    const match = hashProjectId
-      ? projects.find((p) => p.id === hashProjectId)
-      : null;
-    const target = match ?? projects[0];
-    selectProject(target);
+    (hashProjectId ? findProject(hashProjectId) : Promise.resolve(null)).then((match) => {
+      if (cancelled || useSessionStore.getState().currentProject) return;
+      selectProject(match ?? projects[0]);
+    });
+    return () => { cancelled = true; };
   }, [loading, projects, currentProject, selectProject]);
 
   // Listen for hash changes (back/forward)
   useEffect(() => {
-    function onHashChange() {
+    async function onHashChange() {
       const hashProjectId = getProjectIdFromHash();
-      if (!hashProjectId) return;
-      const match = projects.find((p) => p.id === hashProjectId);
-      if (match && match.id !== currentProject?.id) {
+      if (!hashProjectId || hashProjectId === currentProject?.id) return;
+      const match = await findProject(hashProjectId);
+      if (match && getProjectIdFromHash() === match.id) {
         selectProject(match);
       }
     }
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, [projects, currentProject, selectProject]);
+  }, [currentProject, selectProject]);
 
   // Auto-recover state when network comes back online
   useEffect(() => {

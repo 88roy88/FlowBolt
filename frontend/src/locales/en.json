@@ -33,7 +33,8 @@
     "sleep": "Sleep",
     "confirmDelete": "Confirm delete?",
     "searchPlaceholder": "Search projects...",
-    "noProjectsMatch": "No projects match"
+    "noProjectsMatch": "No projects match",
+    "loadMore": "Load more"
   },
   "settings": {
     "title": "Settings",

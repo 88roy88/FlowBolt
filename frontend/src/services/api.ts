@@ -125,8 +125,19 @@ export async function searchFiles(
   return data.results;
 }
 
-export async function fetchProjects(): Promise<Project[]> {
-  return request<Project[]>('/projects');
+export type ProjectPage = { projects: Project[]; next_cursor: string | null };
+
+export async function fetchProjects(opts?: { query?: string; cursor?: string; limit?: number }): Promise<ProjectPage> {
+  const params = new URLSearchParams();
+  if (opts?.query) params.set('q', opts.query);
+  if (opts?.cursor) params.set('cursor', opts.cursor);
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request<ProjectPage>(qs ? `/projects?${qs}` : '/projects');
+}
+
+export async function fetchProject(id: string): Promise<Project> {
+  return request<Project>(`/projects/${id}`);
 }
 
 export async function createProject(name: string): Promise<Project> {
