@@ -35,10 +35,9 @@ async def _handle_litellm_errors(model: str | None = None) -> AsyncIterator[None
             getattr(exc, "message", str(exc)),
         )
         raise
-    except litellm.ContextWindowExceededError as exc:
-        logger.error("[provider] Context window exceeded | model=%s message=%s", resolved_model, exc.message)
-        raise ContextWindowExceeded from exc
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, litellm.ContextWindowExceededError) or "maximum context length" in str(exc):
+            raise ContextWindowExceeded from exc
         logger.exception("[provider] Unexpected error calling LiteLLM | model=%s", resolved_model)
         raise
 
