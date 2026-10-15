@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Column, ForeignKey, String, delete
+from sqlalchemy import JSON, Column, ForeignKey, String, delete, func
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -43,6 +43,16 @@ async def get_messages(project_id: str) -> list[ChatMessage]:
             select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(col(ChatMessage.created_at).asc())
         )
         return list(result.scalars().all())
+
+
+async def count_user_messages(project_id: str) -> int:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(func.count())
+            .select_from(ChatMessage)
+            .where(ChatMessage.project_id == project_id, ChatMessage.role == ChatRole.user)
+        )
+        return result.scalar_one()
 
 
 async def trim_messages_after(project_id: str, created_at: str) -> None:

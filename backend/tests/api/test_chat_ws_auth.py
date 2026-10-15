@@ -65,7 +65,7 @@ def test_wrong_owner_rejected():
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project),
         patch("flow44.api.deps.get_project_member", new_callable=AsyncMock, return_value=None),
-        patch("flow44.api.deps.get_user_id", return_value="other-user"),
+        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="other-user"),
         patch("flow44.api.chat.sandbox_manager") as mock_mgr,
     ):
         assert _handshake_rejected("/ws/chat/proj-123", "any-token")
@@ -76,7 +76,7 @@ def test_unknown_project_rejected():
     """Valid token for a non-existent project → handshake rejected, sandbox untouched."""
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=None),
-        patch("flow44.api.deps.get_user_id", return_value="some-user"),
+        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="some-user"),
         patch("flow44.api.chat.sandbox_manager") as mock_mgr,
     ):
         assert _handshake_rejected("/ws/chat/proj-ghost", "any-token")
@@ -106,7 +106,7 @@ def test_sandbox_not_found_after_auth_sends_error():
     project = _mock_project(user_id="user-a")
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project),
-        patch("flow44.api.deps.get_user_id", return_value="user-a"),
+        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"),
         patch("flow44.api.chat.sandbox_manager") as mock_mgr,
     ):
         mock_mgr.wake_sandbox = AsyncMock(side_effect=Exception("proj-123"))

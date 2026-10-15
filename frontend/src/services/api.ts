@@ -1,5 +1,6 @@
 import { authSession, credentialsStore } from '../auth';
 import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, UserStatus } from '../types';
+import type { LogEvent } from './logger';
 
 const BASE = '/api';
 
@@ -38,11 +39,11 @@ function apiError(status: number, text: string): ApiError {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers = new Headers(options?.headers);
   const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   // Only set JSON Content-Type when body is not FormData.
   if (options?.body && !isFormDataBody) {
-    headers['Content-Type'] = 'application/json';
+    headers.set('Content-Type', 'application/json');
   }
 
   const res = await fetchWithAuth(path, { ...options, headers });
@@ -288,4 +289,20 @@ export async function fetchPublishedApps(): Promise<{
   published_at: string;
 }[]> {
   return request('/admin/published-apps');
+}
+
+// --- Logging ---
+
+export async function sendLogs(events: LogEvent[], options?: { keepalive?: boolean }): Promise<void> {
+  try {
+    const version = import.meta.env.VITE_APP_VERSION || 'unknown';
+    await request('/bi/events', {
+      method: 'POST',
+      headers: { 'X-Client-Version': version },
+      body: JSON.stringify(events),
+      keepalive: options?.keepalive,
+    });
+  } catch (error) {
+    console.warn('Log send failed:', error);
+  }
 }

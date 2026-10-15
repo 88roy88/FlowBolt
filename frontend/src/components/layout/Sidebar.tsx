@@ -12,6 +12,7 @@ import { pollFileTree } from '../../utils/pollFileTree';
 import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { logger } from '../../services/logger';
 
 type SidebarProps = {
   onCollapse?: () => void;
@@ -81,6 +82,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
 
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
+    logger.info('project_opened', { entry_point: 'project_list' });
     window.location.hash = `#/project/${project.id}`;
     resetFiles();
     loadFileTree();
