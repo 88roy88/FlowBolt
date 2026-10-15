@@ -68,6 +68,10 @@ export function ChatPanel() {
     setShowScrollBtn(distFromBottom > 200);
   };
 
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[aria-expanded]')) stickToBottomRef.current = false;
+  };
+
   const jumpToBottom = () => {
     stickToBottomRef.current = true;
     scrollContainerRef.current?.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
@@ -97,7 +101,7 @@ export function ChatPanel() {
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Messages */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-auto p-4">
+      <div ref={scrollContainerRef} onScroll={handleScroll} onClickCapture={handleClickCapture} className="flex-1 overflow-y-auto overflow-x-hidden p-4">
         <div ref={observeContentForPinning} className="flex flex-col gap-4">
         {dayGroups.map((group) => (
           <div key={group.key} className="flex flex-col gap-4">

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Trash2, ExternalLink } from 'lucide-react';
+import { UserPlus, Trash2, ExternalLink, ArrowUp, ArrowDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -15,6 +15,29 @@ interface PlatformUser {
 }
 
 type Tab = 'users' | 'published';
+
+type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at';
+type SortDir = 'asc' | 'desc';
+
+const INITIAL_SORT_DIR: Record<SortKey, SortDir> = {
+  name: 'asc',
+  owner_id: 'asc',
+  project_url: 'asc',
+  created_at: 'desc',
+  published_at: 'desc',
+};
+
+const APPS_GRID ='grid grid-cols-[1fr_130px_150px_80px_80px] gap-2';
+
+/** Date only, with the full date + time of day on hover. */
+function Timestamp({ iso }: { iso: string }) {
+  const date = new Date(iso);
+  return (
+    <span className="text-muted-foreground text-xs cursor-default" title={date.toLocaleString()}>
+      {date.toLocaleDateString()}
+    </span>
+  );
+}
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
@@ -35,7 +58,40 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     queryFn: api.fetchPublishedApps,
     enabled: tab === 'published',
   });
-  const apps = appsQuery.data ?? [];
+  const appsData = appsQuery.data;
+  const apps = useMemo(() => appsData ?? [], [appsData]);
+  const [appsSearch, setAppsSearch] = useState('');
+  const [appsSort, setAppsSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'published_at', dir: 'desc' });
+
+  const visibleApps = useMemo(() => {
+    const query = appsSearch.trim().toLowerCase();
+    const matchingApps = apps.filter((app) =>
+      [app.name, app.owner_id, app.project_url].some((field) => field.toLowerCase().includes(query)));
+
+    return matchingApps.sort((a, b) => {
+      const order = a[appsSort.key].localeCompare(b[appsSort.key], undefined, { sensitivity: 'base' });
+      return appsSort.dir === 'asc' ? order : -order;
+    });
+  }, [apps, appsSearch, appsSort]);
+
+  const toggleSort = (key: SortKey) => setAppsSort((prev) => (prev.key === key
+    ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: INITIAL_SORT_DIR[key] }));
+
+  const sortHeader = (key: SortKey, label: string) => {
+    const active = appsSort.key === key;
+    const SortIcon = appsSort.dir === 'asc' ? ArrowUp : ArrowDown;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        className={cn('flex items-center gap-0.5 text-start hover:text-foreground', active && 'text-foreground')}
+      >
+        {label}
+        {active && <SortIcon size={11} className="shrink-0" />}
+      </button>
+    );
+  };
 
   const handleInvite = async () => {
     const trimmed = userId.trim();
@@ -146,19 +202,47 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
               <p className="text-destructive text-xs mb-2">{error || 'Failed to load published apps'}</p>
             )}
 
+            {apps.length > 0 && (
+              <Input
+                placeholder={t('admin.searchApps', 'Search by project, owner or URL')}
+                value={appsSearch}
+                onChange={(e) => setAppsSearch(e.target.value)}
+                className="mb-3"
+              />
+            )}
+
             {/* Published apps list */}
+            {apps.length > 0 && (
+              <div className={cn(APPS_GRID, 'px-2 pb-1 text-[11px] text-muted-foreground')}>
+                {sortHeader('name', t('admin.colName', 'Project'))}
+                {sortHeader('owner_id', t('admin.colOwner', 'Owner'))}
+                {sortHeader('project_url', t('admin.colUrl', 'URL'))}
+                {sortHeader('created_at', t('admin.colCreated', 'Created'))}
+                {sortHeader('published_at', t('admin.colPublished', 'Published'))}
+              </div>
+            )}
             <div className="max-h-[300px] overflow-auto space-y-1">
               {appsQuery.isLoading ? (
                 <p className="text-muted-foreground text-xs text-center py-4">{t('common.loading', 'Loading...')}</p>
               ) : apps.length === 0 ? (
                 <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noPublished', 'No published apps yet')}</p>
+              ) : visibleApps.length === 0 ? (
+                <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noMatches', 'No matching apps')}</p>
               ) : (
-                apps.map((a) => (
+                visibleApps.map((a) => (
                   <div
                     key={a.project_id}
-                    className="grid grid-cols-[1fr_140px_160px_90px] gap-2 items-center px-2 py-1.5 rounded-md hover:bg-muted/30 group"
+                    className={cn(APPS_GRID, 'items-center px-2 py-1.5 rounded-md hover:bg-muted/30 group')}
                   >
-                    <span className="min-w-0 text-[13px] truncate" title={a.project_id}>{a.name}</span>
+                    {/* The hashchange listener in App selects the project; admins' project list includes every project. */}
+                    <button
+                      type="button"
+                      onClick={() => { window.location.hash = `#/project/${a.project_id}`; onClose(); }}
+                      className="min-w-0 text-[13px] truncate text-start hover:underline"
+                      title={`${t('admin.openProject', 'Open project')} (${a.project_id})`}
+                    >
+                      {a.name}
+                    </button>
                     <span className="text-muted-foreground text-xs text-left truncate" title={a.owner_id}>
                       {a.owner_id}
                     </span>
@@ -171,9 +255,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                       <span className="truncate">{a.project_url}</span>
                       <ExternalLink size={11} className="shrink-0" />
                     </a>
-                    <span className="text-muted-foreground text-xs">
-                      {new Date(a.published_at).toLocaleDateString()}
-                    </span>
+                    <Timestamp iso={a.created_at} />
+                    <Timestamp iso={a.published_at} />
                   </div>
                 ))
               )}
