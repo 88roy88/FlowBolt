@@ -19,12 +19,12 @@ class Role(StrEnum):
     maintainer = "maintainer"
 
 
-class DerivedRole(StrEnum):
+class ImplicitRole(StrEnum):
     admin = "admin"
     owner = "owner"
 
 
-DisplayRole = Role | DerivedRole
+DisplayRole = Role | ImplicitRole
 
 # Display precedence when a project reaches a user through several sources.
 ROLE_RANK: dict[DisplayRole, int] = {
@@ -32,8 +32,8 @@ ROLE_RANK: dict[DisplayRole, int] = {
     Role.editor: 2,
     Role.publisher: 2,
     Role.maintainer: 3,
-    DerivedRole.admin: 4,
-    DerivedRole.owner: 5,
+    ImplicitRole.admin: 4,
+    ImplicitRole.owner: 5,
 }
 
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {

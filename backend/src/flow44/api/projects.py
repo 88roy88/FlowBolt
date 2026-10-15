@@ -20,8 +20,8 @@ from flow44.api.deps import (
 )
 from flow44.auth.permissions import (
     ROLE_RANK,
-    DerivedRole,
     DisplayRole,
+    ImplicitRole,
     get_admin_permissions,
     has_permission,
 )
@@ -94,7 +94,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
         all_projects = await list_all_projects()
         result: list[ProjectResponse] = []
         for p in all_projects:
-            role: DisplayRole = DerivedRole.owner if p.user_id == user_id else DerivedRole.admin
+            role: DisplayRole = ImplicitRole.owner if p.user_id == user_id else ImplicitRole.admin
             result.append(_serialize_project(p, role))
         return result
 
@@ -114,7 +114,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
             by_id[project.id] = (project, role)
 
     for p in owned:
-        _merge(p, DerivedRole.owner)
+        _merge(p, ImplicitRole.owner)
     for p, role in shared:
         _merge(p, role)
     for p, role in group_shared:
@@ -138,7 +138,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_create())
-    return _serialize_project(project, DerivedRole.owner)
+    return _serialize_project(project, ImplicitRole.owner)
 
 
 @router.patch("/{project_id}/name", status_code=200)
