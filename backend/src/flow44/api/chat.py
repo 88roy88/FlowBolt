@@ -17,6 +17,7 @@ from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
@@ -107,6 +108,11 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         # Stop the agent before reporting idle, so a late event can't re-stick the UI.
         await _cancel_task(run_task)
         await _report_run_failure(project_id, "AI processing timed out")
+    except ContextWindowExceeded:
+        logger.error("[chat] Context window exceeded for session %s", project_id)
+        await _report_run_failure(
+            project_id, "This request grew too large for the model. Try a smaller, more focused request."
+        )
     except Exception:
         logger.exception("[chat] Background agent failed for session %s", project_id)
         await _report_run_failure(project_id, "AI processing failed")

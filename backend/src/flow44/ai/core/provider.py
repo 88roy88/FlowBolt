@@ -13,6 +13,10 @@ from flow44.config import settings
 logger = logging.getLogger(__name__)
 
 
+class ContextWindowExceeded(Exception):
+    pass
+
+
 # TODO: when will messages be dicts?
 def _to_dicts(messages: list[dict[str, Any] | Message]) -> list[dict[str, Any]]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]
@@ -31,7 +35,9 @@ async def _handle_litellm_errors(model: str | None = None) -> AsyncIterator[None
             getattr(exc, "message", str(exc)),
         )
         raise
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, litellm.ContextWindowExceededError) or "maximum context length" in str(exc):
+            raise ContextWindowExceeded from exc
         logger.exception("[provider] Unexpected error calling LiteLLM | model=%s", resolved_model)
         raise
 
