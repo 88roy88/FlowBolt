@@ -1,6 +1,7 @@
 import asyncio
 import json
 import uuid
+from itertools import accumulate
 from typing import Any
 
 from opik import track
@@ -11,9 +12,10 @@ from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, 
 from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
-from flow44.ai.core.react_flow import ReActFlow
+from flow44.ai.core.react_flow import ReActFlow, looks_like_leaked_tool_call
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
+from flow44.config import settings
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
@@ -21,6 +23,19 @@ from flow44.sandbox.main import PnpmSandbox
 
 MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
+
+
+def _trim_start(history: list[ChatMessage]) -> int:
+    run_starts = [i for i, m in enumerate(history) if m.role == ChatRole.user]
+    if not run_starts:
+        return 0
+    budget = settings.AI_HISTORY_CHAR_BUDGET
+    sizes = [len(json.dumps(m.raw_message)) if m.raw_message else len(m.content) for m in history]
+    suffix_sizes = list(accumulate(reversed(sizes)))[::-1]
+    if suffix_sizes[0] <= budget:
+        return 0
+    oldest_protected = run_starts[-settings.AI_HISTORY_MIN_RUNS :][0]
+    return next(i for i in run_starts if suffix_sizes[i] <= budget or i >= oldest_protected)
 
 
 def _format_file_safety_error(exc: FileSafetyError) -> str:
@@ -225,29 +240,14 @@ class FollowUpAgent(ChatAgent):
 
     def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
         messages: list[dict[str, Any] | Message] = []
-        pending_legacy = False
 
-        for m in history:
+        for m in history[_trim_start(history) :]:
             if m.role == ChatRole.user:
-                if pending_legacy:
-                    messages.append(
-                        Message.assistant("I made several tool calls and iterations. The details have been compacted.")
-                    )
-                    pending_legacy = False
                 messages.append(Message.user(m.content))
             elif m.raw_message is not None:
-                pending_legacy = False
                 messages.append(m.raw_message)
-            elif m.role == ChatRole.assistant and m.content.strip():
-                pending_legacy = False
+            elif m.role == ChatRole.assistant and m.content.strip() and not looks_like_leaked_tool_call(m.content):
                 messages.append(Message.assistant(m.content))
-            else:
-                pending_legacy = True
-
-        if pending_legacy:
-            messages.append(
-                Message.assistant("I made several tool calls and iterations. The details have been compacted.")
-            )
 
         return messages
 

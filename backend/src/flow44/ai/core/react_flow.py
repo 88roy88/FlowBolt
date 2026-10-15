@@ -15,6 +15,22 @@ logger = logging.getLogger(__name__)
 
 StateT = TypeVar("StateT", bound=BaseModel)
 
+MALFORMED_TOOL_CALL_CORRECTION = (
+    "Your last tool call was malformed text. Call the tool through the tool-calling interface."
+)
+LEAKED_TOOL_CALL_MARKERS = (
+    "<invoke name=",
+    "｜DSML｜",
+    "<tool_call>",
+    "<function_calls>",
+    "[TOOL_CALLS]",
+    "<|python_tag|>",
+)
+
+
+def looks_like_leaked_tool_call(text: str) -> bool:
+    return any(marker in text for marker in LEAKED_TOOL_CALL_MARKERS)
+
 
 class ReActFlow(Flow[StateT], Generic[StateT]):
     def __init__(
@@ -25,7 +41,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         super().__init__(name)
         self.max_iterations = max_iterations
 
-    async def react_loop(
+    async def react_loop(  # noqa: C901
         self,
         messages: list[dict[str, Any] | Message],
         system_prompt: str,
@@ -74,7 +90,12 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             last_content = message.content or ""
 
             if not message.tool_calls:
-                return last_content
+                if not looks_like_leaked_tool_call(last_content):
+                    return last_content
+                working_messages.append(Message.assistant(last_content).to_dict())
+                working_messages.append(Message.user(MALFORMED_TOOL_CALL_CORRECTION).to_dict())
+                last_content = ""
+                continue
 
             assistant_message = message.model_dump()
             working_messages.append(assistant_message)
