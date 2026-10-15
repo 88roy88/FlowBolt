@@ -12,6 +12,7 @@ import { pollFileTree } from '../../utils/pollFileTree';
 import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { useDebouncedValue } from '../../hooks/useDebounce';
 
 type SidebarProps = {
   onCollapse?: () => void;
@@ -147,15 +148,15 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
   const canSearchProjects = projects.length > 10 || projectsCursor !== null;
   const trimmedSearch = canSearchProjects ? searchQuery.trim() : '';
 
+  const debouncedSearch = useDebouncedValue(trimmedSearch, SEARCH_DEBOUNCE_MS);
+  const searchTerm = trimmedSearch ? debouncedSearch : '';
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      searchProjects(trimmedSearch).catch((err) => {
-        console.error('Project search failed:', err);
-        setFailedSearch(trimmedSearch);
-      });
-    }, trimmedSearch ? SEARCH_DEBOUNCE_MS : 0);
-    return () => clearTimeout(timer);
-  }, [trimmedSearch, searchProjects]);
+    searchProjects(searchTerm).catch((err) => {
+      console.error('Project search failed:', err);
+      setFailedSearch(searchTerm);
+    });
+  }, [searchTerm, searchProjects]);
 
   const isSearching = trimmedSearch !== '' && trimmedSearch !== projectSearch?.query && trimmedSearch !== failedSearch;
   const visibleProjects = projectSearch?.results ?? projects;
