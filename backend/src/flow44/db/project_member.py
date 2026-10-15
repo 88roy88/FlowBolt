@@ -18,7 +18,6 @@ class ProjectMember(SQLModel, table=True):
         sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
     )
     user_id: str = Field(index=True)
-    # display-only snapshot captured at invite time; never used for access decisions.
     display_name: str = Field(default="")
     role: str = Field(default=Role.viewer.value)
     created_at: datetime | None = Field(

@@ -10,7 +10,6 @@ class PlatformUser(SQLModel, table=True):
     __tablename__ = "platform_users"
 
     user_id: str = Field(primary_key=True)
-    # display-only snapshot captured at invite time; never used for access decisions.
     display_name: str = Field(default="")
     invited_by: str = Field(default="")
     created_at: datetime | None = Field(
