@@ -70,6 +70,7 @@ class PublishedAppResponse(BaseModel):
     owner_id: str
     project_url: str  # projects.published_url — the slug, or the project id if none was chosen
     public_path: str
+    created_at: str
     published_at: str
 
 
@@ -106,6 +107,7 @@ async def list_published_apps(user_id: AdminDep) -> list[PublishedAppResponse]:
             owner_id=p.user_id,
             project_url=handle,
             public_path=f"/shared/{handle}",
+            created_at=p.created_at,
             published_at=published_at,
         )
         # published_url/published_at are non-null for every row the query returns;

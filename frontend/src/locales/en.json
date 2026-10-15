@@ -20,8 +20,14 @@
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
     "retryConnection": "Retry Connection",
-    "createFirstProject": "Create your first project to get started",
     "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation."
+  },
+  "onboarding": {
+    "tagline": "Describe what you want to build and the AI will design, plan, and code it for you.",
+    "taglineMobile": "Describe what you want to build and the AI will generate it for you.",
+    "hintDashboard": "A dashboard with charts",
+    "hintTodoApp": "A todo app with drag & drop",
+    "hintLandingPage": "A landing page with animations"
   },
   "sidebar": {
     "collapseSidebar": "Collapse sidebar",
@@ -33,7 +39,9 @@
     "sleep": "Sleep",
     "confirmDelete": "Confirm delete?",
     "searchPlaceholder": "Search projects...",
-    "noProjectsMatch": "No projects match"
+    "noProjectsMatch": "No projects match",
+    "untitledProject": "Untitled",
+    "createProjectError": "Failed to create project. Please try again."
   },
   "settings": {
     "title": "Settings",
@@ -140,6 +148,7 @@
     "model": "Model",
     "placeholder": {
       "selectProject": "Select a project first",
+      "creatingProject": "Creating project...",
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
       "readOnly": "View-only access",
@@ -202,7 +211,15 @@
     "searchMinChars": "Type at least 3 characters to search",
     "searchNoResults": "No results",
     "searchUnavailable": "Directory search is unavailable",
-    "searchInvite": "Invite"
+    "searchInvite": "Invite",
+    "colName": "Project",
+    "colOwner": "Owner",
+    "colUrl": "URL",
+    "colCreated": "Created",
+    "colPublished": "Published",
+    "openProject": "Open project",
+    "searchApps": "Search by project, owner or URL",
+    "noMatches": "No matching apps"
   },
   "version": {
     "currentVersion": "Current version",

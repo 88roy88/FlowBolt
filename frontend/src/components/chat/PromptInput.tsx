@@ -8,6 +8,7 @@ import { ArrowUp, CirclePlus, Loader2, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
+import { startProjectFromPrompt } from '../../utils/newProject';
 
 export function PromptInput() {
   const { t } = useTranslation();
@@ -22,8 +23,12 @@ export function PromptInput() {
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const projectId = useSessionStore((s) => s.projectId);
+  const isCreating = useSessionStore((s) => s.isCreating);
+  const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
-  const inputBlocked = lock !== null || awaitingPlan;
+  const inputBlocked = lock !== null || awaitingPlan || isCreating;
+  // No project open: submitting starts a new one, if the user may create projects
+  const startsProject = !projectId && canCreate;
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
@@ -34,8 +39,9 @@ export function PromptInput() {
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || inputBlocked || !projectId) return;
-    sendMessage(trimmed);
+    if (!trimmed || inputBlocked) return;
+    if (projectId) sendMessage(trimmed);
+    else if (startsProject) void startProjectFromPrompt(trimmed);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -45,7 +51,7 @@ export function PromptInput() {
     }
   };
 
-  const disabled = inputBlocked || !projectId;
+  const disabled = inputBlocked || (!projectId && !startsProject);
   const canSend = !!value.trim() && !disabled;
   const dsOpen = showDsSelector && !disabled;
 
@@ -62,7 +68,8 @@ export function PromptInput() {
   }, []);
 
   const placeholderText = () => {
-    if (!projectId) return t('chat.placeholder.selectProject');
+    if (isCreating) return t('chat.placeholder.creatingProject');
+    if (!projectId && !startsProject) return t('chat.placeholder.selectProject');
     if (awaitingPlan) return t('chat.placeholder.reviewPlan');
     if (lock) return t(LOCK_MESSAGES[lock]);
     return t('chat.placeholder.default');
@@ -140,7 +147,7 @@ export function PromptInput() {
 
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}
-          {projectId && (
+          {(projectId || startsProject) && (
             <button
               onClick={() => setShowDsSelector((v) => !v)}
               disabled={disabled}
