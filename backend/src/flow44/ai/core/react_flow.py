@@ -18,10 +18,18 @@ StateT = TypeVar("StateT", bound=BaseModel)
 MALFORMED_TOOL_CALL_CORRECTION = (
     "Your last tool call was malformed text. Call the tool through the tool-calling interface."
 )
+LEAKED_TOOL_CALL_MARKERS = (
+    "<invoke name=",
+    "｜DSML｜",
+    "<tool_call>",
+    "<function_calls>",
+    "[TOOL_CALLS]",
+    "<|python_tag|>",
+)
 
 
 def looks_like_leaked_tool_call(text: str) -> bool:
-    return "<invoke" in text or "DSML" in text
+    return any(marker in text for marker in LEAKED_TOOL_CALL_MARKERS)
 
 
 class ReActFlow(Flow[StateT], Generic[StateT]):

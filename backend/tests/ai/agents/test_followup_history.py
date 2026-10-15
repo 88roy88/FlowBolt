@@ -80,6 +80,12 @@ def test_leaked_tool_call_text_is_skipped() -> None:
     assert [m.content for m in _convert(history)] == ["hi", "all good"]
 
 
+def test_prose_mentioning_markup_names_is_kept() -> None:
+    history = [_row(ChatRole.user, "hi"), _row(ChatRole.assistant, "DSML uses an <invoke> tag for tool calls.")]
+
+    assert [m.content for m in _convert(history)] == ["hi", "DSML uses an <invoke> tag for tool calls."]
+
+
 def test_rows_without_content_leave_no_placeholder() -> None:
     history = [_row(ChatRole.user, "hi"), _row(ChatRole.assistant, "  "), _row(ChatRole.user, "again")]
 
