@@ -129,11 +129,13 @@ export default function App() {
     if (currentProject) return;
 
     let cancelled = false;
-    const hashProjectId = getProjectIdFromHash();
-    (hashProjectId ? findProject(hashProjectId) : Promise.resolve(null)).then((match) => {
+    async function selectInitialProject() {
+      const hashProjectId = getProjectIdFromHash();
+      const match = hashProjectId ? await findProject(hashProjectId) : null;
       if (cancelled || useSessionStore.getState().currentProject) return;
       selectProject(match ?? projects[0]);
-    });
+    }
+    void selectInitialProject();
     return () => { cancelled = true; };
   }, [loading, projects, currentProject, selectProject]);
 
