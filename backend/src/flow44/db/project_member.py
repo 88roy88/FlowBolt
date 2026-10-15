@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, ForeignKey, String, UniqueConstraint, and_, or_
+from sqlalchemy import Column, ForeignKey, String, UniqueConstraint, and_, or_, tuple_
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.auth.permissions import Role
@@ -107,16 +107,9 @@ async def list_projects_for_user(
     if not include_all:
         query = query.where(or_(col(Project.user_id) == user_id, col(ProjectMember.id).is_not(None)))
     if name_query:
-        escaped = name_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        query = query.where(col(Project.name).ilike(f"%{escaped}%", escape="\\"))
+        query = query.where(col(Project.name).icontains(name_query, autoescape=True))
     if before is not None:
-        created_at, project_id = before
-        query = query.where(
-            or_(
-                col(Project.created_at) < created_at,
-                and_(col(Project.created_at) == created_at, col(Project.id) < project_id),
-            )
-        )
+        query = query.where(tuple_(col(Project.created_at), col(Project.id)) < before)
     query = query.order_by(col(Project.created_at).desc(), col(Project.id).desc()).limit(limit)
 
     async with database.async_session() as session:
