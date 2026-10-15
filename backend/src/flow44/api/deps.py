@@ -1,12 +1,14 @@
 import logging
 from collections.abc import AsyncIterator
-from typing import Annotated, Any
+from typing import Annotated, Any, NamedTuple
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from flow44.auth.permissions import (
+    DisplayRole,
+    ImplicitRole,
     Permission,
     Role,
     get_admin_permissions,
@@ -118,37 +120,55 @@ def is_admin(user_id: str) -> bool:
     return user_id in settings.SYSTEM_ADMIN_IDS
 
 
-async def get_project(project_id: str, user_id: UserDep) -> Project:
-    project = await db_get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+def resolve_role(project: Project, user_id: str, member_role: Role | None) -> DisplayRole | None:
+    if project.user_id == user_id:
+        return ImplicitRole.owner
+    if is_admin(user_id):
+        return ImplicitRole.admin
+    return member_role
 
-    has_access = (
-        project.user_id == user_id or is_admin(user_id) or await get_project_member(project_id, user_id) is not None
-    )
-    if not has_access:
+
+async def get_project_role(project: Project, user_id: str) -> DisplayRole | None:
+    if role := resolve_role(project, user_id, None):
+        return role
+    member = await get_project_member(project.id, user_id)
+    return Role(member.role) if member else None
+
+
+def _permissions_for(role: DisplayRole) -> set[Permission]:
+    if isinstance(role, Role):
+        return get_role_permissions(role)
+    return get_owner_permissions() if role is ImplicitRole.owner else get_admin_permissions()
+
+
+class ProjectWithRole(NamedTuple):
+    project: Project
+    role: DisplayRole
+
+
+async def get_project_with_role(project_id: str, user_id: UserDep) -> ProjectWithRole:
+    project = await db_get_project(project_id)
+    role = await get_project_role(project, user_id) if project else None
+    if project is None or role is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
     _log_project_id.set(project.id)
-    return project
+    return ProjectWithRole(project, role)
+
+
+ProjectWithRoleDep = Annotated[ProjectWithRole, Depends(get_project_with_role)]
+
+
+async def get_project(project_with_role: ProjectWithRoleDep) -> Project:
+    return project_with_role.project
 
 
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
+async def get_user_permissions(project_with_role: ProjectWithRoleDep) -> set[Permission]:
     """Resolve the current user's permissions on a project."""
-    if project.user_id == user_id:
-        return get_owner_permissions()
-
-    if is_admin(user_id):
-        return get_admin_permissions()
-
-    member = await get_project_member(project.id, user_id)
-    if member is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    return get_role_permissions(Role(member.role))
+    return _permissions_for(project_with_role.role)
 
 
 PermissionsDep = Annotated[set[Permission], Depends(get_user_permissions)]
@@ -210,29 +230,26 @@ async def get_ws_user_id(
 WsUserDep = Annotated[str, Depends(get_ws_user_id)]
 
 
-async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
+async def get_ws_project_with_role(project_id: str, user_id: WsUserDep) -> ProjectWithRole:
     try:
-        return await get_project(project_id, user_id)
+        return await get_project_with_role(project_id, user_id)
     except HTTPException:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
+
+
+WsProjectWithRoleDep = Annotated[ProjectWithRole, Depends(get_ws_project_with_role)]
+
+
+async def get_ws_project(project_with_role: WsProjectWithRoleDep) -> Project:
+    return project_with_role.project
 
 
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
+async def get_ws_permissions(project_with_role: WsProjectWithRoleDep) -> set[Permission]:
     """WS variant of get_user_permissions."""
-    if project.user_id == user_id:
-        return get_owner_permissions()
-
-    if is_admin(user_id):
-        return get_admin_permissions()
-
-    member = await get_project_member(project.id, user_id)
-    if member is None:
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
-
-    return get_role_permissions(Role(member.role))
+    return _permissions_for(project_with_role.role)
 
 
 WsPermissionsDep = Annotated[set[Permission], Depends(get_ws_permissions)]

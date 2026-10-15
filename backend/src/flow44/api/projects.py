@@ -11,8 +11,17 @@ from typing import Annotated, Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
 
-from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, is_admin, require_permission
-from flow44.auth.permissions import Role, get_admin_permissions, has_permission
+from flow44.api.deps import (
+    Permission,
+    PlatformUserDep,
+    ProjectDep,
+    ProjectWithRoleDep,
+    UserDep,
+    is_admin,
+    require_permission,
+    resolve_role,
+)
+from flow44.auth.permissions import DisplayRole, ImplicitRole, get_admin_permissions, has_permission
 from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import (
     Project,
@@ -21,7 +30,7 @@ from flow44.db.project import (
     rename_project,
     update_project_model,
 )
-from flow44.db.project_member import get_project_member, list_accessible_projects
+from flow44.db.project_member import list_accessible_projects
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
@@ -54,10 +63,10 @@ class ProjectResponse(BaseModel):
     selected_model: str
     published_url: str | None = None
     published_at: str | None = None
-    role: str
+    role: DisplayRole
 
 
-def _serialize_project(project: Project, role: str) -> ProjectResponse:
+def _serialize_project(project: Project, role: DisplayRole) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
 
 
@@ -85,14 +94,6 @@ def _decode_cursor(cursor: str) -> tuple[str, str]:
     return created_at, project_id
 
 
-def _role_for(project: Project, user_id: str, member_role: Role | None) -> str:
-    if project.user_id == user_id:
-        return "owner"
-    if is_admin(user_id) or member_role is None:
-        return "admin"
-    return member_role.value
-
-
 class ProjectListResponse(BaseModel):
     projects: list[ProjectResponse]
     next_cursor: str | None
@@ -115,15 +116,16 @@ async def list_user_projects(
     )
     page = rows[:limit]
     return ProjectListResponse(
-        projects=[_serialize_project(p, _role_for(p, user_id, role)) for p, role in page],
+        projects=[
+            _serialize_project(p, role) for p, member_role in page if (role := resolve_role(p, user_id, member_role))
+        ],
         next_cursor=_encode_cursor(page[-1][0]) if len(rows) > limit else None,
     )
 
 
 @router.get("/{project_id}")
-async def get_single_project(project: ProjectDep, user_id: UserDep) -> ProjectResponse:
-    member = None if project.user_id == user_id or is_admin(user_id) else await get_project_member(project.id, user_id)
-    return _serialize_project(project, _role_for(project, user_id, Role(member.role) if member else None))
+async def get_single_project(project_with_role: ProjectWithRoleDep) -> ProjectResponse:
+    return _serialize_project(project_with_role.project, project_with_role.role)
 
 
 @router.post("", status_code=201)
@@ -141,7 +143,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_create())
-    return _serialize_project(project, "owner")
+    return _serialize_project(project, ImplicitRole.owner)
 
 
 @router.patch("/{project_id}/name", status_code=200)

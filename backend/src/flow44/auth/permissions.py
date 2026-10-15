@@ -19,6 +19,13 @@ class Role(StrEnum):
     maintainer = "maintainer"
 
 
+class ImplicitRole(StrEnum):
+    admin = "admin"
+    owner = "owner"
+
+
+DisplayRole = Role | ImplicitRole
+
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.viewer: {Permission.read},
     Role.editor: {Permission.read, Permission.write},
