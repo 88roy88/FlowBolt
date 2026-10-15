@@ -105,9 +105,7 @@ class DirectoryClient:
         return [AdGroup.model_validate(r) for r in await self._search("/groups", {"customFilter": custom_filter})]
 
     async def _search(self, path: str, params: dict[str, str]) -> list[dict[str, Any]]:
-        # Params are pre-encoded and appended to the URL rather than passed via
-        # params=: httpx encodes a space in a query as "+", which the directory
-        # service rejects. quote encodes it as "%20", which httpx preserves verbatim.
+        # Encode spaces as %20, not httpx's "+", which the directory service rejects.
         query_string = urlencode(params, quote_via=quote)
         try:
             async with httpx.AsyncClient(
@@ -117,11 +115,8 @@ class DirectoryClient:
                 headers=self._headers,
             ) as http:
                 resp = await http.get(f"{path}?{query_string}")
-            # The directory service answers a query that matches nothing with 404
-            # rather than an empty list. That's "no results", not a failure — return
-            # [] so the UI shows "no results" instead of a directory-unavailable error.
-            # Genuine faults (timeouts, connect errors, 5xx) still raise below.
             if resp.status_code == 404:
+                # The directory service returns 404 on "no results"
                 return []
             resp.raise_for_status()
             data = resp.json()
