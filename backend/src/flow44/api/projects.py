@@ -30,7 +30,7 @@ from flow44.db.project import (
     rename_project,
     update_project_model,
 )
-from flow44.db.project_member import list_accessible_projects
+from flow44.db.project_member import list_projects_for_user
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
@@ -107,7 +107,7 @@ async def list_user_projects(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> ProjectListResponse:
     user_perms = get_admin_permissions() if is_admin(user_id) else set()
-    rows = await list_accessible_projects(
+    rows = await list_projects_for_user(
         user_id,
         include_all=has_permission(user_perms, Permission.read),
         name_query=q.strip(),

@@ -92,7 +92,7 @@ async def list_project_members(project_id: str) -> list[ProjectMember]:
         return list(result.scalars().all())
 
 
-async def list_accessible_projects(
+async def list_projects_for_user(
     user_id: str,
     *,
     include_all: bool = False,
