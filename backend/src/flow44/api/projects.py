@@ -9,9 +9,22 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from flow44.api.deps import Permission, PlatformUserDep, ProjectDep, UserDep, is_admin, require_permission
-from flow44.auth.permissions import get_admin_permissions, has_permission
-from flow44.db.platform_user import is_platform_user as db_is_platform_user
+from flow44.api.deps import (
+    Permission,
+    PlatformUserDep,
+    ProjectDep,
+    UserDep,
+    has_platform_access,
+    is_admin,
+    require_permission,
+)
+from flow44.auth.permissions import (
+    ROLE_RANK,
+    DisplayRole,
+    ImplicitRole,
+    get_admin_permissions,
+    has_permission,
+)
 from flow44.db.project import (
     Project,
     create_project,
@@ -22,6 +35,8 @@ from flow44.db.project import (
 )
 from flow44.db.project import list_user_projects as db_list_user_projects
 from flow44.db.project_member import list_shared_projects
+from flow44.db.project_member_group import list_group_shared_projects
+from flow44.integrations.directory.client import directory_client
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
@@ -54,20 +69,19 @@ class ProjectResponse(BaseModel):
     selected_model: str
     published_url: str | None = None
     published_at: str | None = None
-    role: str
+    role: DisplayRole
 
 
-def _serialize_project(project: Project, role: str) -> ProjectResponse:
+def _serialize_project(project: Project, role: DisplayRole) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
 
 
 @router.get("/me")
 async def get_current_user(user_id: UserDep) -> dict[str, Any]:
-    admin = is_admin(user_id)
     return {
         "user_id": user_id,
-        "is_admin": admin,
-        "is_platform_user": admin or await db_is_platform_user(user_id),
+        "is_admin": is_admin(user_id),
+        "is_platform_user": await has_platform_access(user_id),
     }
 
 
@@ -80,19 +94,33 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
         all_projects = await list_all_projects()
         result: list[ProjectResponse] = []
         for p in all_projects:
-            role = "owner" if p.user_id == user_id else "admin"
+            role: DisplayRole = ImplicitRole.owner if p.user_id == user_id else ImplicitRole.admin
             result.append(_serialize_project(p, role))
         return result
 
-    owned, shared = await asyncio.gather(db_list_user_projects(user_id), list_shared_projects(user_id))
+    # Overlap the slow directory lookup with the DB queries. The DB queries themselves run
+    # one after another: concurrent sessions can't share a connection (as they do in tests).
+    group_lookup = asyncio.create_task(directory_client.get_user_group_ids(user_id))
+    owned = await db_list_user_projects(user_id)
+    shared = await list_shared_projects(user_id)
+    group_shared = await list_group_shared_projects(await group_lookup)
 
-    result = []
+    # Collapse to one entry per project, keeping the highest-ranked role for display.
+    by_id: dict[str, tuple[Project, DisplayRole]] = {}
+
+    def _merge(project: Project, role: DisplayRole) -> None:
+        existing = by_id.get(project.id)
+        if existing is None or ROLE_RANK[role] > ROLE_RANK[existing[1]]:
+            by_id[project.id] = (project, role)
+
     for p in owned:
-        result.append(_serialize_project(p, "owner"))
+        _merge(p, ImplicitRole.owner)
     for p, role in shared:
-        result.append(_serialize_project(p, role.value))
+        _merge(p, role)
+    for p, role in group_shared:
+        _merge(p, role)
 
-    return result
+    return [_serialize_project(p, role) for p, role in by_id.values()]
 
 
 @router.post("", status_code=201)
@@ -110,7 +138,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_create())
-    return _serialize_project(project, "owner")
+    return _serialize_project(project, ImplicitRole.owner)
 
 
 @router.patch("/{project_id}/name", status_code=200)
