@@ -167,7 +167,6 @@ ProjectDep = Annotated[Project, Depends(get_project)]
 
 
 async def get_user_permissions(project_with_role: ProjectWithRoleDep) -> set[Permission]:
-    """Resolve the current user's permissions on a project."""
     return _permissions_for(project_with_role.role)
 
 
@@ -248,7 +247,6 @@ WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
 async def get_ws_permissions(project_with_role: WsProjectWithRoleDep) -> set[Permission]:
-    """WS variant of get_user_permissions."""
     return _permissions_for(project_with_role.role)
 
 
