@@ -15,6 +15,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow, looks_like_leaked_tool_call
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
+from flow44.config import settings
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
@@ -22,20 +23,19 @@ from flow44.sandbox.main import PnpmSandbox
 
 MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
-HISTORY_CHAR_BUDGET = 600_000
-MIN_HISTORY_RUNS = 5
 
 
 def _trim_start(history: list[ChatMessage]) -> int:
     run_starts = [i for i, m in enumerate(history) if m.role == ChatRole.user]
     if not run_starts:
         return 0
+    budget = settings.AI_HISTORY_CHAR_BUDGET
     sizes = [len(json.dumps(m.raw_message)) if m.raw_message else len(m.content) for m in history]
     suffix_sizes = list(accumulate(reversed(sizes)))[::-1]
-    if suffix_sizes[0] <= HISTORY_CHAR_BUDGET:
+    if suffix_sizes[0] <= budget:
         return 0
-    oldest_protected = run_starts[-MIN_HISTORY_RUNS:][0]
-    return next(i for i in run_starts if suffix_sizes[i] <= HISTORY_CHAR_BUDGET or i >= oldest_protected)
+    oldest_protected = run_starts[-settings.AI_HISTORY_MIN_RUNS :][0]
+    return next(i for i in run_starts if suffix_sizes[i] <= budget or i >= oldest_protected)
 
 
 def _format_file_safety_error(exc: FileSafetyError) -> str:

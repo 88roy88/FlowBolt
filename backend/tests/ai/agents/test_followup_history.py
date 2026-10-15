@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from flow44.ai.agents.followup import agent as followup_agent
 from flow44.ai.agents.followup.agent import FollowUpAgent
+from flow44.config import settings
 from flow44.db.chat import ChatMessage, ChatRole
 
 
@@ -45,7 +45,7 @@ def test_history_under_budget_is_kept_whole() -> None:
 
 
 def test_history_over_budget_is_cut_at_a_run_start_and_fits(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(followup_agent, "HISTORY_CHAR_BUDGET", 3000)
+    monkeypatch.setattr(settings, "AI_HISTORY_CHAR_BUDGET", 3000)
     history = _history(30)
     messages = _convert(history)
 
@@ -62,7 +62,7 @@ def test_history_over_budget_is_cut_at_a_run_start_and_fits(monkeypatch: pytest.
 
 
 def test_last_runs_are_kept_even_when_they_exceed_the_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(followup_agent, "HISTORY_CHAR_BUDGET", 10)
+    monkeypatch.setattr(settings, "AI_HISTORY_CHAR_BUDGET", 10)
     messages = _convert(_history(30))
 
     assert _user_requests(messages) == [f"request {n}" for n in range(25, 30)]
