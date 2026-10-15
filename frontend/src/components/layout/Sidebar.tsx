@@ -1,4 +1,4 @@
-import { useState, useRef, type CSSProperties } from 'react';
+import { useState, useRef, useLayoutEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
@@ -39,6 +39,21 @@ function getProjectColor(name: string) {
 
 const anchorName = (id: string) => `--a${id.replace(/-/g, '')}`;
 
+// Polyfill to support menu positioning for Chromium versions under 125.
+// placeMenu() mirrors the .anchored-menu CSS.
+const supportsAnchor = typeof CSS !== 'undefined' && CSS.supports('anchor-name', '--a');
+function placeMenu(menu: HTMLElement, button: HTMLElement) {
+  const MARGIN = 2;
+  const btn = button.getBoundingClientRect();
+  const { offsetWidth: w, offsetHeight: h } = menu;
+  const rtl = getComputedStyle(menu).direction === 'rtl';
+  let top = btn.bottom;
+  if (top + h + 2 * MARGIN > window.innerHeight && btn.top - h - 2 * MARGIN >= 0) top = btn.top - h - 2 * MARGIN;
+  const left = Math.min(Math.max(rtl ? btn.left : btn.right - w, 0), window.innerWidth - w);
+  menu.style.top = `${top}px`;
+  menu.style.left = `${left}px`;
+}
+
 function getInitials(name: string) {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
@@ -60,6 +75,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
   const [renameValue, setRenameValue] = useState('');
   const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLElement | null>(null);
 
   const canCreate = userStatus?.is_platform_user || userStatus?.is_admin;
 
@@ -129,6 +145,15 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
   };
 
   const menuProject = projects.find((p) => p.id === menuProjectId);
+
+  const positionMenu = () => {
+    const menu = menuRef.current;
+    if (supportsAnchor || !menu || !menuButtonRef.current || !menu.matches(':popover-open')) return;
+    placeMenu(menu, menuButtonRef.current);
+  };
+
+  // Re-place after switching projects while open: the menu's items (and so its height) depend on the project's role
+  useLayoutEffect(positionMenu, [menuProjectId]);
   const canSearchProjects = projects.length > 10;
   const normalizedSearch = canSearchProjects ? searchQuery.trim().toLowerCase() : '';
   const visibleProjects = normalizedSearch
@@ -254,6 +279,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
                     if (menuProjectId !== project.id && menuRef.current?.matches(':popover-open')) {
                       e.preventDefault();
                     }
+                    menuButtonRef.current = e.currentTarget;
                     setMenuProjectId(project.id);
                   }}
                   style={{ anchorName: anchorName(project.id) } as CSSProperties}
@@ -278,6 +304,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
         popover="auto"
         onToggle={(e) => {
           if ((e as unknown as ToggleEvent).newState === 'closed') setPendingDeleteId(null);
+          else positionMenu();
         }}
         style={menuProject ? ({ positionAnchor: anchorName(menuProject.id) } as CSSProperties) : undefined}
         className="anchored-menu min-w-35 bg-popover border border-border rounded-lg shadow-[var(--shadow-lg)] py-1"
