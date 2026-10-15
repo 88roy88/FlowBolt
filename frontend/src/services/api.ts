@@ -284,6 +284,7 @@ export async function fetchPublishedApps(): Promise<{
   owner_id: string;
   project_url: string;
   public_path: string;
+  created_at: string;
   published_at: string;
 }[]> {
   return request('/admin/published-apps');
