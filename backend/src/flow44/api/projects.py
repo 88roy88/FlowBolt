@@ -18,7 +18,13 @@ from flow44.api.deps import (
     is_admin,
     require_permission,
 )
-from flow44.auth.permissions import ADMIN_ROLE, OWNER_ROLE, ROLE_RANK, get_admin_permissions, has_permission
+from flow44.auth.permissions import (
+    ROLE_RANK,
+    DerivedRole,
+    DisplayRole,
+    get_admin_permissions,
+    has_permission,
+)
 from flow44.db.project import (
     Project,
     create_project,
@@ -63,10 +69,10 @@ class ProjectResponse(BaseModel):
     selected_model: str
     published_url: str | None = None
     published_at: str | None = None
-    role: str
+    role: DisplayRole
 
 
-def _serialize_project(project: Project, role: str) -> ProjectResponse:
+def _serialize_project(project: Project, role: DisplayRole) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
 
 
@@ -88,7 +94,7 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
         all_projects = await list_all_projects()
         result: list[ProjectResponse] = []
         for p in all_projects:
-            role = OWNER_ROLE if p.user_id == user_id else ADMIN_ROLE
+            role: DisplayRole = DerivedRole.owner if p.user_id == user_id else DerivedRole.admin
             result.append(_serialize_project(p, role))
         return result
 
@@ -100,19 +106,19 @@ async def list_user_projects(user_id: UserDep) -> list[ProjectResponse]:
     group_shared = await list_group_shared_projects(await group_lookup)
 
     # Collapse to one entry per project, keeping the highest-ranked role for display.
-    by_id: dict[str, tuple[Project, str]] = {}
+    by_id: dict[str, tuple[Project, DisplayRole]] = {}
 
-    def _merge(project: Project, role: str) -> None:
+    def _merge(project: Project, role: DisplayRole) -> None:
         existing = by_id.get(project.id)
-        if existing is None or ROLE_RANK.get(role, 0) > ROLE_RANK.get(existing[1], 0):
+        if existing is None or ROLE_RANK[role] > ROLE_RANK[existing[1]]:
             by_id[project.id] = (project, role)
 
     for p in owned:
-        _merge(p, OWNER_ROLE)
+        _merge(p, DerivedRole.owner)
     for p, role in shared:
-        _merge(p, role.value)
+        _merge(p, role)
     for p, role in group_shared:
-        _merge(p, role.value)
+        _merge(p, role)
 
     return [_serialize_project(p, role) for p, role in by_id.values()]
 
@@ -132,7 +138,7 @@ async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDe
             await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
 
     asyncio.create_task(_create())
-    return _serialize_project(project, OWNER_ROLE)
+    return _serialize_project(project, DerivedRole.owner)
 
 
 @router.patch("/{project_id}/name", status_code=200)
