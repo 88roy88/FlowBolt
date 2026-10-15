@@ -92,18 +92,6 @@ async def list_project_members(project_id: str) -> list[ProjectMember]:
         return list(result.scalars().all())
 
 
-async def list_shared_projects(user_id: str) -> list[tuple[Project, Role]]:
-    """Returns projects shared with the user and their role."""
-    async with database.async_session() as session:
-        result = await session.execute(
-            select(Project, ProjectMember.role)
-            .join(ProjectMember, col(ProjectMember.project_id) == col(Project.id))
-            .where(col(ProjectMember.user_id) == user_id)
-            .order_by(col(Project.created_at).desc())
-        )
-        return [(row[0], Role(row[1])) for row in result.all()]
-
-
 async def list_accessible_projects(
     user_id: str,
     *,
