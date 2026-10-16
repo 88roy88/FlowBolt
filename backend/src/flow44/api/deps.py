@@ -118,6 +118,10 @@ def is_admin(user_id: str) -> bool:
     return user_id in settings.SYSTEM_ADMIN_IDS
 
 
+def can_use_terminal(user_id: str) -> bool:
+    return settings.SANDBOX_MODE != "local" or is_admin(user_id)
+
+
 async def get_project(project_id: str, user_id: UserDep) -> Project:
     project = await db_get_project(project_id)
     if project is None:
