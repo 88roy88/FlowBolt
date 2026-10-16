@@ -16,8 +16,10 @@ const BOTTOM_MAX = 600;
 export function BottomDrawer() {
   const { t } = useTranslation();
   const currentProject = useSessionStore((s) => s.currentProject);
+  const canUseTerminal = useSessionStore((s) => !!s.userStatus?.can_use_terminal);
   const canWrite = !currentProject?.role || WRITE_ROLES.has(currentProject.role);
-  const bottomTabs: BottomTab[] = canWrite ? ['server', 'terminal', 'console'] : ['server', 'console'];
+  const showTerminal = canWrite && canUseTerminal;
+  const bottomTabs: BottomTab[] = showTerminal ? ['server', 'terminal', 'console'] : ['server', 'console'];
 
   const [bottomOpen, setBottomOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>('server');
@@ -77,7 +79,7 @@ export function BottomDrawer() {
           <div style={{ height: bottomHeight }}>
             <Resizer direction="vertical" onDrag={handleBottomResize} />
             <div style={{ height: bottomHeight - 1 }} className="overflow-hidden">
-              {bottomTab === 'terminal' && canWrite ? <Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
+              {bottomTab === 'terminal' && showTerminal ?<Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
             </div>
           </div>
         </>

@@ -117,6 +117,7 @@ export interface UserStatus {
   user_id: string;
   is_admin: boolean;
   is_platform_user: boolean;
+  can_use_terminal: boolean;
 }
 
 export interface AIModel {
