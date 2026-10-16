@@ -92,9 +92,9 @@ def _build_nsjail_args(
         f"sandbox-{project_id[:8]}",
         "--disable_clone_newnet",
         "--user",
-        "1000:1000:1",
+        f"1000:{os.getuid()}:1",
         "--group",
-        "1000:1000:1",
+        f"1000:{os.getgid()}:1",
         "--disable_proc",
     ]
 

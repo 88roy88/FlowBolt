@@ -70,6 +70,12 @@ RUN uv sync --no-dev --frozen
 # Ensure /app directory and all contents are owned by appuser
 RUN chown -R appuser:appuser /app
 
+RUN chgrp -R 0 /app /var/lib/flow-44 /home/appuser \
+    && chmod -R g=u /app /var/lib/flow-44 /home/appuser
+
+# An arbitrary uid has no passwd entry, so HOME would default to / (not writable)
+ENV HOME=/home/appuser
+
 # Switch to non-root user
 USER appuser
 
