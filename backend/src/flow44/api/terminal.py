@@ -3,9 +3,16 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException
 
-from flow44.api.deps import Permission, WsProjectDep, WsSandboxDep, require_ws_permission
+from flow44.api.deps import (
+    Permission,
+    WsProjectDep,
+    WsSandboxDep,
+    WsUserDep,
+    can_use_terminal,
+    require_ws_permission,
+)
 from flow44.sandbox.pty import BasePTY
 
 logger = logging.getLogger(__name__)
@@ -16,10 +23,14 @@ router = APIRouter()
 @router.websocket("/ws/terminal/{project_id}")
 async def terminal_ws(  # noqa: C901
     websocket: WebSocket,
+    user_id: WsUserDep,
     project: WsProjectDep,
     sandbox: WsSandboxDep,
     _perms: set[Permission] = require_ws_permission(Permission.write),
 ) -> None:
+    if not can_use_terminal(user_id):
+        raise WebSocketException(code=4403, reason="Terminal is not available")
+
     await websocket.accept()
 
     pty: BasePTY | None = None
