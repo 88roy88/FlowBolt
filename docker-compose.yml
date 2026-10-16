@@ -42,6 +42,8 @@ services:
       - apparmor:unconfined
       - seccomp:unconfined
     cgroup: host
+    ports:
+      - "8000:8000"
     volumes:
       - workspaces:/var/lib/flow-44/workspaces
     env_file:
@@ -55,6 +57,7 @@ services:
       AIB_DB_PORT: *db-port
       AIB_WORKSPACE_BASE_DIR: /var/lib/flow-44/workspaces
       AIB_FLAPI_BASE_URL: http://flapi-mock:6001
+      AIB_S3_ENDPOINT_URL: *s3-url
       S3_ENDPOINT_URL: *s3-url
       S3_BUCKET_NAME: *s3-bucket
     healthcheck:
