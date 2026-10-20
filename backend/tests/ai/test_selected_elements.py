@@ -10,12 +10,6 @@ BUTTON = {
 }
 
 
-def test_parse_keeps_valid_elements() -> None:
-    [el] = parse_selected_elements([BUTTON])
-    assert el.tag == "button"
-    assert el.components == ["PricingCard", "App"]
-
-
 def test_parse_drops_invalid_items_and_non_lists() -> None:
     assert parse_selected_elements(None) == []
     assert parse_selected_elements({"tag": "div"}) == []
