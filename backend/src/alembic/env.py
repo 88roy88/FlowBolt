@@ -26,9 +26,11 @@ import flow44.db.events  # noqa
 import flow44.db.heartbeat  # noqa
 import flow44.db.pending_plan  # noqa
 import flow44.db.platform_user  # noqa
+import flow44.db.platform_user_group  # noqa
 import flow44.db.project  # noqa
 import flow44.db.project_data_source  # noqa
 import flow44.db.project_member  # noqa
+import flow44.db.project_member_group  # noqa
 
 target_metadata = SQLModel.metadata
 
