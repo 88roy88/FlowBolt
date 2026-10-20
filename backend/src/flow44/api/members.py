@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
@@ -10,12 +12,19 @@ from flow44.db.project_member import (
     remove_member,
     update_member_role,
 )
+from flow44.db.project_member_group import (
+    add_group,
+    list_project_groups,
+    remove_group,
+    update_group_role,
+)
 
 router = APIRouter(prefix="/api/projects/{project_id}/members", tags=["members"])
 
 
 class AddMemberRequest(BaseModel):
     user_id: str
+    display_name: str = ""
     role: Role = Role.viewer
 
 
@@ -25,8 +34,29 @@ class UpdateMemberRoleRequest(BaseModel):
 
 class MemberResponse(BaseModel):
     user_id: str
+    display_name: str
     role: str
-    created_at: str
+    created_at: datetime | None
+    invited_by: str
+
+
+class AddGroupRequest(BaseModel):
+    group_id: str  # AD distinguishedName (DN)
+    group_name: str = ""
+    email: str = ""
+    role: Role = Role.viewer
+
+
+class UpdateGroupRoleRequest(BaseModel):
+    role: Role
+
+
+class GroupMemberResponse(BaseModel):
+    group_id: str
+    group_name: str
+    email: str
+    role: str
+    created_at: datetime | None
     invited_by: str
 
 
@@ -37,7 +67,13 @@ async def list_members(
 ) -> list[MemberResponse]:
     members = await list_project_members(project.id)
     return [
-        MemberResponse(user_id=m.user_id, role=m.role, created_at=m.created_at, invited_by=m.invited_by)
+        MemberResponse(
+            user_id=m.user_id,
+            display_name=m.display_name,
+            role=m.role,
+            created_at=m.created_at,
+            invited_by=m.invited_by,
+        )
         for m in members
     ]
 
@@ -58,11 +94,16 @@ async def add_project_member(
             user_id=body.user_id,
             role=body.role,
             invited_by=user_id,
+            display_name=body.display_name,
         )
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="User is already a member of this project") from exc
     return MemberResponse(
-        user_id=member.user_id, role=member.role, created_at=member.created_at, invited_by=member.invited_by
+        user_id=member.user_id,
+        display_name=member.display_name,
+        role=member.role,
+        created_at=member.created_at,
+        invited_by=member.invited_by,
     )
 
 
@@ -77,7 +118,11 @@ async def update_member(
     if member is None:
         raise HTTPException(status_code=404, detail="Member not found")
     return MemberResponse(
-        user_id=member.user_id, role=member.role, created_at=member.created_at, invited_by=member.invited_by
+        user_id=member.user_id,
+        display_name=member.display_name,
+        role=member.role,
+        created_at=member.created_at,
+        invited_by=member.invited_by,
     )
 
 
@@ -90,3 +135,84 @@ async def remove_project_member(
     removed = await remove_member(project.id, target_user_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Member not found")
+
+
+# --- Group grants (share a project with a directory group) ---
+
+
+@router.get("/groups")
+async def list_group_grants(
+    project: ProjectDep,
+    _perms: set[Permission] = require_permission(Permission.manage_members),
+) -> list[GroupMemberResponse]:
+    grants = await list_project_groups(project.id)
+    return [
+        GroupMemberResponse(
+            group_id=g.group_id,
+            group_name=g.group_name,
+            email=g.email,
+            role=g.role,
+            created_at=g.created_at,
+            invited_by=g.invited_by,
+        )
+        for g in grants
+    ]
+
+
+@router.post("/groups", status_code=201)
+async def add_group_grant(
+    project: ProjectDep,
+    body: AddGroupRequest,
+    user_id: UserDep,
+    _perms: set[Permission] = require_permission(Permission.manage_members),
+) -> GroupMemberResponse:
+    try:
+        grant = await add_group(
+            project_id=project.id,
+            group_id=body.group_id,
+            group_name=body.group_name,
+            role=body.role,
+            invited_by=user_id,
+            email=body.email,
+        )
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Group already has access to this project") from exc
+    return GroupMemberResponse(
+        group_id=grant.group_id,
+        group_name=grant.group_name,
+        email=grant.email,
+        role=grant.role,
+        created_at=grant.created_at,
+        invited_by=grant.invited_by,
+    )
+
+
+@router.patch("/groups/{group_id}")
+async def update_group_grant(
+    project: ProjectDep,
+    group_id: str,
+    body: UpdateGroupRoleRequest,
+    _perms: set[Permission] = require_permission(Permission.manage_members),
+) -> GroupMemberResponse:
+    grant = await update_group_role(project.id, group_id, body.role)
+    if grant is None:
+        raise HTTPException(status_code=404, detail="Group grant not found")
+    return GroupMemberResponse(
+        group_id=grant.group_id,
+        group_name=grant.group_name,
+        email=grant.email,
+        role=grant.role,
+        created_at=grant.created_at,
+        invited_by=grant.invited_by,
+    )
+
+
+@router.delete("/groups/{group_id}", status_code=204)
+async def remove_group_grant(
+    project: ProjectDep,
+    group_id: str,
+    _perms: set[Permission] = require_permission(Permission.manage_members),
+) -> None:
+    removed = await remove_group(project.id, group_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Group grant not found")

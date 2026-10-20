@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,11 @@ from flow44.db.platform_user import (
     add_platform_user,
     list_platform_users,
     remove_platform_user,
+)
+from flow44.db.platform_user_group import (
+    add_platform_group,
+    list_platform_groups,
+    remove_platform_group,
 )
 from flow44.db.project import Project, list_published_projects
 from flow44.sandbox.base import workspace_path
@@ -34,12 +40,28 @@ AdminDep = Annotated[str, Depends(require_admin)]
 
 class InviteUserRequest(BaseModel):
     user_id: str
+    display_name: str = ""
 
 
 class PlatformUserResponse(BaseModel):
     user_id: str
+    display_name: str
     invited_by: str
-    created_at: str
+    created_at: datetime | None
+
+
+class InviteGroupRequest(BaseModel):
+    group_id: str  # AD distinguishedName (DN)
+    group_name: str = ""
+    email: str = ""
+
+
+class PlatformGroupResponse(BaseModel):
+    group_id: str
+    group_name: str
+    email: str
+    invited_by: str
+    created_at: datetime | None
 
 
 class PublishedAppResponse(BaseModel):
@@ -55,16 +77,23 @@ class PublishedAppResponse(BaseModel):
 @router.get("/users")
 async def list_users(user_id: AdminDep) -> list[PlatformUserResponse]:
     users = await list_platform_users()
-    return [PlatformUserResponse(user_id=u.user_id, invited_by=u.invited_by, created_at=u.created_at) for u in users]
+    return [
+        PlatformUserResponse(
+            user_id=u.user_id, display_name=u.display_name, invited_by=u.invited_by, created_at=u.created_at
+        )
+        for u in users
+    ]
 
 
 @router.post("/users", status_code=201)
 async def invite_user(user_id: AdminDep, body: InviteUserRequest) -> PlatformUserResponse:
     try:
-        user = await add_platform_user(user_id=body.user_id, invited_by=user_id)
+        user = await add_platform_user(user_id=body.user_id, invited_by=user_id, display_name=body.display_name)
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="User already has platform access") from exc
-    return PlatformUserResponse(user_id=user.user_id, invited_by=user.invited_by, created_at=user.created_at)
+    return PlatformUserResponse(
+        user_id=user.user_id, display_name=user.display_name, invited_by=user.invited_by, created_at=user.created_at
+    )
 
 
 @router.get("/published-apps")
@@ -93,6 +122,45 @@ async def revoke_user(user_id: AdminDep, target_user_id: str) -> None:
     removed = await remove_platform_user(target_user_id)
     if not removed:
         raise HTTPException(status_code=404, detail="User not found")
+
+
+@router.get("/groups")
+async def list_groups(user_id: AdminDep) -> list[PlatformGroupResponse]:
+    groups = await list_platform_groups()
+    return [
+        PlatformGroupResponse(
+            group_id=g.group_id,
+            group_name=g.group_name,
+            email=g.email,
+            invited_by=g.invited_by,
+            created_at=g.created_at,
+        )
+        for g in groups
+    ]
+
+
+@router.post("/groups", status_code=201)
+async def invite_group(user_id: AdminDep, body: InviteGroupRequest) -> PlatformGroupResponse:
+    try:
+        group = await add_platform_group(
+            group_id=body.group_id, group_name=body.group_name, invited_by=user_id, email=body.email
+        )
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Group already has platform access") from exc
+    return PlatformGroupResponse(
+        group_id=group.group_id,
+        group_name=group.group_name,
+        email=group.email,
+        invited_by=group.invited_by,
+        created_at=group.created_at,
+    )
+
+
+@router.delete("/groups/{group_id}", status_code=204)
+async def revoke_group(user_id: AdminDep, group_id: str) -> None:
+    removed = await remove_platform_group(group_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Group not found")
 
 
 @router.post("/maintenance/fix-file-permissions", tags=["maintenance"])
