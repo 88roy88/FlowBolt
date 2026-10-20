@@ -4,11 +4,13 @@ import { useChatStore } from '../../stores/chat';
 import { isAwaitingPlanApproval } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
-import { ArrowUp, CirclePlus, Loader2, X } from 'lucide-react';
+import { ArrowUp, CirclePlus, Loader2, SquareDashedMousePointer, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
+import { elementLabel, elementTooltip } from '../../utils/selectedElement';
+import { FOCUS_CHAT_INPUT_EVENT } from '../../hooks/usePreviewBridge';
 
 export function PromptInput() {
   const { t } = useTranslation();
@@ -22,6 +24,8 @@ export function PromptInput() {
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
+  const selectedElements = useChatStore((s) => s.selectedElements);
+  const removeSelectedElement = useChatStore((s) => s.removeSelectedElement);
   const projectId = useSessionStore((s) => s.projectId);
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
@@ -63,8 +67,13 @@ export function PromptInput() {
         textareaRef.current?.focus();
       }
     };
+    const focus = () => textareaRef.current?.focus();
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener(FOCUS_CHAT_INPUT_EVENT, focus);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener(FOCUS_CHAT_INPUT_EVENT, focus);
+    };
   }, []);
 
   const placeholderText = () => {
@@ -113,10 +122,23 @@ export function PromptInput() {
             : 'border border-border shadow-[var(--shadow-md)]'
         }`}
       >
-        {/* Selected data source badges */}
-        {!dsOpen && selectedDataSources.length > 0 && (
+        {/* Selected element and data source badges */}
+        {((!dsOpen && selectedDataSources.length > 0) || selectedElements.length > 0) && (
           <div className="flex flex-wrap gap-1.5 px-1">
-            {selectedDataSources.map((c) => (
+            {selectedElements.map((el) => (
+              <Badge key={el.id} variant="accent" className="gap-1 max-w-full" title={elementTooltip(el)}>
+                <SquareDashedMousePointer size={12} className="shrink-0" />
+                <span className="font-medium truncate" dir="auto">{elementLabel(el)}</span>
+                <button
+                  onClick={() => removeSelectedElement(el.id)}
+                  className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-primary/20 shrink-0"
+                  title={t('chat.selectedElement.remove')}
+                >
+                  <X size={12} />
+                </button>
+              </Badge>
+            ))}
+            {!dsOpen && selectedDataSources.map((c) => (
               <Badge key={c.id} variant="accent" className="gap-1">
                 <span className="font-medium">{c.name}</span>
                 <button

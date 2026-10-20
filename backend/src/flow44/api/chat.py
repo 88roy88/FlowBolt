@@ -18,6 +18,7 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.core.provider import ContextWindowExceeded
+from flow44.ai.selected_elements import format_selected_elements, parse_selected_elements
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
@@ -151,11 +152,13 @@ async def _start_turn(
         raise
 
 
-async def _save_user_turn(project_id: str, content: str, event: dict[str, Any]) -> None:
+async def _save_user_turn(
+    project_id: str, content: str, event: dict[str, Any], *, prompt_length: int | None = None
+) -> None:
     await save_message(project_id, ChatRole.user, content)
     log_bi_event(
         "prompt_submitted",
-        prompt_length=len(content),
+        prompt_length=len(content) if prompt_length is None else prompt_length,
         prompt_sequence_number=await count_user_messages(project_id),
     )
     await emit_event(project_id, event, notify=False)
@@ -214,8 +217,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                     user_content: str = data["content"]
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
+                    elements = parse_selected_elements(data.get("selectedElements"))
 
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
+                    # The model gets the elements as text; the UI event keeps them structured.
+                    model_content = user_content
+                    if elements:
+                        user_event["selected_elements"] = [el.model_dump() for el in elements]
+                        model_content = f"{user_content}\n\n{format_selected_elements(elements)}"
                     if ds_ids:
                         ds_names: list[str] = []
                         for ds_id in ds_ids:
@@ -240,8 +249,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                     # Claim first: a refused turn must not leave the message behind.
                     await _start_turn(
                         project.id,
-                        partial(agent.run, user_content, data_source_ids=source_ids),
-                        prepare=partial(_save_user_turn, project.id, user_content, user_event),
+                        partial(agent.run, model_content, data_source_ids=source_ids),
+                        prepare=partial(
+                            _save_user_turn,
+                            project.id,
+                            model_content,
+                            user_event,
+                            prompt_length=len(user_content),
+                        ),
                     )
 
                 elif msg_type == "plan_response":

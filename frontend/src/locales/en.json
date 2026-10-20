@@ -186,6 +186,9 @@
       "removeDataSource": "Remove data source",
       "searchPlaceholder": "Search data sources (optional)",
       "usedInProject": "Used in this project"
+    },
+    "selectedElement": {
+      "remove": "Remove element"
     }
   },
   "sharing": {

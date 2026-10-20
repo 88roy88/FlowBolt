@@ -1,8 +1,9 @@
 import logging
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 
 from flow44.api.deps import ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
 from flow44.db.locks import LockNamespace, advisory_lock
@@ -13,6 +14,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 _proxy_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+
+_TOOLBAR_FILE = Path(__file__).resolve().parent.parent / "static" / "preview_toolbar.js"
+_TOOLBAR_TAG = b'<script src="/api/preview/preview_toolbar.js" defer></script>'
+
+
+def _inject_toolbar(html: bytes) -> bytes:
+    lower = html.lower()
+    for marker in (b"</head>", b"</body>"):
+        idx = lower.rfind(marker)
+        if idx != -1:
+            return html[:idx] + _TOOLBAR_TAG + html[idx:]
+    return html + _TOOLBAR_TAG
 
 
 def _loading_page(title: str, message: str, detail: str, reload_ms: int) -> str:
@@ -25,6 +38,15 @@ def _loading_page(title: str, message: str, detail: str, reload_ms: int) -> str:
         f'<div style="font-size:0.85rem;color:#999">{detail}</div>\n'
         f"<script>setTimeout(()=>location.reload(),{reload_ms})</script>\n"
         f"</body>\n</html>\n"
+    )
+
+
+@router.get("/preview_toolbar.js")
+async def preview_toolbar() -> FileResponse:
+    return FileResponse(
+        _TOOLBAR_FILE,
+        media_type="application/javascript; charset=utf-8",
+        headers={"Cache-Control": "no-cache"},
     )
 
 
@@ -101,8 +123,12 @@ async def proxy_to_sandbox(
     for h in ("content-encoding", "content-length", "transfer-encoding", "connection"):
         response_headers.pop(h, None)
 
+    content = resp.content
+    if content and resp.headers.get("content-type", "").startswith("text/html"):
+        content = _inject_toolbar(content)
+
     return Response(
-        content=resp.content,
+        content=content,
         status_code=resp.status_code,
         headers=response_headers,
         media_type=resp.headers.get("content-type"),

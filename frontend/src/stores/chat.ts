@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
+import type { Message, SelectedElement, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { WRITE_ROLES } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
@@ -27,6 +27,7 @@ export interface ChatState {
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
   selectedDataSources: { id: number; name: string }[];
+  selectedElements: SelectedElement[];
   /** True after the project has completed at least one AI action cycle. */
   buildCompleted: boolean;
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
@@ -48,8 +49,14 @@ export interface ChatState {
   addDataSource: (pkg: { id: number; name: string }) => void;
   removeDataSource: (id: number) => void;
   clearDataSources: () => void;
+  /** Returns false when the element limit is reached. */
+  addSelectedElement: (element: SelectedElement) => boolean;
+  removeSelectedElement: (id: string) => void;
+  clearSelectedElements: () => void;
   loadModels: () => Promise<void>;
 }
+
+export const MAX_SELECTED_ELEMENTS = 5;
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -106,6 +113,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
   selectedDataSources: [],
+  selectedElements: [],
   buildCompleted: false,
   agentAlive: null,
   agentAlivePollId: 0,
@@ -166,7 +174,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!projectId) return;
     void requestPermissionIfNeeded();
 
-    const { selectedDataSources, selectedModel } = get();
+    const { selectedDataSources, selectedElements, selectedModel } = get();
 
     const userMessage: Message = {
       id: generateId(),
@@ -174,6 +182,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content,
       timestamp: Date.now(),
       dataSources: selectedDataSources.length > 0 ? [...selectedDataSources] : undefined,
+      selectedElements: selectedElements.length > 0 ? [...selectedElements] : undefined,
     };
 
     set((state) => ({
@@ -195,6 +204,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content,
       ...(selectedModel && { model: selectedModel }),
       ...(selectedDataSources.length > 0 && { dataSourceIds: selectedDataSources.map((c) => c.id) }),
+      ...(selectedElements.length > 0 && { selectedElements: selectedElements.map(({ id: _id, ...e }) => e) }),
     });
 
     // Persist the model to the project so it's restored on next visit
@@ -203,12 +213,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updateProjectModel(currentProject.id, selectedModel).catch(() => {});
     }
 
-    set({ selectedDataSources: [] });
+    set({ selectedDataSources: [], selectedElements: [] });
     armTurn({
       run: () => get().sendMessage(content),
       undo: () => {
         get().rollbackTurn(userMessage.id);
-        set({ draft: content });
+        set({ draft: content, selectedElements });
       },
     });
   },
@@ -262,6 +272,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         buildCompleted: false,
         agentAlive: null,
         draft: '',
+        selectedElements: [],
         ...RESET_STATE,
       });
       useVersionStore.getState().reset();
@@ -304,6 +315,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       historyLoaded: false,
       buildCompleted: false,
       agentAlive: null,
+      selectedElements: [],
       ...RESET_STATE,
     });
     useVersionStore.getState().reset();
@@ -340,6 +352,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearDataSources() {
     set({ selectedDataSources: [] });
+  },
+
+  addSelectedElement(element: SelectedElement) {
+    if (get().selectedElements.length >= MAX_SELECTED_ELEMENTS) return false;
+    set((state) => ({ selectedElements: [...state.selectedElements, element] }));
+    return true;
+  },
+
+  removeSelectedElement(id: string) {
+    set((state) => ({ selectedElements: state.selectedElements.filter((e) => e.id !== id) }));
+  },
+
+  clearSelectedElements() {
+    set({ selectedElements: [] });
   },
 
   async loadModels() {

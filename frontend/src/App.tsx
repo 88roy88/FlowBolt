@@ -9,6 +9,7 @@ import { AppShell } from './components/layout/AppShell';
 import { ErrorToast } from './components/errors/ErrorToast';
 import { UnsavedEditsDialog } from './components/version/UnsavedEditsDialog';
 import { useErrorCapture } from './hooks/useErrorCapture';
+import { usePreviewBridge } from './hooks/usePreviewBridge';
 import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
@@ -58,6 +59,7 @@ export default function App() {
   const loadFileTree = useFilesStore((s) => s.loadFileTree);
   const resetFiles = useFilesStore((s) => s.reset);
   useErrorCapture();
+  usePreviewBridge();
   const [showNewProject, setShowNewProject] = useState(false);
   const [loading, setLoading] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(true);
