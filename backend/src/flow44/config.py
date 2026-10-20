@@ -103,6 +103,19 @@ class FlapiSettings(BuildAppSettings):
     FLAPI_CLIENT_TIMEOUT_SEC: int = 25 * 60 + 10  # Flapi's default run timeout is 25 minutes
 
 
+class DirectorySettings(BuildAppSettings):
+    # Defaults to the local directory-mock in dev.
+    DIRECTORY_BASE_URL: str = "http://localhost:6002"
+    DIRECTORY_VERIFY_SSL: bool = True
+    DIRECTORY_TIMEOUT_SECONDS: float = 10.0
+    # Sent as the ClientId header; the local mock ignores it.
+    DIRECTORY_CLIENT_ID: str = "default"
+    # Mail domain -> domain used in the user id ({sAMAccountName}@{domain}). Keys match case-insensitively.
+    DIRECTORY_MAIL_DOMAIN_MAP: dict[str, str] = {}
+    # Used when the user's mail domain is missing or not in DIRECTORY_MAIL_DOMAIN_MAP.
+    DIRECTORY_DEFAULT_DOMAIN: str = "corp"
+
+
 class S3Settings(BuildAppSettings):
     S3_ENDPOINT_URL: str
     S3_USE_SSL: bool = True
@@ -143,6 +156,7 @@ class Settings(
     SearchIndexSettings,
     AuthSettings,
     FlapiSettings,
+    DirectorySettings,
     S3Settings,
     OpikSettings,
     LoggerSettings,

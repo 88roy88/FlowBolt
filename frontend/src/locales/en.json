@@ -20,8 +20,14 @@
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
     "retryConnection": "Retry Connection",
-    "createFirstProject": "Create your first project to get started",
     "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation."
+  },
+  "onboarding": {
+    "tagline": "Describe what you want to build and the AI will design, plan, and code it for you.",
+    "taglineMobile": "Describe what you want to build and the AI will generate it for you.",
+    "hintDashboard": "A dashboard with charts",
+    "hintTodoApp": "A todo app with drag & drop",
+    "hintLandingPage": "A landing page with animations"
   },
   "sidebar": {
     "collapseSidebar": "Collapse sidebar",
@@ -33,7 +39,9 @@
     "sleep": "Sleep",
     "confirmDelete": "Confirm delete?",
     "searchPlaceholder": "Search projects...",
-    "noProjectsMatch": "No projects match"
+    "noProjectsMatch": "No projects match",
+    "untitledProject": "Untitled",
+    "createProjectError": "Failed to create project. Please try again."
   },
   "settings": {
     "title": "Settings",
@@ -140,6 +148,7 @@
     "model": "Model",
     "placeholder": {
       "selectProject": "Select a project first",
+      "creatingProject": "Creating project...",
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
       "readOnly": "View-only access",
@@ -183,17 +192,34 @@
     "title": "Share",
     "share": "Share",
     "owner": "Owner",
-    "userIdPlaceholder": "User ID",
+    "inviteAs": "Invite as",
     "noMembers": "No members yet"
   },
   "admin": {
     "title": "Admin",
     "usersTab": "Platform Users",
     "publishedTab": "Published Apps",
-    "userIdPlaceholder": "User ID to invite",
     "invite": "Invite",
     "noUsers": "No platform users yet",
-    "noPublished": "No published apps yet"
+    "noPublished": "No published apps yet",
+    "searchAll": "All",
+    "searchUsers": "Users",
+    "searchGroups": "Groups",
+    "searchPlaceholder": "Search users & groups by name or email…",
+    "searchUsersPlaceholder": "Search users by name or email…",
+    "searchGroupsPlaceholder": "Search groups by name or email…",
+    "searchMinChars": "Type at least 3 characters to search",
+    "searchNoResults": "No results",
+    "searchUnavailable": "Directory search is unavailable",
+    "searchInvite": "Invite",
+    "colName": "Project",
+    "colOwner": "Owner",
+    "colUrl": "URL",
+    "colCreated": "Created",
+    "colPublished": "Published",
+    "openProject": "Open project",
+    "searchApps": "Search by project, owner or URL",
+    "noMatches": "No matching apps"
   },
   "version": {
     "currentVersion": "Current version",
@@ -204,7 +230,7 @@
     "returnToLatest": "Return to latest",
     "previewingBanner": "Previewing {{version}}",
     "restoreDialogTitle": "Restore version {{version}}?",
-    "restoreDialogBody": "This will discard all versions after {{version}}. They can be recovered by support. This action cannot be undone.",
+    "restoreDialogBody": "This will discard all versions after {{version}}. This action cannot be undone.",
     "previewReadOnly": "Return to latest to edit",
     "previewTooltip": "View version without restoring",
     "exitPreviewTooltip": "Back to latest",

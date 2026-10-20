@@ -21,12 +21,13 @@ from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
-from flow44.db.chat import ChatRole, get_messages, save_message
+from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.logging import log_bi_event
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import GitError
 
@@ -101,7 +102,6 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
     try:
         await _heartbeat_until_done(project_id, run_task, beat)
         await run_task
-        await versioning.commit_turn(project_id)
     except _RunBudgetExceeded:
         logger.error(
             "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
@@ -119,6 +119,7 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         await _report_run_failure(project_id, "AI processing failed")
     finally:
         await _cancel_task(run_task)
+        await versioning.commit_turn(project_id)
         await clear_heartbeat(project_id, only_beat=beat.at)
 
 
@@ -152,6 +153,11 @@ async def _start_turn(
 
 async def _save_user_turn(project_id: str, content: str, event: dict[str, Any]) -> None:
     await save_message(project_id, ChatRole.user, content)
+    log_bi_event(
+        "prompt_submitted",
+        prompt_length=len(content),
+        prompt_sequence_number=await count_user_messages(project_id),
+    )
     await emit_event(project_id, event, notify=False)
 
 

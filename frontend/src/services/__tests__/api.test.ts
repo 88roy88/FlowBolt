@@ -8,7 +8,7 @@ vi.mock('../../auth', () => ({
   },
 }));
 
-import { fetchProjects } from '../api';
+import { fetchProjects, searchAdUsers, searchAdGroups } from '../api';
 import { authSession } from '../../auth';
 
 function response(status: number, body = ''): Response {
@@ -16,6 +16,15 @@ function response(status: number, body = ''): Response {
     status,
     ok: status >= 200 && status < 300,
     text: async () => body,
+  } as unknown as Response;
+}
+
+function jsonResponse(status: number, data: unknown): Response {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    json: async () => data,
+    text: async () => JSON.stringify(data),
   } as unknown as Response;
 }
 
@@ -79,5 +88,31 @@ describe('fetchWithAuth (via fetchProjects)', () => {
 
     await expect(fetchProjects()).rejects.toThrow(/API error 401/);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Directory search', () => {
+  it('requests the backend users endpoint with an encoded query and a Bearer token', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, [{ cn: 'djenkins' }]));
+
+    const users = await searchAdUsers('a b');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/directory/users?q=a%20b');
+    // Proxied through the backend, so it carries auth like any other request.
+    expect(authHeader()).toBe('Bearer tok');
+    expect(users).toEqual([{ cn: 'djenkins' }]);
+  });
+
+  it('requests the backend groups endpoint with an encoded query', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, [{ cn: 'Legal' }]));
+
+    await searchAdGroups('le');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/directory/groups?q=le');
+  });
+
+  it('throws on a non-ok response', async () => {
+    fetchMock.mockResolvedValue(response(502, 'Directory service unavailable'));
+    await expect(searchAdUsers('dje')).rejects.toThrow(/API error 502/);
   });
 });

@@ -19,6 +19,23 @@ class Role(StrEnum):
     maintainer = "maintainer"
 
 
+class ImplicitRole(StrEnum):
+    admin = "admin"
+    owner = "owner"
+
+
+DisplayRole = Role | ImplicitRole
+
+# Display precedence when a project reaches a user through several sources.
+ROLE_RANK: dict[DisplayRole, int] = {
+    Role.viewer: 1,
+    Role.editor: 2,
+    Role.publisher: 2,
+    Role.maintainer: 3,
+    ImplicitRole.admin: 4,
+    ImplicitRole.owner: 5,
+}
+
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.viewer: {Permission.read},
     Role.editor: {Permission.read, Permission.write},

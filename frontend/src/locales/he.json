@@ -20,8 +20,14 @@
     "backendUnavailable": "השרת לא זמין",
     "cannotConnect": "לא ניתן להתחבר לשרת. אנא ודא שהשרת פועל ונסה לרענן את הדף.",
     "retryConnection": "נסה להתחבר שוב",
-    "createFirstProject": "צור את הפרויקט הראשון שלך כדי להתחיל",
     "noAccessMessage": "אין לך הרשאה ליצור פרויקטים. פנה למנהל המערכת לקבלת הזמנה."
+  },
+  "onboarding": {
+    "tagline": "תאר מה תרצה לבנות והבינה המלאכותית תעצב, תתכנן ותפתח את זה עבורך.",
+    "taglineMobile": "תאר מה תרצה לבנות והבינה המלאכותית תיצור את זה עבורך.",
+    "hintDashboard": "דשבורד עם גרפים",
+    "hintTodoApp": "אפליקציית רשימת משימות עם גרירה",
+    "hintLandingPage": "דף נחיתה עם אנימציות"
   },
   "sidebar": {
     "collapseSidebar": "כווץ סרגל צד",
@@ -33,7 +39,9 @@
     "sleep": "השהה",
     "confirmDelete": "אשר מחיקה?",
     "searchPlaceholder": "חפש פרויקטים...",
-    "noProjectsMatch": "אין פרויקטים תואמים"
+    "noProjectsMatch": "אין פרויקטים תואמים",
+    "untitledProject": "ללא שם",
+    "createProjectError": "יצירת הפרויקט נכשלה. אנא נסה שוב."
   },
   "settings": {
     "title": "הגדרות",
@@ -140,6 +148,7 @@
     "model": "מודל",
     "placeholder": {
       "selectProject": "בחר פרויקט תחילה",
+      "creatingProject": "יוצר פרויקט...",
       "reviewPlan": "בדוק את התוכנית למעלה, ולאחר מכן אשר או שנה",
       "working": "הבינה המלאכותית עובדת...",
       "readOnly": "גישת צפייה בלבד",
@@ -183,17 +192,34 @@
     "title": "שיתוף",
     "share": "שתף",
     "owner": "בעלים",
-    "userIdPlaceholder": "מזהה משתמש",
+    "inviteAs": "הזמן בתור",
     "noMembers": "אין חברים עדיין"
   },
   "admin": {
     "title": "ניהול",
     "usersTab": "משתמשי פלטפורמה",
     "publishedTab": "אפליקציות שפורסמו",
-    "userIdPlaceholder": "מזהה משתמש להזמנה",
     "invite": "הזמן",
     "noUsers": "אין משתמשי פלטפורמה עדיין",
-    "noPublished": "אין אפליקציות שפורסמו עדיין"
+    "noPublished": "אין אפליקציות שפורסמו עדיין",
+    "searchAll": "הכול",
+    "searchUsers": "משתמשים",
+    "searchGroups": "קבוצות",
+    "searchPlaceholder": "חיפוש משתמשים וקבוצות לפי שם או דוא\"ל…",
+    "searchUsersPlaceholder": "חיפוש משתמשים לפי שם או דוא\"ל…",
+    "searchGroupsPlaceholder": "חיפוש קבוצות לפי שם או דוא\"ל…",
+    "searchMinChars": "יש להקליד לפחות 3 תווים כדי לחפש",
+    "searchNoResults": "אין תוצאות",
+    "searchUnavailable": "חיפוש הספרייה אינו זמין",
+    "searchInvite": "הזמן",
+    "colName": "פרויקט",
+    "colOwner": "בעלים",
+    "colUrl": "כתובת",
+    "colCreated": "נוצר",
+    "colPublished": "פורסם",
+    "openProject": "פתח פרויקט",
+    "searchApps": "חיפוש לפי פרויקט, בעלים או כתובת",
+    "noMatches": "אין אפליקציות תואמות"
   },
   "version": {
     "currentVersion": "גרסה נוכחית",
@@ -204,7 +230,7 @@
     "returnToLatest": "חזור לגרסה האחרונה",
     "previewingBanner": "מציג תצוגה מקדימה של {{version}}",
     "restoreDialogTitle": "לשחזר את גרסה {{version}}?",
-    "restoreDialogBody": "פעולה זו תמחק את כל הגרסאות שאחרי {{version}}. ניתן לשחזר אותן דרך התמיכה. לא ניתן לבטל פעולה זו.",
+    "restoreDialogBody": "פעולה זו תמחק את כל הגרסאות שאחרי {{version}}. לא ניתן לבטל פעולה זו.",
     "previewReadOnly": "חזור לגרסה האחרונה כדי לערוך",
     "previewTooltip": "צפייה בגרסה ללא שחזור",
     "exitPreviewTooltip": "חזרה לגרסה האחרונה",

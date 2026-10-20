@@ -17,6 +17,7 @@ def _published_project(project_id: str, handle: str, published_at: str) -> Proje
         id=project_id,
         user_id="owner-1",
         name=f"App {project_id}",
+        created_at="2025-12-01T00:00:00+00:00",
         published_url=handle,
         published_at=published_at,
     )
@@ -46,6 +47,7 @@ class TestListPublishedApps:
                 "owner_id": "owner-1",
                 "project_url": "my-app",
                 "public_path": "/shared/my-app",
+                "created_at": "2025-12-01T00:00:00+00:00",
                 "published_at": "2026-01-02T00:00:00+00:00",
             },
             {
@@ -54,6 +56,7 @@ class TestListPublishedApps:
                 "owner_id": "owner-1",
                 "project_url": "proj-2",
                 "public_path": "/shared/proj-2",
+                "created_at": "2025-12-01T00:00:00+00:00",
                 "published_at": "2026-01-01T00:00:00+00:00",
             },
         ]

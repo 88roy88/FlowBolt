@@ -1,0 +1,244 @@
+from unittest.mock import patch
+from urllib.parse import parse_qs
+
+import httpx
+import pytest
+
+from flow44.config import settings
+from flow44.integrations.directory.client import (
+    AdUser,
+    DirectoryClient,
+    DirectoryError,
+    domain_from_user,
+    unique_id_from_user,
+)
+
+
+def _resp(status_code: int, json_data: object) -> httpx.Response:
+    request = httpx.Request("GET", "http://directory.local/api/users")
+    return httpx.Response(status_code, json=json_data, request=request)
+
+
+class TestSearchUsers:
+    @pytest.mark.asyncio
+    async def test_returns_typed_users_and_ignores_unknown_fields(self):
+        payload = [
+            {
+                "cn": "djenkins",
+                "displayName": "Dana Jenkins",
+                "distinguishedName": "CN=djenkins,OU=Staff,DC=corp",
+                "mail": "dj@corp.local",
+                "sAMAccountName": "djenkins",
+                "whenCreated": "20240101",  # extra field must be ignored, not rejected
+            }
+        ]
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)) as mock_get:
+            users = await client.search_users("dje")
+
+        assert mock_get.call_args.args[0] == "/users?aNR=dje"
+        assert len(users) == 1
+        assert users[0].cn == "djenkins"
+        assert users[0].display_name == "Dana Jenkins"
+
+    def test_sends_client_id_header(self):
+        # Explicit override wins; otherwise it falls back to the configured default.
+        assert DirectoryClient(base_url="http://directory.local", client_id="acme")._headers == {"ClientId": "acme"}
+        assert "ClientId" in DirectoryClient(base_url="http://directory.local")._headers
+
+    @pytest.mark.asyncio
+    async def test_space_in_query_is_percent_encoded(self):
+        # The query rides in the URL, pre-encoded: a space must be %20, not +,
+        # which the directory service rejects.
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
+            await client.search_users("Tom Turner")
+
+        assert mock_get.call_args.args[0] == "/users?aNR=Tom%20Turner"
+
+    @pytest.mark.asyncio
+    async def test_empty_result_is_not_an_error(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [])):
+            assert await client.search_users("nobody") == []
+
+    @pytest.mark.asyncio
+    async def test_not_found_is_no_results_not_an_error(self):
+        # the directory service returns 404 when a query matches nothing. That's an empty result
+        # set, not a failure — it must not surface as a directory-unavailable error.
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(404, {"error": "not found"})):
+            assert await client.search_users("ghost") == []
+
+    @pytest.mark.asyncio
+    async def test_http_error_raises_directory_error(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(500, {"error": "boom"})), pytest.raises(DirectoryError):
+            await client.search_users("dje")
+
+    @pytest.mark.asyncio
+    async def test_transport_failure_raises_directory_error(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("refused")), pytest.raises(DirectoryError):
+            await client.search_users("dje")
+
+    @pytest.mark.asyncio
+    async def test_non_list_payload_raises_directory_error(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        with (
+            patch("httpx.AsyncClient.get", return_value=_resp(200, {"unexpected": "object"})),
+            pytest.raises(DirectoryError),
+        ):
+            await client.search_users("dje")
+
+
+class TestSearchGroups:
+    @pytest.mark.asyncio
+    async def test_returns_typed_groups_with_description(self):
+        payload = [
+            {
+                "cn": "Legal",
+                "displayName": "Legal Team",
+                "distinguishedName": "CN=Legal,OU=Groups,DC=corp",
+                "description": "Legal department",
+                "mail": "legal@corp.local",
+                "sAMAccountName": "legal",
+                "objectGUID": "82e16f20-f05e-6d5c-3589-79cd6b398160",
+            }
+        ]
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            groups = await client.search_groups("le")
+
+        assert len(groups) == 1
+        assert groups[0].cn == "Legal"
+        assert groups[0].description == "Legal department"
+        # objectGUID is surfaced as a stable directory id, alongside the DN used for grants.
+        assert groups[0].object_guid == "82e16f20-f05e-6d5c-3589-79cd6b398160"
+
+    @staticmethod
+    async def _requested_filter(query: str) -> str:
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
+            await client.search_groups(query)
+        path, _, query_string = mock_get.call_args.args[0].partition("?")
+        assert path == "/groups"
+        params = parse_qs(query_string)
+        assert list(params) == ["customFilter"]
+        return params["customFilter"][0]
+
+    @pytest.mark.asyncio
+    async def test_filters_security_groups_by_display_name_or_account(self):
+        assert await self._requested_filter("le") == "(&(|(displayName=*le*)(samAccountName=*le*))(groupType<=0))"
+
+    @pytest.mark.asyncio
+    async def test_escapes_filter_metacharacters_in_query(self):
+        # A crafted term must not be able to close the OR and drop the groupType clause.
+        assert await self._requested_filter("a*)(x") == (
+            r"(&(|(displayName=*a\2a\29\28x*)(samAccountName=*a\2a\29\28x*))(groupType<=0))"
+        )
+
+
+class TestGetUserGroupIds:
+    @staticmethod
+    def _user(sam: str, member_of: list[str]) -> dict:
+        return {
+            "cn": sam,
+            "displayName": sam,
+            "distinguishedName": f"CN={sam},OU=Users,DC=corp",
+            "mail": f"{sam}@corp.local",
+            "sAMAccountName": sam,
+            "memberOf": member_of,
+        }
+
+    @pytest.mark.asyncio
+    async def test_queries_by_exact_sam_account_name_only(self):
+        # The auth path must not reuse the fuzzy search — it looks the user up by an
+        # exact (sAMAccountName=…) filter, so the query works regardless of how the
+        # directory service combines the samAccountName param with customFilter.
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [])) as mock_get:
+            await client.get_user_group_ids("djenkins@corp")
+
+        url = mock_get.call_args.args[0]
+        assert url.startswith("/users?customFilter=")
+        assert "samAccountName=" not in url
+        assert "sAMAccountName%3Ddjenkins%29" in url
+
+    @pytest.mark.asyncio
+    async def test_returns_member_of_dns_for_exact_match(self):
+        dns = ["CN=Legal,OU=Groups,DC=corp", "CN=Engineering,OU=Groups,DC=corp"]
+        # A substring search can return several users; only the exact account counts.
+        payload = [self._user("djenkins", dns), self._user("djenkinson", ["CN=Other,OU=Groups,DC=corp"])]
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            assert await client.get_user_group_ids("djenkins@corp") == set(dns)
+
+    @pytest.mark.asyncio
+    async def test_match_is_case_insensitive(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        # Stored account is DJenkins; query with a different case must still match.
+        payload = [self._user("DJenkins", ["CN=Legal,OU=Groups,DC=corp"])]
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            assert await client.get_user_group_ids("djenkins@corp") == {"CN=Legal,OU=Groups,DC=corp"}
+
+    @pytest.mark.asyncio
+    async def test_same_account_in_other_domain_does_not_match(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        payload = [self._user("djenkins", ["CN=Legal,OU=Groups,DC=corp"])]
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            assert await client.get_user_group_ids("djenkins@other") == set()
+
+    @pytest.mark.asyncio
+    async def test_no_exact_match_returns_empty_set(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        # A substring hit that is not the requested account must not leak its groups.
+        payload = [self._user("djenkinson", ["CN=Legal,OU=Groups,DC=corp"])]
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, payload)):
+            assert await client.get_user_group_ids("djenkins@corp") == set()
+
+    @pytest.mark.asyncio
+    async def test_user_without_groups_returns_empty_set(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", return_value=_resp(200, [self._user("djenkins", [])])):
+            assert await client.get_user_group_ids("djenkins@corp") == set()
+
+    @pytest.mark.asyncio
+    async def test_directory_failure_soft_fails_to_empty_set(self):
+        client = DirectoryClient(base_url="http://directory.local")
+        with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("refused")):
+            assert await client.get_user_group_ids("djenkins@corp") == set()
+
+
+class TestUniqueId:
+    @staticmethod
+    def _user(**fields: str) -> AdUser:
+        return AdUser.model_validate({"cn": "x", **fields})
+
+    @pytest.fixture(autouse=True)
+    def _domains(self):
+        with (
+            patch.object(settings, "DIRECTORY_MAIL_DOMAIN_MAP", {"corp.example.com": "CORP", "sub.example.com": "SUB"}),
+            patch.object(settings, "DIRECTORY_DEFAULT_DOMAIN", "fallback"),
+        ):
+            yield
+
+    def test_mapped_mail_domain(self):
+        assert domain_from_user(self._user(mail="daniel.jenkins@sub.example.com")) == "SUB"
+
+    def test_mail_domain_match_is_case_insensitive(self):
+        assert domain_from_user(self._user(mail="daniel.jenkins@Corp.Example.COM")) == "CORP"
+
+    def test_unmapped_mail_domain_uses_default(self):
+        assert domain_from_user(self._user(mail="daniel.jenkins@elsewhere.com")) == "fallback"
+
+    def test_missing_mail_uses_default(self):
+        assert domain_from_user(self._user()) == "fallback"
+
+    def test_unique_id_is_sam_at_domain(self):
+        user = self._user(sAMAccountName="djenkins", mail="daniel.jenkins@corp.example.com")
+        assert unique_id_from_user(user) == "djenkins@CORP"
+        assert user.model_dump(by_alias=True)["uniqueId"] == "djenkins@CORP"
+
+    def test_unique_id_empty_without_sam_account_name(self):
+        assert unique_id_from_user(self._user(mail="daniel.jenkins@corp.example.com")) == ""
