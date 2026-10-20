@@ -44,6 +44,7 @@ def render(
     *,
     user_content: str,
     data_source_name: str,
+    data_source_summary: str,
     sample_data_json: str | None,
     queries: list[dict[str, Any]],
     params: list[dict[str, Any]],
@@ -77,6 +78,7 @@ def render_data_source_analysis(
     user_content: str,
     data_source_name: str,
     sample_data: Any,
+    data_source_summary: str = "",
     queries: list[dict[str, Any]] | None = None,
     params_info: dict[str, Any] | None = None,
 ) -> str:
@@ -85,6 +87,7 @@ def render_data_source_analysis(
         "data_source_analysis.jinja2",
         user_content=user_content,
         data_source_name=data_source_name,
+        data_source_summary=data_source_summary,
         sample_data_json=sample_json,
         queries=queries or [],
         params=(params_info or {}).get("parameters", []),

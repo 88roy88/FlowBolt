@@ -2,6 +2,11 @@
 **ID:** {{ ctx.data_source_id }}
 **Module:** `src/dataSources/{{ ctx.sanitized_name }}.ts`
 
+{% if ctx.data_source_summary %}
+## Summary
+{{ ctx.data_source_summary }}
+
+{% endif %}
 {% if ctx.data_schema %}
 ## Schema
 {{ ctx.data_schema }}
