@@ -9,6 +9,7 @@ from flow44.logic.models import (
     DataSourceQuerySchema,
     ParamDefinition,
     ParamOption,
+    QuickParamInfo,
 )
 
 
@@ -185,6 +186,41 @@ class TestDisplayNameComment:
         )
         assert "name: string;\n  deptId: string; // Department" in result
         assert "name: string; // Name" not in result
+
+    def test_comment_prefers_quick_info_display_name_and_description(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="dept_id",
+                    display_name="Dept",
+                    quick_info=QuickParamInfo(display_name="Department", description="Owning\ndepartment"),
+                    type="string",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="employees",
+                ),
+                ParamDefinition(
+                    name="name",
+                    display_name="Name",
+                    quick_info=QuickParamInfo(display_name=None, description="Full name"),
+                    type="string",
+                    is_required=False,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="employees",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="Employee",
+            params_info=params,
+            queries=_queries("employee"),
+        )
+        assert "deptId: string; // Department — Owning department\n" in result
+        assert "name?: string; // Full name\n" in result
 
 
 class TestArrayParam:

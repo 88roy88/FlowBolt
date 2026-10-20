@@ -135,6 +135,11 @@ class DataSourceRunResult(BaseModel):
 # -- Quick params info: GET /package/v1/quick/{id} -----------------------
 
 
+class QuickParameterInfo(PascalCaseBaseModel):
+    display_name: str | None = None
+    description: str | None = None
+
+
 class QuickParamDefinition(PascalCaseBaseModel):
     name: str
     display_name: str
@@ -145,6 +150,7 @@ class QuickParamDefinition(PascalCaseBaseModel):
     is_required: bool
     is_require_any: bool = False
     value: QuickParamValue
+    quick_parameter_info: QuickParameterInfo | None = Field(default=None, alias="quickParameterInfo")
 
     @field_validator("type_", mode="before")
     def _normalize_type(cls, v: object) -> object:

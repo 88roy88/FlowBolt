@@ -122,11 +122,9 @@ def _build_signature(
     param_names = "".join(f"\n  {idents[id(p)]}," for p in all_params)
     fields: list[str] = []
     for p in required:
-        comment = "" if _redundant_display_name(p.name, p.display_name) else f" // {p.display_name}"
-        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)};{comment}")
+        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)};{_quick_param_comment(p)}")
     for p in optional:
-        comment = "" if _redundant_display_name(p.name, p.display_name) else f" // {p.display_name}"
-        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};{comment}")
+        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};{_quick_param_comment(p)}")
     type_body = "".join(fields)
 
     sig = f"export async function {function_name}({{{param_names}\n}}: {{{type_body}\n}}): Promise<{response_type}>"
@@ -134,6 +132,19 @@ def _build_signature(
         names = ", ".join(p.name for p in require_any)
         return f"/** At least one of the following must be provided: {names}. */\n{sig}"
     return sig
+
+
+def _quick_param_comment(p: ParamDefinition) -> str:
+    info = p.quick_info
+    display_name = (info and info.display_name) or p.display_name
+    description = (info and info.description) or p.description
+    parts: list[str] = []
+    if display_name and not _redundant_display_name(p.name, display_name):
+        parts.append(display_name)
+    if description:
+        parts.append(description)
+    text = " ".join(" — ".join(parts).split())
+    return f" // {text}" if text else ""
 
 
 def _build_body(
