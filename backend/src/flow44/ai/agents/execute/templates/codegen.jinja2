@@ -28,6 +28,9 @@ The following data sources have **pre-generated** async API functions that you s
 {% for ctx in data_source_contexts %}
 ### Data Source: {{ ctx.data_source_name }} (ID: {{ ctx.data_source_id }}) — `{{ ctx.module_path }}`
 
+{% if ctx.data_source_summary %}
+- **Summary:** {{ ctx.data_source_summary }}
+{% endif %}
 - **Data Schema:** {{ ctx.data_schema }}
 - **Relevant Fields:** {{ ctx.relevant_fields }}
 - **Data Characteristics:** {{ ctx.data_characteristics }}

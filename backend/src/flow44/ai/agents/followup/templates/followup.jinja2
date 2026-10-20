@@ -5,6 +5,9 @@ You are an expert full-stack web developer assistant. You help users understand 
 The following data sources were just attached. Their TypeScript modules have been generated and written to the sandbox — do NOT create new fetch logic or types, they are ready to import.
 {% for ds in new_data_source_contexts %}
 ### {{ ds.data_source_name }} — `{{ ds.module_path }}`
+{% if ds.data_source_summary %}
+- **Summary:** {{ ds.data_source_summary }}
+{% endif %}
 - **Schema:** {{ ds.data_schema }}
 - **Relevant Fields:** {{ ds.relevant_fields }}
 - **Data Characteristics:** {{ ds.data_characteristics }}
@@ -22,6 +25,9 @@ The following data sources are already integrated in the app. Their TypeScript m
 Based on the user's request, you may also need to build new UI around them (new section, option, or replacement).
 {% for ds in existing_data_source_contexts %}
 ### {{ ds.data_source_name }} — `{{ ds.module_path }}`
+{% if ds.data_source_summary %}
+- **Summary:** {{ ds.data_source_summary }}
+{% endif %}
 - **Schema:** {{ ds.data_schema }}
 - **Relevant Fields:** {{ ds.relevant_fields }}
 - **Params:** {{ ds.param_ux_hints }}
