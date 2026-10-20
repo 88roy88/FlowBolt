@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_utils import add_trace_tags
 from flow44.ai.core.provider import complete_chat_with_tools
 from flow44.ai.core.tools import ToolExecutor, truncate_tool_args
 
@@ -89,13 +90,21 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             message = choice.message
             last_content = message.content or ""
 
-            if not message.tool_calls:
-                if not looks_like_leaked_tool_call(last_content):
-                    return last_content
+            if not message.tool_calls and looks_like_leaked_tool_call(last_content):
+                logger.warning(
+                    "[react_loop:%s] Leaked tool call in text content, asking for retry | iteration=%d model=%s",
+                    self.name,
+                    iteration,
+                    model or "default",
+                )
+                add_trace_tags(["leaked_tool_call"])
                 working_messages.append(Message.assistant(last_content).to_dict())
                 working_messages.append(Message.user(MALFORMED_TOOL_CALL_CORRECTION).to_dict())
                 last_content = ""
                 continue
+
+            if not message.tool_calls:
+                return last_content
 
             assistant_message = message.model_dump()
             working_messages.append(assistant_message)
