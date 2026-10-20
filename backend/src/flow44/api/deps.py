@@ -23,10 +23,11 @@ from flow44.db.project import get_project as db_get_project
 from flow44.db.project_member import get_project_member
 from flow44.db.project_member_group import list_project_groups
 from flow44.integrations.directory.client import directory_client
-from flow44.logging import _project_id as _log_project_id
-from flow44.logging import _user_id as _log_user_id
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.logging import _project_id as _log_project_id
+from flow44.services.logging import _project_name as _log_project_name
+from flow44.services.logging import _user_id as _log_user_id
 from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
@@ -107,8 +108,11 @@ def validate_token(token: TokenDep) -> TokenPayload:
     return payload
 
 
-def get_user_id(token: TokenDep) -> str:
-    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
+async def get_user_id(token: TokenDep) -> str:
+    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required.
+
+    async so the log user_id set here reaches the endpoint (sync deps run in a threadpool).
+    """
     payload = validate_token(token)
     if not payload.unique_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
@@ -183,6 +187,7 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     _log_project_id.set(project.id)
+    _log_project_name.set(project.name)
     return project
 
 
@@ -256,7 +261,7 @@ async def get_ws_user_id(
 ) -> str:
     """WS variant of get_user_id: raises WebSocketException so FastAPI rejects the handshake before accept."""
     try:
-        return get_user_id(flow44_token)
+        return await get_user_id(flow44_token)
     except HTTPException:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
 
