@@ -5,17 +5,16 @@ import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
-import { useSessionStore } from '../../stores/session';
+import { useLayoutStore, type RightTab } from '../../stores/layout';
 
-
-type RightTab = 'preview' | 'code';
 
 const MAIN_SPLIT_MIN = 0.2;
 const MAIN_SPLIT_MAX = 0.8;
 
 export function ClassicLayout() {
   const { t } = useTranslation();
-  const [rightTab, setRightTab] = useState<RightTab>('preview');
+  const rightTab = useLayoutStore((s) => s.rightTab);
+  const setRightTab = useLayoutStore((s) => s.setRightTab);
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
@@ -24,16 +23,11 @@ export function ClassicLayout() {
   const historyLoaded = useChatStore((s) => s.historyLoaded);
   const isNewProject = historyLoaded && messages.length === 0;
 
-  const projectId = useSessionStore((s) => s.projectId);
-  useEffect(() => {
-    setRightTab('preview');
-  }, [projectId]);
-
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
       setRightTab('preview');
     }
-  }, [agentPhase]);
+  }, [agentPhase, setRightTab]);
 
   const handleMainSplitResize = useCallback((delta: number) => {
     const el = mainTopRef.current;

@@ -3,6 +3,7 @@ import type { Project, UserStatus } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
 import { useChatStore } from './chat';
+import { useLayoutStore } from './layout';
 import { setProjectHasMessages } from '../utils/projectHasMessagesCache';
 
 interface SessionState {
@@ -31,6 +32,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, projectId: project.id });
+    useLayoutStore.getState().setRightTab('preview');
     if (project.selected_model) {
       useChatStore.setState({ selectedModel: project.selected_model });
     }
@@ -62,6 +64,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
       setProjectHasMessages(project.id, false);
       set({ projects, currentProject: project, projectId: project.id });
+      useLayoutStore.getState().setRightTab('preview');
     } finally {
       set({ isCreating: false });
     }
