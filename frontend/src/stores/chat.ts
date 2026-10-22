@@ -4,7 +4,7 @@ import { WRITE_ROLES } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
-import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState } from './chatHandlers';
+import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState, setReplayMode } from './chatHandlers';
 import { armTurn, handleVersionMessage, useVersionStore } from './version';
 import { requestPermissionIfNeeded } from '../utils/notifications';
 import { AGENT_PHASE } from './chatAgentState';
@@ -281,9 +281,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Kept separate: the turn handler detaches after each turn, the version handler stays for the session.
       const events = await fetchAgentEvents(projectId);
       const replayHandler = turnHandler ?? createSendMessageHandler(set, get, () => {});
-      for (const evt of events) {
-        replayHandler(evt as WSMessage);
-        handleVersionMessage(evt as WSMessage);
+      setReplayMode(true);
+      try {
+        for (const evt of events) {
+          replayHandler(evt as WSMessage);
+          handleVersionMessage(evt as WSMessage);
+        }
+      } finally {
+        setReplayMode(false);
       }
 
       finalizeHistoryReplayState(set, get, events);
