@@ -1,4 +1,4 @@
-"""delete file agent events
+"""delete file agent events (now transient)
 
 Revision ID: f7b4e12871c0
 Revises: 594782a318f7
@@ -21,7 +21,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # 'file' events are live-only now; history replay never needed them.
     op.execute("DELETE FROM agent_events WHERE event_type = 'file'")
 
 
