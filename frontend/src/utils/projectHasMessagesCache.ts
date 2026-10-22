@@ -1,9 +1,9 @@
 export function getProjectHasMessages(projectId: string): boolean | null {
   try {
-    const v = localStorage.getItem(`project-has-messages:${projectId}`);
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-    return null; // No cache
+    const cached = localStorage.getItem(`project-has-messages:${projectId}`);
+    if (cached === 'true') return true;
+    if (cached === 'false') return false;
+    return null;
   } catch {
     return null;
   }
