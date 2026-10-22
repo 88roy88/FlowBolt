@@ -5,7 +5,7 @@ import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
-import { useLayoutStore, type RightTab } from '../../stores/layout';
+import { useTabPanelStore, type PanelTab } from '../../stores/tabPanel';
 
 
 const MAIN_SPLIT_MIN = 0.2;
@@ -13,8 +13,8 @@ const MAIN_SPLIT_MAX = 0.8;
 
 export function ClassicLayout() {
   const { t } = useTranslation();
-  const rightTab = useLayoutStore((s) => s.rightTab);
-  const setRightTab = useLayoutStore((s) => s.setRightTab);
+  const rightTab = useTabPanelStore((s) => s.tab);
+  const setRightTab = useTabPanelStore((s) => s.setTab);
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
@@ -57,7 +57,7 @@ export function ClassicLayout() {
 
       <div style={{ flex: 1 - mainSplit, minWidth: 0 }} className="overflow-hidden flex flex-col">
         <div className="flex items-center border-b border-border bg-surface shrink-0">
-          {(['preview', 'code'] as RightTab[]).map((tab) => (
+          {(['preview', 'code'] as PanelTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setRightTab(tab)}
