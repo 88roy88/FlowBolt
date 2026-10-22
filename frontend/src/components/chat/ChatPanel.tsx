@@ -8,6 +8,7 @@ import { isAgentAlive } from '../../stores/chatAgentState';
 import { ChatMessage } from './ChatMessage';
 import { UnsavedEditsRow } from '../version/UnsavedEditsRow';
 import { PromptInput } from './PromptInput';
+import { ChatSkeleton } from './ChatSkeleton';
 import { WorkPlanView } from './WorkPlanView';
 import { TaskProgress } from './TaskProgress';
 import { PhaseIndicator } from './PhaseIndicator';
@@ -32,35 +33,6 @@ function DayDivider({ label }: { label: string }) {
       <span className="pointer-events-auto text-[11px] text-muted-foreground bg-surface border border-border rounded-full px-2.5 py-0.5 shadow-[var(--shadow-sm)] select-none">
         {label}
       </span>
-    </div>
-  );
-}
-
-const SKELETON_BUBBLES = [
-  { isUser: true, lines: ['w-full', 'w-2/3'] },
-  { isUser: false, lines: ['w-full', 'w-11/12', 'w-full', 'w-4/5', 'w-full', 'w-3/4', 'w-1/2'] },
-  { isUser: true, lines: ['w-full'] },
-  { isUser: false, lines: ['w-full', 'w-full', 'w-5/6', 'w-full', 'w-2/3'] },
-  { isUser: true, lines: ['w-full', 'w-3/4', 'w-1/3'] },
-  { isUser: false, lines: ['w-full', 'w-11/12', 'w-full', 'w-full', 'w-4/5', 'w-full', 'w-full', 'w-3/5'] },
-];
-
-function ChatSkeleton() {
-  return (
-    <div className="flex flex-col gap-4 animate-pulse" aria-hidden>
-      {SKELETON_BUBBLES.map(({ isUser, lines }, i) => (
-        <div key={i} className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-          <div
-            className={`flex flex-col gap-2.5 px-3.5 py-3.5 rounded-xl ${
-              isUser ? 'w-[45%] items-end bg-user-bubble/60 border border-primary/15' : 'w-[85%] bg-assistant-bubble/60 border border-border/60'
-            }`}
-          >
-            {lines.map((w, j) => (
-              <div key={j} className={`h-3 rounded-full bg-muted-foreground/15 ${w}`} />
-            ))}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
