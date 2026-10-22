@@ -1,0 +1,29 @@
+"""delete file agent events (now transient)
+
+Revision ID: f7b4e12871c0
+Revises: 594782a318f7
+Create Date: 2026-10-22 22:38:14.831497
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+import sqlmodel
+
+
+# revision identifiers, used by Alembic.
+revision: str = 'f7b4e12871c0'
+down_revision: Union[str, Sequence[str], None] = '594782a318f7'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    op.execute("DELETE FROM agent_events WHERE event_type = 'file'")
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    pass
