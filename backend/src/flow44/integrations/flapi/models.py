@@ -144,7 +144,7 @@ class QuickParamDefinition(PascalCaseBaseModel):
     is_single_value: bool
     is_required: bool
     is_require_any: bool = False
-    value: QuickParamValue
+    value: QuickParamValue | None = None
 
     @field_validator("type_", mode="before")
     def _normalize_type(cls, v: object) -> object:
