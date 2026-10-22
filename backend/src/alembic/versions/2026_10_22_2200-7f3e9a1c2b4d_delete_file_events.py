@@ -1,4 +1,4 @@
-"""strip file content from stored 'file' agent events
+"""delete stored 'file' agent events (now live-only)
 
 Revision ID: 7f3e9a1c2b4d
 Revises: 594782a318f7
@@ -18,9 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("UPDATE agent_events SET payload = (payload::jsonb - 'content')::json WHERE event_type = 'file'")
+    op.execute("DELETE FROM agent_events WHERE event_type = 'file'")
 
 
 def downgrade() -> None:
-    # The stripped content is gone; replay never needed it.
+    # Deleted events are gone; history replay never needed them.
     pass
