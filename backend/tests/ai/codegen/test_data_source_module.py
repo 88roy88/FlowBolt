@@ -482,6 +482,52 @@ class TestCubeIdDisambiguation:
         assert "body['1reports']['start_date'] = _1reports_startDate;" in result
         assert "body['2filters']['start_date'] = _2filters_startDate;" in result
 
+    def test_dashed_cube_id_prefix_is_valid_ts_identifier(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="sales-reports",
+                ),
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="123-123",
+                ),
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="1231-23",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="10",
+            sanitized_name="Report",
+            params_info=params,
+            queries=_queries("report"),
+        )
+        assert "sales_reports_startDate: { From: Date; To: Date }" in result
+        assert "_123_123_startDate: { From: Date; To: Date }" in result
+        assert "_1231_23_startDate: { From: Date; To: Date }" in result
+        assert "body['sales-reports']['start_date'] = sales_reports_startDate;" in result
+        assert "body['123-123']['start_date'] = _123_123_startDate;" in result
+        assert "body['1231-23']['start_date'] = _1231_23_startDate;" in result
+
 
 class TestAllParamTypes:
     def test_all_four_param_types_map_to_correct_ts_types(self) -> None:

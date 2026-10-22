@@ -205,14 +205,16 @@ def _build_date_conversions(queries: list[DataSourceQuerySchema]) -> list[str]:
 def _ts_ident(name: str) -> str:
     """Turn a FLAPI param name into a safe TS identifier.
 
-    Snake-case is camel-cased; reserved words get a trailing underscore so the
+    Snake-case is camel-cased; any characters invalid in an identifier are
+    replaced with underscores; reserved words get a trailing underscore so the
     emitted signature stays valid TS. The FLAPI wire name used for the body
     key is handled separately and always uses the original string.
     """
     parts = re.split(r"_+", name)
     head, *rest = parts
     ident = head + "".join(p[:1].upper() + p[1:] for p in rest if p)
-    if ident[:1].isdigit():
+    ident = re.sub(r"\W", "_", ident)
+    if not ident or ident[:1].isdigit():
         ident = "_" + ident
     if ident in _TS_RESERVED:
         return f"{ident}_"
