@@ -1,6 +1,5 @@
 import type { PackageMetadata, QuickParamDefinition } from '../schemas';
 
-/** Thrown from getResults to make a run fail with a FLAPI-style error response. */
 export class MockPackageError extends Error {
   constructor(
     public status: number,

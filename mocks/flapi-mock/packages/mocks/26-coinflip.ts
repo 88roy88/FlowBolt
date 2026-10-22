@@ -1,6 +1,5 @@
 import { MockPackage, MockPackageError, buildMetadata } from '../package-base.js';
 
-// Fails half the time, for testing how apps handle data source errors.
 const data = { Coin: { side: 'Heads', flipped_at: '2026-01-01T00:00:00Z' } };
 
 export default new MockPackage({
