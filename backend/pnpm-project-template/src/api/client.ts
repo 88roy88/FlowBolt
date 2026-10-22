@@ -28,17 +28,8 @@ export async function fetchDataSource(path: string, body?: Record<string, unknow
   };
   const res = await fetchWithAuth(path, options);
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await readErrorDetail(res)}`);
+    const detail = (await res.text()) || res.statusText || 'request failed';
+    throw new Error(`API error ${res.status}: ${detail}`);
   }
   return res;
-}
-
-async function readErrorDetail(res: Response): Promise<string> {
-  try {
-    const body = await res.json();
-    if (typeof body?.detail === 'string') return body.detail;
-  } catch {
-    // Non-JSON error body (e.g. a gateway HTML page)
-  }
-  return res.statusText || 'request failed';
 }

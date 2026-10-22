@@ -1,6 +1,7 @@
 import time
 
 from fastapi import APIRouter, Body, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from flow44.api.deps import TokenDep as AuthDep
@@ -81,7 +82,7 @@ async def can_run_without_params(
         raise HTTPException(status_code=502, detail=str(err)) from err
 
 
-@router.post("/{data_source_id}/run")
+@router.post("/{data_source_id}/run", response_model=DataSourceResult)
 async def run_data_source(
     authorization: AuthDep,
     data_source_id: str,
@@ -89,7 +90,7 @@ async def run_data_source(
         None,
         examples=[{"cube-1": {"person_id": 2, "active": True, "tag_ids": [10, 11]}}],
     ),
-) -> DataSourceResult:
+) -> DataSourceResult | JSONResponse:
     start_time = time.monotonic()
     try:
         quick_params = QuickParams(root=params) if params else None
@@ -119,6 +120,8 @@ async def run_data_source(
             error_message=str(err),
         )
         status = 401 if err.status_code == 401 else 502
+        if err.body is not None:
+            return JSONResponse(status_code=status, content=err.body)
         raise HTTPException(status_code=status, detail=str(err)) from err
     except ValidationError as err:
         raise HTTPException(status_code=502, detail=str(err)) from err

@@ -21,9 +21,10 @@ __all__ = ["FlapiClient", "FlapiUpstreamError", "data_source_client"]
 class FlapiUpstreamError(RuntimeError):
     """FLAPI returned an error or was unreachable."""
 
-    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+    def __init__(self, message: str, *, status_code: int | None = None, body: Any | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.body = body
 
 
 class FlapiClient:
@@ -78,7 +79,13 @@ class FlapiClient:
         elif resp.status_code >= 400:
             logger.info("FLAPI %s on %s %s", resp.status_code, method, path)
         if resp.status_code >= 400:
-            raise FlapiUpstreamError(f"FLAPI error ({resp.status_code})", status_code=resp.status_code)
+            try:
+                body = resp.json()
+            except ValueError:
+                body = None
+            raise FlapiUpstreamError(
+                f"FLAPI error ({resp.status_code}): {resp.text}", status_code=resp.status_code, body=body
+            )
         return resp.json()
 
     # -- API methods --
