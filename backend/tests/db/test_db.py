@@ -9,7 +9,7 @@ from sqlmodel import select
 from flow44.config import settings
 from flow44.db import database
 from flow44.db.chat import get_messages, save_message
-from flow44.db.events import clear_events, emit_event, get_events
+from flow44.db.events import clear_events, emit_event, get_events, subscribe, unsubscribe
 from flow44.db.heartbeat import (
     AgentRunHeartbeat,
     clear_heartbeat,
@@ -275,6 +275,20 @@ class TestAgentEventCRUD:
         assert len(events) == 1
         assert len(events[0].payload["tasks"]) == 2
         assert events[0].payload["tasks"][0]["name"] == "Create Header"
+
+    async def test_file_event_stored_without_content(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        queue = subscribe(project.id)
+        try:
+            await emit_event(project.id, {"type": "file", "path": "src/App.tsx", "content": "export {}"})
+            live = queue.get_nowait()
+        finally:
+            unsubscribe(project.id, queue)
+
+        assert live["content"] == "export {}"
+        [stored] = await get_events(project.id)
+        assert stored.payload["path"] == "src/App.tsx"
+        assert "content" not in stored.payload
 
 
 async def _seed_heartbeat(project_id: str, *, age_seconds: float = 0.0) -> None:

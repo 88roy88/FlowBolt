@@ -65,11 +65,18 @@ class AgentEvent(SQLModel, table=True):
 # ---------------------------------------------------------------------------
 
 
+def _stored_payload(event: dict[str, Any]) -> dict[str, Any]:
+    # Live subscribers get the written file's content; history only needs the path.
+    if event.get("type") == "file":
+        return {k: v for k, v in event.items() if k != "content"}
+    return event
+
+
 async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = True) -> None:
     event.setdefault("_ts", datetime.now(UTC).isoformat())
 
     async with database.async_session() as session:
-        row = AgentEvent(project_id=project_id, event_type=event.get("type", "unknown"), payload=event)
+        row = AgentEvent(project_id=project_id, event_type=event.get("type", "unknown"), payload=_stored_payload(event))
         session.add(row)
         await session.commit()
 
