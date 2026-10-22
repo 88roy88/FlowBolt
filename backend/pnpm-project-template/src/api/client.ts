@@ -26,5 +26,19 @@ export async function fetchDataSource(path: string, body?: Record<string, unknow
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   };
-  return fetchWithAuth(path, options);
+  const res = await fetchWithAuth(path, options);
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${await readErrorDetail(res)}`);
+  }
+  return res;
+}
+
+async function readErrorDetail(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    if (typeof body?.detail === 'string') return body.detail;
+  } catch {
+    // Non-JSON error body (e.g. a gateway HTML page)
+  }
+  return res.statusText || 'request failed';
 }
