@@ -1,5 +1,15 @@
 import type { PackageMetadata, QuickParamDefinition } from '../schemas';
 
+export class MockPackageError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 export interface MockPackageConfig {
   metadata: PackageMetadata;
   quickParams?: Record<string, QuickParamDefinition[]>;
