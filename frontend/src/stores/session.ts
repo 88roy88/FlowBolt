@@ -3,6 +3,7 @@ import type { Project, UserStatus } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
 import { useChatStore } from './chat';
+import { setProjectHasMessages } from '../utils/projectHasMessagesCache';
 
 interface SessionState {
   currentProject: Project | null;
@@ -59,6 +60,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const project = await api.createProject(name);
       const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
+      setProjectHasMessages(project.id, false);
       set({ projects, currentProject: project, projectId: project.id });
     } finally {
       set({ isCreating: false });

@@ -5,6 +5,7 @@ import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
+import { useSessionStore } from '../../stores/session';
 
 
 type RightTab = 'preview' | 'code';
@@ -21,7 +22,12 @@ export function ClassicLayout() {
 
   const messages = useChatStore((s) => s.messages);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
-  const isNewProject = !historyLoaded || messages.length === 0;
+  const isNewProject = historyLoaded && messages.length === 0;
+
+  const projectId = useSessionStore((s) => s.projectId);
+  useEffect(() => {
+    setRightTab('preview');
+  }, [projectId]);
 
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
