@@ -68,13 +68,12 @@ class FlapiClient:
             raise FlapiUpstreamError(hint) from exc
 
         if resp.status_code >= 500:
-            # Truncate body: responses can be large and may include sensitive fields.
             logger.error(
                 "FLAPI %s on %s %s: %s",
                 resp.status_code,
                 method,
                 path,
-                resp.text[:500],
+                resp.text,
             )
         elif resp.status_code >= 400:
             logger.info("FLAPI %s on %s %s", resp.status_code, method, path)
