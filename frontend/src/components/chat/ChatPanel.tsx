@@ -8,6 +8,7 @@ import { isAgentAlive } from '../../stores/chatAgentState';
 import { ChatMessage } from './ChatMessage';
 import { UnsavedEditsRow } from '../version/UnsavedEditsRow';
 import { PromptInput } from './PromptInput';
+import { ChatSkeleton } from './ChatSkeleton';
 import { WorkPlanView } from './WorkPlanView';
 import { TaskProgress } from './TaskProgress';
 import { PhaseIndicator } from './PhaseIndicator';
@@ -43,6 +44,7 @@ export function ChatPanel() {
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
   } = useChatStore();
   const agentActive = useChatStore(isAgentAlive);
+  const historyLoaded = useChatStore((s) => s.historyLoaded);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -103,6 +105,7 @@ export function ChatPanel() {
       {/* Messages */}
       <div ref={scrollContainerRef} onScroll={handleScroll} onClickCapture={handleClickCapture} className="flex-1 overflow-y-auto overflow-x-hidden p-4">
         <div ref={observeContentForPinning} className="flex flex-col gap-4">
+        {!historyLoaded && <ChatSkeleton />}
         {dayGroups.map((group) => (
           <div key={group.key} className="flex flex-col gap-4">
             <DayDivider label={formatDayDivider(group.ts, i18n.language, t)} />
