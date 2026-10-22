@@ -9,7 +9,7 @@ from sqlmodel import select
 from flow44.config import settings
 from flow44.db import database
 from flow44.db.chat import get_messages, save_message
-from flow44.db.events import clear_events, emit_event, get_events, subscribe, unsubscribe
+from flow44.db.events import clear_events, emit_event, get_events, get_latest_event, subscribe, unsubscribe
 from flow44.db.heartbeat import (
     AgentRunHeartbeat,
     clear_heartbeat,
@@ -275,6 +275,17 @@ class TestAgentEventCRUD:
         assert len(events) == 1
         assert len(events[0].payload["tasks"]) == 2
         assert events[0].payload["tasks"][0]["name"] == "Create Header"
+
+    async def test_get_latest_event_by_type(self, test_db):
+        project = await create_project("App", user_id="test-user")
+        await emit_event(project.id, {"type": "phase", "phase": "designing"}, notify=False)
+        await emit_event(project.id, {"type": "phase", "phase": "executing"}, notify=False)
+        await emit_event(project.id, {"type": "action_complete"}, notify=False)
+
+        latest = await get_latest_event(project.id, "phase")
+        assert latest is not None
+        assert latest.payload["phase"] == "executing"
+        assert await get_latest_event(project.id, "error") is None
 
     async def test_file_event_stored_without_content(self, test_db):
         project = await create_project("App", user_id="test-user")

@@ -3,7 +3,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, delete, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, String, delete, func
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -48,6 +48,7 @@ async def _notify(project_id: str, event: dict[str, Any]) -> None:
 
 class AgentEvent(SQLModel, table=True):
     __tablename__ = "agent_events"
+    __table_args__ = (Index("ix_agent_events_project_id_event_type_id", "project_id", "event_type", "id"),)
 
     id: int | None = Field(default=None, primary_key=True)
     project_id: str = Field(
@@ -97,6 +98,17 @@ async def get_events(project_id: str, after_id: int = 0) -> list[AgentEvent]:
             .order_by(AgentEvent.id.asc())  # type: ignore[union-attr]
         )
         return list(result.scalars().all())
+
+
+async def get_latest_event(project_id: str, event_type: str) -> AgentEvent | None:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(AgentEvent)
+            .where(AgentEvent.project_id == project_id, AgentEvent.event_type == event_type)
+            .order_by(AgentEvent.id.desc())  # type: ignore[union-attr]
+            .limit(1)
+        )
+        return result.scalars().first()
 
 
 async def clear_events(project_id: str) -> None:
