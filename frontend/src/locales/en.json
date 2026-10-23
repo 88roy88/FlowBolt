@@ -102,6 +102,7 @@
   },
   "terminal": {
     "terminal": "Terminal",
+    "adminOnly": "Visible to admins only",
     "console": "Console",
     "server": "Server",
     "serverLog": "Server Log",
