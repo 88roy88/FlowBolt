@@ -11,7 +11,7 @@ const TOOLBAR_SOURCE = 'buildapp-toolbar';
 const BUILDER_SOURCE = 'buildapp-builder';
 
 /** Adds elements picked in the preview (iframe or opened tab) to the chat input, and sends prompts written there. */
-export function usePreviewBridge() {
+export function usePreviewToolbarBridge() {
   const projectId = useSessionStore((s) => s.projectId);
 
   useEffect(() => {
