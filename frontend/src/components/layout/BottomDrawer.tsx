@@ -33,10 +33,10 @@ export function BottomDrawer() {
   const tabLabel = (tab: BottomTab) =>
     tab === 'server' ? t('terminal.server') : tab === 'console' ? t('terminal.console') : t('terminal.terminal');
 
-  const adminBadge = (tab: BottomTab, size: number) =>
+  const adminBadge = (tab: BottomTab, size: number, className?: string) =>
     tab === 'terminal' && terminalAdminOnly && (
       <span title={t('terminal.adminOnly')} className="inline-flex">
-        <Shield size={size} className="text-warning/70" />
+        <Shield size={size} className={className} />
       </span>
     );
 
@@ -62,7 +62,7 @@ export function BottomDrawer() {
                 }`}
               >
                 {tab}
-                {adminBadge(tab, 11)}
+                {adminBadge(tab, 11, 'text-warning/70')}
               </button>
             ))}
           </div>
