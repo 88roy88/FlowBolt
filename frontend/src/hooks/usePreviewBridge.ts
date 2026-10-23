@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useSessionStore } from '../stores/session';
 import { useChatStore } from '../stores/chat';
+import { isAwaitingPlanApproval } from '../stores/chatAgentState';
+import { workspaceLocked } from '../stores/workspaceLock';
 import { WRITE_ROLES } from '../types';
 import { parseSelectedElement } from '../utils/selectedElement';
 
@@ -8,13 +10,7 @@ import { parseSelectedElement } from '../utils/selectedElement';
 const TOOLBAR_SOURCE = 'buildapp-toolbar';
 const BUILDER_SOURCE = 'buildapp-builder';
 
-export const FOCUS_CHAT_INPUT_EVENT = 'buildapp:focus-chat-input';
-
-export function focusChatInput() {
-  window.dispatchEvent(new Event(FOCUS_CHAT_INPUT_EVENT));
-}
-
-/** Adds elements picked in the preview (iframe or opened tab) to the chat input. */
+/** Adds elements picked in the preview (iframe or opened tab) to the chat input, and sends prompts written there. */
 export function usePreviewBridge() {
   const projectId = useSessionStore((s) => s.projectId);
 
@@ -41,7 +37,26 @@ export function usePreviewBridge() {
         if (!element) return;
         const added = chat.addSelectedElement({ ...element, id: crypto.randomUUID() });
         send({ type: 'count', count: useChatStore.getState().selectedElements.length, added });
-        if (added) focusChatInput();
+      } else if (data.type === 'clear-elements' && canWrite) {
+        chat.clearSelectedElements();
+      } else if (data.type === 'send-prompt') {
+        const content = typeof data.content === 'string' ? data.content.trim() : '';
+        const count = chat.selectedElements.length;
+        if (!canWrite) {
+          send({ type: 'prompt-result', ok: false, reason: 'readonly', count });
+        } else if (!content) {
+          send({ type: 'prompt-result', ok: false, reason: 'empty', count });
+        } else if (
+          // Same gate as the chat input.
+          workspaceLocked() !== null ||
+          isAwaitingPlanApproval(chat) ||
+          useSessionStore.getState().isCreating
+        ) {
+          send({ type: 'prompt-result', ok: false, reason: 'busy', count });
+        } else {
+          chat.sendMessage(content, { keepDraft: true });
+          send({ type: 'prompt-result', ok: true, count: useChatStore.getState().selectedElements.length });
+        }
       }
     }
 

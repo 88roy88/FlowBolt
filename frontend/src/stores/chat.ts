@@ -35,7 +35,7 @@ export interface ChatState {
   agentAlivePollId: number;
   draft: string;
   setDraft: (draft: string) => void;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, opts?: { keepDraft?: boolean }) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   rollbackTurn: (id: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
@@ -169,7 +169,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  sendMessage(content: string) {
+  sendMessage(content: string, opts?: { keepDraft?: boolean }) {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
     void requestPermissionIfNeeded();
@@ -189,7 +189,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
       agentAlive: true,
-      draft: '',
+      ...(!opts?.keepDraft && { draft: '' }),
       ...RESET_STATE,
       designProgress: { architecture: null, ux: null },
     }));
@@ -215,10 +215,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set({ selectedDataSources: [], selectedElements: [] });
     armTurn({
-      run: () => get().sendMessage(content),
+      run: () => get().sendMessage(content, opts),
       undo: () => {
         get().rollbackTurn(userMessage.id);
-        set({ draft: content, selectedElements });
+        set({ selectedElements, ...((!opts?.keepDraft || !get().draft) && { draft: content }) });
       },
     });
   },

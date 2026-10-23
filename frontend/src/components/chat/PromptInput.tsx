@@ -10,7 +10,6 @@ import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
-import { FOCUS_CHAT_INPUT_EVENT } from '../../hooks/usePreviewBridge';
 
 export function PromptInput() {
   const { t } = useTranslation();
@@ -67,13 +66,8 @@ export function PromptInput() {
         textareaRef.current?.focus();
       }
     };
-    const focus = () => textareaRef.current?.focus();
     window.addEventListener('keydown', handler);
-    window.addEventListener(FOCUS_CHAT_INPUT_EVENT, focus);
-    return () => {
-      window.removeEventListener('keydown', handler);
-      window.removeEventListener(FOCUS_CHAT_INPUT_EVENT, focus);
-    };
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   const placeholderText = () => {
