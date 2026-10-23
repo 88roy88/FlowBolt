@@ -5,10 +5,10 @@ import { WRITE_ROLES } from '../types';
 import { parseSelectedElement } from '../utils/selectedElement';
 
 /** Matches backend `static/preview_toolbar.js`. */
-const TOOLBAR_SOURCE = 'flowbolt-toolbar';
-const BUILDER_SOURCE = 'flowbolt-builder';
+const TOOLBAR_SOURCE = 'buildapp-toolbar';
+const BUILDER_SOURCE = 'buildapp-builder';
 
-export const FOCUS_CHAT_INPUT_EVENT = 'flowbolt:focus-chat-input';
+export const FOCUS_CHAT_INPUT_EVENT = 'buildapp:focus-chat-input';
 
 export function focusChatInput() {
   window.dispatchEvent(new Event(FOCUS_CHAT_INPUT_EVENT));

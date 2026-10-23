@@ -34,7 +34,7 @@ class Git:
         self.git_dir = os.path.join(self.workspace_dir, ".git")
 
     async def _run(self, *args: str) -> str:
-        # Pin the git dir: under bare `-C`, a workspace with no `.git` walks up and finds FlowBolt's repo.
+        # Pin the git dir: under bare `-C`, a workspace with no `.git` walks up and finds BuildApp's repo.
         repo = ["-C", self.workspace_dir, "--git-dir", self.git_dir, "--work-tree", self.workspace_dir]
         # to_thread, not create_subprocess_exec: uvicorn's Windows selector loop has no subprocess support.
         result = await asyncio.to_thread(

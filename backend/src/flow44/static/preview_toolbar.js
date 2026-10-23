@@ -2,16 +2,16 @@
 // Sends picked elements to the builder via postMessage (window.parent in the iframe, window.opener in a new tab).
 (function () {
   'use strict';
-  if (window.__FLOWBOLT_TOOLBAR__) return;
-  window.__FLOWBOLT_TOOLBAR__ = true;
+  if (window.__BUILDAPP_TOOLBAR__) return;
+  window.__BUILDAPP_TOOLBAR__ = true;
 
   var match = location.pathname.match(/^\/api\/preview\/([^/]+)\/proxy\//);
   if (!match) return;
   var projectId = decodeURIComponent(match[1]);
 
-  var SOURCE = 'flowbolt-toolbar';
-  var BUILDER_SOURCE = 'flowbolt-builder';
-  var COLLAPSED_KEY = 'flowbolt-toolbar-collapsed';
+  var SOURCE = 'buildapp-toolbar';
+  var BUILDER_SOURCE = 'buildapp-builder';
+  var COLLAPSED_KEY = 'buildapp-toolbar-collapsed';
   var HELLO_TIMEOUT_MS = 500;
   var HELLO_THROTTLE_MS = 1000;
   var MAX_COMPONENTS = 4;
@@ -325,7 +325,7 @@
     true,
   );
 
-  var hostEl = document.createElement('flowbolt-toolbar');
+  var hostEl = document.createElement('buildapp-toolbar');
   var shadow = hostEl.attachShadow({ mode: 'closed' });
   var style = document.createElement('style');
   style.textContent = STYLES;
@@ -371,7 +371,7 @@
 
   function hintText() {
     if (state.status === 'readonly') return 'You have view-only access to this project';
-    return 'Open this preview from FlowBolt to select elements for chat';
+    return 'Open this preview from BuildApp to select elements for chat';
   }
 
   function render() {
@@ -386,7 +386,7 @@
     }
 
     if (isCollapsed()) {
-      ui.appendChild(button('tab', ICON_UP, 'Show FlowBolt toolbar', function () {
+      ui.appendChild(button('tab', ICON_UP, 'Show BuildApp toolbar', function () {
         setCollapsed(false);
       }));
       return;
