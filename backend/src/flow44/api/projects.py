@@ -18,6 +18,7 @@ from flow44.api.deps import (
     has_platform_access,
     is_admin,
     require_permission,
+    terminal_admin_only,
 )
 from flow44.auth.permissions import (
     ROLE_RANK,
@@ -85,6 +86,7 @@ async def get_current_user(user_id: UserDep) -> dict[str, Any]:
         "is_admin": is_admin(user_id),
         "is_platform_user": await has_platform_access(user_id),
         "can_use_terminal": can_use_terminal(user_id),
+        "terminal_admin_only": terminal_admin_only(),
     }
 
 
