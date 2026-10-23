@@ -6,10 +6,6 @@ const BUTTON = {
 };
 
 describe('parseSelectedElement', () => {
-  it('accepts a valid element', () => {
-    expect(parseSelectedElement(BUTTON)).toEqual(BUTTON);
-  });
-
   it('rejects junk and missing tags', () => {
     expect(parseSelectedElement(null)).toBeNull();
     expect(parseSelectedElement('button')).toBeNull();

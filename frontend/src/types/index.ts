@@ -10,7 +10,6 @@ export interface Message {
   version?: string; // commit_sha
 }
 
-/** An element picked in the preview, attached to a chat message. */
 export interface SelectedElement {
   id: string;
   tag: string;

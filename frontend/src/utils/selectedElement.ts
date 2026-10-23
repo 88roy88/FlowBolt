@@ -8,7 +8,6 @@ function clip(value: unknown, max: number): string {
   return typeof value === 'string' ? value.slice(0, max) : '';
 }
 
-/** Validates an element description received from the preview toolbar. */
 export function parseSelectedElement(raw: unknown): Omit<SelectedElement, 'id'> | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -29,7 +28,6 @@ export function parseSelectedElement(raw: unknown): Omit<SelectedElement, 'id'> 
   };
 }
 
-/** Short chip label: the element's visible text, else its first class, else its tag name. */
 export function elementLabel(el: Omit<SelectedElement, 'id'>): string {
   const text = el.text.replace(/\s+/g, ' ').trim();
   if (text) return text.length > LABEL_TEXT_MAX ? `${text.slice(0, LABEL_TEXT_MAX)}…` : text;
@@ -38,7 +36,6 @@ export function elementLabel(el: Omit<SelectedElement, 'id'>): string {
   return el.tag;
 }
 
-/** e.g. `PricingCard < App · main > button.cta` */
 export function elementTooltip(el: Omit<SelectedElement, 'id'>): string {
   return [el.components.join(' < '), el.selector].filter(Boolean).join(' · ');
 }

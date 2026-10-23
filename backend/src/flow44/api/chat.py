@@ -18,7 +18,7 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.core.provider import ContextWindowExceeded
-from flow44.ai.selected_elements import format_selected_elements, parse_selected_elements
+from flow44.ai.selected_elements_context import format_selected_elements, parse_selected_elements
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
@@ -231,7 +231,6 @@ async def chat_ws(  # noqa: C901, PLR0915
 
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                     turn = _UserTurn(prompt=user_content, event=user_event)
-                    # The model gets the elements as text; the UI event keeps them structured.
                     if elements:
                         user_event["selected_elements"] = [el.model_dump() for el in elements]
                         turn.context = format_selected_elements(elements)
