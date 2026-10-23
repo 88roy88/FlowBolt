@@ -101,6 +101,7 @@
   },
   "terminal": {
     "terminal": "טרמינל",
+    "adminOnly": "גלוי למנהלים בלבד",
     "console": "קונסול",
     "server": "שרת",
     "serverLog": "לוג שרת",

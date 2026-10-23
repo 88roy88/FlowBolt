@@ -178,6 +178,14 @@ async def resolve_project_permissions(project: Project, user_id: str) -> set[Per
     return permissions
 
 
+def terminal_admin_only() -> bool:
+    return settings.SANDBOX_MODE == "local"
+
+
+def can_use_terminal(user_id: str) -> bool:
+    return not terminal_admin_only() or is_admin(user_id)
+
+
 async def get_project(project_id: str, user_id: UserDep) -> Project:
     project = await db_get_project(project_id)
     if project is None:
