@@ -4,6 +4,7 @@ from typing import Any
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.file_diffs import DiffTracker
+from flow44.ai.agents.file_edits import apply_edits
 from flow44.db.chat import ChatRole, save_message
 from flow44.services.logging.helpers import bi_logger
 
@@ -66,12 +67,17 @@ class ChatAgent(BaseAgent):
         tracker.record(path, old_content, content, is_new=is_new)
         await self.emit({"type": "file", "path": path, "content": content})
 
-    async def _edit_file_and_emit_diff(self, tracker: DiffTracker, path: str, search: str, replace: str) -> None:
+    async def _edit_file_and_emit_diff(self, tracker: DiffTracker, path: str, edits: list[tuple[str, str]]) -> str:
+        """Apply search/replace pairs all-or-nothing and return the new content.
+
+        Raises FileNotFoundError, or EditApplyError when a search is missing or ambiguous.
+        """
         old_content = await self.sandbox.read_file(path)
-        await self.sandbox.edit_file(path, search, replace)
-        new_content = await self.sandbox.read_file(path)
+        new_content = apply_edits(old_content, edits)
+        await self.sandbox.write_file(path, new_content)
         tracker.record(path, old_content, new_content, is_new=False)
         await self.emit({"type": "file", "path": path, "content": new_content})
+        return new_content
 
     async def _emit_file_diffs_summary(self, tracker: DiffTracker) -> None:
         diffs = tracker.combined_diffs()

@@ -124,16 +124,6 @@ async def test_step_write_rejects_edit_to_protected_file() -> None:
     assert len(result.rejected_files) == 1
 
 
-def test_apply_edits_rejects_ambiguous_search() -> None:
-    with pytest.raises(fix_error_agent.EditApplyError, match="matches 2 places"):
-        fix_error_agent.apply_edits("x\nx\n", [("x", "y")])
-
-
-def test_apply_edits_rejects_empty_search() -> None:
-    with pytest.raises(fix_error_agent.EditApplyError, match="not found"):
-        fix_error_agent.apply_edits("x", [("", "y")])
-
-
 def test_route_after_validate_retries_on_edit_failures() -> None:
     state = _make_state(_RecordingSandbox())
     state.edit_failures = ["No edits to src/App.tsx were applied"]

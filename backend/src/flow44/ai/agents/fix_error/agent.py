@@ -5,6 +5,7 @@ from typing import Any
 from opik import track
 
 from flow44.ai.agents._chat_agent import ChatAgent
+from flow44.ai.agents.file_edits import EditApplyError
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
@@ -25,28 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 MAX_RETRY_ATTEMPTS = 3
-
-
-class EditApplyError(ValueError):
-    pass
-
-
-def apply_edits(content: str, edits: list[tuple[str, str]]) -> str:
-    """Apply search/replace pairs in order. Each search must match exactly one place."""
-    if not edits:
-        raise EditApplyError("the edit action had no <search>/<replace> pairs.")
-    for i, (search, replace) in enumerate(edits, start=1):
-        matches = content.count(search) if search else 0
-        if matches == 0:
-            raise EditApplyError(
-                f"search block {i} was not found. Copy it exactly from the current file, including whitespace."
-            )
-        if matches > 1:
-            raise EditApplyError(
-                f"search block {i} matches {matches} places. Include surrounding lines so it matches exactly one."
-            )
-        content = content.replace(search, replace, 1)
-    return content
 
 
 def format_edit_failures(failures: list[str]) -> str:
@@ -353,15 +332,11 @@ class FixErrorAgent(ChatAgent):
                 state.rejected_files.append(exc)
                 continue
             try:
-                content = apply_edits(await self.sandbox.read_file(path), pairs)
+                state.changed_files[path] = await self._edit_file_and_emit_diff(state.diffs, path, pairs)
             except FileNotFoundError:
                 state.edit_failures.append(f"{path} does not exist. Create it with a file action instead.")
-                continue
             except EditApplyError as exc:
                 state.edit_failures.append(f"No edits to {path} were applied: {exc}")
-                continue
-            await self._write_file_and_emit_diff(state.diffs, path, content)
-            state.changed_files[path] = content
 
     async def _file_exists(self, path: str) -> bool:
         try:
