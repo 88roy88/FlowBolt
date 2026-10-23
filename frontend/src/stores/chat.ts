@@ -49,7 +49,6 @@ export interface ChatState {
   addDataSource: (pkg: { id: number; name: string }) => void;
   removeDataSource: (id: number) => void;
   clearDataSources: () => void;
-  /** Returns false when the element limit is reached. */
   addSelectedElement: (element: SelectedElement) => boolean;
   removeSelectedElement: (id: string) => void;
   clearSelectedElements: () => void;
