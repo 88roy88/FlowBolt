@@ -66,6 +66,17 @@ class _Beat:
     at: datetime
 
 
+@dataclass
+class _UserTurn:
+    prompt: str
+    event: dict[str, Any]
+    context: str = ""
+
+    @property
+    def model_content(self) -> str:
+        return f"{self.prompt}\n\n{self.context}" if self.context else self.prompt
+
+
 async def _heartbeat_until_done(project_id: str, run_task: asyncio.Task[Any], beat: _Beat) -> None:
     deadline = time.monotonic() + settings.AGENT_RUN_TIMEOUT
     beat_interval = settings.AGENT_RUN_STALE_TIMEOUT / 4
@@ -152,16 +163,15 @@ async def _start_turn(
         raise
 
 
-async def _save_user_turn(
-    project_id: str, content: str, event: dict[str, Any], *, prompt_length: int | None = None
-) -> None:
-    await save_message(project_id, ChatRole.user, content)
+async def _save_user_turn(project_id: str, turn: _UserTurn) -> None:
+    await save_message(project_id, ChatRole.user, turn.model_content)
     log_bi_event(
         "prompt_submitted",
-        prompt_length=len(content) if prompt_length is None else prompt_length,
+        prompt_length=len(turn.prompt),
         prompt_sequence_number=await count_user_messages(project_id),
+        selected_element_count=len(turn.event.get("selected_elements", [])),
     )
-    await emit_event(project_id, event, notify=False)
+    await emit_event(project_id, turn.event, notify=False)
 
 
 @http_router.get("/{project_id}/history")
@@ -220,11 +230,11 @@ async def chat_ws(  # noqa: C901, PLR0915
                     elements = parse_selected_elements(data.get("selectedElements"))
 
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
+                    turn = _UserTurn(prompt=user_content, event=user_event)
                     # The model gets the elements as text; the UI event keeps them structured.
-                    model_content = user_content
                     if elements:
                         user_event["selected_elements"] = [el.model_dump() for el in elements]
-                        model_content = f"{user_content}\n\n{format_selected_elements(elements)}"
+                        turn.context = format_selected_elements(elements)
                     if ds_ids:
                         ds_names: list[str] = []
                         for ds_id in ds_ids:
@@ -249,14 +259,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                     # Claim first: a refused turn must not leave the message behind.
                     await _start_turn(
                         project.id,
-                        partial(agent.run, model_content, data_source_ids=source_ids),
-                        prepare=partial(
-                            _save_user_turn,
-                            project.id,
-                            model_content,
-                            user_event,
-                            prompt_length=len(user_content),
-                        ),
+                        partial(agent.run, turn.model_content, data_source_ids=source_ids),
+                        prepare=partial(_save_user_turn, project.id, turn),
                     )
 
                 elif msg_type == "plan_response":
@@ -330,7 +334,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             error_line=error_line,
                             error_stack=error_stack,
                         ),
-                        prepare=partial(_save_user_turn, project.id, error_desc, fix_event),
+                        prepare=partial(_save_user_turn, project.id, _UserTurn(prompt=error_desc, event=fix_event)),
                     )
 
                 else:

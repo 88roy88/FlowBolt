@@ -55,6 +55,7 @@ def _send_message(payload: dict[str, Any]) -> dict[str, Any]:
     captured["saved_content"] = save_message.await_args.args[2]
     captured["event"] = emit_event.await_args.args[1]
     captured["prompt_length"] = log_bi_event.call_args.kwargs["prompt_length"]
+    captured["element_count"] = log_bi_event.call_args.kwargs["selected_element_count"]
     return captured
 
 
@@ -68,6 +69,7 @@ def test_selected_elements_reach_the_model_and_the_event() -> None:
     assert result["event"]["content"] == "make this red"
     assert result["event"]["selected_elements"][0]["tag"] == "button"
     assert result["prompt_length"] == len("make this red")
+    assert result["element_count"] == 1
 
 
 def test_message_without_elements_is_unchanged() -> None:
@@ -76,3 +78,4 @@ def test_message_without_elements_is_unchanged() -> None:
     assert result["run_args"][0] == "make it red"
     assert result["saved_content"] == "make it red"
     assert "selected_elements" not in result["event"]
+    assert result["element_count"] == 0
