@@ -1,5 +1,3 @@
-"""Elements the user picked in the live preview, attached to a chat message as context."""
-
 import logging
 from typing import Any
 
@@ -7,8 +5,8 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
-MAX_SELECTED_ELEMENTS = 5
-_MAX_COMPONENTS = 4
+_MAX_SELECTED_ELEMENTS = 5
+_MAX_COMPONENT_HIERARCHY_DEPTH = 4
 
 
 def _clip(value: Any, max_len: int) -> Any:
@@ -53,15 +51,14 @@ class SelectedElement(BaseModel):
     def _clip_components(cls, v: Any) -> Any:
         if not isinstance(v, list):
             return []
-        return [c[:80] for c in v if isinstance(c, str) and c][:_MAX_COMPONENTS]
+        return [c[:80] for c in v if isinstance(c, str) and c][:_MAX_COMPONENT_HIERARCHY_DEPTH]
 
 
 def parse_selected_elements(raw: Any) -> list[SelectedElement]:
-    """Invalid items are dropped; items beyond the cap are ignored."""
     if not isinstance(raw, list):
         return []
     elements: list[SelectedElement] = []
-    for item in raw[:MAX_SELECTED_ELEMENTS]:
+    for item in raw[:_MAX_SELECTED_ELEMENTS]:
         try:
             elements.append(SelectedElement.model_validate(item))
         except ValidationError:
