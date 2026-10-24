@@ -5,7 +5,8 @@ from typing import Any
 from opik import track
 
 from flow44.ai.agents._chat_agent import ChatAgent
-from flow44.ai.agents.file_edits import EditApplyError
+from flow44.ai.agents.file_diffs import DiffTracker
+from flow44.ai.agents.fix_error.file_edits import EditApplyError, apply_edits
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
@@ -332,11 +333,20 @@ class FixErrorAgent(ChatAgent):
                 state.rejected_files.append(exc)
                 continue
             try:
-                state.changed_files[path] = await self._edit_file_and_emit_diff(state.diffs, path, pairs)
+                state.changed_files[path] = await self._apply_edits_and_emit_diff(state.diffs, path, pairs)
             except FileNotFoundError:
                 state.edit_failures.append(f"{path} does not exist. Create it with a file action instead.")
             except EditApplyError as exc:
                 state.edit_failures.append(f"No edits to {path} were applied: {exc}")
+
+    async def _apply_edits_and_emit_diff(self, tracker: DiffTracker, path: str, edits: list[tuple[str, str]]) -> str:
+        """Raises FileNotFoundError, or EditApplyError when a search is missing or ambiguous."""
+        old_content = await self.sandbox.read_file(path)
+        new_content = apply_edits(old_content, edits)
+        await self.sandbox.write_file(path, new_content)
+        tracker.record(path, old_content, new_content, is_new=False)
+        await self.emit({"type": "file", "path": path, "content": new_content})
+        return new_content
 
     async def _file_exists(self, path: str) -> bool:
         try:

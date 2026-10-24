@@ -23,6 +23,19 @@ class TestReadWrite:
 
 
 @pytest.mark.asyncio
+class TestEditFile:
+    async def test_replaces_content(self, sandbox: DummySandbox) -> None:
+        await sandbox.write_file("f.txt", "hello world")
+        await sandbox.edit_file("f.txt", "world", "there")
+        assert await sandbox.read_file("f.txt") == "hello there"
+
+    async def test_missing_search_raises(self, sandbox: DummySandbox) -> None:
+        await sandbox.write_file("f.txt", "hello world")
+        with pytest.raises(ValueError, match="Search string not found"):
+            await sandbox.edit_file("f.txt", "NOPE", "x")
+
+
+@pytest.mark.asyncio
 class TestDeleteFile:
     async def test_removes_file(self, sandbox: DummySandbox, tmp_path) -> None:  # type: ignore[type-arg]
         await sandbox.write_file("del.txt", "bye")
@@ -104,6 +117,10 @@ class TestPathTraversal:
     async def test_write_file_traversal_blocked(self, sandbox: DummySandbox) -> None:
         with pytest.raises(PermissionError, match="Path traversal"):
             await sandbox.write_file("../../tmp/malicious", "data")
+
+    async def test_edit_file_traversal_blocked(self, sandbox: DummySandbox) -> None:
+        with pytest.raises(PermissionError, match="Path traversal"):
+            await sandbox.edit_file("../../etc/passwd", "old", "new")
 
     async def test_list_files_traversal_blocked(self, sandbox: DummySandbox) -> None:
         with pytest.raises(PermissionError, match="Path traversal"):

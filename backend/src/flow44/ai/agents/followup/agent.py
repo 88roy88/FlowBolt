@@ -10,7 +10,6 @@ from pydantic import BaseModel
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.file_diffs import DiffTracker
-from flow44.ai.agents.file_edits import EditApplyError
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow, looks_like_leaked_tool_call
@@ -138,22 +137,26 @@ class FollowUpAgent(ChatAgent):
 
         @tool
         async def edit_file(path: str, search: str, replace: str) -> str:
-            """Apply a targeted search-and-replace edit. The search string must match exactly one place."""
+            """Apply a targeted search-and-replace edit. The search string must match exactly."""
             try:
                 path = normalized_path_or_reject(path)
             except FileSafetyError as exc:
                 return _format_file_safety_error(exc)
             try:
-                await self._edit_file_and_emit_diff(self._diffs, path, [(search, replace)])
+                await self._edit_file_and_emit_diff(self._diffs, path, search, replace)
             except FileNotFoundError:
                 return f"Error: File not found: {path}"
-            except EditApplyError as exc:
+            except ValueError:
                 current = await sandbox.read_file(path)
                 lines = current.splitlines()
                 snippet = "\n".join(lines[:40])
                 if len(lines) > 40:
                     snippet += f"\n... ({len(lines)} lines total)"
-                return f"Error in {path}: {exc}\n\nCurrent file content:\n```\n{snippet}\n```"
+                return (
+                    f"Error: search string not found in {path}. "
+                    f"The search must match exactly (including whitespace).\n\n"
+                    f"Current file content:\n```\n{snippet}\n```"
+                )
             return f"OK — edited {path}"
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])

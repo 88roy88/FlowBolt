@@ -54,6 +54,16 @@ class FileSystemMixin(BaseSandbox, ABC):
         os.makedirs(os.path.dirname(destination_full), exist_ok=True)
         os.replace(source_full, destination_full)
 
+    async def edit_file(self, path: str, search: str, replace: str) -> None:
+        full = self._safe_path(path)
+        with open(full, encoding="utf-8") as fh:  # noqa: ASYNC230
+            content = fh.read()
+        if search not in content:
+            raise ValueError(f"Search string not found in {path}")
+        content = content.replace(search, replace, 1)
+        with open(full, "w", encoding="utf-8") as fh:  # noqa: ASYNC230
+            fh.write(content)
+
     async def delete_file(self, path: str) -> None:
         full = self._safe_path(path)
         if os.path.isdir(full):  # noqa: ASYNC240

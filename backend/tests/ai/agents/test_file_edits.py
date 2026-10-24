@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from flow44.ai.agents.file_edits import EditApplyError, apply_edits
+from flow44.ai.agents.fix_error.file_edits import EditApplyError, apply_edits
 
 
 def test_applies_pairs_in_order() -> None:
