@@ -27,9 +27,16 @@ class ChatMessage(SQLModel, table=True):
 
 
 async def save_message(
-    project_id: str, role: ChatRole, content: str, raw_message: dict[str, Any] | None = None
+    project_id: str,
+    role: ChatRole,
+    content: str,
+    raw_message: dict[str, Any] | None = None,
+    *,
+    message_id: str | None = None,
 ) -> ChatMessage:
     msg = ChatMessage(project_id=project_id, role=role, content=content, raw_message=raw_message)
+    if message_id is not None:
+        msg.id = message_id
     async with database.async_session() as session:
         session.add(msg)
         await session.commit()
@@ -43,6 +50,14 @@ async def get_messages(project_id: str) -> list[ChatMessage]:
             select(ChatMessage).where(ChatMessage.project_id == project_id).order_by(col(ChatMessage.created_at).asc())
         )
         return list(result.scalars().all())
+
+
+async def get_message(project_id: str, message_id: str) -> ChatMessage | None:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(ChatMessage).where(ChatMessage.project_id == project_id, ChatMessage.id == message_id)
+        )
+        return result.scalar_one_or_none()
 
 
 async def count_user_messages(project_id: str) -> int:
@@ -61,6 +76,17 @@ async def trim_messages_after(project_id: str, created_at: str) -> None:
             delete(ChatMessage).where(
                 col(ChatMessage.project_id) == project_id,
                 col(ChatMessage.created_at) > created_at,
+            )
+        )
+        await session.commit()
+
+
+async def trim_messages_from(project_id: str, created_at: str) -> None:
+    async with database.async_session() as session:
+        await session.execute(
+            delete(ChatMessage).where(
+                col(ChatMessage.project_id) == project_id,
+                col(ChatMessage.created_at) >= created_at,
             )
         )
         await session.commit()

@@ -168,6 +168,18 @@ function handleVersionRestored(msg: { commit_sha: string }) {
   settle(true);
 }
 
+function handleHistoryRewound(msg: { commit_sha: string }) {
+  // The chat store already cut the messages optimistically; only the version list follows the server.
+  const versions = useVersionStore.getState().versions;
+  const shaIdx = versions.indexOf(msg.commit_sha);
+  useVersionStore.setState({
+    previewingVersion: null,
+    versions: shaIdx >= 0 ? versions.slice(0, shaIdx + 1) : versions,
+  });
+  useErrorStore.getState().clearErrors();
+  refreshEditorFiles();
+}
+
 function handleVersionError(msg: { message: string; code: string; files?: string[] }) {
   const refused = pending;
   settle(false);
@@ -182,6 +194,7 @@ const versionRoutes: { [M in WSMessage as M['type']]?: (msg: M) => void } = {
   version_committed: handleVersionCommitted,
   version_preview_active: handleVersionPreviewActive,
   version_restored: handleVersionRestored,
+  history_rewound: handleHistoryRewound,
   version_error: handleVersionError,
   workspace_dirty: (msg) => useVersionStore.setState({ dirtyFiles: msg.files }),
   workspace_reset: refreshEditorFiles,

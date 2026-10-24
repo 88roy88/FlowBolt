@@ -5,6 +5,7 @@ import contextlib
 import json
 import logging
 import time
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,7 +23,7 @@ from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
 from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
-from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
+from flow44.db.events import emit_event, find_user_event, get_events, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
@@ -48,6 +49,7 @@ _RUNNING: set[asyncio.Task[None]] = set()
 
 _AGENT_BUSY = {"type": "error", "message": "An agent is already running for this project"}
 _VERSION_FAILED = {"type": "version_error", "message": "Version operation failed", "code": "failed"}
+_FIX_NOT_EDITABLE = {"type": "error", "message": "An error fix request can only be regenerated"}
 
 
 class AgentAlreadyRunning(Exception):
@@ -151,8 +153,17 @@ async def _start_turn(
         raise
 
 
-async def _save_user_turn(project_id: str, content: str, event: dict[str, Any]) -> None:
-    await save_message(project_id, ChatRole.user, content)
+def _message_id(raw: Any) -> str:
+    """The client names its messages so it can later edit them; anything malformed gets a fresh id."""
+    try:
+        return str(uuid.UUID(str(raw)))
+    except ValueError:
+        return str(uuid.uuid4())
+
+
+async def _save_user_turn(project_id: str, content: str, event: dict[str, Any], message_id: str) -> None:
+    await save_message(project_id, ChatRole.user, content, message_id=message_id)
+    event["message_id"] = message_id
     log_bi_event(
         "prompt_submitted",
         prompt_length=len(content),
@@ -203,6 +214,59 @@ async def chat_ws(  # noqa: C901, PLR0915
         except Exception:
             logger.debug("Event forwarding stopped for session %s", project.id)
 
+    async def _message_turn(content: str, ds_ids: list[int], model: str | None, message_id: str) -> None:
+        user_event: dict[str, Any] = {"type": "user_message", "content": content}
+        if ds_ids:
+            ds_names: list[str] = []
+            for ds_id in ds_ids:
+                name = await ds_logic.get_display_name(
+                    ds_id,
+                    authorization=data_source_authorization,
+                )
+                ds_names.append(name)
+            user_event["data_sources"] = [
+                {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
+            ]
+
+        agent_cls = PlanAgent if await _is_new_project(project.id) else FollowUpAgent
+        agent = agent_cls(
+            project_id=project.id,
+            sandbox=sandbox,
+            model=model,
+            user_id=user_id,
+            data_source_authorization=data_source_authorization,
+        )
+        source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
+        # Claim first: a refused turn must not leave the message behind.
+        await _start_turn(
+            project.id,
+            partial(agent.run, content, data_source_ids=source_ids),
+            prepare=partial(_save_user_turn, project.id, content, user_event, message_id),
+        )
+
+    async def _fix_turn(fix: dict[str, Any], model: str | None, message_id: str) -> None:
+        error_desc = f"Fix error: {fix['errorMessage']}"
+        if fix["errorFile"]:
+            error_desc += f" in {fix['errorFile']}"
+        fix_event: dict[str, Any] = {"type": "user_message", "content": "", "error_fix_request": fix}
+        fix_agent = FixErrorAgent(
+            project_id=project.id,
+            sandbox=sandbox,
+            model=model,
+            user_id=user_id,
+        )
+        await _start_turn(
+            project.id,
+            partial(
+                fix_agent.run,
+                error_message=fix["errorMessage"],
+                error_file=fix["errorFile"],
+                error_line=fix["errorLine"],
+                error_stack=fix["errorStack"],
+            ),
+            prepare=partial(_save_user_turn, project.id, error_desc, fix_event, message_id),
+        )
+
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
             raw = await websocket.receive_text()
@@ -211,37 +275,11 @@ async def chat_ws(  # noqa: C901, PLR0915
 
             try:
                 if msg_type == "message":
-                    user_content: str = data["content"]
-                    selected_model: str | None = data.get("model")
-                    ds_ids: list[int] = data.get("dataSourceIds") or []
-
-                    user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
-                    if ds_ids:
-                        ds_names: list[str] = []
-                        for ds_id in ds_ids:
-                            name = await ds_logic.get_display_name(
-                                ds_id,
-                                authorization=data_source_authorization,
-                            )
-                            ds_names.append(name)
-                        user_event["data_sources"] = [
-                            {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
-                        ]
-
-                    agent_cls = PlanAgent if await _is_new_project(project.id) else FollowUpAgent
-                    agent = agent_cls(
-                        project_id=project.id,
-                        sandbox=sandbox,
-                        model=selected_model,
-                        user_id=user_id,
-                        data_source_authorization=data_source_authorization,
-                    )
-                    source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
-                    # Claim first: a refused turn must not leave the message behind.
-                    await _start_turn(
-                        project.id,
-                        partial(agent.run, user_content, data_source_ids=source_ids),
-                        prepare=partial(_save_user_turn, project.id, user_content, user_event),
+                    await _message_turn(
+                        data["content"],
+                        data.get("dataSourceIds") or [],
+                        data.get("model"),
+                        _message_id(data.get("message_id")),
                     )
 
                 elif msg_type == "plan_response":
@@ -281,42 +319,30 @@ async def chat_ws(  # noqa: C901, PLR0915
                         await _start_turn(project.id, partial(plan_agent.rebuild_with_feedback, state, feedback))
 
                 elif msg_type == "fix_error":
-                    error_message = data.get("error_message", "")
-                    error_file = data.get("error_file")
-                    error_line = data.get("error_line")
-                    error_stack = data.get("error_stack")
-                    selected_model = data.get("model")
-
-                    error_desc = f"Fix error: {error_message}"
-                    if error_file:
-                        error_desc += f" in {error_file}"
-                    fix_event: dict[str, Any] = {
-                        "type": "user_message",
-                        "content": "",
-                        "error_fix_request": {
-                            "errorMessage": error_message,
-                            "errorFile": error_file,
-                            "errorLine": error_line,
-                            "errorStack": error_stack,
-                        },
+                    fix_request = {
+                        "errorMessage": data.get("error_message", ""),
+                        "errorFile": data.get("error_file"),
+                        "errorLine": data.get("error_line"),
+                        "errorStack": data.get("error_stack"),
                     }
-                    fix_agent = FixErrorAgent(
-                        project_id=project.id,
-                        sandbox=sandbox,
-                        model=selected_model,
-                        user_id=user_id,
-                    )
-                    await _start_turn(
-                        project.id,
-                        partial(
-                            fix_agent.run,
-                            error_message=error_message,
-                            error_file=error_file,
-                            error_line=error_line,
-                            error_stack=error_stack,
-                        ),
-                        prepare=partial(_save_user_turn, project.id, error_desc, fix_event),
-                    )
+                    await _fix_turn(fix_request, data.get("model"), _message_id(data.get("message_id")))
+
+                elif msg_type == "rewind":
+                    target_id = str(data.get("message_id", ""))
+                    new_content: str | None = data.get("content")
+                    target = await find_user_event(project.id, target_id)
+                    if target and new_content is not None and "error_fix_request" in target.payload:
+                        await websocket.send_json(_FIX_NOT_EDITABLE)
+                        continue
+                    original = (await versioning.rewind_to_message(project.id, target_id)).payload
+                    log_bi_event("message_rewound", mode="regenerate" if new_content is None else "edit")
+                    new_id = _message_id(data.get("new_message_id"))
+                    if "error_fix_request" in original:
+                        await _fix_turn(original["error_fix_request"], data.get("model"), new_id)
+                    else:
+                        ds_ids = [ds["id"] for ds in original.get("data_sources") or []]
+                        content = original["content"] if new_content is None else new_content
+                        await _message_turn(content, ds_ids, data.get("model"), new_id)
 
                 else:
                     await versioning.handle_action(project.id, msg_type, data)
@@ -324,7 +350,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                 await websocket.send_json(_AGENT_BUSY)
             except versioning.WorkspaceLocked as exc:
                 await websocket.send_json(exc.payload)
-            except (GitError, versioning.UnknownVersionError):
+            except (GitError, versioning.UnknownVersionError, versioning.UnknownMessageError):
                 logger.exception("[versioning] %s failed for %s", msg_type, project.id)
                 await websocket.send_json(_VERSION_FAILED)
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useChatStore } from '../chat';
 import { useErrorStore } from '../errors';
 import { handleVersionMessage, useVersionStore } from '../version';
-import type { WSMessage } from '../../types';
+import type { Message, WSMessage } from '../../types';
 
 vi.mock('../files', () => ({
   useFilesStore: {
@@ -102,5 +102,62 @@ describe('turn rollback boundary', () => {
     expect(useErrorStore.getState().errors.map((error) => error.message)).toEqual([
       "Can't edit while the AI is working",
     ]);
+  });
+
+  it('sends the client id with each message', () => {
+    useChatStore.getState().sendMessage('add a button');
+
+    const [message] = useChatStore.getState().messages;
+    expect(message.editable).toBe(true);
+    expect(socketSend).toHaveBeenCalledWith(expect.objectContaining({ type: 'message', message_id: message.id }));
+  });
+});
+
+describe('rewinding a turn', () => {
+  const history: Message[] = [
+    { id: 'u1', role: 'user', content: 'build it', timestamp: 1, editable: true },
+    { id: 'a1', role: 'assistant', content: 'built', timestamp: 2 },
+    { id: 'u2', role: 'user', content: 'make it blue', timestamp: 3, editable: true },
+    { id: 'a2', role: 'assistant', content: 'blue now', timestamp: 4 },
+  ];
+
+  beforeEach(() => {
+    handleVersionMessage(msg({ type: 'phase', phase: 'idle' })); // commit any turn a previous test left pending
+    useChatStore.setState({ messages: history, isStreaming: false, agentAlive: null, buildCompleted: true });
+    useVersionStore.setState({ pendingDirtyOp: null, previewingVersion: null });
+    useErrorStore.setState({ errors: [] });
+    socketSend.mockClear();
+  });
+
+  it('cuts at the message and resends the edit under a new id', () => {
+    useChatStore.getState().rewindTurn('u2', 'make it red');
+
+    const messages = useChatStore.getState().messages;
+    expect(messages.map((m) => m.content)).toEqual(['build it', 'built', 'make it red']);
+    expect(messages[2].id).not.toBe('u2');
+    expect(useChatStore.getState().buildCompleted).toBe(true);
+    expect(socketSend).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'rewind', message_id: 'u2', new_message_id: messages[2].id, content: 'make it red' }),
+    );
+  });
+
+  it('regenerates without content and reopens planning for the first prompt', () => {
+    useChatStore.getState().rewindTurn('u1');
+
+    expect(useChatStore.getState().messages.map((m) => m.content)).toEqual(['build it']);
+    expect(useChatStore.getState().buildCompleted).toBe(false);
+    expect(socketSend.mock.calls[0][0]).not.toHaveProperty('content');
+  });
+
+  it('restores the history when the rewind is refused', () => {
+    useChatStore.getState().rewindTurn('u1', 'build something else');
+
+    handleVersionMessage(
+      msg({ type: 'version_error', code: 'run_active', message: "Can't edit while the AI is working", files: [] }),
+    );
+
+    expect(useChatStore.getState().messages).toEqual(history);
+    expect(useChatStore.getState().buildCompleted).toBe(true);
+    expect(useChatStore.getState().isStreaming).toBe(false);
   });
 });

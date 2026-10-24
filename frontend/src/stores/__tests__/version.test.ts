@@ -129,6 +129,17 @@ describe('version store wire contracts', () => {
     });
   });
 
+  it('trims only the version list when history is rewound', () => {
+    const messages = [{ id: 'u1', role: 'user' as const, content: 'edited', timestamp: 1 }];
+    useVersionStore.setState({ versions: ['sha0', 'sha1', 'sha2'], previewingVersion: null });
+    useChatStore.setState({ messages });
+
+    handleVersionMessage(msg({ type: 'history_rewound', commit_sha: 'sha1' }));
+
+    expect(useVersionStore.getState().versions).toEqual(['sha0', 'sha1']);
+    expect(useChatStore.getState().messages).toEqual(messages);
+  });
+
   it('keeps the refused operation and server-owned dirty file list', () => {
     useVersionStore.getState().previewVersion('sha1');
 

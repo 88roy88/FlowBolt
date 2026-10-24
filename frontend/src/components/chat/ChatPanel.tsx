@@ -1,10 +1,13 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, RotateCcw } from 'lucide-react';
 import { formatDayDivider, sameDay } from '../../utils/formatTime';
 import type { Message } from '../../types';
 import { useChatStore } from '../../stores/chat';
-import { isAgentAlive } from '../../stores/chatAgentState';
+import { isAgentAlive, isAwaitingPlanApproval } from '../../stores/chatAgentState';
+import { useWorkspaceLock } from '../../stores/workspaceLock';
+import { Button } from '../ui/button';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '../ui/dialog';
 import { ChatMessage } from './ChatMessage';
 import { UnsavedEditsRow } from '../version/UnsavedEditsRow';
 import { PromptInput } from './PromptInput';
@@ -26,6 +29,58 @@ function groupMessagesByDay(messages: Message[]): DayGroup[] {
   }, []);
 }
 
+const isEditCard = (m: Message) => m.agentCard?.type === 'user_edit';
+
+/** Which messages can be edited, and which user message each regenerate button reruns. */
+function rewindTargets(messages: Message[]) {
+  const editable = new Set<string>();
+  const regenerates = new Map<string, string>();
+  let turn: Message | null = null;
+  messages.forEach((m, i) => {
+    if (isEditCard(m)) return;
+    if (m.role === 'user') {
+      turn = m.editable ? m : null;
+      if (turn && !turn.agentCard) editable.add(m.id);
+    }
+    const next = messages.slice(i + 1).find((n) => !isEditCard(n));
+    if (turn && (!next || next.role === 'user')) regenerates.set(m.id, turn.id);
+  });
+  return { editable, regenerates };
+}
+
+function laterMessages(messages: Message[], id: string): number {
+  const idx = messages.findIndex((m) => m.id === id);
+  const nextTurn = messages.findIndex((m, i) => i > idx && (m.role === 'user' || isEditCard(m)));
+  return nextTurn < 0 ? 0 : messages.length - nextTurn;
+}
+
+type Rewind = { id: string; content?: string };
+
+function RewindDialog({ rewind, count, onConfirm, onClose }: {
+  rewind: Rewind | null; count: number; onConfirm: () => void; onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const edit = rewind?.content !== undefined;
+  return (
+    <Dialog open={rewind !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogClose onClose={onClose} />
+        <DialogTitle>{t(edit ? 'chat.rewind.editTitle' : 'chat.rewind.regenerateTitle')}</DialogTitle>
+        <div className="text-sm text-muted-foreground mt-2 mb-4">{t('chat.rewind.body', { count })}</div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="warning" size="sm" onClick={onConfirm}>
+            <RotateCcw size={13} />
+            {t(edit ? 'chat.rewind.confirmEdit' : 'chat.rewind.confirmRegenerate')}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DayDivider({ label }: { label: string }) {
   return (
     <div className="sticky top-0 z-10 flex justify-center pointer-events-none">
@@ -43,6 +98,10 @@ export function ChatPanel() {
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
   } = useChatStore();
   const agentActive = useChatStore(isAgentAlive);
+  const awaitingPlan = useChatStore(isAwaitingPlanApproval);
+  const rewindTurn = useChatStore((s) => s.rewindTurn);
+  const { lock } = useWorkspaceLock();
+  const [pendingRewind, setPendingRewind] = useState<Rewind | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -97,6 +156,17 @@ export function ChatPanel() {
   const showTypingDots = agentActive && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
 
   const dayGroups = groupMessagesByDay(messages);
+  const canRewind = lock === null && !awaitingPlan;
+  const { editable, regenerates } = rewindTargets(messages);
+
+  const requestRewind = (rewind: Rewind) => {
+    if (laterMessages(messages, rewind.id) > 0) setPendingRewind(rewind);
+    else rewindTurn(rewind.id, rewind.content);
+  };
+  const confirmRewind = () => {
+    if (pendingRewind) rewindTurn(pendingRewind.id, pendingRewind.content);
+    setPendingRewind(null);
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
@@ -106,9 +176,17 @@ export function ChatPanel() {
         {dayGroups.map((group) => (
           <div key={group.key} className="flex flex-col gap-4">
             <DayDivider label={formatDayDivider(group.ts, i18n.language, t)} />
-            {group.msgs.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} />
-            ))}
+            {group.msgs.map((msg) => {
+              const turnId = regenerates.get(msg.id);
+              return (
+                <ChatMessage
+                  key={msg.id}
+                  message={msg}
+                  onEdit={canRewind && editable.has(msg.id) ? (content) => requestRewind({ id: msg.id, content }) : undefined}
+                  onRegenerate={canRewind && turnId ? () => requestRewind({ id: turnId }) : undefined}
+                />
+              );
+            })}
           </div>
         ))}
 
@@ -178,6 +256,13 @@ export function ChatPanel() {
       )}
 
       <PromptInput />
+
+      <RewindDialog
+        rewind={pendingRewind}
+        count={pendingRewind ? laterMessages(messages, pendingRewind.id) : 0}
+        onConfirm={confirmRewind}
+        onClose={() => setPendingRewind(null)}
+      />
     </div>
   );
 }

@@ -139,6 +139,16 @@
     "dismiss": "Dismiss"
   },
   "chat": {
+    "rewind": {
+      "regenerate": "Regenerate",
+      "send": "Send",
+      "editTitle": "Edit this message?",
+      "regenerateTitle": "Regenerate this response?",
+      "body_one": "This discards 1 later message and reverts the app to how it was before this message. This action cannot be undone.",
+      "body_other": "This discards {{count}} later messages and reverts the app to how it was before this message. This action cannot be undone.",
+      "confirmEdit": "Yes, send edit",
+      "confirmRegenerate": "Yes, regenerate"
+    },
     "chat": "Chat",
     "send": "send",
     "newLine": "new line",

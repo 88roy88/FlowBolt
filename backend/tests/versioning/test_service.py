@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Awaitable, Callable
 from functools import partial
 from pathlib import Path
@@ -7,10 +8,11 @@ from sqlalchemy import func, select
 
 from flow44.config import settings
 from flow44.db import database
-from flow44.db.chat import ChatMessage, ChatRole, get_messages
-from flow44.db.events import emit_event, get_versions, subscribe, unsubscribe
+from flow44.db.chat import ChatMessage, ChatRole, get_messages, save_message
+from flow44.db.events import emit_event, get_events, get_versions, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat
 from flow44.db.locks import LockNamespace
+from flow44.db.pending_plan import get_pending_plan, save_pending_plan
 from flow44.services.maintenance.template_sync import sync_protected_template_files
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git, GitError
@@ -356,3 +358,81 @@ async def test_template_sync_skips_a_workspace_that_is_not_on_this_pod(project_i
 
     assert summary == "workspace not present on this pod, skipped"
     assert not (tmp_path / "gone").exists()
+
+
+async def _turn(project_id: str, workspace: Path, text: str, file_content: str | None = None) -> str:
+    message_id = str(uuid.uuid4())
+    await save_message(project_id, ChatRole.user, text, message_id=message_id)
+    await emit_event(project_id, {"type": "user_message", "content": text, "message_id": message_id}, notify=False)
+    await save_message(project_id, ChatRole.assistant, f"re: {text}")
+    if file_content is not None:
+        (workspace / "a.txt").write_text(file_content)
+    await versioning.commit_turn(project_id)
+    return message_id
+
+
+async def _user_contents(project_id: str) -> list[str]:
+    return [e.payload["content"] for e in await get_events(project_id) if e.payload["type"] == "user_message"]
+
+
+async def test_rewind_cuts_exactly_at_the_message_and_keeps_turns_without_a_version(
+    project_id: str, workspace: Path
+) -> None:
+    (workspace / "a.txt").write_text("zero")
+    await versioning.ensure_repo(project_id)
+    await _turn(project_id, workspace, "build", "one")
+    await _turn(project_id, workspace, "just a question")
+    edited = await _turn(project_id, workspace, "change it", "two")
+    v1 = (await get_versions(project_id))[1].payload["commit_sha"]
+    queue = subscribe(project_id)
+    try:
+        event = await versioning.rewind_to_message(project_id, edited)
+    finally:
+        unsubscribe(project_id, queue)
+
+    assert event.payload["content"] == "change it"
+    assert await Git(project_id).head_sha() == v1
+    assert (workspace / "a.txt").read_text() == "one"
+    assert await _user_contents(project_id) == ["build", "just a question"]
+    assert [m.content for m in await get_messages(project_id)] == [
+        "build",
+        "re: build",
+        "just a question",
+        "re: just a question",
+    ]
+    assert queue.get_nowait() == {"type": "history_rewound", "commit_sha": v1}
+
+
+async def test_rewinding_the_first_message_returns_to_the_scaffold(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("zero")
+    await versioning.ensure_repo(project_id)
+    first = await _turn(project_id, workspace, "build", "one")
+    await save_pending_plan(project_id, "{}")
+
+    await versioning.rewind_to_message(project_id, first)
+
+    assert [e.payload["commit_sha"] for e in await get_versions(project_id)] == [await Git(project_id).head_sha()]
+    assert (workspace / "a.txt").read_text() == "zero"
+    assert await get_messages(project_id) == []
+    assert await get_pending_plan(project_id) is None
+
+
+async def test_rewind_rejects_an_unknown_message(project_id: str, version_chain: VersionChain) -> None:
+    with pytest.raises(versioning.UnknownMessageError):
+        await versioning.rewind_to_message(project_id, str(uuid.uuid4()))
+
+    assert await version_chain.git.head_sha() == version_chain.shas[2]
+
+
+async def test_rewind_preserves_a_dirty_workspace(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("zero")
+    await versioning.ensure_repo(project_id)
+    first = await _turn(project_id, workspace, "build", "one")
+    (workspace / "a.txt").write_text("MANUAL-EDIT")
+
+    with pytest.raises(versioning.WorkspaceLocked) as excinfo:
+        await versioning.rewind_to_message(project_id, first)
+
+    assert excinfo.value.payload["code"] == "dirty_workspace"
+    assert (workspace / "a.txt").read_text() == "MANUAL-EDIT"
+    assert await _user_contents(project_id) == ["build"]

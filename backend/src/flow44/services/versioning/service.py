@@ -8,10 +8,18 @@ from datetime import datetime
 from typing import Any
 
 from flow44.ai.agents.file_diffs import FileDiff
-from flow44.db.chat import ChatRole, save_message, trim_messages_after
-from flow44.db.events import AgentEvent, emit_event, emit_transient, get_versions, trim_events_after
+from flow44.db.chat import ChatRole, get_message, save_message, trim_messages_after, trim_messages_from
+from flow44.db.events import (
+    AgentEvent,
+    emit_event,
+    emit_transient,
+    find_user_event,
+    get_versions,
+    trim_events_after,
+)
 from flow44.db.heartbeat import is_run_active, try_claim_run
 from flow44.db.locks import LockNamespace, LockTimeout, advisory_lock
+from flow44.db.pending_plan import delete_pending_plan
 from flow44.services.logging import log_bi_event
 from flow44.services.versioning.git import Git
 
@@ -33,6 +41,10 @@ _MAX_DIFF_CHARS = 100_000
 
 
 class UnknownVersionError(RuntimeError):
+    pass
+
+
+class UnknownMessageError(RuntimeError):
     pass
 
 
@@ -207,6 +219,27 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
         await trim_messages_after(project_id, target.payload["_ts"])
         await emit_transient(project_id, {"type": "version_restored", "commit_sha": commit_sha})
         await _emit_dirty_files(project_id, git)
+
+
+async def rewind_to_message(project_id: str, message_id: str) -> AgentEvent:
+    """Drop user message `message_id` and everything after it, reverting files to the version before it."""
+    async with _locked_workspace(project_id, [_not_busy, _not_dirty]) as git:
+        event = await find_user_event(project_id, message_id)
+        row = await get_message(project_id, message_id)
+        if event is None or event.id is None or row is None:
+            raise UnknownMessageError(message_id)
+        cut = event.id
+        before = [v for v in await get_versions(project_id) if v.id is not None and v.id < cut]
+        if not before:  # only a legacy project can lack the v0 scaffold version
+            raise UnknownMessageError(message_id)
+        sha = before[-1].payload["commit_sha"]
+        await git.restore_main(sha)
+        await trim_events_after(project_id, event.id - 1)
+        await trim_messages_from(project_id, row.created_at)
+        await delete_pending_plan(project_id)
+        await emit_transient(project_id, {"type": "history_rewound", "commit_sha": sha})
+        await _emit_dirty_files(project_id, git)
+        return event
 
 
 async def handle_action(project_id: str, msg_type: str, data: dict[str, Any]) -> None:
