@@ -14,13 +14,17 @@ from flow44.ai.file_safety import FileSafetyError
 
 
 class _RecordingSandbox:
-    def __init__(self) -> None:
+    def __init__(self, files: dict[str, str] | None = None) -> None:
+        self.files = dict(files or {})
         self.written: list[tuple[str, str]] = []
 
     async def read_file(self, path: str) -> str:
-        raise FileNotFoundError(path)
+        if path not in self.files:
+            raise FileNotFoundError(path)
+        return self.files[path]
 
     async def write_file(self, path: str, content: str) -> None:
+        self.files[path] = content
         self.written.append((path, content))
 
 
@@ -60,15 +64,71 @@ async def test_step_write_drops_protected_file_and_records_rejection() -> None:
         sandbox_ref=sandbox,
         emit_fn=_noop_emit,
         error_message="boom",
-        generated_files=[("src/main.tsx", "x"), ("src/components/Foo.tsx", "y")],
+        new_files=[("src/main.tsx", "x"), ("src/components/Foo.tsx", "y")],
     )
 
     agent = _make_agent(sandbox)
     result = await agent._step_write(state)
 
     assert sandbox.written == [("src/components/Foo.tsx", "y")]
-    assert result.generated_files == [("src/components/Foo.tsx", "y")]
+    assert result.changed_files == {"src/components/Foo.tsx": "y"}
     assert len(result.rejected_files) == 1
+
+
+async def test_step_write_applies_edits_to_existing_file() -> None:
+    sandbox = _RecordingSandbox({"src/App.tsx": "const a = 1;\nconst b = 2;\n"})
+    state = _make_state(sandbox)
+    state.edits = [("src/App.tsx", [("const b = 2;", "const b = 3;")])]
+
+    result = await _make_agent(sandbox)._step_write(state)
+
+    assert sandbox.files["src/App.tsx"] == "const a = 1;\nconst b = 3;\n"
+    assert result.changed_files == {"src/App.tsx": "const a = 1;\nconst b = 3;\n"}
+    assert result.edit_failures == []
+
+
+async def test_step_write_refuses_full_rewrite_of_existing_file() -> None:
+    sandbox = _RecordingSandbox({"src/App.tsx": "original"})
+    state = _make_state(sandbox)
+    state.new_files = [("src/App.tsx", "rewritten")]
+
+    result = await _make_agent(sandbox)._step_write(state)
+
+    assert sandbox.files["src/App.tsx"] == "original"
+    assert sandbox.written == []
+    assert len(result.edit_failures) == 1
+    assert "already exists" in result.edit_failures[0]
+
+
+async def test_step_write_applies_no_edits_to_file_when_one_fails() -> None:
+    sandbox = _RecordingSandbox({"src/App.tsx": "const a = 1;\nconst b = 2;\n"})
+    state = _make_state(sandbox)
+    state.edits = [("src/App.tsx", [("const a = 1;", "const a = 9;"), ("const missing", "x")])]
+
+    result = await _make_agent(sandbox)._step_write(state)
+
+    assert sandbox.written == []
+    assert result.changed_files == {}
+    assert len(result.edit_failures) == 1
+    assert "search block 2 was not found" in result.edit_failures[0]
+
+
+async def test_step_write_rejects_edit_to_protected_file() -> None:
+    sandbox = _RecordingSandbox({"src/main.tsx": "x"})
+    state = _make_state(sandbox)
+    state.edits = [("src/main.tsx", [("x", "y")])]
+
+    result = await _make_agent(sandbox)._step_write(state)
+
+    assert sandbox.written == []
+    assert len(result.rejected_files) == 1
+
+
+def test_route_after_validate_retries_on_edit_failures() -> None:
+    state = _make_state(_RecordingSandbox())
+    state.edit_failures = ["No edits to src/App.tsx were applied"]
+
+    assert FixErrorAgent.__new__(FixErrorAgent)._route_after_validate(state) == "retry"
 
 
 def test_route_after_validate_treats_rejections_like_errors() -> None:
@@ -168,3 +228,29 @@ async def test_step_retry_composes_single_message(monkeypatch: pytest.MonkeyPatc
     assert "rejected" in message
     assert len(state.rejected_files) == 1
     assert "something rejected" in str(state.rejected_files[0])
+
+
+async def test_step_retry_reports_edit_failures_and_shows_discovered_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: list[tuple[list[Any], str]] = []
+
+    def _capturing_stream(messages: list[Any], prompt: str, *_args: Any, **_kwargs: Any) -> AsyncIterator[str]:
+        captured.append((messages, prompt))
+
+        async def _empty() -> AsyncIterator[str]:
+            return
+            yield
+
+        return _empty()
+
+    monkeypatch.setattr(fix_error_agent, "stream_chat", _capturing_stream)
+
+    state = _make_state(_RecordingSandbox())
+    state.discovered_files = {"src/App.tsx": "const discoveredMarker = 1;"}
+    state.edit_failures = ["No edits to src/App.tsx were applied: search block 1 was not found."]
+
+    await FixErrorAgent.__new__(FixErrorAgent)._step_retry(state)
+
+    messages, prompt = captured[0]
+    assert "Edits that could not be applied" in messages[0].content
+    assert "search block 1 was not found" in messages[0].content
+    assert "discoveredMarker" in prompt

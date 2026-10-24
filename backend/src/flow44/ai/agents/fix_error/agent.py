@@ -5,13 +5,19 @@ from typing import Any
 from opik import track
 
 from flow44.ai.agents._chat_agent import ChatAgent
+from flow44.ai.agents.file_edits import EditApplyError
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import stream_chat
-from flow44.ai.file_safety import format_rejection_feedback, screen_generated_files
+from flow44.ai.file_safety import (
+    FileSafetyError,
+    format_rejection_feedback,
+    normalized_path_or_reject,
+    screen_generated_files,
+)
 from flow44.ai.helpers import format_agent_feedback
 from flow44.ai.parser import ActionParser
 from flow44.sandbox.main import PnpmSandbox
@@ -20,6 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 MAX_RETRY_ATTEMPTS = 3
+
+
+def format_edit_failures(failures: list[str]) -> str:
+    lines = "\n".join(f"- {failure}" for failure in failures)
+    return f"## Edits that could not be applied\n{lines}\nRe-send them against the current file contents."
 
 
 class FixErrorAgent(ChatAgent):
@@ -50,7 +61,7 @@ class FixErrorAgent(ChatAgent):
 
     def _route_after_validate(self, state: FixErrorState) -> str | None:
         """Route after validation: retry, or complete."""
-        if not state.validation_errors and not state.rejected_files:
+        if not state.validation_errors and not state.rejected_files and not state.edit_failures:
             return "complete"
 
         if state.retry_count >= MAX_RETRY_ATTEMPTS:
@@ -126,7 +137,10 @@ class FixErrorAgent(ChatAgent):
             files=state.discovered_files,
         )
 
-        parser = ActionParser(on_file_action=lambda p, c: state.generated_files.append((p, c)))
+        parser = ActionParser(
+            on_file_action=lambda p, c: state.new_files.append((p, c)),
+            on_edit_action=lambda p, e: state.edits.append((p, e)),
+        )
         full_text: list[str] = []
 
         try:
@@ -153,12 +167,13 @@ class FixErrorAgent(ChatAgent):
         if explanation:
             await state.emit_fn({"type": "text", "content": explanation + "\n\n"})
 
+        fixed_paths = {path for path, _ in (*state.new_files, *state.edits)}
         await state.emit_fn(
             {
                 "type": "fix_step",
                 "step": "generate",
                 "status": "completed",
-                "message": f"Generated fix for {len(state.generated_files)} file(s)",
+                "message": f"Generated fix for {len(fixed_paths)} file(s)",
             }
         )
 
@@ -166,26 +181,23 @@ class FixErrorAgent(ChatAgent):
 
     async def _step_write(self, state: FixErrorState) -> FixErrorState:
         """Step: Write generated files."""
-        if not state.generated_files:
+        if not state.new_files and not state.edits:
             return state
 
         await state.emit_fn(
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
-        state.generated_files, state.rejected_files = screen_generated_files(state.generated_files)
-        if not state.generated_files:
+        await self._apply_changes(state, state.new_files, state.edits)
+        if not state.changed_files:
             return state
-
-        for path, content in state.generated_files:
-            await self._write_file_and_emit_diff(state.diffs, path, content)
 
         await state.emit_fn(
             {
                 "type": "fix_step",
                 "step": "write",
                 "status": "completed",
-                "message": f"Wrote {len(state.generated_files)} file(s)",
+                "message": f"Wrote {len(state.changed_files)} file(s)",
             }
         )
 
@@ -193,7 +205,7 @@ class FixErrorAgent(ChatAgent):
 
     async def _step_validate(self, state: FixErrorState) -> FixErrorState:
         """Step: Validate the fix."""
-        if not state.generated_files and not state.rejected_files:
+        if not state.changed_files and not state.rejected_files and not state.edit_failures:
             return state
 
         await state.emit_fn(
@@ -226,13 +238,18 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."}
         )
 
-        prompt = render_feedback(files=dict(state.generated_files))
-        messages: list[dict[str, Any] | Message] = [
-            Message.user(format_agent_feedback(state.validation_errors, state.rejected_files))
-        ]
+        prompt = render_feedback(files={**state.discovered_files, **state.changed_files})
+        feedback = format_agent_feedback(state.validation_errors, state.rejected_files)
+        if state.edit_failures:
+            feedback = "\n\n".join(s for s in (feedback, format_edit_failures(state.edit_failures)) if s)
+        messages: list[dict[str, Any] | Message] = [Message.user(feedback)]
 
         generated: list[tuple[str, str]] = []
-        parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
+        edits: list[tuple[str, list[tuple[str, str]]]] = []
+        parser = ActionParser(
+            on_file_action=lambda p, c: generated.append((p, c)),
+            on_edit_action=lambda p, e: edits.append((p, e)),
+        )
 
         try:
             async for chunk in stream_chat(
@@ -244,11 +261,8 @@ class FixErrorAgent(ChatAgent):
                 parser.feed(chunk)
             parser.flush()
 
-            if generated:
-                validated, state.rejected_files = screen_generated_files(generated)
-                for path, content in validated:
-                    await self._write_file_and_emit_diff(state.diffs, path, content)
-                state.generated_files = validated
+            if generated or edits:
+                await self._apply_changes(state, generated, edits)
 
             await state.emit_fn(
                 {"type": "fix_step", "step": "retry", "status": "completed", "message": "Auto-fix applied"}
@@ -265,7 +279,7 @@ class FixErrorAgent(ChatAgent):
         if state.rejected_files:
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
 
-        files = [p for p, _ in state.generated_files]
+        files = list(state.changed_files)
         steps = [
             {
                 "tool": "fix_error",
@@ -291,6 +305,45 @@ class FixErrorAgent(ChatAgent):
         return state
 
     # -- Helper Methods --
+
+    async def _apply_changes(
+        self,
+        state: FixErrorState,
+        files: list[tuple[str, str]],
+        edits: list[tuple[str, list[tuple[str, str]]]],
+    ) -> None:
+        """Create new files and apply edits to existing ones. Each edit action applies all-or-nothing."""
+        safe_files, state.rejected_files = screen_generated_files(files)
+        state.edit_failures = []
+
+        for path, content in safe_files:
+            if await self._file_exists(path):
+                state.edit_failures.append(
+                    f"{path} already exists. Change it with an edit action instead of rewriting the whole file."
+                )
+                continue
+            await self._write_file_and_emit_diff(state.diffs, path, content)
+            state.changed_files[path] = content
+
+        for raw_path, pairs in edits:
+            try:
+                path = normalized_path_or_reject(raw_path)
+            except FileSafetyError as exc:
+                state.rejected_files.append(exc)
+                continue
+            try:
+                state.changed_files[path] = await self._edit_file_and_emit_diff(state.diffs, path, pairs)
+            except FileNotFoundError:
+                state.edit_failures.append(f"{path} does not exist. Create it with a file action instead.")
+            except EditApplyError as exc:
+                state.edit_failures.append(f"No edits to {path} were applied: {exc}")
+
+    async def _file_exists(self, path: str) -> bool:
+        try:
+            await self.sandbox.read_file(path)
+        except FileNotFoundError:
+            return False
+        return True
 
     # TODO: add the some AI magic to this function if the file is not clear or need more?
     # TODO: should ignore stuff from node_models? and stuff like that?

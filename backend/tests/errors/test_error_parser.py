@@ -92,6 +92,35 @@ class TestParseErrorBlock:
         assert result.column == 13
         assert "Missing initializer" in result.message
 
+    def test_vite_internal_server_error_windows_path(self) -> None:
+        block = (
+            r"20:42:28 [vite] Internal server error: C:\Users\me\FlowBolt\backend\data\workspaces\851b"
+            r"\src\components\CoinFlipper.tsx: Missing semicolon. (6:4)"
+        )
+        result = parse_error_block(block)
+        assert result is not None
+        assert result.file == r"C:\Users\me\FlowBolt\backend\data\workspaces\851b\src\components\CoinFlipper.tsx"
+        assert result.line == 6
+        assert result.column == 4
+        assert result.message == "Missing semicolon."
+
+    def test_vite_error_in_node_modules_windows_path_no_file(self) -> None:
+        block = (
+            r"[vite] Internal server error: C:\project\node_modules\@babel\parser\lib\index.js: Unexpected token (42:8)"
+        )
+        result = parse_error_block(block)
+        assert result is not None
+        assert result.file is None
+        assert result.line is None
+
+    def test_file_line_col_windows_path(self) -> None:
+        block = "Error\nC:\\project\\src\\App.tsx:12:5"
+        result = parse_error_block(block)
+        assert result is not None
+        assert result.file == "C:\\project\\src\\App.tsx"
+        assert result.line == 12
+        assert result.column == 5
+
     def test_vite_error_in_node_modules_no_file(self) -> None:
         block = "[vite] Internal server error: /home/project/node_modules/@babel/parser/lib/index.js: Unexpected token (42:8)"
         result = parse_error_block(block)

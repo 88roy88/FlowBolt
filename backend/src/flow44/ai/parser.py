@@ -10,6 +10,10 @@ XML format handled::
       <flowAction type="file" filePath="src/App.tsx">
         file content here
       </flowAction>
+      <flowAction type="edit" filePath="src/App.tsx">
+        <search>exact existing text</search>
+        <replace>new text</replace>
+      </flowAction>
     </flowArtifact>
 """
 
@@ -20,6 +24,15 @@ from collections.abc import Callable
 from enum import Enum, auto
 
 _CDATA_RE = re.compile(r"<!\[CDATA\[(.*?)]]>", re.DOTALL)
+_EDIT_PAIR_RE = re.compile(r"<search>(.*?)</search>\s*<replace>(.*?)</replace>", re.DOTALL)
+_TRAILING_TAG_INDENT_RE = re.compile(r"\r?\n[ \t]*\Z")
+
+
+def _trim_edit_block(text: str) -> str:
+    """Drop the newline after the opening tag and the newline + indent before the closing tag."""
+    text = _CDATA_RE.sub(r"\1", text)
+    text = text.removeprefix("\r\n") if text.startswith("\r\n") else text.removeprefix("\n")
+    return _TRAILING_TAG_INDENT_RE.sub("", text)
 
 
 class _State(Enum):
@@ -42,18 +55,24 @@ class ActionParser:
         Fired for text outside any ``<flowArtifact>`` block.
     on_file_action(path: str, content: str)
         Fired when a complete ``<flowAction type="file">`` is parsed.
+    on_edit_action(path: str, edits: list[tuple[str, str]])
+        Fired when a complete ``<flowAction type="edit">`` is parsed, with its
+        ``(search, replace)`` pairs in order. Whitespace inside them is kept.
     """
 
     def __init__(
         self,
         on_text: Callable[[str], None] | None = None,
         on_file_action: Callable[[str, str], None] | None = None,
+        on_edit_action: Callable[[str, list[tuple[str, str]]], None] | None = None,
     ) -> None:
         self.on_text = on_text or (lambda _t: None)
         self.on_file_action = on_file_action or (lambda _p, _c: None)
+        self.on_edit_action = on_edit_action or (lambda _p, _e: None)
 
         self._buffer: str = ""
         self._state: _State = _State.TEXT
+        self._action_type: str = ""
         self._action_file_path: str = ""
         self._action_body: str = ""
 
@@ -65,7 +84,7 @@ class ActionParser:
     _ARTIFACT_OPEN = re.compile(r"<flowArtifact\b[^>]*>", re.DOTALL)
     _ARTIFACT_CLOSE = "</flowArtifact>"
     _ACTION_OPEN = re.compile(
-        r'<flowAction\s+type="file"(?:\s+filePath="(?P<path>[^"]*)")?[^>]*>',
+        r'<flowAction\s+type="(?P<type>file|edit)"(?:\s+filePath="(?P<path>[^"]*)")?[^>]*>',
         re.DOTALL,
     )
     _ACTION_CLOSE = "</flowAction>"
@@ -106,6 +125,7 @@ class ActionParser:
                 m = self._ACTION_OPEN.match(self._buffer, action_idx)
                 if m is None:
                     return
+                self._action_type = m.group("type")
                 self._action_file_path = m.group("path") or ""
                 self._action_body = ""
                 self._buffer = self._buffer[m.end() :]
@@ -123,14 +143,26 @@ class ActionParser:
                 self._action_body += self._buffer[:close_idx]
                 self._buffer = self._buffer[close_idx + len(self._ACTION_CLOSE) :]
 
-                body = self._action_body.strip()
-                # Strip CDATA wrappers that some models produce
-                body = _CDATA_RE.sub(r"\1", body)
-                self.on_file_action(self._action_file_path, body)
+                self._emit_action()
 
+                self._action_type = ""
                 self._action_file_path = ""
                 self._action_body = ""
                 self._state = _State.IN_ARTIFACT
+
+    def _emit_action(self) -> None:
+        if self._action_type == "edit":
+            edits = [
+                (_trim_edit_block(search), _trim_edit_block(replace))
+                for search, replace in _EDIT_PAIR_RE.findall(self._action_body)
+            ]
+            self.on_edit_action(self._action_file_path, edits)
+            return
+
+        body = self._action_body.strip()
+        # Strip CDATA wrappers that some models produce
+        body = _CDATA_RE.sub(r"\1", body)
+        self.on_file_action(self._action_file_path, body)
 
     def flush(self) -> None:
         """Flush any remaining buffered text (call at end of stream)."""
