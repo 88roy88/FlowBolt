@@ -138,7 +138,7 @@ class FixErrorAgent(ChatAgent):
         )
 
         parser = ActionParser(
-            on_file_action=lambda p, c: state.generated_files.append((p, c)),
+            on_file_action=lambda p, c: state.new_files.append((p, c)),
             on_edit_action=lambda p, e: state.edits.append((p, e)),
         )
         full_text: list[str] = []
@@ -167,7 +167,7 @@ class FixErrorAgent(ChatAgent):
         if explanation:
             await state.emit_fn({"type": "text", "content": explanation + "\n\n"})
 
-        fixed_paths = {path for path, _ in (*state.generated_files, *state.edits)}
+        fixed_paths = {path for path, _ in (*state.new_files, *state.edits)}
         await state.emit_fn(
             {
                 "type": "fix_step",
@@ -181,14 +181,14 @@ class FixErrorAgent(ChatAgent):
 
     async def _step_write(self, state: FixErrorState) -> FixErrorState:
         """Step: Write generated files."""
-        if not state.generated_files and not state.edits:
+        if not state.new_files and not state.edits:
             return state
 
         await state.emit_fn(
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
-        await self._apply_changes(state, state.generated_files, state.edits)
+        await self._apply_changes(state, state.new_files, state.edits)
         if not state.changed_files:
             return state
 

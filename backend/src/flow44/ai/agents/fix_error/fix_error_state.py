@@ -28,11 +28,9 @@ class FixErrorState(BaseModel):
 
     # Working state
     discovered_files: dict[str, str] = Field(default_factory=dict)
-    # Full-content file actions; only accepted for files that don't exist yet
-    generated_files: list[tuple[str, str]] = Field(default_factory=list)
+    new_files: list[tuple[str, str]] = Field(default_factory=list)
     # Edit actions: (path, [(search, replace), ...])
     edits: list[tuple[str, list[tuple[str, str]]]] = Field(default_factory=list)
-    # Latest content of every file this run wrote
     changed_files: dict[str, str] = Field(default_factory=dict)
     edit_failures: list[str] = Field(default_factory=list)
     diffs: DiffTracker = Field(default_factory=DiffTracker)

@@ -68,10 +68,7 @@ class ChatAgent(BaseAgent):
         await self.emit({"type": "file", "path": path, "content": content})
 
     async def _edit_file_and_emit_diff(self, tracker: DiffTracker, path: str, edits: list[tuple[str, str]]) -> str:
-        """Apply search/replace pairs all-or-nothing and return the new content.
-
-        Raises FileNotFoundError, or EditApplyError when a search is missing or ambiguous.
-        """
+        """Raises FileNotFoundError, or EditApplyError when a search is missing or ambiguous."""
         old_content = await self.sandbox.read_file(path)
         new_content = apply_edits(old_content, edits)
         await self.sandbox.write_file(path, new_content)

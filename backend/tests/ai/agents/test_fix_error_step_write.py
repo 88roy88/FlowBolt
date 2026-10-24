@@ -64,7 +64,7 @@ async def test_step_write_drops_protected_file_and_records_rejection() -> None:
         sandbox_ref=sandbox,
         emit_fn=_noop_emit,
         error_message="boom",
-        generated_files=[("src/main.tsx", "x"), ("src/components/Foo.tsx", "y")],
+        new_files=[("src/main.tsx", "x"), ("src/components/Foo.tsx", "y")],
     )
 
     agent = _make_agent(sandbox)
@@ -90,7 +90,7 @@ async def test_step_write_applies_edits_to_existing_file() -> None:
 async def test_step_write_refuses_full_rewrite_of_existing_file() -> None:
     sandbox = _RecordingSandbox({"src/App.tsx": "original"})
     state = _make_state(sandbox)
-    state.generated_files = [("src/App.tsx", "rewritten")]
+    state.new_files = [("src/App.tsx", "rewritten")]
 
     result = await _make_agent(sandbox)._step_write(state)
 
