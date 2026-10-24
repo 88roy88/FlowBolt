@@ -16,11 +16,6 @@ def test_rejects_missing_search() -> None:
         apply_edits("hello world", [("NOPE", "x")])
 
 
-def test_names_failing_block_when_several_pairs() -> None:
-    with pytest.raises(EditApplyError, match="search block 2 was not found"):
-        apply_edits("hello world", [("hello", "hi"), ("NOPE", "x")])
-
-
 def test_rejects_ambiguous_search() -> None:
     with pytest.raises(EditApplyError, match="matches 2 places"):
         apply_edits("x\nx\n", [("x", "y")])

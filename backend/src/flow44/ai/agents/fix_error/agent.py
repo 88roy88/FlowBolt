@@ -313,7 +313,6 @@ class FixErrorAgent(ChatAgent):
         files: list[tuple[str, str]],
         edits: list[tuple[str, list[tuple[str, str]]]],
     ) -> None:
-        """Create new files and apply edits to existing ones. Each edit action applies all-or-nothing."""
         safe_files, state.rejected_files = screen_generated_files(files)
         state.edit_failures = []
 

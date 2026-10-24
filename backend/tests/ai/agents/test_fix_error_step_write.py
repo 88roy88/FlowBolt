@@ -124,18 +124,15 @@ async def test_step_write_rejects_edit_to_protected_file() -> None:
     assert len(result.rejected_files) == 1
 
 
-def test_route_after_validate_retries_on_edit_failures() -> None:
-    state = _make_state(_RecordingSandbox())
-    state.edit_failures = ["No edits to src/App.tsx were applied"]
-
-    assert FixErrorAgent.__new__(FixErrorAgent)._route_after_validate(state) == "retry"
-
-
 def test_route_after_validate_treats_rejections_like_errors() -> None:
     state = _make_state(_RecordingSandbox())
     agent = FixErrorAgent.__new__(FixErrorAgent)
 
     assert agent._route_after_validate(state) == "complete"
+
+    state.edit_failures = ["No edits to src/App.tsx were applied"]
+    assert agent._route_after_validate(state) == "retry"
+    state.edit_failures = []
 
     state.rejected_files = [FileSafetyError("something rejected")]
     assert agent._route_after_validate(state) == "retry"

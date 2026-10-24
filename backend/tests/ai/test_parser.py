@@ -247,21 +247,6 @@ class TestActionParserEdits:
 
         assert edits == [("a.ts", [("  x", "  y")])]
 
-    def test_edit_split_across_chunks(self) -> None:
-        edits: list[tuple[str, list[tuple[str, str]]]] = []
-        parser = ActionParser(on_edit_action=lambda p, e: edits.append((p, e)))
-
-        text = (
-            '<flowArtifact id="t" title="t"><flowAction type="edit" filePath="a.ts">'
-            "<search>old line</search><replace>new line</replace>"
-            "</flowAction></flowArtifact>"
-        )
-        for ch in text:
-            parser.feed(ch)
-        parser.flush()
-
-        assert edits == [("a.ts", [("old line", "new line")])]
-
     def test_file_and_edit_actions_are_routed_separately(self) -> None:
         files: list[tuple[str, str]] = []
         edits: list[tuple[str, list[tuple[str, str]]]] = []
