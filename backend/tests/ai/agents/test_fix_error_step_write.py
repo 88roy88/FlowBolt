@@ -78,6 +78,7 @@ async def test_step_write_drops_protected_file_and_records_rejection() -> None:
 async def test_step_write_applies_edits_to_existing_file() -> None:
     sandbox = _RecordingSandbox({"src/App.tsx": "const a = 1;\nconst b = 2;\n"})
     state = _make_state(sandbox)
+    state.discovered_files = dict(sandbox.files)
     state.edits = [("src/App.tsx", [("const b = 2;", "const b = 3;")])]
 
     result = await _make_agent(sandbox)._step_write(state)
@@ -103,6 +104,7 @@ async def test_step_write_refuses_full_rewrite_of_existing_file() -> None:
 async def test_step_write_applies_no_edits_to_file_when_one_fails() -> None:
     sandbox = _RecordingSandbox({"src/App.tsx": "const a = 1;\nconst b = 2;\n"})
     state = _make_state(sandbox)
+    state.discovered_files = dict(sandbox.files)
     state.edits = [("src/App.tsx", [("const a = 1;", "const a = 9;"), ("const missing", "x")])]
 
     result = await _make_agent(sandbox)._step_write(state)
@@ -111,6 +113,18 @@ async def test_step_write_applies_no_edits_to_file_when_one_fails() -> None:
     assert result.changed_files == {}
     assert len(result.edit_failures) == 1
     assert "search block 2 was not found" in result.edit_failures[0]
+
+
+async def test_step_write_refuses_edit_to_file_not_shown() -> None:
+    sandbox = _RecordingSandbox({"src/App.tsx": "x", "src/Other.tsx": "y"})
+    state = _make_state(sandbox)
+    state.discovered_files = {"src/App.tsx": "x"}
+    state.edits = [("src/Other.tsx", [("y", "z")])]
+
+    result = await _make_agent(sandbox)._step_write(state)
+
+    assert sandbox.written == []
+    assert "was not shown to you" in result.edit_failures[0]
 
 
 async def test_step_write_rejects_edit_to_protected_file() -> None:
@@ -227,7 +241,7 @@ async def test_step_retry_composes_single_message(monkeypatch: pytest.MonkeyPatc
     assert "something rejected" in str(state.rejected_files[0])
 
 
-async def test_step_retry_reports_edit_failures_and_shows_discovered_files(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_step_retry_prompt_has_failures_files_and_original_error(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[tuple[list[Any], str]] = []
 
     def _capturing_stream(messages: list[Any], prompt: str, *_args: Any, **_kwargs: Any) -> AsyncIterator[str]:
@@ -242,6 +256,8 @@ async def test_step_retry_reports_edit_failures_and_shows_discovered_files(monke
     monkeypatch.setattr(fix_error_agent, "stream_chat", _capturing_stream)
 
     state = _make_state(_RecordingSandbox())
+    state.error_message = "ReferenceError: originalErrorMarker is not defined"
+    state.explanation = "previousExplanationMarker"
     state.discovered_files = {"src/App.tsx": "const discoveredMarker = 1;"}
     state.edit_failures = ["No edits to src/App.tsx were applied: search block 1 was not found."]
 
@@ -251,3 +267,5 @@ async def test_step_retry_reports_edit_failures_and_shows_discovered_files(monke
     assert "Edits that could not be applied" in messages[0].content
     assert "search block 1 was not found" in messages[0].content
     assert "discoveredMarker" in prompt
+    assert "originalErrorMarker" in prompt
+    assert "previousExplanationMarker" in prompt

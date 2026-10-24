@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import PurePosixPath
 from typing import Any
@@ -6,6 +7,8 @@ from opik import track
 
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.file_diffs import DiffTracker
+from flow44.ai.agents.fix_error.build_errors import drop_baseline_errors
+from flow44.ai.agents.fix_error.discovery import find_source_path, local_import_candidates
 from flow44.ai.agents.fix_error.file_edits import EditApplyError, apply_edits
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
@@ -27,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 
 MAX_RETRY_ATTEMPTS = 3
+MAX_DISCOVERED_FILES = 8
+ENTRY_FILE = "src/App.tsx"
 
 
 def format_edit_failures(failures: list[str]) -> str:
@@ -106,12 +111,15 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "discover", "status": "running", "message": "Discovering files to fix..."}
         )
 
-        state.discovered_files = await self._discover_files(state.error_file)
+        state.discovered_files = await self._discover_files(state)
 
         if not state.discovered_files:
             await state.emit_fn({"type": "error", "message": "Could not read source files to fix error"})
             await state.emit_fn({"type": "phase", "phase": "idle"})
             raise RuntimeError("No files discovered")
+
+        # Runs while the model generates, so errors that predate the fix can be ignored in validation
+        state.baseline_build = asyncio.create_task(self._build())
 
         await state.emit_fn(
             {
@@ -189,6 +197,8 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "write", "status": "running", "message": "Writing fixed files..."}
         )
 
+        if state.baseline_build is not None:
+            state.baseline_errors = await state.baseline_build
         await self._apply_changes(state, state.new_files, state.edits)
         if not state.changed_files:
             return state
@@ -213,7 +223,8 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "validate", "status": "running", "message": "Validating fix..."}
         )
 
-        state.validation_errors = await self._build()
+        keep_files = {*state.changed_files, *([state.error_file] if state.error_file else [])}
+        state.validation_errors = drop_baseline_errors(await self._build(), state.baseline_errors, keep_files)
 
         if state.validation_errors:
             await state.emit_fn(
@@ -239,7 +250,12 @@ class FixErrorAgent(ChatAgent):
             {"type": "fix_step", "step": "retry", "status": "running", "message": "Attempting auto-fix..."}
         )
 
-        prompt = render_feedback(files={**state.discovered_files, **state.changed_files})
+        prompt = render_feedback(
+            error_message=state.error_message,
+            error_file=state.error_file,
+            previous_explanation=state.explanation,
+            files={**state.discovered_files, **state.changed_files},
+        )
         feedback = format_agent_feedback(state.validation_errors, state.rejected_files)
         if state.edit_failures:
             feedback = "\n\n".join(s for s in (feedback, format_edit_failures(state.edit_failures)) if s)
@@ -331,6 +347,9 @@ class FixErrorAgent(ChatAgent):
             except FileSafetyError as exc:
                 state.rejected_files.append(exc)
                 continue
+            if path not in state.discovered_files and path not in state.changed_files:
+                state.edit_failures.append(f"{path} was not shown to you. Only edit files listed under Current Files.")
+                continue
             try:
                 state.changed_files[path] = await self._apply_edits_and_emit_diff(state.diffs, path, pairs)
             except FileNotFoundError:
@@ -354,45 +373,36 @@ class FixErrorAgent(ChatAgent):
             return False
         return True
 
-    # TODO: add the some AI magic to this function if the file is not clear or need more?
-    # TODO: should ignore stuff from node_models? and stuff like that?
-    async def _discover_files(self, error_file: str | None) -> dict[str, str]:  # noqa: C901, PLR0912
-        files_to_read: list[str] = []
+    async def _discover_files(self, state: FixErrorState) -> dict[str, str]:
+        """Read the error file (or the app entry when none is known) plus the local files it imports."""
+        raw_path = state.error_file or find_source_path(state.error_message, state.error_stack)
+        state.error_file = self._normalize_path(raw_path) if raw_path else None
 
-        if error_file:
-            files_to_read.append(self._normalize_path(error_file))
-        else:
-            try:
-                tree = await self.sandbox.list_files()
-                for entry in tree:
-                    if entry.name == "src" and entry.children:
-                        for child in entry.children:
-                            if child.path.endswith((".tsx", ".ts", ".jsx", ".js")):
-                                files_to_read.append(child.path)
-            except Exception:
-                logger.warning("[fix-error] Could not read file tree")
+        entry = state.error_file or ENTRY_FILE
+        content = await self._read_or_none(entry)
+        if content is None and entry != ENTRY_FILE:
+            logger.warning("[fix-error] Could not read error file %s, falling back to %s", entry, ENTRY_FILE)
+            entry = ENTRY_FILE
+            content = await self._read_or_none(entry)
+        if content is None:
+            return {}
 
-        file_contents: dict[str, str] = {}
-        for path in files_to_read[:10]:
-            try:
-                file_contents[path] = await self.sandbox.read_file(path)
-            except Exception:
-                logger.warning("[fix-error] Could not read %s", path)
-                if not file_contents and error_file:
-                    try:
-                        tree = await self.sandbox.list_files()
-                        for entry in tree:
-                            if entry.name == "src" and entry.children:
-                                for child in entry.children:
-                                    if child.path.endswith((".tsx", ".ts", ".jsx", ".js", ".css")):
-                                        try:
-                                            file_contents[child.path] = await self.sandbox.read_file(child.path)
-                                        except Exception:
-                                            logger.debug("Could not read fallback file %s", child.path)
-                                break
-                    except Exception:
-                        logger.debug("Fallback file tree listing failed")
-        return file_contents
+        files = {entry: content}
+        for candidates in local_import_candidates(entry, content):
+            if len(files) >= MAX_DISCOVERED_FILES:
+                break
+            for candidate in candidates:
+                imported = await self._read_or_none(candidate)
+                if imported is not None:
+                    files[candidate] = imported
+                    break
+        return files
+
+    async def _read_or_none(self, path: str) -> str | None:
+        try:
+            return await self.sandbox.read_file(path)
+        except Exception:
+            return None
 
     # TODO: we might want genral utils outside of the agent. also, me might want to move this to the sandbox manager.
     # TODO: or even to the frontend

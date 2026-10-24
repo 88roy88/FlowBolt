@@ -36,6 +36,9 @@ class FixErrorState(BaseModel):
     diffs: DiffTracker = Field(default_factory=DiffTracker)
     full_response: str = ""
     explanation: str = ""
+    # Build of the untouched project, started at discover and awaited before the first write
+    baseline_build: Any = None
+    baseline_errors: str = ""
     validation_errors: str = ""
     retry_count: int = 0
     rejected_files: list[FileSafetyError] = Field(default_factory=list)
