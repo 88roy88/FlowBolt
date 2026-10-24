@@ -7,6 +7,8 @@ export interface Message {
   dataSources?: { id: number; name: string }[];
   agentCard?: AgentCard;
   version?: string; // commit_sha
+  /** The server knows this message by `id`, so it can be edited or regenerated. */
+  editable?: boolean;
 }
 
 export type VersionAuthor = 'ai' | 'user' | 'system';
@@ -214,7 +216,7 @@ export interface FollowUpStep {
 }
 
 export type WSMessage = { _ts?: string } & (
-  | { type: 'message'; content: string; model?: string; dataSourceIds?: number[] }
+  | { type: 'message'; content: string; message_id?: string; model?: string; dataSourceIds?: number[] }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }
@@ -228,17 +230,19 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'plan_response'; action: 'accept' | 'modify'; feedback?: string }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'fix_step'; step: 'discover' | 'generate' | 'write' | 'validate' | 'retry'; status: 'running' | 'completed' | 'failed'; message: string }
-  | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; model?: string }
+  | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; message_id?: string; model?: string }
+  | { type: 'rewind'; message_id: string; new_message_id: string; content?: string; model?: string }
   | { type: 'data_sources_fetched'; data_sources: { data_source_id: string; data_source_name: string; data_schema: string; relevant_fields?: string }[] }
   | { type: 'data_source_error'; message: string }
 
   | { type: 'followup_step'; tool: string; args: Record<string, string>; status: string; result_preview?: string; iteration: number }
   | { type: 'file_diffs'; diffs: FileDiff[] }
-  | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
+  | { type: 'user_message'; content: string; message_id?: string; data_sources?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
   | { type: 'plan_accepted'; overview: PlanOverview }
   | { type: 'version_committed'; commit_sha: string; author?: VersionAuthor; diffs?: FileDiff[] }
   | { type: 'version_preview_active'; commit_sha: string; is_latest: boolean }
   | { type: 'version_restored'; commit_sha: string }
+  | { type: 'history_rewound'; commit_sha: string }
   | { type: 'version_error'; message: string; code: VersionErrorCode; files?: string[] }
   | { type: 'workspace_dirty'; files: string[] }
   | { type: 'workspace_reset' }

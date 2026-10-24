@@ -123,10 +123,11 @@ function handleFixStep(msg: WSMessage & { type: 'fix_step' }, set: SetState) {
 
 function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetState) {
   const userMsg: Message = {
-    id: generateId(),
+    id: msg.message_id ?? generateId(),
     role: 'user',
     content: msg.content || '',
     timestamp: getTimestamp(),
+    editable: !!msg.message_id,
   };
   if (msg.data_sources && msg.data_sources.length > 0) {
     userMsg.dataSources = msg.data_sources;

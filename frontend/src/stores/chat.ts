@@ -37,6 +37,8 @@ export interface ChatState {
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   rollbackTurn: (id: string) => void;
+  /** Drop user message `id` and everything after it, then resend it, as `content` when edited. */
+  rewindTurn: (id: string, content?: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
@@ -126,6 +128,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content: '',
       timestamp: Date.now(),
       agentCard: { type: 'error_fix_request', errorMessage, errorFile, errorLine, errorStack },
+      editable: true,
     };
 
     set((state) => ({
@@ -147,6 +150,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       error_file: errorFile,
       error_line: errorLine,
       error_stack: errorStack,
+      message_id: userMessage.id,
       model: selectedModel || undefined,
     });
 
@@ -174,6 +178,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content,
       timestamp: Date.now(),
       dataSources: selectedDataSources.length > 0 ? [...selectedDataSources] : undefined,
+      editable: true,
     };
 
     set((state) => ({
@@ -193,6 +198,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.send({
       type: 'message',
       content,
+      message_id: userMessage.id,
       ...(selectedModel && { model: selectedModel }),
       ...(selectedDataSources.length > 0 && { dataSourceIds: selectedDataSources.map((c) => c.id) }),
     });
@@ -221,6 +227,59 @@ export const useChatStore = create<ChatState>((set, get) => ({
       agentAlive: false,
       ...RESET_STATE,
     }));
+  },
+
+  rewindTurn(id: string, content?: string) {
+    const projectId = useSessionStore.getState().projectId;
+    const before = get().messages;
+    const idx = before.findIndex((m) => m.id === id);
+    if (!projectId || idx < 0) return;
+    void requestPermissionIfNeeded();
+
+    const original = before[idx];
+    const isFix = original.agentCard?.type === 'error_fix_request';
+    const userMessage: Message = {
+      ...original,
+      id: generateId(),
+      content: content ?? original.content,
+      timestamp: Date.now(),
+      editable: true,
+    };
+    const buildCompleted = get().buildCompleted;
+    // Before the first prompt the project is blank again (edit cards are user messages, not prompts)
+    const rewindsFirstPrompt = !before.slice(0, idx).some((m) => m.role === 'user' && m.agentCard?.type !== 'user_edit');
+
+    set({
+      messages: [...before.slice(0, idx), userMessage],
+      isStreaming: true,
+      agentAlive: true,
+      ...RESET_STATE,
+      designProgress: { architecture: null, ux: null },
+      buildCompleted: buildCompleted && !rewindsFirstPrompt,
+    });
+
+    const socket = getChatSocket(projectId);
+    const makeHandler = isFix ? createFixErrorHandler : createSendMessageHandler;
+    const handler = makeHandler(set, get, () => detachHandler(socket, handler));
+    attachHandler(projectId, socket, handler);
+    startAgentAlivePolling(projectId);
+
+    const { selectedModel } = get();
+    socket.send({
+      type: 'rewind',
+      message_id: id,
+      new_message_id: userMessage.id,
+      ...(content !== undefined && { content }),
+      ...(selectedModel && { model: selectedModel }),
+    });
+
+    armTurn({
+      run: () => get().rewindTurn(id, content),
+      undo: () => {
+        stopAgentAlivePolling();
+        set({ messages: before, isStreaming: false, agentAlive: false, ...RESET_STATE, buildCompleted });
+      },
+    });
   },
 
   respondToPlan(action: 'accept' | 'modify', feedback?: string) {

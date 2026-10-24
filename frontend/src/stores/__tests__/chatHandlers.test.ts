@@ -82,6 +82,7 @@ const INITIAL_STATE: ChatState = {
   sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
   sendFixError: vi.fn() as unknown as ChatState['sendFixError'],
   rollbackTurn: vi.fn() as unknown as ChatState['rollbackTurn'],
+  rewindTurn: vi.fn() as unknown as ChatState['rewindTurn'],
   respondToPlan: vi.fn() as unknown as ChatState['respondToPlan'],
   addMessage: vi.fn() as unknown as ChatState['addMessage'],
   loadHistory: vi.fn() as unknown as ChatState['loadHistory'],
@@ -237,6 +238,15 @@ describe('createSendMessageHandler — build flow', () => {
     const result = store.state().messages[0];
     expect(result.role).toBe('user');
     expect(result.dataSources).toEqual([{ id: 1, name: 'Sales' }]);
+  });
+
+  it('user_message with a message_id keeps it so the message can be rewound', () => {
+    handler(msg({ type: 'user_message', content: 'Hi', message_id: 'server-id' }));
+    handler(msg({ type: 'user_message', content: 'Legacy' }));
+
+    const [named, legacy] = store.state().messages;
+    expect(named).toMatchObject({ id: 'server-id', editable: true });
+    expect(legacy.editable).toBe(false);
   });
 
   it('unknown event type does not crash', () => {

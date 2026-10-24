@@ -108,6 +108,16 @@ async def get_versions(project_id: str) -> list[AgentEvent]:
         return list(result.scalars().all())
 
 
+async def find_user_event(project_id: str, message_id: str) -> AgentEvent | None:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(AgentEvent)
+            .where(AgentEvent.project_id == project_id, AgentEvent.event_type == "user_message")
+            .order_by(AgentEvent.id.asc())  # type: ignore[union-attr]
+        )
+        return next((e for e in result.scalars().all() if e.payload.get("message_id") == message_id), None)
+
+
 async def trim_events_after(project_id: str, event_id: int) -> None:
     async with database.async_session() as session:
         await session.execute(

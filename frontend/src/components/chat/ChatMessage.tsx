@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
-import { FileText, TerminalSquare } from 'lucide-react';
+import { FileText, Pencil, RotateCcw, TerminalSquare } from 'lucide-react';
 import type { Message } from '../../types';
 import { formatClock } from '../../utils/formatTime';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
 import {
   DataSourcesFetchedCard,
   DesignCompleteCard,
@@ -17,10 +19,15 @@ import {
   UserEditCard,
 } from './cards';
 import { VersionControl } from './VersionControl';
+import { MessageEditor } from './MessageEditor';
 
 interface ChatMessageProps {
   message: Message;
   isStreaming?: boolean;
+  /** Resend this user message with new content, discarding everything after it. */
+  onEdit?: (content: string) => void;
+  /** Rerun the turn this message belongs to. */
+  onRegenerate?: () => void;
 }
 
 function AgentCardRenderer({ message }: { message: Message }) {
@@ -74,8 +81,36 @@ function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: st
   );
 }
 
-export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+function MessageActions({ onEdit, onRegenerate }: { onEdit?: () => void; onRegenerate?: () => void }) {
+  const { t } = useTranslation();
+  if (!onEdit && !onRegenerate) return null;
+  const className = 'h-6 w-6 text-muted-foreground hover:text-foreground';
+  return (
+    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      {onEdit && (
+        <Button variant="ghost" size="icon-sm" className={className} title={t('common.edit')} aria-label={t('common.edit')} onClick={onEdit}>
+          <Pencil size={12} />
+        </Button>
+      )}
+      {onRegenerate && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={className}
+          title={t('chat.rewind.regenerate')}
+          aria-label={t('chat.rewind.regenerate')}
+          onClick={onRegenerate}
+        >
+          <RotateCcw size={12} />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function ChatMessage({ message, isStreaming, onEdit, onRegenerate }: ChatMessageProps) {
   const { i18n } = useTranslation();
+  const [editing, setEditing] = useState(false);
   const isUser = message.role === 'user';
 
   if (!message.content && !message.agentCard && !message.actions?.length && !isStreaming) {
@@ -89,10 +124,28 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   );
 
   const timestamp = !isStreaming && (
-    <span className="px-1 text-[11px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
-      {formatClock(message.timestamp, i18n.language)}
-    </span>
+    <div className={`flex items-center gap-1 ${isUser ? 'flex-row-reverse' : ''}`}>
+      <span className="px-1 text-[11px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
+        {formatClock(message.timestamp, i18n.language)}
+      </span>
+      <MessageActions onEdit={onEdit && (() => setEditing(true))} onRegenerate={onRegenerate} />
+    </div>
   );
+
+  if (editing && onEdit) {
+    return (
+      <div className="flex flex-col w-full items-end animate-message-in">
+        <MessageEditor
+          initial={message.content}
+          onCancel={() => setEditing(false)}
+          onSave={(content) => {
+            setEditing(false);
+            onEdit(content);
+          }}
+        />
+      </div>
+    );
+  }
 
   // Agent card messages
   if (message.agentCard) {
@@ -100,7 +153,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
       <div className={`group flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} animate-message-in`}>
         <AgentCardRenderer message={message} />
         {versionControl}
-        {message.agentCard.type === 'error_fix_request' && timestamp}
+        {(message.agentCard.type === 'error_fix_request' || onRegenerate) && timestamp}
       </div>
     );
   }

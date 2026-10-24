@@ -142,3 +142,70 @@ def test_version_op_refusal_reaches_the_client() -> None:
         "message": "Can't edit while the AI is working",
         "files": [],
     }
+
+
+MSG_ID = "11111111-1111-4111-8111-111111111111"
+NEW_ID = "22222222-2222-4222-8222-222222222222"
+
+
+def _run_then_barrier(payload: dict[str, Any], original: dict[str, Any]) -> dict[str, Any]:
+    """Send `payload`, then a refused op whose reply proves the first one was fully handled."""
+    event = MagicMock()
+    event.payload = original
+    mocks = {
+        "rewind": AsyncMock(return_value=event),
+        "start_agent": MagicMock(),
+        "plan_agent": MagicMock(),
+    }
+    with (
+        _connected(AsyncMock(return_value=CLAIMED_AT)) as writes,
+        patch("flow44.api.chat.find_user_event", new_callable=AsyncMock, return_value=event),
+        patch("flow44.api.chat.versioning.rewind_to_message", mocks["rewind"]),
+        patch("flow44.api.chat.versioning.preview_version", _locked("run_active")),
+        patch("flow44.api.chat._start_agent", mocks["start_agent"]),
+        patch("flow44.api.chat.PlanAgent", mocks["plan_agent"]),
+        patch("flow44.api.chat.ds_logic.get_display_name", new_callable=AsyncMock, return_value="Sales"),
+        patch("flow44.api.chat.count_user_messages", new_callable=AsyncMock, return_value=1),
+    ):
+        with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
+            ws.send_json(payload)
+            ws.send_json({"type": "preview_version", "commit_sha": "abc"})
+            first = ws.receive_json()
+        return {**writes, **mocks, "reply": first}
+
+
+def test_message_is_stored_under_the_client_id() -> None:
+    result = _run_then_barrier({"type": "message", "content": "hi", "message_id": MSG_ID}, {})
+
+    result["save_message"].assert_awaited_once_with(PROJECT_ID, "user", "hi", message_id=MSG_ID)
+    assert result["emit_event"].await_args.args[1]["message_id"] == MSG_ID
+
+
+def test_regenerate_resends_the_original_with_its_data_sources() -> None:
+    original = {"type": "user_message", "content": "build a CRM", "data_sources": [{"id": 3, "name": "Sales"}]}
+    result = _run_then_barrier({"type": "rewind", "message_id": MSG_ID, "new_message_id": NEW_ID}, original)
+
+    result["rewind"].assert_awaited_once_with(PROJECT_ID, MSG_ID)
+    result["save_message"].assert_awaited_once_with(PROJECT_ID, "user", "build a CRM", message_id=NEW_ID)
+    assert result["emit_event"].await_args.args[1]["data_sources"] == [{"id": 3, "name": "Sales"}]
+    assert result["plan_agent"].return_value.run.call_args.kwargs == {"data_source_ids": ["3"]}
+    result["start_agent"].assert_called_once()
+
+
+def test_edit_sends_the_new_content() -> None:
+    original = {"type": "user_message", "content": "build a CRM"}
+    result = _run_then_barrier(
+        {"type": "rewind", "message_id": MSG_ID, "new_message_id": NEW_ID, "content": "build a wiki"}, original
+    )
+
+    result["save_message"].assert_awaited_once_with(PROJECT_ID, "user", "build a wiki", message_id=NEW_ID)
+    assert result["plan_agent"].return_value.run.call_args.args == ("build a wiki",)
+
+
+def test_editing_a_fix_request_is_refused_without_rewinding() -> None:
+    original = {"type": "user_message", "content": "", "error_fix_request": {"errorMessage": "boom"}}
+    result = _run_then_barrier({"type": "rewind", "message_id": MSG_ID, "content": "x"}, original)
+
+    assert result["reply"] == {"type": "error", "message": "An error fix request can only be regenerated"}
+    result["rewind"].assert_not_awaited()
+    result["save_message"].assert_not_awaited()
