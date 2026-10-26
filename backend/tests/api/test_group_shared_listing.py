@@ -39,7 +39,7 @@ class TestGroupSharedListingEndpoint:
             resp = await async_client.get("/api/projects")
 
         assert resp.status_code == 200
-        by_id = {p["id"]: p for p in resp.json()}
+        by_id = {p["id"]: p for p in resp.json()["projects"]}
         assert project.id in by_id
         assert by_id[project.id]["role"] == Role.editor.value
 
@@ -57,7 +57,7 @@ class TestGroupSharedListingEndpoint:
             resp = await async_client.get("/api/projects")
 
         assert resp.status_code == 200
-        assert project.id not in {p["id"] for p in resp.json()}
+        assert project.id not in {p["id"] for p in resp.json()["projects"]}
 
     async def test_direct_and_group_share_collapse_to_highest_role(self, test_db, async_client):
         # test-user is a direct editor and also a maintainer via a group grant.
@@ -72,6 +72,6 @@ class TestGroupSharedListingEndpoint:
             resp = await async_client.get("/api/projects")
 
         assert resp.status_code == 200
-        entries = [p for p in resp.json() if p["id"] == project.id]
+        entries = [p for p in resp.json()["projects"] if p["id"] == project.id]
         assert len(entries) == 1  # deduped, not listed twice
         assert entries[0]["role"] == Role.maintainer.value

@@ -40,6 +40,7 @@
     "confirmDelete": "Confirm delete?",
     "searchPlaceholder": "Search projects...",
     "noProjectsMatch": "No projects match",
+    "loadMore": "Load more",
     "untitledProject": "Untitled",
     "createProjectError": "Failed to create project. Please try again."
   },
