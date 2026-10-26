@@ -34,7 +34,6 @@ export type AgentCard =
 export interface Action {
   type: 'file' | 'shell';
   path?: string;
-  content?: string;
   command?: string;
   output?: string;
 }

@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { formatDayDivider, sameDay } from '../../utils/formatTime';
 import type { Message } from '../../types';
 import { useChatStore } from '../../stores/chat';
@@ -42,7 +43,12 @@ export function ChatPanel() {
   const {
     messages, currentAssistantMessage, actions, error, clearError,
     agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
-  } = useChatStore();
+  } = useChatStore(useShallow((s) => ({
+    messages: s.messages, currentAssistantMessage: s.currentAssistantMessage, actions: s.actions,
+    error: s.error, clearError: s.clearError, agentPhase: s.agentPhase, planOverview: s.planOverview,
+    executionTasks: s.executionTasks, designProgress: s.designProgress, fixSteps: s.fixSteps,
+    followUpSteps: s.followUpSteps, fileDiffs: s.fileDiffs,
+  })));
   const agentActive = useChatStore(isAgentAlive);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
