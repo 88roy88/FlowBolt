@@ -3,20 +3,16 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from flow44.api.deps import ProjectDep
-from flow44.db.events import get_events
+from flow44.db.events import get_latest_event
 from flow44.db.heartbeat import is_run_active
 
 router = APIRouter(prefix="/api/iaagent", tags=["iaagent"])
 
 
 async def _latest_phase(project_id: str) -> str | None:
-    events = await get_events(project_id)
-    for evt in reversed(events):
-        if evt.payload.get("type") == "phase":
-            phase = evt.payload.get("phase")
-            if isinstance(phase, str):
-                return phase
-    return None
+    event = await get_latest_event(project_id, "phase")
+    phase = event.payload.get("phase") if event else None
+    return phase if isinstance(phase, str) else None
 
 
 @router.get("/{project_id}/alive")
