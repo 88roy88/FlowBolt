@@ -16,17 +16,15 @@ def _warn_missing_url() -> None:
 
 
 async def fetch_data_source_summary(data_source_id: str) -> str:
-    """Fetch a summary of the data source's architecture and purpose. Returns "" when unavailable."""
     url = settings.DATA_SOURCE_ENRICHMENT_URL
     if not url:
         _warn_missing_url()
         return ""
 
-    try:
-        package_id = int(data_source_id)
-    except ValueError:
+    if not data_source_id.isdecimal():
         logger.error("Invalid data source id %r, must be a number", data_source_id)
         return ""
+    package_id = int(data_source_id)
 
     try:
         async with httpx.AsyncClient(timeout=settings.DATA_SOURCE_ENRICHMENT_TIMEOUT_SECONDS) as client:
