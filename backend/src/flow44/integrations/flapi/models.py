@@ -149,7 +149,7 @@ class QuickParamDefinition(PascalCaseBaseModel):
     is_single_value: bool
     is_required: bool
     is_require_any: bool = False
-    value: QuickParamValue
+    value: QuickParamValue | None = None
     quick_parameter_info: QuickParameterInfo | None = Field(default=None, alias="quickParameterInfo")
 
     @field_validator("type_", mode="before")
