@@ -120,6 +120,13 @@ export const QuickParamDefinitionSchema = Type.Object({
   IsRequireAny: Type.Boolean(),   // Is it even exist?
 
   Value: Type.Array(QuickParamValueSchema),
+
+  quickParameterInfo: Type.Optional(
+    Type.Object({
+      DisplayName: Type.Union([Type.String(), Type.Null()]),
+      Description: Type.Union([Type.String(), Type.Null()]),
+    }),
+  ),
 });
 
 export type QuickParamDefinition = Static<typeof QuickParamDefinitionSchema>;
