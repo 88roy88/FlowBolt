@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from enum import StrEnum
 
 
@@ -25,6 +26,16 @@ class ImplicitRole(StrEnum):
 
 
 DisplayRole = Role | ImplicitRole
+
+# Display precedence when a project reaches a user through several sources.
+ROLE_RANK: dict[DisplayRole, int] = {
+    Role.viewer: 1,
+    Role.editor: 2,
+    Role.publisher: 2,
+    Role.maintainer: 3,
+    ImplicitRole.admin: 4,
+    ImplicitRole.owner: 5,
+}
 
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.viewer: {Permission.read},
@@ -73,3 +84,7 @@ def has_permission(user_permissions: set[Permission], required: Permission) -> b
         return True
     all_variant = _ALL_VARIANTS.get(required)
     return bool(all_variant and all_variant in user_permissions)
+
+
+def highest_role(roles: Iterable[Role]) -> Role | None:
+    return max(roles, key=ROLE_RANK.__getitem__, default=None)

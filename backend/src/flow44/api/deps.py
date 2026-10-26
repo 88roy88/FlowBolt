@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncIterator
-from typing import Annotated, Any, NamedTuple
+from contextvars import ContextVar
+from typing import Annotated, Any
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
@@ -15,16 +16,21 @@ from flow44.auth.permissions import (
     get_owner_permissions,
     get_role_permissions,
     has_permission,
+    highest_role,
 )
 from flow44.config import settings
 from flow44.db.platform_user import is_platform_user as db_is_platform_user
+from flow44.db.platform_user_group import platform_group_ids
 from flow44.db.project import Project
 from flow44.db.project import get_project as db_get_project
 from flow44.db.project_member import get_project_member
-from flow44.logging import _project_id as _log_project_id
-from flow44.logging import _user_id as _log_user_id
+from flow44.db.project_member_group import list_project_groups
+from flow44.integrations.directory.client import directory_client
 from flow44.sandbox.main import PnpmSandbox
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.logging import _project_id as _log_project_id
+from flow44.services.logging import _project_name as _log_project_name
+from flow44.services.logging import _user_id as _log_user_id
 from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
@@ -47,6 +53,7 @@ class TokenPayload(BaseModel):
     iss: str | None = None
     exp: int
     unique_id: str | None = None
+    email: str | None = None
     given_name: str | None = None
     surname: str | None = None
 
@@ -55,6 +62,7 @@ class TokenPayload(BaseModel):
     def _surface_url_claims(cls, data: dict[str, object]) -> dict[str, object]:
         return data | {
             "unique_id": _claim_with_suffix(data, "/UniqueID"),
+            "email": _claim_with_suffix(data, "/emailaddress"),
             "given_name": _claim_with_suffix(data, "/givenname"),
             "surname": _claim_with_suffix(data, "/surname"),
         }
@@ -103,8 +111,11 @@ def validate_token(token: TokenDep) -> TokenPayload:
     return payload
 
 
-def get_user_id(token: TokenDep) -> str:
-    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required."""
+async def get_user_id(token: TokenDep) -> str:
+    """Resolve a token to a user_id; a valid signed JWT with a ``/UniqueID`` claim is required.
+
+    async so the log user_id set here reaches the endpoint (sync deps run in a threadpool).
+    """
     payload = validate_token(token)
     if not payload.unique_id:
         raise HTTPException(status_code=401, detail="Token missing user identification")
@@ -120,62 +131,102 @@ def is_admin(user_id: str) -> bool:
     return user_id in settings.SYSTEM_ADMIN_IDS
 
 
-def resolve_role(project: Project, user_id: str, member_role: Role | None) -> DisplayRole | None:
+def resolve_role(project: Project, user_id: str, granted_role: Role | None) -> DisplayRole | None:
     if project.user_id == user_id:
         return ImplicitRole.owner
     if is_admin(user_id):
         return ImplicitRole.admin
-    return member_role
+    return granted_role
 
 
 async def get_project_role(project: Project, user_id: str) -> DisplayRole | None:
     if role := resolve_role(project, user_id, None):
         return role
     member = await get_project_member(project.id, user_id)
-    return Role(member.role) if member else None
+    grants = await list_project_groups(project.id)
+    user_group_ids = await directory_client.get_user_group_ids(user_id) if grants else set()
+    roles = [Role(member.role)] if member else []
+    roles += [Role(grant.role) for grant in grants if grant.group_id in user_group_ids]
+    return highest_role(roles)
 
 
-def _permissions_for(role: DisplayRole) -> set[Permission]:
-    if isinstance(role, Role):
-        return get_role_permissions(role)
-    return get_owner_permissions() if role is ImplicitRole.owner else get_admin_permissions()
+async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permission]:
+    grants = await list_project_groups(project_id)
+    if not grants:
+        return set()
+
+    user_group_ids = await directory_client.get_user_group_ids(user_id)
+    if not user_group_ids:
+        return set()
+
+    permissions: set[Permission] = set()
+    for grant in grants:
+        if grant.group_id in user_group_ids:
+            permissions |= get_role_permissions(Role(grant.role))
+    return permissions
 
 
-class ProjectWithRole(NamedTuple):
-    project: Project
-    role: DisplayRole
+async def _resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
+    if project.user_id == user_id:
+        return get_owner_permissions()
+
+    permissions: set[Permission] = set()
+    if is_admin(user_id):
+        permissions |= get_admin_permissions()
+
+    member = await get_project_member(project.id, user_id)
+    if member is not None:
+        permissions |= get_role_permissions(Role(member.role))
+
+    permissions |= await resolve_group_permissions(project.id, user_id)
+    return permissions
 
 
-async def get_project_with_role(project_id: str, user_id: UserDep) -> ProjectWithRole:
+# Per-request cache: get_project and the permission dependencies both resolve the
+# same (project, user) set, so resolving once avoids a second member lookup and
+# directory-service round-trip. ContextVars are per-task, so this never leaks across requests;
+# the key guards against reuse for a different project/user in the same task.
+_perm_cache_per_request: ContextVar[tuple[tuple[str, str], set[Permission]] | None] = ContextVar(
+    "_perm_cache_per_request", default=None
+)
+
+
+async def resolve_project_permissions(project: Project, user_id: str) -> set[Permission]:
+    cached = _perm_cache_per_request.get()
+    if cached is not None and cached[0] == (project.id, user_id):
+        return cached[1]
+    permissions = await _resolve_project_permissions(project, user_id)
+    _perm_cache_per_request.set(((project.id, user_id), permissions))
+    return permissions
+
+
+async def get_project(project_id: str, user_id: UserDep) -> Project:
     project = await db_get_project(project_id)
-    role = await get_project_role(project, user_id) if project else None
-    if project is None or role is None:
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not await resolve_project_permissions(project, user_id):
         raise HTTPException(status_code=404, detail="Project not found")
 
     _log_project_id.set(project.id)
-    return ProjectWithRole(project, role)
-
-
-ProjectWithRoleDep = Annotated[ProjectWithRole, Depends(get_project_with_role)]
-
-
-async def get_project(project_with_role: ProjectWithRoleDep) -> Project:
-    return project_with_role.project
+    _log_project_name.set(project.name)
+    return project
 
 
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
-async def get_user_permissions(project_with_role: ProjectWithRoleDep) -> set[Permission]:
-    return _permissions_for(project_with_role.role)
+async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
+    permissions = await resolve_project_permissions(project, user_id)
+    if not permissions:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return permissions
 
 
 PermissionsDep = Annotated[set[Permission], Depends(get_user_permissions)]
 
 
 def require_permission(permission: Permission) -> Any:
-    """Dependency factory: raises 403 if the user lacks the required permission."""
-
     async def _check(user_permissions: PermissionsDep) -> set[Permission]:
         if not has_permission(user_permissions, permission):
             raise HTTPException(status_code=403, detail="Insufficient permissions")
@@ -193,11 +244,22 @@ async def require_writable_workspace(project: ProjectDep) -> AsyncIterator[None]
     await versioning.broadcast_dirty(project.id)
 
 
+async def _is_platform_group_member(user_id: str) -> bool:
+    group_ids = await platform_group_ids()
+    if not group_ids:
+        return False
+    user_group_ids = await directory_client.get_user_group_ids(user_id)
+    return bool(user_group_ids & group_ids)
+
+
+async def has_platform_access(user_id: str) -> bool:
+    if is_admin(user_id) or await db_is_platform_user(user_id):
+        return True
+    return await _is_platform_group_member(user_id)
+
+
 async def require_platform_user(user_id: UserDep) -> str:
-    """Gate: only platform users and admins can create projects."""
-    if is_admin(user_id):
-        return user_id
-    if await db_is_platform_user(user_id):
+    if await has_platform_access(user_id):
         return user_id
     raise HTTPException(status_code=403, detail="Platform access required")
 
@@ -221,7 +283,7 @@ async def get_ws_user_id(
 ) -> str:
     """WS variant of get_user_id: raises WebSocketException so FastAPI rejects the handshake before accept."""
     try:
-        return get_user_id(flow44_token)
+        return await get_user_id(flow44_token)
     except HTTPException:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
 
@@ -229,33 +291,27 @@ async def get_ws_user_id(
 WsUserDep = Annotated[str, Depends(get_ws_user_id)]
 
 
-async def get_ws_project_with_role(project_id: str, user_id: WsUserDep) -> ProjectWithRole:
+async def get_ws_project(project_id: str, user_id: WsUserDep) -> Project:
     try:
-        return await get_project_with_role(project_id, user_id)
+        return await get_project(project_id, user_id)
     except HTTPException:
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION) from None
-
-
-WsProjectWithRoleDep = Annotated[ProjectWithRole, Depends(get_ws_project_with_role)]
-
-
-async def get_ws_project(project_with_role: WsProjectWithRoleDep) -> Project:
-    return project_with_role.project
 
 
 WsProjectDep = Annotated[Project, Depends(get_ws_project)]
 
 
-async def get_ws_permissions(project_with_role: WsProjectWithRoleDep) -> set[Permission]:
-    return _permissions_for(project_with_role.role)
+async def get_ws_permissions(project: WsProjectDep, user_id: WsUserDep) -> set[Permission]:
+    permissions = await resolve_project_permissions(project, user_id)
+    if not permissions:
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+    return permissions
 
 
 WsPermissionsDep = Annotated[set[Permission], Depends(get_ws_permissions)]
 
 
 def require_ws_permission(permission: Permission) -> Any:
-    """WS dependency factory: rejects handshake if the user lacks the required permission."""
-
     async def _check(user_permissions: WsPermissionsDep) -> set[Permission]:
         if not has_permission(user_permissions, permission):
             raise WebSocketException(code=4403, reason="Insufficient permissions")

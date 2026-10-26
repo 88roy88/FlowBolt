@@ -3,6 +3,8 @@ import type { Project, UserStatus } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
 import { useChatStore } from './chat';
+import { useTabPanelStore } from './tabPanel';
+import { setProjectHasMessages } from '../utils/projectHasMessagesCache';
 
 type ProjectSearch = { query: string; results: Project[]; cursor: string | null };
 
@@ -16,6 +18,7 @@ interface SessionState {
   isCreating: boolean;
   userStatus: UserStatus | null;
   setCurrentProject: (project: Project) => void;
+  goHome: () => void;
   loadUserStatus: () => Promise<void>;
   loadProjects: () => Promise<void>;
   loadMoreProjects: () => Promise<void>;
@@ -55,10 +58,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setCurrentProject(project: Project) {
     set({ currentProject: project, projectId: project.id });
+    useTabPanelStore.getState().setTab('preview');
     if (project.selected_model) {
       useChatStore.setState({ selectedModel: project.selected_model });
     }
     useChatStore.getState().clearDataSources();
+  },
+
+  goHome() {
+    set({ currentProject: null, projectId: null });
+    useChatStore.getState().clearMessages();
+    useChatStore.getState().clearDataSources();
+    window.location.hash = '';
   },
 
   async loadUserStatus() {
@@ -113,7 +124,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const project = await api.createProject(name);
       const projects = [project, ...get().projects.filter((p) => p.id !== project.id)];
+      setProjectHasMessages(project.id, false);
       set({ projects, currentProject: project, projectId: project.id });
+      useTabPanelStore.getState().setTab('preview');
     } finally {
       set({ isCreating: false });
     }
@@ -135,13 +148,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const projects = prevProjects.filter((p) => p.id !== id);
     const projectSearch = prevSearch && { ...prevSearch, results: prevSearch.results.filter((p) => p.id !== id) };
     if (prevCurrent?.id === id) {
-      const next = projects[0] ?? null;
-      set({
-        projects,
-        projectSearch,
-        currentProject: next,
-        projectId: next?.id ?? null,
-      });
+      set({ projects, projectSearch, currentProject: null, projectId: null });
     } else {
       set({ projects, projectSearch });
     }

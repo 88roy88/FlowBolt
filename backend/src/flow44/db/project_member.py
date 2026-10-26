@@ -1,12 +1,14 @@
 import uuid
-from datetime import UTC, datetime
+from collections.abc import Collection
+from datetime import datetime
 
-from sqlalchemy import Column, ForeignKey, String, UniqueConstraint, and_, or_, tuple_
+from sqlalchemy import Column, DateTime, ForeignKey, String, UniqueConstraint, and_, func, or_, tuple_
 from sqlmodel import Field, SQLModel, col, select
 
-from flow44.auth.permissions import Role
+from flow44.auth.permissions import Role, highest_role
 from flow44.db import database
 from flow44.db.project import Project
+from flow44.db.project_member_group import ProjectMemberGroup
 
 
 class ProjectMember(SQLModel, table=True):
@@ -18,15 +20,22 @@ class ProjectMember(SQLModel, table=True):
         sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
     )
     user_id: str = Field(index=True)
+    display_name: str = Field(default="")
     role: str = Field(default=Role.viewer.value)
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
     invited_by: str = Field(default="")
 
 
-async def add_member(project_id: str, user_id: str, role: Role, invited_by: str) -> ProjectMember:
+async def add_member(
+    project_id: str, user_id: str, role: Role, invited_by: str, display_name: str = ""
+) -> ProjectMember:
     member = ProjectMember(
         project_id=project_id,
         user_id=user_id,
+        display_name=display_name,
         role=role.value,
         invited_by=invited_by,
     )
@@ -95,17 +104,26 @@ async def list_project_members(project_id: str) -> list[ProjectMember]:
 async def list_projects_for_user(
     user_id: str,
     *,
+    group_ids: Collection[str] = (),
     include_all: bool = False,
     name_query: str = "",
     before: tuple[str, str] | None = None,
     limit: int,
 ) -> list[tuple[Project, Role | None]]:
+    """Return a page of projects visible to the user, each with the highest role granted directly or via a group."""
     query = select(Project, ProjectMember.role).outerjoin(
         ProjectMember,
         and_(col(ProjectMember.project_id) == col(Project.id), col(ProjectMember.user_id) == user_id),
     )
     if not include_all:
-        query = query.where(or_(col(Project.user_id) == user_id, col(ProjectMember.id).is_not(None)))
+        group_shared = select(ProjectMemberGroup.project_id).where(col(ProjectMemberGroup.group_id).in_(group_ids))
+        query = query.where(
+            or_(
+                col(Project.user_id) == user_id,
+                col(ProjectMember.id).is_not(None),
+                col(Project.id).in_(group_shared),
+            )
+        )
     if name_query:
         query = query.where(col(Project.name).icontains(name_query, autoescape=True))
     if before is not None:
@@ -113,5 +131,16 @@ async def list_projects_for_user(
     query = query.order_by(col(Project.created_at).desc(), col(Project.id).desc()).limit(limit)
 
     async with database.async_session() as session:
-        result = await session.execute(query)
-        return [(row[0], Role(row[1]) if row[1] is not None else None) for row in result.all()]
+        rows = (await session.execute(query)).all()
+        granted: dict[str, list[Role]] = {row[0].id: [Role(row[1])] if row[1] is not None else [] for row in rows}
+        if group_ids and rows:
+            grants = await session.execute(
+                select(ProjectMemberGroup.project_id, ProjectMemberGroup.role).where(
+                    col(ProjectMemberGroup.project_id).in_(list(granted)),
+                    col(ProjectMemberGroup.group_id).in_(group_ids),
+                )
+            )
+            for project_id, role in grants.all():
+                granted[project_id].append(Role(role))
+
+    return [(row[0], highest_role(granted[row[0].id])) for row in rows]

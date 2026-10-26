@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
@@ -74,7 +75,7 @@ function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: st
   );
 }
 
-export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   const { i18n } = useTranslation();
   const isUser = message.role === 'user';
 
@@ -122,6 +123,13 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
+                table({ children, ...props }) {
+                  return (
+                    <div className="overflow-x-auto max-w-full">
+                      <table {...props}>{children}</table>
+                    </div>
+                  );
+                },
                 code({ children, className, ...props }) {
                   const isInline = !className;
                   if (isInline) {
@@ -172,4 +180,4 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
       {timestamp}
     </div>
   );
-}
+});

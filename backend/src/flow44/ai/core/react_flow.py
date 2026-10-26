@@ -8,12 +8,30 @@ from pydantic import BaseModel
 
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_utils import add_trace_tags
 from flow44.ai.core.provider import complete_chat_with_tools
 from flow44.ai.core.tools import ToolExecutor, truncate_tool_args
 
 logger = logging.getLogger(__name__)
 
 StateT = TypeVar("StateT", bound=BaseModel)
+
+MALFORMED_TOOL_CALL_CORRECTION = (
+    "Your last tool call was malformed text. Call the tool through the tool-calling interface."
+)
+LEAKED_TOOL_CALL_MARKERS = (
+    "<invoke name=",
+    "｜DSML｜",
+    "<tool_call>",
+    "<function_calls>",
+    "[TOOL_CALLS]",
+    "<|python_tag|>",
+    '[{"tool_call',
+)
+
+
+def looks_like_leaked_tool_call(text: str) -> bool:
+    return any(marker in text for marker in LEAKED_TOOL_CALL_MARKERS)
 
 
 class ReActFlow(Flow[StateT], Generic[StateT]):
@@ -25,7 +43,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         super().__init__(name)
         self.max_iterations = max_iterations
 
-    async def react_loop(
+    async def react_loop(  # noqa: C901
         self,
         messages: list[dict[str, Any] | Message],
         system_prompt: str,
@@ -72,6 +90,19 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             choice = response.choices[0]
             message = choice.message
             last_content = message.content or ""
+
+            if not message.tool_calls and looks_like_leaked_tool_call(last_content):
+                logger.warning(
+                    "[react_loop:%s] Leaked tool call in text content, asking for retry | iteration=%d model=%s",
+                    self.name,
+                    iteration,
+                    model or "default",
+                )
+                add_trace_tags(["leaked_tool_call"])
+                working_messages.append(Message.assistant(last_content).to_dict())
+                working_messages.append(Message.user(MALFORMED_TOOL_CALL_CORRECTION).to_dict())
+                last_content = ""
+                continue
 
             if not message.tool_calls:
                 return last_content

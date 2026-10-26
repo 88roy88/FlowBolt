@@ -9,7 +9,7 @@ from typing import Any
 import litellm
 import pytest
 
-from flow44.ai.core.provider import stream_chat
+from flow44.ai.core.provider import ContextWindowExceeded, _handle_litellm_errors, stream_chat
 from flow44.config import settings
 
 _MESSAGES = [{"role": "user", "content": "go"}]
@@ -40,3 +40,11 @@ async def test_stream_yields_every_chunk_and_uses_the_stream_timeout(monkeypatch
     assert [chunk async for chunk in stream_chat(_MESSAGES, "sys")] == ["0", "1", "2"]
     assert seen["timeout"] == settings.AI_STREAM_TIMEOUT
     assert seen["timeout"] != settings.AI_REQUEST_TIMEOUT
+
+
+async def test_unprefixed_context_length_error_becomes_context_window_exceeded() -> None:
+    error = litellm.BadRequestError("maximum context length is 600000 tokens", model="m", llm_provider="openai")
+
+    with pytest.raises(ContextWindowExceeded):
+        async with _handle_litellm_errors("m"):
+            raise error

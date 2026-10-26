@@ -1,0 +1,28 @@
+# Filebeat that tails backend/app.log (AIB_LOG_FILE_PATH) and writes to a local OpenObserve instance.
+filebeat.inputs:
+  - type: filestream
+    id: buildapp-dev
+    paths:
+      - /logs/app.log
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+          # true would fail to overwrite the reserved @timestamp with ours (+0300 offset)
+          # and tag every line with error_type. Ingest time is ~1-2s off, which is fine.
+          overwrite_keys: false
+
+# OpenObserve speaks the Elasticsearch bulk ingest API under /api/<org>/.
+output.elasticsearch:
+  # Trailing slash matters — OpenObserve's ES-compat cluster-info probe 404s without it.
+  hosts: ["http://openobserve:5080/api/default/"]
+  username: "${OPENOBSERVE_USER}"
+  password: "${OPENOBSERVE_PASSWORD}"
+  index: "buildapp-dev"
+
+# OpenObserve doesn't implement ES index-template/ILM admin APIs — skip them.
+setup.template.enabled: false
+setup.ilm.enabled: false
+
+logging.level: info
+logging.to_stderr: true

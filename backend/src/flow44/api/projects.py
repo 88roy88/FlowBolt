@@ -15,14 +15,14 @@ from flow44.api.deps import (
     Permission,
     PlatformUserDep,
     ProjectDep,
-    ProjectWithRoleDep,
     UserDep,
+    get_project_role,
+    has_platform_access,
     is_admin,
     require_permission,
     resolve_role,
 )
 from flow44.auth.permissions import DisplayRole, ImplicitRole, get_admin_permissions, has_permission
-from flow44.db.platform_user import is_platform_user as db_is_platform_user
 from flow44.db.project import (
     Project,
     create_project,
@@ -31,9 +31,11 @@ from flow44.db.project import (
     update_project_model,
 )
 from flow44.db.project_member import list_projects_for_user
+from flow44.integrations.directory.client import directory_client
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.logging import log_bi_event
 from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
@@ -72,11 +74,10 @@ def _serialize_project(project: Project, role: DisplayRole) -> ProjectResponse:
 
 @router.get("/me")
 async def get_current_user(user_id: UserDep) -> dict[str, Any]:
-    admin = is_admin(user_id)
     return {
         "user_id": user_id,
-        "is_admin": admin,
-        "is_platform_user": admin or await db_is_platform_user(user_id),
+        "is_admin": is_admin(user_id),
+        "is_platform_user": await has_platform_access(user_id),
     }
 
 
@@ -107,9 +108,11 @@ async def list_user_projects(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> ProjectListResponse:
     user_perms = get_admin_permissions() if is_admin(user_id) else set()
+    include_all = has_permission(user_perms, Permission.read)
     rows = await list_projects_for_user(
         user_id,
-        include_all=has_permission(user_perms, Permission.read),
+        group_ids=set() if include_all else await directory_client.get_user_group_ids(user_id),
+        include_all=include_all,
         name_query=q.strip(),
         before=_decode_cursor(cursor) if cursor else None,
         limit=limit + 1,
@@ -117,20 +120,24 @@ async def list_user_projects(
     page = rows[:limit]
     return ProjectListResponse(
         projects=[
-            _serialize_project(p, role) for p, member_role in page if (role := resolve_role(p, user_id, member_role))
+            _serialize_project(p, role) for p, granted_role in page if (role := resolve_role(p, user_id, granted_role))
         ],
         next_cursor=_encode_cursor(page[-1][0]) if len(rows) > limit else None,
     )
 
 
 @router.get("/{project_id}")
-async def get_single_project(project_with_role: ProjectWithRoleDep) -> ProjectResponse:
-    return _serialize_project(project_with_role.project, project_with_role.role)
+async def get_single_project(project: ProjectDep, user_id: UserDep) -> ProjectResponse:
+    role = await get_project_role(project, user_id)
+    if role is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return _serialize_project(project, role)
 
 
 @router.post("", status_code=201)
 async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
     project = await create_project(body.name, user_id)
+    log_bi_event("project_created", project_id=project.id, project_name=body.name)
 
     async def _create() -> None:
         from flow44.db.events import emit_event  # noqa: PLC0415
@@ -178,6 +185,7 @@ async def delete_existing_project(
     idle_reaper.remove(project.id)
     await s3_storage.delete_published_prefix(project.id)
     await delete_project(project.id)
+    log_bi_event("project_deleted")
     background_tasks.add_task(sandbox_manager.destroy_sandbox, project.id)
 
 

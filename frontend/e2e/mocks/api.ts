@@ -122,6 +122,8 @@ export interface MockAPIOptions {
   searchUnavailable?: boolean;
   /** Return 401 on the first GET /api/projects, then succeed — exercises the refresh-on-401 retry. */
   failProjectsOnce?: boolean;
+  /** Flags returned by GET /api/projects/me. Defaults to an admin. */
+  userStatus?: { is_admin: boolean; is_platform_user: boolean };
 }
 
 function escapeRegExp(value: string): string {
@@ -159,7 +161,8 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
 
     // User status endpoint
     if (url.endsWith('/me')) {
-      return route.fulfill({ json: { user_id: 'test-user', is_admin: true, is_platform_user: true } });
+      const status = options.userStatus ?? { is_admin: true, is_platform_user: true };
+      return route.fulfill({ json: { user_id: 'test-user', ...status } });
     }
 
     // Skip sub-routes like /name, /model, /members

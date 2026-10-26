@@ -38,7 +38,7 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
     }
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project),
-        patch("flow44.api.deps.get_user_id", return_value="user-a"),
+        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"),
         patch("flow44.api.chat.sandbox_manager") as mgr,
         patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
         patch("flow44.api.chat.versioning.begin_turn", claim),

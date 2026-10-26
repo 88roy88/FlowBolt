@@ -65,6 +65,8 @@ class AIModelSettings(BuildAppSettings):
     AI_API_KEY: str | None = "default"
     AI_REQUEST_TIMEOUT: int = 300
     AI_STREAM_TIMEOUT: int = 600
+    AI_HISTORY_CHAR_BUDGET: int = 600_000
+    AI_HISTORY_MIN_RUNS: int = 5
 
     # if ai_model starts with bedrock/ set base_url and api_key to None
     # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)
@@ -99,6 +101,19 @@ class FlapiSettings(BuildAppSettings):
     FLAPI_BASE_URL: str = "http://localhost:6001"
     FLAPI_VERIFY_SSL: bool = True
     FLAPI_CLIENT_TIMEOUT_SEC: int = 25 * 60 + 10  # Flapi's default run timeout is 25 minutes
+
+
+class DirectorySettings(BuildAppSettings):
+    # Defaults to the local directory-mock in dev.
+    DIRECTORY_BASE_URL: str = "http://localhost:6002"
+    DIRECTORY_VERIFY_SSL: bool = True
+    DIRECTORY_TIMEOUT_SECONDS: float = 10.0
+    # Sent as the ClientId header; the local mock ignores it.
+    DIRECTORY_CLIENT_ID: str = "default"
+    # Mail domain -> domain used in the user id ({sAMAccountName}@{domain}). Keys match case-insensitively.
+    DIRECTORY_MAIL_DOMAIN_MAP: dict[str, str] = {}
+    # Used when the user's mail domain is missing or not in DIRECTORY_MAIL_DOMAIN_MAP.
+    DIRECTORY_DEFAULT_DOMAIN: str = "corp"
 
 
 class S3Settings(BuildAppSettings):
@@ -141,6 +156,7 @@ class Settings(
     SearchIndexSettings,
     AuthSettings,
     FlapiSettings,
+    DirectorySettings,
     S3Settings,
     OpikSettings,
     LoggerSettings,

@@ -1,0 +1,41 @@
+# Local-only log viewer for the backend's LOG_FILE_PATH (backend/app.log by default).
+#
+# Usage:
+#   cd mocks/observability
+#   docker compose up -d
+#   open http://localhost:5080  (login: admin@local.dev / Local123!)
+#
+# Stream name in OpenObserve: buildapp-dev
+
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: buildapp-openobserve
+    ports:
+      - "5080:5080"
+    environment:
+      ZO_ROOT_USER_EMAIL: admin@local.dev
+      ZO_ROOT_USER_PASSWORD: Local123!
+    volumes:
+      - openobserve-data:/data
+    restart: unless-stopped
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.3
+    container_name: buildapp-filebeat
+    user: root
+    entrypoint: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ../../backend:/logs:ro
+      - filebeat-data:/usr/share/filebeat/data
+    environment:
+      OPENOBSERVE_USER: admin@local.dev
+      OPENOBSERVE_PASSWORD: Local123!
+    depends_on:
+      - openobserve
+    restart: unless-stopped
+
+volumes:
+  openobserve-data:
+  filebeat-data:

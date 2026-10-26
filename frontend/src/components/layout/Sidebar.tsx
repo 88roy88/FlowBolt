@@ -13,6 +13,7 @@ import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useDebouncedValue } from '../../hooks/useDebounce';
+import { logger } from '../../services/logger';
 
 type SidebarProps = {
   onCollapse?: () => void;
@@ -52,7 +53,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
   const { t } = useTranslation();
   const {
     projects, projectsCursor, projectSearch, isLoadingMoreProjects, loadMoreProjects, searchProjects,
-    currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus,
+    currentProject, setCurrentProject, createProject, deleteProject, renameProject, goHome, isCreating, userStatus,
   } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
@@ -88,6 +89,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
 
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
+    logger.info('project_opened', { entry_point: 'project_list' });
     window.location.hash = `#/project/${project.id}`;
     resetFiles();
     loadFileTree();
@@ -104,18 +106,8 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
     const wasSelected = currentProject?.id === id;
     await deleteProject(id);
     if (wasSelected) {
-      const next = useSessionStore.getState().currentProject;
-      if (next) {
-        window.location.hash = `#/project/${next.id}`;
-        resetFiles();
-        loadFileTree();
-        clearMessages();
-        loadHistory(next.id);
-      } else {
-        window.location.hash = '';
-        resetFiles();
-        clearMessages();
-      }
+      goHome();
+      resetFiles();
     }
   };
 

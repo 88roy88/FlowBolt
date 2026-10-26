@@ -152,7 +152,7 @@ class S3Storage:
 
     async def _is_pending_deletion(self, key: str) -> bool:
         response = await self.client.get_object_tagging(Bucket=settings.S3_BUCKET_NAME, Key=key)
-        return _DELETION_TAG in response["TagSet"]
+        return _DELETION_TAG in response.get("TagSet", [])
 
     async def _restart_clock_and_tag(self, key: str) -> None:
         # Self-copy instead of put_object_tagging: lifecycle expiry counts from the last write, not from tagging.
