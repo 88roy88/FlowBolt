@@ -1,4 +1,4 @@
-# FlowBolt
+# BuildApp
 
 AI-powered web app builder. The backend is a FastAPI service; the frontend is a Vite/React app.
 

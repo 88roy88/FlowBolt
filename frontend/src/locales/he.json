@@ -186,6 +186,9 @@
       "removeDataSource": "הסר מקור נתונים",
       "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)",
       "usedInProject": "שימש בפרויקט זה"
+    },
+    "selectedElement": {
+      "remove": "הסר רכיב"
     }
   },
   "sharing": {

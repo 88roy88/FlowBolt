@@ -77,6 +77,7 @@ const INITIAL_STATE: ChatState = {
   models: [],
   selectedModel: null,
   selectedDataSources: [],
+  selectedElements: [],
   historyLoaded: true,
   setDraft: vi.fn() as unknown as ChatState['setDraft'],
   sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
@@ -92,6 +93,9 @@ const INITIAL_STATE: ChatState = {
   addDataSource: vi.fn() as unknown as ChatState['addDataSource'],
   removeDataSource: vi.fn() as unknown as ChatState['removeDataSource'],
   clearDataSources: vi.fn() as unknown as ChatState['clearDataSources'],
+  addSelectedElement: vi.fn() as unknown as ChatState['addSelectedElement'],
+  removeSelectedElement: vi.fn() as unknown as ChatState['removeSelectedElement'],
+  clearSelectedElements: vi.fn() as unknown as ChatState['clearSelectedElements'],
   loadModels: vi.fn() as unknown as ChatState['loadModels'],
 };
 
@@ -237,6 +241,19 @@ describe('createSendMessageHandler — build flow', () => {
     const result = store.state().messages[0];
     expect(result.role).toBe('user');
     expect(result.dataSources).toEqual([{ id: 1, name: 'Sales' }]);
+  });
+
+  it('user_message with selected_elements attaches them with ids', () => {
+    const element = {
+      tag: 'button', selector: 'main > button.cta', text: 'Sign up', classes: 'cta', html: '<button>Sign up</button>', components: ['App'],
+    };
+    handler(msg({ type: 'user_message', content: 'Make this red', selected_elements: [element] }));
+
+    const result = store.state().messages[0];
+    expect(result.content).toBe('Make this red');
+    expect(result.selectedElements).toHaveLength(1);
+    expect(result.selectedElements![0]).toMatchObject(element);
+    expect(result.selectedElements![0].id).toEqual(expect.any(String));
   });
 
   it('unknown event type does not crash', () => {

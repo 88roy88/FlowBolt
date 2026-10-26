@@ -89,6 +89,21 @@ describe('turn rollback boundary', () => {
     );
   });
 
+  it('keepDraft sends without touching the draft, even when the turn is withdrawn', () => {
+    const element = { id: 'el-1', tag: 'button', selector: 'button', text: '', classes: '', html: '', components: [] };
+    useChatStore.setState({ draft: 'half-typed', selectedElements: [element] });
+
+    useChatStore.getState().sendMessage('make it red', { keepDraft: true });
+    expect(useChatStore.getState().draft).toBe('half-typed');
+    expect(useChatStore.getState().selectedElements).toEqual([]);
+    expect(socketSend).toHaveBeenCalledWith(expect.objectContaining({ content: 'make it red' }));
+
+    handleVersionMessage(msg({ type: 'version_error', code: 'run_active', message: 'busy', files: [] }));
+
+    expect(useChatStore.getState().draft).toBe('half-typed');
+    expect(useChatStore.getState().selectedElements).toEqual([element]);
+  });
+
   it('keeps the turn after the first phase commits it', () => {
     useChatStore.getState().sendMessage('add a button');
     handleVersionMessage(msg({ type: 'phase', phase: 'planning' }));
