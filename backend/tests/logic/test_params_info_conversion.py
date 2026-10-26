@@ -108,3 +108,22 @@ class TestToParamsInfo:
 
         result = await ds_logic.get_params_info("1")
         assert result.parameters[0].description is None
+
+    async def test_quick_parameter_info_mapped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        raw = _param("status").model_dump(by_alias=True)
+        raw["quickParameterInfo"] = {"DisplayName": "Order status", "Description": "Current status", "Extra": 1}
+        info = _flapi_info(flapi_models.QuickParamDefinition.model_validate(raw))
+        monkeypatch.setattr(ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info))
+
+        result = await ds_logic.get_params_info("1")
+        quick_info = result.parameters[0].quick_info
+        assert quick_info is not None
+        assert quick_info.display_name == "Order status"
+        assert quick_info.description == "Current status"
+
+    async def test_missing_quick_parameter_info(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        info = _flapi_info(_param("status"))
+        monkeypatch.setattr(ds_logic.data_source_client, "get_quick_params_info", AsyncMock(return_value=info))
+
+        result = await ds_logic.get_params_info("1")
+        assert result.parameters[0].quick_info is None
