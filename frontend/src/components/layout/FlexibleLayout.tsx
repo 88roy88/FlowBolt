@@ -47,7 +47,7 @@ export function FlexibleLayout() {
 
   const messages = useChatStore((s) => s.messages);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
-  const isNewProject = !historyLoaded || messages.length === 0;
+  const isNewProject = historyLoaded && messages.length === 0;
 
   const togglePane = (pane: PaneId) => {
     setVisiblePanes(prev => {
