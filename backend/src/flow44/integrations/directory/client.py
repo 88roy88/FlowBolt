@@ -53,7 +53,7 @@ def unique_id_from_user(user: AdUser) -> str:
     domain = domain_from_user(user)
     if not user.sam_account_name or not domain:
         return ""
-    return f"{user.sam_account_name}@{domain}"
+    return f"{user.sam_account_name.lower()}@{domain}"
 
 
 def _escape_filter_value(value: str) -> str:

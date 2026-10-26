@@ -27,6 +27,7 @@ from flow44.ai.file_safety import (
 from flow44.ai.helpers import format_agent_feedback, parse_json_response
 from flow44.ai.parser import ActionParser
 from flow44.ai.state import BuildState
+from flow44.db.events import emit_transient
 from flow44.db.project import update_project_summary
 from flow44.sandbox.main import PnpmSandbox
 
@@ -223,7 +224,7 @@ class ExecuteAgent(BaseAgent):
                 for path, content in validated:
                     await state.sandbox_ref.write_file(path, content)
                     state.build_state.completed_files[path] = content
-                    await state.emit_fn({"type": "file", "path": path, "content": content})
+                    await emit_transient(state.project_id, {"type": "file", "path": path, "content": content})
         except Exception as exc:
             logger.exception("[execute] Error fix pass failed")
             record_span_error(exc)
@@ -402,7 +403,7 @@ class ExecuteAgent(BaseAgent):
                 state.build_state.completed_files[path] = content
                 paths.append(path)
                 await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "running", "file": path})
-                await state.emit_fn({"type": "file", "path": path, "content": content})
+                await emit_transient(state.project_id, {"type": "file", "path": path, "content": content})
 
             state.build_state.task_files[task.id] = paths
             task.status = "completed"

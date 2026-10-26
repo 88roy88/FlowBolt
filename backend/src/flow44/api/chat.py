@@ -22,7 +22,7 @@ from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
 from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
-from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
+from flow44.db.events import emit_event, get_events, get_latest_event, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
 from flow44.logic import data_source as ds_logic
@@ -39,8 +39,7 @@ ws_router = APIRouter()
 
 async def _is_new_project(project_id: str) -> bool:
     """A project is 'new' if no build has completed yet (no action_complete event)."""
-    events = await get_events(project_id)
-    return not any(e.payload.get("type") == "action_complete" for e in events)
+    return await get_latest_event(project_id, "action_complete") is None
 
 
 # Strong refs: asyncio holds tasks weakly, so a run could be GC'd mid-flight.

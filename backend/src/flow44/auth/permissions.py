@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from enum import StrEnum
 
 
@@ -83,3 +84,7 @@ def has_permission(user_permissions: set[Permission], required: Permission) -> b
         return True
     all_variant = _ALL_VARIANTS.get(required)
     return bool(all_variant and all_variant in user_permissions)
+
+
+def highest_role(roles: Iterable[Role]) -> Role | None:
+    return max(roles, key=ROLE_RANK.__getitem__, default=None)
