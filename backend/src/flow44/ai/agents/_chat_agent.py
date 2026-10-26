@@ -81,7 +81,7 @@ class ChatAgent(BaseAgent):
         new_content = apply_edits(old_content, edits)
         await self.sandbox.write_file(path, new_content)
         tracker.record(path, old_content, new_content, is_new=False)
-        await self.emit({"type": "file", "path": path, "content": new_content})
+        await emit_transient(self.project_id, {"type": "file", "path": path, "content": new_content})
         return new_content
 
     async def _emit_file_diffs_summary(self, tracker: DiffTracker) -> None:
