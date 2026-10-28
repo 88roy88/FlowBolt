@@ -311,6 +311,7 @@ const runPackageSchema = {
     401: ErrorBodySchema,
     404: ErrorBodySchema,
     422: ErrorBodySchema,
+    500: ErrorBodySchema,
   },
 };
 
@@ -325,7 +326,9 @@ const runPackageHandler = async (request: any, reply: any) => {
     return reply.status(404).send(errorBody('not_found', `No package found for id: ${dataSourceId}`));
   }
   if ('error' in result) {
-    return reply.status(421).send(errorBody('missing_required_params', result.error));
+    return reply
+      .status(result.status ?? 421)
+      .send(errorBody(result.code ?? 'missing_required_params', result.error));
   }
 
   return result;

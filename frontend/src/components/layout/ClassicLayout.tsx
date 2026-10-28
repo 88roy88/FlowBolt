@@ -5,29 +5,29 @@ import { ChatPanel } from '../chat/ChatPanel';
 import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
+import { useTabPanelStore, type PanelTab } from '../../stores/tabPanel';
 
-
-type RightTab = 'preview' | 'code';
 
 const MAIN_SPLIT_MIN = 0.2;
 const MAIN_SPLIT_MAX = 0.8;
 
 export function ClassicLayout() {
   const { t } = useTranslation();
-  const [rightTab, setRightTab] = useState<RightTab>('preview');
+  const panelTab = useTabPanelStore((s) => s.tab);
+  const setPanelTab = useTabPanelStore((s) => s.setTab);
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
 
   const messages = useChatStore((s) => s.messages);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
-  const isNewProject = !historyLoaded || messages.length === 0;
+  const isNewProject = historyLoaded && messages.length === 0;
 
   useEffect(() => {
     if (agentPhase === 'executing' || agentPhase === 'complete') {
-      setRightTab('preview');
+      setPanelTab('preview');
     }
-  }, [agentPhase]);
+  }, [agentPhase, setPanelTab]);
 
   const handleMainSplitResize = useCallback((delta: number) => {
     const el = mainTopRef.current;
@@ -57,12 +57,12 @@ export function ClassicLayout() {
 
       <div style={{ flex: 1 - mainSplit, minWidth: 0 }} className="overflow-hidden flex flex-col">
         <div className="flex items-center border-b border-border bg-surface shrink-0">
-          {(['preview', 'code'] as RightTab[]).map((tab) => (
+          {(['preview', 'code'] as PanelTab[]).map((tab) => (
             <button
               key={tab}
-              onClick={() => setRightTab(tab)}
+              onClick={() => setPanelTab(tab)}
               className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors duration-150 capitalize ${
-                rightTab === tab
+                panelTab === tab
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
@@ -72,7 +72,7 @@ export function ClassicLayout() {
           ))}
         </div>
         <div className="flex-1 overflow-hidden">
-          {rightTab === 'preview' ? <Preview /> : <EditorPanel />}
+          {panelTab === 'preview' ? <Preview /> : <EditorPanel />}
         </div>
       </div>
     </div>

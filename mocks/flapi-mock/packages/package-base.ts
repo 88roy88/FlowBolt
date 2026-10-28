@@ -1,5 +1,15 @@
 import type { PackageMetadata, QuickParamDefinition } from '../schemas';
 
+export class MockPackageError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 export interface MockPackageConfig {
   metadata: PackageMetadata;
   quickParams?: Record<string, QuickParamDefinition[]>;
@@ -116,6 +126,10 @@ export function quickParam(opts: QuickParamOptions): QuickParamDefinition {
     IsRequired: opts.required || false,
     IsRequireAny: opts.requireAny || false,
     Value: (opts.defaultValues || []).map((v) => ({ Name: String(v), Value: String(v) })),
+    quickParameterInfo: {
+      DisplayName: displayName,
+      Description: opts.description || null,
+    },
   };
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronUp } from 'lucide-react';
+import { ChevronUp, Shield } from 'lucide-react';
 import { Terminal } from '../terminal/Terminal';
 import { ServerLog } from '../terminal/ServerLog';
 import { Console } from '../terminal/Console';
@@ -16,8 +16,11 @@ const BOTTOM_MAX = 600;
 export function BottomDrawer() {
   const { t } = useTranslation();
   const currentProject = useSessionStore((s) => s.currentProject);
+  const canUseTerminal = useSessionStore((s) => !!s.userStatus?.can_use_terminal);
+  const terminalAdminOnly = useSessionStore((s) => !!s.userStatus?.terminal_admin_only);
   const canWrite = !currentProject?.role || WRITE_ROLES.has(currentProject.role);
-  const bottomTabs: BottomTab[] = canWrite ? ['server', 'terminal', 'console'] : ['server', 'console'];
+  const showTerminal = canWrite && canUseTerminal;
+  const bottomTabs: BottomTab[] = showTerminal ? ['server', 'terminal', 'console'] : ['server', 'console'];
 
   const [bottomOpen, setBottomOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>('server');
@@ -29,6 +32,13 @@ export function BottomDrawer() {
 
   const tabLabel = (tab: BottomTab) =>
     tab === 'server' ? t('terminal.server') : tab === 'console' ? t('terminal.console') : t('terminal.terminal');
+
+  const adminBadge = (tab: BottomTab, size: number, className?: string) =>
+    tab === 'terminal' && terminalAdminOnly && (
+      <span title={t('terminal.adminOnly')} className="inline-flex">
+        <Shield size={size} className={className} />
+      </span>
+    );
 
   return (
     <div className="border-t border-border bg-surface shrink-0">
@@ -47,11 +57,12 @@ export function BottomDrawer() {
               <button
                 key={tab}
                 onClick={(e) => { e.stopPropagation(); setBottomTab(tab); setBottomOpen(true); }}
-                className={`px-2 py-0.5 rounded text-[11px] capitalize ${
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] capitalize ${
                   bottomTab === tab ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {tab}
+                {adminBadge(tab, 11, 'text-warning/70')}
               </button>
             ))}
           </div>
@@ -64,20 +75,21 @@ export function BottomDrawer() {
               <button
                 key={tab}
                 onClick={() => setBottomTab(tab)}
-                className={`px-4 py-1.5 text-[13px] font-medium border-b-2 transition-colors duration-150 capitalize ${
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 text-[13px] font-medium border-b-2 transition-colors duration-150 capitalize ${
                   bottomTab === tab
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {tabLabel(tab)}
+                {adminBadge(tab, 13)}
               </button>
             ))}
           </div>
           <div style={{ height: bottomHeight }}>
             <Resizer direction="vertical" onDrag={handleBottomResize} />
             <div style={{ height: bottomHeight - 1 }} className="overflow-hidden">
-              {bottomTab === 'terminal' && canWrite ? <Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
+              {bottomTab === 'terminal' && showTerminal ? <Terminal /> : bottomTab === 'console' ? <Console /> : <ServerLog />}
             </div>
           </div>
         </>

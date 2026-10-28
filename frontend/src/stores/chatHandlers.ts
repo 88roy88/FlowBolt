@@ -87,7 +87,7 @@ function handleFileUpdate(msg: { path: string; content: string }, set: SetState)
   set((state) => ({
     actions: [
       ...state.actions,
-      { type: 'file', path: msg.path, content: msg.content },
+      { type: 'file', path: msg.path },
     ],
   }));
   if (_replaying) return;

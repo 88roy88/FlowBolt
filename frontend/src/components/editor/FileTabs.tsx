@@ -17,7 +17,7 @@ export function FileTabs() {
         const normalizedPath = `/${normalizeProjectPath(path)}`;
         const fileName = normalizedPath.split('/').pop() ?? normalizedPath;
         const isActive = normalizedPath === (activeFilePath ? `/${normalizeProjectPath(activeFilePath)}` : activeFilePath);
-        const isMissing = !existingPaths.has(normalizedPath);
+        const isMissing = fileTree.length > 0 && !existingPaths.has(normalizedPath);
         return (
           <div
             key={normalizedPath}

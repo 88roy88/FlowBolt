@@ -34,7 +34,6 @@ export type AgentCard =
 export interface Action {
   type: 'file' | 'shell';
   path?: string;
-  content?: string;
   command?: string;
   output?: string;
 }
@@ -118,6 +117,8 @@ export interface UserStatus {
   user_id: string;
   is_admin: boolean;
   is_platform_user: boolean;
+  can_use_terminal: boolean;
+  terminal_admin_only: boolean;
 }
 
 export interface AIModel {

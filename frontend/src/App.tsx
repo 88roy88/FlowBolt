@@ -12,11 +12,23 @@ import { useErrorCapture } from './hooks/useErrorCapture';
 import { Loader2 } from 'lucide-react';
 import { FlowBrand } from './components/ui/flow-logo';
 import * as api from './services/api';
+import type { Project } from './types';
 import { logger } from './services/logger';
 
 function getProjectIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/project\/(.+)$/);
   return match ? match[1] : null;
+}
+
+async function findProject(id: string): Promise<Project | null> {
+  const { projects, projectSearch } = useSessionStore.getState();
+  const loaded = projects.find((p) => p.id === id) ?? projectSearch?.results.find((p) => p.id === id);
+  if (loaded) return loaded;
+  try {
+    return await api.fetchProject(id);
+  } catch {
+    return null;
+  }
 }
 
 function hasProjectsCache(): boolean {
@@ -124,21 +136,25 @@ export default function App() {
     }
     if (currentProject) return;
 
-    const hashProjectId = getProjectIdFromHash();
-    const match = hashProjectId
-      ? projects.find((p) => p.id === hashProjectId)
-      : null;
-    if (match) {
-      selectProject(match, 'direct_link');
-    } else if (!userStatus?.is_admin) {
-      // Replace rather than push, so Back leaves the app instead of returning to an empty home page
-      selectProject(projects[0], 'auto_select', { replaceUrl: true });
+    let cancelled = false;
+    async function selectInitialProject() {
+      const hashProjectId = getProjectIdFromHash();
+      const match = hashProjectId ? await findProject(hashProjectId) : null;
+      if (cancelled || useSessionStore.getState().currentProject) return;
+      if (match) {
+        selectProject(match, 'direct_link');
+      } else if (!userStatus?.is_admin) {
+        // Replace rather than push, so Back leaves the app instead of returning to an empty home page
+        selectProject(projects[0], 'auto_select', { replaceUrl: true });
+      }
     }
+    void selectInitialProject();
+    return () => { cancelled = true; };
   }, [loading, projects, currentProject, selectProject, userStatus]);
 
   // Listen for hash changes (back/forward)
   useEffect(() => {
-    function onHashChange() {
+    async function onHashChange() {
       const hashProjectId = getProjectIdFromHash();
       if (!hashProjectId) {
         if (currentProject) {
@@ -147,14 +163,15 @@ export default function App() {
         }
         return;
       }
-      const match = projects.find((p) => p.id === hashProjectId);
-      if (match && match.id !== currentProject?.id) {
+      if (hashProjectId === currentProject?.id) return;
+      const match = await findProject(hashProjectId);
+      if (match && getProjectIdFromHash() === match.id) {
         selectProject(match, 'direct_link');
       }
     }
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, [projects, currentProject, selectProject, goHome, resetFiles]);
+  }, [currentProject, selectProject, goHome, resetFiles]);
 
   // Auto-recover state when network comes back online
   useEffect(() => {
