@@ -61,10 +61,10 @@ def test_iaagent_alive_idle_without_heartbeat() -> None:
 
 
 def test_iaagent_alive_active_reports_latest_phase() -> None:
-    events = [_event({"type": "phase", "phase": "planning"})]
+    latest = _event({"type": "phase", "phase": "planning"})
     with (
         patch("flow44.db.heartbeat.get_heartbeat", new_callable=AsyncMock, return_value=_heartbeat()),
-        patch("flow44.api.iaagent.get_events", new_callable=AsyncMock, return_value=events),
+        patch("flow44.api.iaagent.get_latest_event", new_callable=AsyncMock, return_value=latest),
     ):
         response = client.get(f"/api/iaagent/{PROJECT_ID}/alive")
     assert response.status_code == 200

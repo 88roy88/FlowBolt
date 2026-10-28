@@ -126,6 +126,10 @@ export function quickParam(opts: QuickParamOptions): QuickParamDefinition {
     IsRequired: opts.required || false,
     IsRequireAny: opts.requireAny || false,
     Value: (opts.defaultValues || []).map((v) => ({ Name: String(v), Value: String(v) })),
+    quickParameterInfo: {
+      DisplayName: displayName,
+      Description: opts.description || null,
+    },
   };
 }
 

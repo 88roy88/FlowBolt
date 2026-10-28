@@ -21,6 +21,7 @@ from flow44.logic.models import (
     ParamDefinition,
     ParamOption,
     ParamType,
+    QuickParamInfo,
     parse_param_value,
 )
 
@@ -111,6 +112,14 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
                     name=p.name,
                     display_name=p.display_name,
                     description=p.description,
+                    quick_info=(
+                        QuickParamInfo(
+                            display_name=p.quick_parameter_info.display_name,
+                            description=p.quick_parameter_info.description,
+                        )
+                        if p.quick_parameter_info
+                        else None
+                    ),
                     type=_FLAPI_PARAM_TYPE.get(p.type_, "string"),
                     is_required=p.is_required,
                     is_single_value=p.is_single_value,
