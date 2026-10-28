@@ -5,7 +5,7 @@
  * sequences through the handlers, and assert the resulting state.
  * No React rendering, no browser — pure logic tests.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSendMessageHandler, createFixErrorHandler, setReplayMode, finalizeHistoryReplayState } from '../chatHandlers';
 import {
   AGENT_PHASE,
@@ -16,19 +16,28 @@ import {
 } from '../chatAgentState';
 import type { ChatState } from '../chat';
 import type { WSMessage, PlanOverview, ProjectSummary } from '../../types';
+import { notifyAgentNeedsAttention, notifyBuildComplete } from '../../utils/notifications';
+
+const filesMock = vi.hoisted(() => ({
+  openFiles: new Map<string, unknown>(),
+  updateFileContent: vi.fn(),
+  loadFileTree: vi.fn(),
+  refreshOpenFiles: vi.fn(),
+  saveVersion: 0,
+}));
 
 // Mock external stores — we don't want real file fetches or session lookups
 vi.mock('../files', () => ({
   useFilesStore: {
-    getState: () => ({
-      openFiles: new Map(),
-      updateFileContent: vi.fn(),
-      loadFileTree: vi.fn(),
-      refreshOpenFiles: vi.fn(),
-      saveVersion: 0,
-    }),
+    getState: () => filesMock,
     setState: vi.fn(),
   },
+}));
+
+vi.mock('../../utils/notifications', () => ({
+  requestPermissionIfNeeded: vi.fn(),
+  notifyAgentNeedsAttention: vi.fn(),
+  notifyBuildComplete: vi.fn(),
 }));
 
 vi.mock('../session', () => ({
@@ -290,10 +299,20 @@ describe('createSendMessageHandler — followup flow', () => {
 describe('createSendMessageHandler — replay mode', () => {
   let store: ReturnType<typeof createTestStore>;
   let handler: (msg: WSMessage) => void;
+  let cleanup: () => void;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    filesMock.openFiles = new Map([['src/App.tsx', {}]]);
     store = createTestStore();
-    handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void, { replay: true });
+    cleanup = vi.fn();
+    handler = createSendMessageHandler(store.set, store.get, cleanup);
+    setReplayMode(true);
+  });
+
+  afterEach(() => {
+    setReplayMode(false);
+    filesMock.openFiles = new Map();
   });
 
   it('uses _ts timestamps instead of Date.now()', () => {
@@ -301,24 +320,46 @@ describe('createSendMessageHandler — replay mode', () => {
     expect(store.state().messages[0].timestamp).toBe(new Date('2026-01-15T10:30:00.000Z').getTime());
   });
 
-  it('replay mode skips adding cards to messages', () => {
+  it('still rebuilds cards and messages', () => {
     handler(msg({ type: 'phase', phase: 'designing', _ts: '2026-01-15T10:30:00Z' }));
     handler(msg({ type: 'design_progress', stream: 'architecture', content: 'complete' }));
     handler(msg({ type: 'design_progress', stream: 'ux', content: 'complete' }));
     handler(msg({ type: 'phase', phase: 'planning' }));
-
-    const designCard = store.state().messages.find(m => m.agentCard?.type === 'design_complete');
-    expect(designCard).toBeUndefined();
-    expect(store.state().agentPhase).toBe('planning');
-  });
-
-  it('action_complete in replay does not add messages', () => {
     handler(msg({ type: 'text', content: 'Done!' }));
     handler(msg({ type: 'action_complete', _ts: '2026-01-15T10:31:00Z' }));
 
-    expect(store.state().currentAssistantMessage).toBe('');
+    const types = store.state().messages.map((m) => m.agentCard?.type ?? m.content);
+    expect(types).toEqual(['design_complete', 'Done!']);
     expect(store.state().agentPhase).toBe('idle');
-    expect(store.state().messages).toHaveLength(0);
+  });
+
+  it('replayed turns do not notify, detach the live handler, or refetch files', () => {
+    for (let turn = 0; turn < 3; turn++) {
+      handler(msg({ type: 'plan_overview', overview: MOCK_PLAN_OVERVIEW }));
+      handler(msg({ type: 'phase', phase: 'executing' }));
+      handler(msg({ type: 'file', path: 'src/App.tsx', content: 'old content' }));
+      handler(msg({ type: 'task_update', taskId: 't1', status: 'completed', file: 'src/App.tsx' }));
+      handler(msg({ type: 'action_complete' }));
+    }
+    handler(msg({ type: 'error', message: 'boom' }));
+
+    expect(notifyBuildComplete).not.toHaveBeenCalled();
+    expect(notifyAgentNeedsAttention).not.toHaveBeenCalled();
+    expect(cleanup).not.toHaveBeenCalled();
+    expect(filesMock.updateFileContent).not.toHaveBeenCalled();
+    expect(filesMock.refreshOpenFiles).not.toHaveBeenCalled();
+    expect(filesMock.loadFileTree).not.toHaveBeenCalled();
+  });
+
+  it('live turns keep their side effects once replay ends', () => {
+    setReplayMode(false);
+    handler(msg({ type: 'file', path: 'src/App.tsx', content: 'new content' }));
+    handler(msg({ type: 'action_complete' }));
+
+    expect(filesMock.updateFileContent).toHaveBeenCalledWith('src/App.tsx', 'new content');
+    expect(notifyBuildComplete).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(filesMock.refreshOpenFiles).toHaveBeenCalledTimes(1);
   });
 });
 
