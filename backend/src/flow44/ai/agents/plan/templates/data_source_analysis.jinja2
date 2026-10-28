@@ -5,6 +5,11 @@ Analyze this API data source in the context of the user's request.
 User wants to build: {{ user_content }}
 
 Data source: {{ data_source_name }}
+{% if data_source_summary %}
+
+**About this data source:**
+{{ data_source_summary }}
+{% endif %}
 
 **Response schema (queries/cubes):**
 {% for q in queries %}

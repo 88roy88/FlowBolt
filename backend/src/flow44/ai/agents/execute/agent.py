@@ -290,6 +290,7 @@ class ExecuteAgent(BaseAgent):
                     "data_source_id": ctx.data_source_id,
                     "data_source_name": ctx.data_source_name,
                     "sanitized_name": ctx.sanitized_name,
+                    "data_source_summary": ctx.data_source_summary,
                     "relevant_fields": ctx.relevant_fields,
                     "data_characteristics": ctx.data_characteristics,
                     "integration_notes": ctx.integration_notes,

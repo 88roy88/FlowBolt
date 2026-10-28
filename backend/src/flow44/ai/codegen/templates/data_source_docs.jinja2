@@ -2,6 +2,11 @@
 **ID:** {{ ctx.data_source_id }}
 **Module:** `src/dataSources/{{ ctx.sanitized_name }}.ts`
 
+{% if ctx.data_source_summary %}
+## Summary
+{{ ctx.data_source_summary }}
+
+{% endif %}
 {% if ctx.data_schema %}
 ## Schema
 {{ ctx.data_schema }}
@@ -31,6 +36,7 @@
 - `{{ f.name }}` ({{ f.type }}){% if f.description %} — {{ f.description }}{% endif %}
 
 {% endfor %}
+
 {% endfor %}
 {% endif %}
 {% if params %}
@@ -39,6 +45,7 @@
 - `{{ p.name }}` ({{ p.type }}{% if not p.is_single_value %}[]{% endif %}) — {% if p.is_required %}required{% elif p.is_require_any %}required (one of group){% else %}optional{% endif %}
 
 {% endfor %}
+
 {% endif %}
 {% if redacted_sample %}
 ## Response Structure (redacted)
