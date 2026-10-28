@@ -74,7 +74,7 @@ class ExecuteAgent(BaseAgent):
 
     @track(name="execute-agent-run")  # type: ignore[untyped-decorator]
     async def run(self) -> None:
-        self._setup_trace(["execute-agent"])
+        await self._setup_trace(["execute-agent"])
         self._set_trace_input({"action": "plan_approved"})
 
         await self.emit({"type": "plan_accepted", "overview": self._build_state.user_plan_overview.model_dump()})
