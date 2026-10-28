@@ -19,8 +19,10 @@ class BuildAppSettings(BaseSettings):
 class SandboxSettings(BuildAppSettings):
     WORKSPACE_BASE_DIR: str = _DEFAULT_WORKSPACE
     TEMPLATE_DIR: str = _DEFAULT_TEMPLATE
-    SANDBOX_PORT_RANGE_START: int = 3501
-    SANDBOX_PORT_RANGE_END: int = 4501
+    # Kept clear of common dev ports (3000, 4000, 4200, 5173, 8000...) and below the
+    # Windows ephemeral range (49152+).
+    SANDBOX_PORT_RANGE_START: int = 43000
+    SANDBOX_PORT_RANGE_END: int = 43999
     NSJAIL_BIN: str = "/usr/bin/nsjail"
     MAX_COMMAND_TIMEOUT: int = 60
     SANDBOX_MEMORY_LIMIT_MB: int = 512

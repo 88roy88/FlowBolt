@@ -75,9 +75,7 @@ class WindowsLocalSandbox(BaseSandbox):
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]  # Windows-only
         )
 
-        self._bg_processes[name] = _PopenWrapper(proc)  # type: ignore[assignment]
-        self._bg_log_files[name] = log_file
-        logger.debug("Background process '%s' started (pid %s)", name, proc.pid)
+        self._register_background(name, _PopenWrapper(proc), log_file)  # type: ignore[arg-type]
 
     @classmethod
     def find_pids_in_port_range(cls, port_start: int, port_end: int) -> list[tuple[int, int]]:
@@ -120,6 +118,29 @@ class WindowsLocalSandbox(BaseSandbox):
             )
         except Exception:  # noqa: S110
             pass
+
+    @classmethod
+    def get_pid_cmdline(cls, pid: int) -> str | None:
+        """Read the command line via Win32_Process (wmic is gone on recent Windows)."""
+        try:
+            result = subprocess.run(  # noqa: PLW1510
+                [  # noqa: S607
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    f"(Get-CimInstance Win32_Process -Filter 'ProcessId={int(pid)}').CommandLine",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=15,
+            )
+            return result.stdout.strip() or None
+        except Exception:
+            logger.debug("Failed to read cmdline of pid %d on Windows", pid, exc_info=True)
+            return None
 
     def create_pty(self) -> WinPTY:
         proc = WinPtyProcess.spawn("cmd.exe", cwd=self.workspace_dir)
