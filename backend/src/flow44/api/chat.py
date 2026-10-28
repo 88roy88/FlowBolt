@@ -17,6 +17,7 @@ from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.core.opik_utils import last_turn_trace_id, log_trace_feedback
 from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
@@ -254,6 +255,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                         continue
 
                     state = BuildState.model_validate_json(state_json)
+                    # Read before starting the next turn, which replaces it with its own trace.
+                    plan_trace_id = await last_turn_trace_id(project.id)
 
                     if action == "accept":
                         execute_agent = ExecuteAgent(
@@ -269,6 +272,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             execute_agent.run,
                             prepare=partial(delete_pending_plan, project.id),
                         )
+                        log_trace_feedback(plan_trace_id, "plan_accepted", 1, "User accepted the plan")
 
                     elif action == "modify" and feedback:
                         plan_agent = PlanAgent(
@@ -278,6 +282,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             user_id=user_id,
                         )
                         await _start_turn(project.id, partial(plan_agent.rebuild_with_feedback, state, feedback))
+                        log_trace_feedback(plan_trace_id, "plan_accepted", 0, f"User asked to modify: {feedback}")
 
                 elif msg_type == "fix_error":
                     error_message = data.get("error_message", "")
@@ -299,6 +304,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             "errorStack": error_stack,
                         },
                     }
+                    errored_trace_id = await last_turn_trace_id(project.id)
                     fix_agent = FixErrorAgent(
                         project_id=project.id,
                         sandbox=sandbox,
@@ -316,6 +322,12 @@ async def chat_ws(  # noqa: C901, PLR0915
                         ),
                         prepare=partial(_save_user_turn, project.id, error_desc, fix_event),
                     )
+                    log_trace_feedback(errored_trace_id, "error_after_turn", 1, error_desc)
+
+                elif msg_type == "restore_version":
+                    reverted_trace_id = await last_turn_trace_id(project.id)
+                    await versioning.handle_action(project.id, msg_type, data)
+                    log_trace_feedback(reverted_trace_id, "reverted", 1, "User restored an earlier version")
 
                 else:
                     await versioning.handle_action(project.id, msg_type, data)

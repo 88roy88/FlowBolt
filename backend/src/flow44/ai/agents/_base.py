@@ -1,6 +1,12 @@
 from typing import Any
 
-from flow44.ai.core.opik_utils import llm_metadata, set_trace_input, set_trace_output, setup_trace
+from flow44.ai.core.opik_utils import (
+    llm_metadata,
+    remember_turn_trace,
+    set_trace_input,
+    set_trace_output,
+    setup_trace,
+)
 from flow44.db.events import emit_event
 from flow44.sandbox.main import PnpmSandbox
 
@@ -23,8 +29,9 @@ class BaseAgent:
         self.model = model
         self._trace_id = trace_id
 
-    def _setup_trace(self, tags: list[str]) -> None:
+    async def _setup_trace(self, tags: list[str]) -> None:
         self._trace_id = setup_trace(self.project_id, self._user_id, self.model, tags)
+        await remember_turn_trace(self.project_id, self._trace_id)
 
     async def emit(self, event: dict[str, Any]) -> None:
         await emit_event(self.project_id, event)

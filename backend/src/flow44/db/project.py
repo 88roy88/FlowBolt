@@ -18,6 +18,7 @@ class Project(SQLModel, table=True):
     selected_model: str = Field(default="")
     published_url: str | None = Field(default=None, sa_column_kwargs={"unique": True})
     published_at: str | None = Field(default=None)
+    last_trace_id: str | None = Field(default=None)
 
 
 async def create_project(name: str, user_id: str) -> Project:
@@ -112,3 +113,17 @@ async def update_project_published_url(project_id: str, handle: str) -> None:
         project.updated_at = now
         session.add(project)
         await session.commit()
+
+
+async def get_last_trace_id(project_id: str) -> str | None:
+    project = await get_project(project_id)
+    return project.last_trace_id if project else None
+
+
+async def set_last_trace_id(project_id: str, trace_id: str) -> None:
+    async with database.async_session() as session:
+        project = await session.get(Project, project_id)
+        if project:
+            project.last_trace_id = trace_id
+            session.add(project)
+            await session.commit()

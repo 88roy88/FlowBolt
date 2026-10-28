@@ -11,6 +11,7 @@ from opik import Span, get_global_client, opik_context
 from opik.types import ErrorInfoDict
 
 from flow44.config import settings
+from flow44.db.project import get_last_trace_id, set_last_trace_id
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,40 @@ def set_trace_output(output: dict[str, Any]) -> None:
 def add_trace_tags(tags: list[str]) -> None:
     if opik_context.get_current_trace_data() is not None:
         opik_context.update_current_trace(tags=tags)
+
+
+async def remember_turn_trace(project_id: str, trace_id: str | None) -> None:
+    """Store the turn's trace so the user's reaction to it can be scored later. Never raises."""
+    if not settings.OPIK_API_KEY or not trace_id:
+        return
+    try:
+        await set_last_trace_id(project_id, trace_id)
+    except Exception:
+        logger.exception("Failed to store last trace id for project %s", project_id)
+
+
+async def last_turn_trace_id(project_id: str) -> str | None:
+    """The trace of the project's latest agent turn, to score the user's reaction onto. Never raises."""
+    if not settings.OPIK_API_KEY:
+        return None
+    try:
+        return await get_last_trace_id(project_id)
+    except Exception:
+        logger.exception("Failed to read last trace id for project %s", project_id)
+        return None
+
+
+def log_trace_feedback(trace_id: str | None, name: str, value: float, reason: str) -> None:
+    """Score a finished trace, e.g. with the user's reaction to that turn. Never raises."""
+    if not settings.OPIK_API_KEY or not trace_id:
+        return
+    try:
+        get_global_client().log_traces_feedback_scores(
+            [{"id": trace_id, "name": name, "value": value, "reason": reason}],
+            project_name=settings.OPIK_PROJECT_NAME,
+        )
+    except Exception:
+        logger.exception("Failed to log Opik feedback score %s on trace %s", name, trace_id)
 
 
 def create_span(**kwargs: Any) -> Span:
