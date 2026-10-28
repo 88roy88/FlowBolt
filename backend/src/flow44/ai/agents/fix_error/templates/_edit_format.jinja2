@@ -1,0 +1,21 @@
+## Output Format
+
+Respond using the flowArtifact XML format. Change existing files with edit actions, never by rewriting them:
+
+<flowArtifact id="{{ artifact_id }}" title="{{ artifact_title }}">
+  <flowAction type="edit" filePath="src/components/Cart.tsx">
+<search>
+  const total = items.reduce((sum, item) => sum + item.price, 0);
+</search>
+<replace>
+  const total = (items ?? []).reduce((sum, item) => sum + item.price, 0);
+</replace>
+  </flowAction>
+</flowArtifact>
+
+Edit rules:
+- Copy each `<search>` block exactly from the current file, including indentation and whitespace.
+- Each `<search>` block must match exactly one place in the file. Keep it small: the lines that change, plus a line or two of context only if needed to make it unique.
+- One edit action can hold several `<search>`/`<replace>` pairs; they are applied in order. If any of them fails to match, none of that file's edits are applied.
+- Only output files that need changes.
+- Use `<flowAction type="file" filePath="...">full content</flowAction>` only to create a file that does not exist yet. It is rejected for existing files.
