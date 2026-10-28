@@ -17,7 +17,7 @@ from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
-from flow44.ai.core.opik_utils import last_turn_trace_id, log_trace_feedback
+from flow44.ai.core.opik_utils import forget_turn_trace, last_turn_trace_id, log_trace_feedback
 from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
@@ -328,6 +328,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     reverted_trace_id = await last_turn_trace_id(project.id)
                     await versioning.handle_action(project.id, msg_type, data)
                     log_trace_feedback(reverted_trace_id, "reverted", 1, "User restored an earlier version")
+                    await forget_turn_trace(project.id)
 
                 else:
                     await versioning.handle_action(project.id, msg_type, data)

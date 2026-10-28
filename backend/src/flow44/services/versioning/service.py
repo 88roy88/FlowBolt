@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from flow44.ai.agents.file_diffs import FileDiff
-from flow44.ai.core.opik_utils import last_turn_trace_id, log_trace_feedback
+from flow44.ai.core.opik_utils import forget_turn_trace, last_turn_trace_id, log_trace_feedback
 from flow44.db.chat import ChatRole, save_message, trim_messages_after
 from flow44.db.events import AgentEvent, emit_event, emit_transient, get_versions, trim_events_after
 from flow44.db.heartbeat import is_run_active, try_claim_run
@@ -170,6 +170,8 @@ async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, a
                 log_trace_feedback(
                     await last_turn_trace_id(project_id), "user_edited", 1, f"User edited {len(diffs)} file(s) by hand"
                 )
+                # Later errors or reverts may come from these edits, so don't pin them on the AI turn.
+                await forget_turn_trace(project_id)
             await _emit_committed(project_id, sha, author=author, diffs=diffs)
         await _emit_dirty_files(project_id, git)
 

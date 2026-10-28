@@ -105,6 +105,16 @@ async def remember_turn_trace(project_id: str, trace_id: str | None) -> None:
         logger.exception("Failed to store last trace id for project %s", project_id)
 
 
+async def forget_turn_trace(project_id: str) -> None:
+    """Stop scoring reactions onto the last turn, e.g. once its code was reverted or hand-edited. Never raises."""
+    if not settings.OPIK_API_KEY:
+        return
+    try:
+        await set_last_trace_id(project_id, None)
+    except Exception:
+        logger.exception("Failed to clear last trace id for project %s", project_id)
+
+
 async def last_turn_trace_id(project_id: str) -> str | None:
     """The trace of the project's latest agent turn, to score the user's reaction onto. Never raises."""
     if not settings.OPIK_API_KEY:

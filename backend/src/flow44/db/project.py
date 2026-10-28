@@ -120,7 +120,7 @@ async def get_last_trace_id(project_id: str) -> str | None:
     return project.last_trace_id if project else None
 
 
-async def set_last_trace_id(project_id: str, trace_id: str) -> None:
+async def set_last_trace_id(project_id: str, trace_id: str | None) -> None:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if project:
