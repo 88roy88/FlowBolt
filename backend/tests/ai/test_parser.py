@@ -208,3 +208,60 @@ class TestActionParserEdgeCases:
         assert "const a = 1;" in files[0][1]
         assert "const b = 2;" in files[0][1]
         assert "CDATA" not in files[0][1]
+
+
+class TestActionParserEdits:
+    def test_edit_pairs_keep_inner_indentation(self) -> None:
+        edits: list[tuple[str, list[tuple[str, str]]]] = []
+        parser = ActionParser(on_edit_action=lambda p, e: edits.append((p, e)))
+
+        parser.feed(
+            '<flowArtifact id="test" title="test">\n'
+            '  <flowAction type="edit" filePath="src/App.tsx">\n'
+            "<search>\n"
+            "    const a = 1;\n"
+            "</search>\n"
+            "<replace>\n"
+            "    const a = 2;\n"
+            "</replace>\n"
+            "<search>const b = 1;</search><replace>const b = 2;</replace>\n"
+            "  </flowAction>\n"
+            "</flowArtifact>"
+        )
+        parser.flush()
+
+        assert edits == [
+            ("src/App.tsx", [("    const a = 1;", "    const a = 2;"), ("const b = 1;", "const b = 2;")]),
+        ]
+
+    def test_edit_trims_closing_tag_indent(self) -> None:
+        edits: list[tuple[str, list[tuple[str, str]]]] = []
+        parser = ActionParser(on_edit_action=lambda p, e: edits.append((p, e)))
+
+        parser.feed(
+            '<flowArtifact id="t" title="t"><flowAction type="edit" filePath="a.ts">'
+            "<search>\n  x\n    </search><replace>\n  y\n    </replace>"
+            "</flowAction></flowArtifact>"
+        )
+        parser.flush()
+
+        assert edits == [("a.ts", [("  x", "  y")])]
+
+    def test_file_and_edit_actions_are_routed_separately(self) -> None:
+        files: list[tuple[str, str]] = []
+        edits: list[tuple[str, list[tuple[str, str]]]] = []
+        parser = ActionParser(
+            on_file_action=lambda p, c: files.append((p, c)),
+            on_edit_action=lambda p, e: edits.append((p, e)),
+        )
+
+        parser.feed(
+            '<flowArtifact id="t" title="t">'
+            '<flowAction type="file" filePath="new.ts">export const x = 1;</flowAction>'
+            '<flowAction type="edit" filePath="old.ts"><search>a</search><replace>b</replace></flowAction>'
+            "</flowArtifact>"
+        )
+        parser.flush()
+
+        assert files == [("new.ts", "export const x = 1;")]
+        assert edits == [("old.ts", [("a", "b")])]
