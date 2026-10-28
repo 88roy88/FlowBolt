@@ -8,12 +8,15 @@ from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, 
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from flow44.auth.permissions import (
+    DisplayRole,
+    ImplicitRole,
     Permission,
     Role,
     get_admin_permissions,
     get_owner_permissions,
     get_role_permissions,
     has_permission,
+    highest_role,
 )
 from flow44.config import settings
 from flow44.db.platform_user import is_platform_user as db_is_platform_user
@@ -128,6 +131,25 @@ def is_admin(user_id: str) -> bool:
     return user_id in settings.SYSTEM_ADMIN_IDS
 
 
+def resolve_role(project: Project, user_id: str, granted_role: Role | None) -> DisplayRole | None:
+    if project.user_id == user_id:
+        return ImplicitRole.owner
+    if is_admin(user_id):
+        return ImplicitRole.admin
+    return granted_role
+
+
+async def get_project_role(project: Project, user_id: str) -> DisplayRole | None:
+    if role := resolve_role(project, user_id, None):
+        return role
+    member = await get_project_member(project.id, user_id)
+    grants = await list_project_groups(project.id)
+    user_group_ids = await directory_client.get_user_group_ids(user_id) if grants else set()
+    roles = [Role(member.role)] if member else []
+    roles += [Role(grant.role) for grant in grants if grant.group_id in user_group_ids]
+    return highest_role(roles)
+
+
 async def resolve_group_permissions(project_id: str, user_id: str) -> set[Permission]:
     grants = await list_project_groups(project_id)
     if not grants:
@@ -176,6 +198,14 @@ async def resolve_project_permissions(project: Project, user_id: str) -> set[Per
     permissions = await _resolve_project_permissions(project, user_id)
     _perm_cache_per_request.set(((project.id, user_id), permissions))
     return permissions
+
+
+def terminal_admin_only() -> bool:
+    return settings.SANDBOX_MODE == "local"
+
+
+def can_use_terminal(user_id: str) -> bool:
+    return not terminal_admin_only() or is_admin(user_id)
 
 
 async def get_project(project_id: str, user_id: UserDep) -> Project:

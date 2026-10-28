@@ -12,6 +12,13 @@ You are an expert React/TypeScript developer. Fix the following error:
 {{ error_stack[:500] }}
 ```
 {% endif %}
+{% if "API error" in error_message %}
+
+## Data Source Failure
+This error was thrown by `fetchDataSource` (`src/api/client.ts`): the data source request failed, and the response body is included in the message. `src/api/` and `src/dataSources/` are generated and must not be modified. Instead:
+- Find the component that calls the failing `dataSource*` function and wrap the call with error handling (`.catch` / `try`/`catch`) that shows a readable error state instead of crashing.
+- Make sure the call passes the parameters the function expects, especially if the error body points to a bad or missing one.
+{% endif %}
 
 ## Current Files
 {% for path, content in files.items() %}

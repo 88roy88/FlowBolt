@@ -26,5 +26,24 @@ export async function fetchDataSource(path: string, body?: Record<string, unknow
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   };
-  return fetchWithAuth(path, options);
+  const res = await fetchWithAuth(path, options);
+  if (!res.ok) {
+    const detail = (await res.text()) || res.statusText || 'request failed';
+    throw new Error(`API error ${res.status}: ${detail}`);
+  }
+  return res;
+}
+
+/** Turns ISO date strings in the given fields into Date objects, in place. */
+export function convertDateFields(rows: object[] | undefined, fields: string[]): void {
+  try {
+    for (const row of rows ?? []) {
+      const record = row as Record<string, unknown>;
+      for (const field of fields) {
+        if (record[field] != null) record[field] = new Date(record[field] as string);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to convert date fields', e);
+  }
 }
