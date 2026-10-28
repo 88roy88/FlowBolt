@@ -21,6 +21,7 @@ import pkg22 from './mocks/22-name-search.js';
 import pkg23 from './mocks/23-person-by-name.js';
 import pkg24 from './mocks/24-people-by-ids.js';
 import pkg25 from './mocks/25-all-param-types.js';
+import pkg26 from './mocks/26-coinflip.js';
 
 const allPackages: MockPackage[] = [
   pkg01,
@@ -45,6 +46,7 @@ const allPackages: MockPackage[] = [
   pkg23,
   pkg24,
   pkg25,
+  pkg26,
 ];
 
 export const packageById = new Map(allPackages.map((pkg) => [String(pkg.id), pkg]));
