@@ -1,5 +1,3 @@
-"""Pydantic models for InterviewAgent: clarifying questions and their answers."""
-
 import logging
 from typing import Any
 

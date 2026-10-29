@@ -1,5 +1,3 @@
-"""Tests for the interview agent's clarifying questions and handoff."""
-
 from __future__ import annotations
 
 import json
@@ -114,7 +112,7 @@ class TestRun:
         assert saved == []
         assert not any(e["type"] == "interview_questions" for e in emitted)
 
-    async def test_generation_failure_hands_over(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_generation_failure_propagates(self, monkeypatch: pytest.MonkeyPatch) -> None:
         agent, _emitted, _saved = _make_agent(monkeypatch)
         host = _Host()
 
@@ -123,9 +121,10 @@ class TestRun:
 
         monkeypatch.setattr(interview_agent_module, "complete_chat", _complete_chat)
 
-        await agent.run("build something", gather_context=host.gather_context, continue_with=host.continue_with)
+        with pytest.raises(RuntimeError, match="llm down"):
+            await agent.run("build something", gather_context=host.gather_context, continue_with=host.continue_with)
 
-        assert host.continued == [host.state]
+        assert host.continued == []
 
     async def test_invalid_payload_hands_over(self, monkeypatch: pytest.MonkeyPatch) -> None:
         agent, _emitted, _saved = _make_agent(monkeypatch)
@@ -331,6 +330,27 @@ class TestResume:
 
         assert "Analytics-first (Dense tables, muted colours)" in state.user_content
         assert "Who is this for?: no preference given" in state.user_content
+
+    async def test_blank_submit_marks_every_question_unanswered(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        agent, _emitted, _saved = _make_agent(monkeypatch)
+        host = _Host()
+
+        state = BuildState(project_id="proj-1", user_content="build a dashboard")
+        state.interview_questions = [
+            InterviewQuestion(
+                id=qid,
+                header="H",
+                question=text,
+                options=[InterviewOption(label="A", description="a"), InterviewOption(label="B", description="b")],
+            )
+            for qid, text in (("q-1", "Who is this for?"), ("q-2", "What look?"))
+        ]
+        blank = [InterviewAnswer(question_id="q-1", values=[]), InterviewAnswer(question_id="q-2", values=[])]
+
+        await agent.resume(state, blank, continue_with=host.continue_with)
+
+        assert "Who is this for?: no preference given" in state.user_content
+        assert "What look?: no preference given" in state.user_content
 
     async def test_skip_leaves_request_untouched(self, monkeypatch: pytest.MonkeyPatch) -> None:
         agent, _emitted, _saved = _make_agent(monkeypatch)

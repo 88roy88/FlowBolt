@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
 from flow44.ai.agents.interview.models import InterviewOption, InterviewQuestion
+from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.state import BuildState
 from flow44.main import app
 
@@ -36,7 +38,7 @@ def _connect_and_send(payload: dict[str, object], state: BuildState) -> dict[str
     return _connect_and_send_all([payload], state)[0]
 
 
-def _connect_and_send_all(payloads: list[dict[str, object]], state: BuildState) -> list[dict[str, object]]:
+def _connect_and_send_all(payloads: list[Any], state: BuildState) -> list[dict[str, object]]:
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
     sandbox = MagicMock()
 
@@ -88,6 +90,39 @@ def test_interview_response_rejects_malformed_answer_payload() -> None:
     )
     assert response["type"] == "error"
     assert str(response["message"]).startswith("Invalid payload:")
+
+
+def test_non_object_frame_does_not_kill_the_session() -> None:
+    state = BuildState(project_id="proj-123", phase="awaiting_interview")
+    responses = _connect_and_send_all([[], {"type": "interview_response", "action": "submitt"}], state)
+    assert responses[0] == {"type": "error", "message": "Invalid payload"}
+    assert responses[1] == {"type": "error", "message": "Invalid interview action"}
+
+
+def test_message_without_mode_skips_the_interview() -> None:
+    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+
+    with (
+        patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=_mock_project()),
+        patch("flow44.api.deps.get_project_member", new_callable=AsyncMock, return_value=object()),
+        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"),
+        patch("flow44.api.chat.sandbox_manager") as mock_mgr,
+        patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
+        patch("flow44.api.chat.subscribe", return_value=queue),
+        patch("flow44.api.chat.unsubscribe"),
+        patch("flow44.api.chat._is_new_project", new_callable=AsyncMock, return_value=True),
+        patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as mock_start_turn,
+        patch("flow44.api.chat.InterviewAgent") as mock_interview_agent,
+    ):
+        mock_mgr.wake_sandbox = AsyncMock(return_value=MagicMock(project_id="proj-123"))
+        with client.websocket_connect("/ws/chat/proj-123", headers={"cookie": "flow44_token=test-token"}) as ws:
+            ws.send_json({"type": "message", "content": "build a todo app"})
+            ws.send_json({"type": "interview_response", "action": "submitt"})
+            ws.receive_json()
+
+    assert mock_start_turn.await_count == 1
+    assert isinstance(mock_start_turn.call_args.args[1].func.__self__, PlanAgent)
+    mock_interview_agent.assert_not_called()
 
 
 def test_non_iterable_answers_do_not_kill_the_session() -> None:

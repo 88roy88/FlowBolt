@@ -294,6 +294,25 @@ describe('createSendMessageHandler — interview flow', () => {
     expect(card.answers[0].values).toEqual(['Me']);
   });
 
+  it('an error while awaiting the interview keeps the questions and phase', () => {
+    handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
+    handler(msg({ type: 'error', message: 'refused' }));
+
+    expect(store.state().interviewQuestions).toEqual(QUESTIONS);
+    expect(store.state().agentPhase).toBe('awaiting_interview');
+    expect(store.state().isStreaming).toBe(false);
+    expect(store.state().error).toBe('refused');
+  });
+
+  it('an error in another phase resets the phase and questions', () => {
+    handler(msg({ type: 'phase', phase: 'planning' }));
+    handler(msg({ type: 'error', message: 'boom' }));
+
+    expect(store.state().interviewQuestions).toBeNull();
+    expect(store.state().agentPhase).toBe('idle');
+    expect(store.state().error).toBe('boom');
+  });
+
   it('interview_questions is replay-safe (no card added, state set)', () => {
     const replayStore = createTestStore();
     const replayHandler = createSendMessageHandler(

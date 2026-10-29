@@ -25,6 +25,7 @@ vi.mock('../session', () => ({
 }));
 
 import { useChatStore } from '../chat';
+import { fetchAgentEvents } from '../../services/api';
 
 describe('chatStore interviewMode', () => {
   beforeEach(() => {
@@ -34,6 +35,13 @@ describe('chatStore interviewMode', () => {
   it('keeps the selected mode while the project stays open', () => {
     useChatStore.getState().setInterviewMode('build');
     useChatStore.getState().sendMessage('build me a todo app');
+    expect(useChatStore.getState().interviewMode).toBe('build');
+  });
+
+  it('keeps the selected mode across loadHistory', async () => {
+    vi.mocked(fetchAgentEvents).mockResolvedValue([]);
+    useChatStore.getState().setInterviewMode('build');
+    await useChatStore.getState().loadHistory('proj-1');
     expect(useChatStore.getState().interviewMode).toBe('build');
   });
 

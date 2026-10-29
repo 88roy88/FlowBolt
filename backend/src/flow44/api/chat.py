@@ -229,7 +229,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     user_content: str = data["content"]
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
-                    mode: str = data.get("mode", "interview")
+                    mode: str = data.get("mode", "build")
 
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                     if ds_ids:
@@ -244,6 +244,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                         ]
 
+                    source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
                     agent_cls = PlanAgent if await _is_new_project(project.id) else FollowUpAgent
                     agent = agent_cls(
                         project_id=project.id,
@@ -252,9 +253,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                         user_id=user_id,
                         data_source_authorization=data_source_authorization,
                     )
-                    source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
                     run = partial(agent.run, user_content, data_source_ids=source_ids)
-                    if isinstance(agent, PlanAgent) and mode != "build":
+                    if isinstance(agent, PlanAgent) and mode == "interview":
                         interview_agent = InterviewAgent(
                             project_id=project.id,
                             sandbox=sandbox,
@@ -335,18 +335,16 @@ async def chat_ws(  # noqa: C901, PLR0915
                         else []
                     )
 
+                    model = selected_model or state.model
                     plan_agent = PlanAgent(
                         project_id=project.id,
                         sandbox=sandbox,
-                        model=selected_model or state.model,
+                        model=model,
                         user_id=user_id,
                         data_source_authorization=data_source_authorization,
                     )
                     interview_agent = InterviewAgent(
-                        project_id=project.id,
-                        sandbox=sandbox,
-                        model=selected_model or state.model,
-                        user_id=user_id,
+                        project_id=project.id, sandbox=sandbox, model=model, user_id=user_id
                     )
                     await _start_turn(
                         project.id,
@@ -402,7 +400,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                 await websocket.send_json(_VERSION_FAILED)
             except ValidationError as exc:
                 await websocket.send_json({"type": "error", "message": f"Invalid payload: {exc.errors()[0]['msg']}"})
-            except (TypeError, KeyError, ValueError):
+            except (TypeError, KeyError, ValueError, AttributeError):
                 logger.warning("[chat] Malformed %s frame for session %s", msg_type, project.id, exc_info=True)
                 await websocket.send_json({"type": "error", "message": "Invalid payload"})
 

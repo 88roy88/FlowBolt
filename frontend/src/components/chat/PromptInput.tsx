@@ -10,6 +10,17 @@ import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
+import type { AgentPhase } from '../../types';
+
+const PHASE_LABEL_KEYS: Partial<Record<AgentPhase, string>> = {
+  fetching_data_sources: 'chat.phase.fetchingDataSources',
+  interviewing: 'chat.phase.interviewing',
+  designing: 'chat.phase.designing',
+  planning: 'chat.phase.planning',
+  executing: 'chat.phase.building',
+  fixing: 'chat.phase.fixing',
+  exploring: 'chat.phase.exploring',
+};
 
 export function PromptInput() {
   const { t } = useTranslation();
@@ -79,15 +90,7 @@ export function PromptInput() {
   };
   const placeholder = placeholderText();
 
-  const busyLabel =
-    agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
-    agentPhase === 'interviewing' ? t('chat.phase.interviewing') :
-    agentPhase === 'designing' ? t('chat.phase.designing') :
-    agentPhase === 'planning' ? t('chat.phase.planning') :
-    agentPhase === 'executing' ? t('chat.phase.building') :
-    agentPhase === 'fixing' ? t('chat.phase.fixing') :
-    agentPhase === 'exploring' ? t('chat.phase.exploring') :
-    t('chat.phase.thinking');
+  const busyLabel = t(PHASE_LABEL_KEYS[agentPhase] ?? 'chat.phase.thinking');
 
   return (
     <div className="px-4 pt-2 pb-4 shrink-0">

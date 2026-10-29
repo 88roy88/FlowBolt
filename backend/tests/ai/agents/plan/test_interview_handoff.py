@@ -1,5 +1,3 @@
-"""Tests for the two PlanAgent methods the interview agent hands work through."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace

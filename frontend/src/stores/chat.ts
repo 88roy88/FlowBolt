@@ -99,7 +99,6 @@ const PROJECT_RESET_STATE = {
   historyLoaded: false,
   buildCompleted: false,
   agentAlive: null,
-  interviewMode: 'interview' as InterviewMode,
 };
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -261,9 +260,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!projectId) return;
 
     const socket = getChatSocket(projectId);
+    const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
+    attachHandler(projectId, socket, handler);
     socket.send({ type: 'interview_response', action, answers });
 
-    set({ isStreaming: true, agentAlive: true, agentPhase: AGENT_PHASE.interviewing, interviewQuestions: null });
+    set({ isStreaming: true, agentAlive: true });
     startAgentAlivePolling(projectId);
   },
 
@@ -323,7 +324,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearMessages() {
     stopAgentAlivePolling();
-    set(PROJECT_RESET_STATE);
+    set({ ...PROJECT_RESET_STATE, interviewMode: 'interview' });
     useVersionStore.getState().reset();
   },
 

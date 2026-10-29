@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Awaitable, Callable
 
 from opik import track
@@ -16,8 +15,6 @@ from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
 from flow44.db.pending_plan import save_pending_plan
 
-logger = logging.getLogger(__name__)
-
 GatherContext = Callable[[str, list[str] | None], Awaitable[BuildState]]
 ContinueWith = Callable[[BuildState], Awaitable[None]]
 
@@ -28,9 +25,9 @@ def _describe_values(question: InterviewQuestion, values: list[str]) -> str:
 
 
 def _format_clarifications(questions: list[InterviewQuestion], answers: list[InterviewAnswer]) -> str:
-    chosen = {a.question_id: a.values for a in answers if a.values}
-    if not chosen:
+    if not answers:
         return ""
+    chosen = {a.question_id: a.values for a in answers if a.values}
     lines = [
         f"- {q.question}: {_describe_values(q, chosen[q.id])}"
         if q.id in chosen
@@ -93,15 +90,10 @@ class InterviewAgent(BaseAgent):
 
     @track(name="generate-interview")  # type: ignore[untyped-decorator]
     async def _generate_questions(self, state: BuildState) -> list[InterviewQuestion]:
-        try:
-            raw = await complete_chat(
-                [Message.user(state.user_content)],
-                render_interview(data_source_contexts=state.data_source_contexts or None),
-                model=self.model,
-                metadata=self._llm_metadata("generate_interview"),
-            )
-            payload = InterviewQuestionsPayload.model_validate(parse_json_response(raw))
-        except Exception:
-            logger.exception("[interview] Question generation failed")
-            return []
-        return payload.questions
+        raw = await complete_chat(
+            [Message.user(state.user_content)],
+            render_interview(data_source_contexts=state.data_source_contexts or None),
+            model=self.model,
+            metadata=self._llm_metadata("generate_interview"),
+        )
+        return InterviewQuestionsPayload.model_validate(parse_json_response(raw)).questions

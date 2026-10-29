@@ -68,9 +68,12 @@ class PlanAgent(BaseAgent):
         await self._flow.run(self._make_plan_state(), start=start_step)
         self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
 
-    def _begin(self, content: str, data_source_ids: list[str] | None, tags: list[str]) -> None:
+    def _set_input(self, content: str, data_source_ids: list[str] | None) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
+
+    def _begin(self, content: str, data_source_ids: list[str] | None, tags: list[str]) -> None:
+        self._set_input(content, data_source_ids)
         self._setup_trace(tags)
 
     @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
@@ -81,8 +84,7 @@ class PlanAgent(BaseAgent):
     @track(name="plan-agent-prefetch")  # type: ignore[untyped-decorator]
     async def prefetch_data_sources(self, content: str, data_source_ids: list[str] | None = None) -> BuildState:
         # No _setup_trace: this runs nested inside another agent's trace, and setup_trace retags the current one.
-        self._state.user_content = content
-        self._state.data_source_ids = data_source_ids or []
+        self._set_input(content, data_source_ids)
 
         if self._state.data_source_ids:
             await self._step_fetch_data_sources(self._make_plan_state())

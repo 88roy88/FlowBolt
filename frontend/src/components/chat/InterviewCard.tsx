@@ -31,16 +31,16 @@ export function InterviewCard({ questions }: InterviewCardProps) {
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [otherText, setOtherText] = useState<Record<string, string>>({});
-  const [otherFocusedId, setOtherFocusedId] = useState('');
+  const isStreaming = useChatStore((s) => s.isStreaming);
 
   const q = questions[step];
   const isLast = step === questions.length - 1;
   const cur = selected[q.id] ?? [];
-  const otherActive = !!(otherText[q.id] ?? '').trim() || otherFocusedId === q.id;
+  const otherActive = !!(otherText[q.id] ?? '').trim();
 
-  const focusOther = () => {
-    setOtherFocusedId(q.id);
-    if (!q.multi_select) {
+  const changeOther = (value: string) => {
+    setOtherText((prev) => ({ ...prev, [q.id]: value }));
+    if (!q.multi_select && value.trim()) {
       setSelected((prev) => ({ ...prev, [q.id]: [] }));
     }
   };
@@ -106,6 +106,7 @@ export function InterviewCard({ questions }: InterviewCardProps) {
                 key={opt.label}
                 type="button"
                 onClick={() => toggle(opt.label)}
+                disabled={isStreaming}
                 aria-pressed={active}
                 className={`w-full flex items-start gap-2 px-2.5 py-1.5 text-start rounded-lg border text-[13px] transition-colors ${
                   active ? 'border-primary bg-accent-bg-strong' : 'border-border hover:bg-muted/50'
@@ -121,7 +122,7 @@ export function InterviewCard({ questions }: InterviewCardProps) {
           })}
 
           <label
-            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-text transition-colors ${
+            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-text transition-colors focus-within:border-primary focus-within:bg-accent-bg-strong ${
               otherActive ? 'border-primary bg-accent-bg-strong' : 'border-border hover:bg-muted/50'
             }`}
           >
@@ -130,13 +131,12 @@ export function InterviewCard({ questions }: InterviewCardProps) {
             <input
               dir="auto"
               value={otherText[q.id] ?? ''}
-              onFocus={focusOther}
-              onBlur={() => setOtherFocusedId('')}
-              onChange={(e) => setOtherText((prev) => ({ ...prev, [q.id]: e.target.value }))}
+              disabled={isStreaming}
+              onChange={(e) => changeOther(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key !== 'Enter') return;
                 e.preventDefault();
-                advance();
+                if (otherActive) advance();
               }}
               placeholder={t('chat.interview.other')}
               aria-label={t('chat.interview.other')}
@@ -148,21 +148,21 @@ export function InterviewCard({ questions }: InterviewCardProps) {
 
       <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-border">
         {step > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => setStep((s) => s - 1)} className="text-muted-foreground">
+          <Button variant="ghost" size="sm" disabled={isStreaming} onClick={() => setStep((s) => s - 1)} className="text-muted-foreground">
             <ChevronLeft size={13} className="rtl:rotate-180" />
             {t('chat.interview.back')}
           </Button>
         )}
-        <Button variant="ghost" size="sm" onClick={() => respondToInterview('skip')} className="ms-auto text-muted-foreground">
+        <Button variant="ghost" size="sm" disabled={isStreaming} onClick={() => respondToInterview('skip')} className="ms-auto text-muted-foreground">
           {t('chat.interview.skipAll')}
         </Button>
         {isLast ? (
-          <Button variant="success" size="sm" onClick={submit}>
+          <Button variant="success" size="sm" disabled={isStreaming} onClick={advance}>
             <Check size={13} />
             {t('chat.interview.submit')}
           </Button>
         ) : (
-          <Button variant="success" size="sm" onClick={() => setStep((s) => s + 1)}>
+          <Button variant="success" size="sm" disabled={isStreaming} onClick={advance}>
             {t('chat.interview.next')}
             <ChevronRight size={13} className="rtl:rotate-180" />
           </Button>

@@ -91,8 +91,9 @@ function handleText(msg: { content: string }, set: SetState) {
   }));
 }
 
-function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
-  set({ ...getTransientReset(), agentAlive: false, error: msg.message });
+function handleError(msg: { message: string }, set: SetState, get: GetState, cleanup: () => void) {
+  const reset = get().agentPhase === AGENT_PHASE.awaiting_interview ? { isStreaming: false } : getTransientReset();
+  set({ ...reset, agentAlive: false, error: msg.message });
   if (!_skipMessages) {
     notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
   }
@@ -166,7 +167,7 @@ export function createFixErrorHandler(
         break;
 
       case 'error':
-        handleError(msg, set, cleanup);
+        handleError(msg, set, get, cleanup);
         break;
 
       case 'action_complete': {
@@ -325,7 +326,7 @@ export function createSendMessageHandler(
         break;
 
       case 'error':
-        handleError(msg, set, cleanup);
+        handleError(msg, set, get, cleanup);
         break;
 
       case 'action_complete':
