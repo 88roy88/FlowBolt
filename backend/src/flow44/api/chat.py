@@ -18,7 +18,7 @@ from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.interview.agent import InterviewAgent
-from flow44.ai.agents.interview.models import InterviewAnswer
+from flow44.ai.agents.interview.models import InterviewAnswer, InterviewSession
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.state import BuildState
@@ -27,7 +27,7 @@ from flow44.config import settings
 from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
 from flow44.db.events import emit_event, get_events, get_latest_event, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
-from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
+from flow44.db.paused_turn import clear_paused_turn, get_paused_turn
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
@@ -205,16 +205,27 @@ async def chat_ws(  # noqa: C901, PLR0915
         except Exception:
             logger.debug("Event forwarding stopped for session %s", project.id)
 
-    async def _pending_state(phase: str, missing: str, wrong_phase: str) -> BuildState | None:
-        state_json = await get_pending_plan(project.id)
-        if state_json is None:
+    async def _paused_state(phase: str, missing: str, wrong_phase: str) -> str | None:
+        turn = await get_paused_turn(project.id)
+        if turn is None:
             await websocket.send_json({"type": "error", "message": missing})
             return None
-        state = BuildState.model_validate_json(state_json)
-        if state.phase != phase:
+        if turn.phase != phase:
             await websocket.send_json({"type": "error", "message": wrong_phase})
             return None
-        return state
+        return turn.state_json
+
+    paused_agents = {
+        "plan": lambda model: (
+            PlanAgent(
+                project_id=project.id,
+                sandbox=sandbox,
+                model=model,
+                user_id=user_id,
+                data_source_authorization=data_source_authorization,
+            ).run_from_design
+        )
+    }
 
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
@@ -266,6 +277,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             user_content,
                             source_ids,
                             gather_context=agent.prefetch_data_sources,
+                            paused_agent="plan",
                             continue_with=agent.run_from_design,
                         )
                     # Claim first: a refused turn must not leave the message behind.
@@ -280,13 +292,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                     feedback = data.get("feedback")
                     selected_model = data.get("model")
 
-                    state = await _pending_state(
+                    state_json = await _paused_state(
                         "awaiting_approval",
                         "No pending plan found",
                         "Plan response is only allowed while awaiting approval",
                     )
-                    if state is None:
+                    if state_json is None:
                         continue
+                    state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
                         execute_agent = ExecuteAgent(
@@ -300,7 +313,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         await _start_turn(
                             project.id,
                             execute_agent.run,
-                            prepare=partial(delete_pending_plan, project.id),
+                            prepare=partial(clear_paused_turn, project.id),
                         )
 
                     elif action == "modify" and feedback:
@@ -321,13 +334,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                         await websocket.send_json({"type": "error", "message": "Invalid interview action"})
                         continue
 
-                    state = await _pending_state(
+                    state_json = await _paused_state(
                         "awaiting_interview",
                         "No pending interview found",
                         "Interview response is only allowed while awaiting interview",
                     )
-                    if state is None:
+                    if state_json is None:
                         continue
+                    session = InterviewSession.model_validate_json(state_json)
 
                     answers = (
                         [InterviewAnswer.model_validate(a) for a in data.get("answers") or []]
@@ -335,20 +349,18 @@ async def chat_ws(  # noqa: C901, PLR0915
                         else []
                     )
 
-                    model = selected_model or state.model
-                    plan_agent = PlanAgent(
-                        project_id=project.id,
-                        sandbox=sandbox,
-                        model=model,
-                        user_id=user_id,
-                        data_source_authorization=data_source_authorization,
-                    )
+                    model = selected_model or session.model
                     interview_agent = InterviewAgent(
                         project_id=project.id, sandbox=sandbox, model=model, user_id=user_id
                     )
                     await _start_turn(
                         project.id,
-                        partial(interview_agent.resume, state, answers, continue_with=plan_agent.run_from_design),
+                        partial(
+                            interview_agent.resume,
+                            session,
+                            answers,
+                            continue_with=paused_agents[session.paused_agent](model),
+                        ),
                     )
 
                 elif msg_type == "fix_error":

@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable
+from typing import Protocol
 
 from opik import track
 
@@ -7,16 +8,25 @@ from flow44.ai.agents.interview.models import (
     InterviewAnswer,
     InterviewQuestion,
     InterviewQuestionsPayload,
+    InterviewSession,
 )
 from flow44.ai.agents.interview.prompts import render_interview
 from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
-from flow44.ai.state import BuildState
-from flow44.db.pending_plan import save_pending_plan
+from flow44.db.paused_turn import pause_turn
+from flow44.db.project_data_source import DataSourceContext
 
-GatherContext = Callable[[str, list[str] | None], Awaitable[BuildState]]
-ContinueWith = Callable[[BuildState], Awaitable[None]]
+Continue = Callable[[str, str], Awaitable[None]]
+
+
+class PausedState(Protocol):
+    data_source_contexts: list[DataSourceContext]
+
+    def model_dump_json(self) -> str: ...
+
+
+GatherContext = Callable[[str, list[str] | None], Awaitable[PausedState]]
 
 
 def _describe_values(question: InterviewQuestion, values: list[str]) -> str:
@@ -45,54 +55,59 @@ class InterviewAgent(BaseAgent):
         data_source_ids: list[str] | None = None,
         *,
         gather_context: GatherContext,
-        continue_with: ContinueWith,
+        paused_agent: str,
+        continue_with: Continue,
     ) -> None:
         self._setup_trace(["interview-agent"])
 
         state = await gather_context(content, data_source_ids)
         await self.emit({"type": "phase", "phase": "interviewing"})
-        questions = await self._generate_questions(state)
+        questions = await self._generate_questions(content, state.data_source_contexts)
 
         if not questions:
-            await continue_with(state)
+            await continue_with(content, state.model_dump_json())
             return
 
-        state.interview_questions = questions
-        state.phase = "awaiting_interview"
-        await save_pending_plan(self.project_id, state.model_dump_json())
+        session = InterviewSession(
+            content=content,
+            questions=questions,
+            paused_agent=paused_agent,
+            paused_state=state.model_dump_json(),
+            model=self.model,
+        )
+        await pause_turn(self.project_id, "awaiting_interview", session.model_dump_json())
         await self.emit({"type": "phase", "phase": "awaiting_interview"})
         await self.emit({"type": "interview_questions", "questions": [q.model_dump() for q in questions]})
 
-    @track(name="interview-agent-resume", ignore_arguments=["state"])  # type: ignore[untyped-decorator]
+    @track(name="interview-agent-resume", ignore_arguments=["session"])  # type: ignore[untyped-decorator]
     async def resume(
         self,
-        state: BuildState,
+        session: InterviewSession,
         answers: list[InterviewAnswer],
         *,
-        continue_with: ContinueWith,
+        continue_with: Continue,
     ) -> None:
         self._setup_trace(["interview-agent", "resume"])
-
-        state.interview_answers = answers
-        clarifications = _format_clarifications(state.interview_questions, answers)
-        if clarifications:
-            state.user_content = f"{state.user_content}\n\n{clarifications}"
 
         await self.emit(
             {
                 "type": "interview_answered",
-                "questions": [q.model_dump() for q in state.interview_questions],
+                "questions": [q.model_dump() for q in session.questions],
                 "answers": [a.model_dump() for a in answers],
             }
         )
 
-        await continue_with(state)
+        clarifications = _format_clarifications(session.questions, answers)
+        content = f"{session.content}\n\n{clarifications}" if clarifications else session.content
+        await continue_with(content, session.paused_state)
 
     @track(name="generate-interview")  # type: ignore[untyped-decorator]
-    async def _generate_questions(self, state: BuildState) -> list[InterviewQuestion]:
+    async def _generate_questions(
+        self, content: str, data_source_contexts: list[DataSourceContext]
+    ) -> list[InterviewQuestion]:
         raw = await complete_chat(
-            [Message.user(state.user_content)],
-            render_interview(data_source_contexts=state.data_source_contexts or None),
+            [Message.user(content)],
+            render_interview(data_source_contexts=data_source_contexts or None),
             model=self.model,
             metadata=self._llm_metadata("generate_interview"),
         )

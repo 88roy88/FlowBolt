@@ -6,9 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from flow44.ai.agents.interview.models import InterviewOption, InterviewQuestion
+from flow44.ai.agents.interview.models import InterviewOption, InterviewQuestion, InterviewSession
 from flow44.ai.agents.plan.agent import PlanAgent
-from flow44.ai.state import BuildState
 from flow44.main import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -34,11 +33,18 @@ def _base_interview_question() -> InterviewQuestion:
     )
 
 
-def _connect_and_send(payload: dict[str, object], state: BuildState) -> dict[str, object]:
-    return _connect_and_send_all([payload], state)[0]
+def _turn(phase: str) -> MagicMock:
+    session = InterviewSession(
+        content="build a todo app", questions=[_base_interview_question()], paused_agent="plan", paused_state="{}"
+    )
+    return MagicMock(phase=phase, state_json=session.model_dump_json())
 
 
-def _connect_and_send_all(payloads: list[Any], state: BuildState) -> list[dict[str, object]]:
+def _connect_and_send(payload: dict[str, object], phase: str) -> dict[str, object]:
+    return _connect_and_send_all([payload], phase)[0]
+
+
+def _connect_and_send_all(payloads: list[Any], phase: str) -> list[dict[str, object]]:
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
     sandbox = MagicMock()
 
@@ -50,7 +56,7 @@ def _connect_and_send_all(payloads: list[Any], state: BuildState) -> list[dict[s
         patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
         patch("flow44.api.chat.subscribe", return_value=queue),
         patch("flow44.api.chat.unsubscribe"),
-        patch("flow44.api.chat.get_pending_plan", new_callable=AsyncMock, return_value=state.model_dump_json()),
+        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=_turn(phase)),
         patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as mock_start_turn,
     ):
         mock_mgr.wake_sandbox = AsyncMock(return_value=sandbox)
@@ -64,37 +70,31 @@ def _connect_and_send_all(payloads: list[Any], state: BuildState) -> list[dict[s
 
 
 def test_plan_response_rejected_while_awaiting_interview() -> None:
-    state = BuildState(project_id="proj-123", phase="awaiting_interview")
-    response = _connect_and_send({"type": "plan_response", "action": "accept"}, state)
+    response = _connect_and_send({"type": "plan_response", "action": "accept"}, "awaiting_interview")
     assert response == {"type": "error", "message": "Plan response is only allowed while awaiting approval"}
 
 
 def test_interview_response_rejected_while_awaiting_approval() -> None:
-    state = BuildState(project_id="proj-123", phase="awaiting_approval")
-    response = _connect_and_send({"type": "interview_response", "action": "skip"}, state)
+    response = _connect_and_send({"type": "interview_response", "action": "skip"}, "awaiting_approval")
     assert response == {"type": "error", "message": "Interview response is only allowed while awaiting interview"}
 
 
 def test_interview_response_rejects_invalid_action() -> None:
-    state = BuildState(project_id="proj-123", phase="awaiting_interview")
-    response = _connect_and_send({"type": "interview_response", "action": "submitt"}, state)
+    response = _connect_and_send({"type": "interview_response", "action": "submitt"}, "awaiting_interview")
     assert response == {"type": "error", "message": "Invalid interview action"}
 
 
 def test_interview_response_rejects_malformed_answer_payload() -> None:
-    state = BuildState(project_id="proj-123", phase="awaiting_interview")
-    state.interview_questions = [_base_interview_question()]
     response = _connect_and_send(
         {"type": "interview_response", "action": "submit", "answers": [{"values": ["Me"]}]},
-        state,
+        "awaiting_interview",
     )
     assert response["type"] == "error"
     assert str(response["message"]).startswith("Invalid payload:")
 
 
 def test_non_object_frame_does_not_kill_the_session() -> None:
-    state = BuildState(project_id="proj-123", phase="awaiting_interview")
-    responses = _connect_and_send_all([[], {"type": "interview_response", "action": "submitt"}], state)
+    responses = _connect_and_send_all([[], {"type": "interview_response", "action": "submitt"}], "awaiting_interview")
     assert responses[0] == {"type": "error", "message": "Invalid payload"}
     assert responses[1] == {"type": "error", "message": "Invalid interview action"}
 
@@ -126,13 +126,12 @@ def test_message_without_mode_skips_the_interview() -> None:
 
 
 def test_non_iterable_answers_do_not_kill_the_session() -> None:
-    state = BuildState(project_id="proj-123", phase="awaiting_interview")
     responses = _connect_and_send_all(
         [
             {"type": "interview_response", "action": "submit", "answers": 5},
             {"type": "interview_response", "action": "submitt"},
         ],
-        state,
+        "awaiting_interview",
     )
     assert responses[0] == {"type": "error", "message": "Invalid payload"}
     assert responses[1] == {"type": "error", "message": "Invalid interview action"}

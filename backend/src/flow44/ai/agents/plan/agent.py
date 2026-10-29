@@ -8,14 +8,18 @@ from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
-from flow44.ai.agents.plan.prompts import UX_DESIGN_PROMPT, render_architecture, render_user_plan
+from flow44.ai.agents.plan.prompts import (
+    UX_DESIGN_PROMPT,
+    render_architecture,
+    render_user_plan,
+)
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
-from flow44.db.pending_plan import save_pending_plan
+from flow44.db.paused_turn import pause_turn
 from flow44.sandbox.main import PnpmSandbox
 from flow44.services.logging.helpers import bi_logger
 
@@ -72,13 +76,10 @@ class PlanAgent(BaseAgent):
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
 
-    def _begin(self, content: str, data_source_ids: list[str] | None, tags: list[str]) -> None:
-        self._set_input(content, data_source_ids)
-        self._setup_trace(tags)
-
     @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
-        self._begin(content, data_source_ids, ["plan-agent"])
+        self._set_input(content, data_source_ids)
+        self._setup_trace(["plan-agent"])
         await self._run_flow()
 
     @track(name="plan-agent-prefetch")  # type: ignore[untyped-decorator]
@@ -91,9 +92,10 @@ class PlanAgent(BaseAgent):
 
         return self._state
 
-    @track(name="plan-agent-from-design", ignore_arguments=["state"])  # type: ignore[untyped-decorator]
-    async def run_from_design(self, state: BuildState) -> None:
-        self._state = state
+    @track(name="plan-agent-from-design", ignore_arguments=["paused_state"])  # type: ignore[untyped-decorator]
+    async def run_from_design(self, content: str, paused_state: str) -> None:
+        self._state = BuildState.model_validate_json(paused_state)
+        self._state.user_content = content
         self._state.model = self.model
         self._setup_trace(["plan-agent", "post-interview"])
 
@@ -190,8 +192,7 @@ class PlanAgent(BaseAgent):
 
     async def _step_persist(self, state: PlanState) -> PlanState:
         """Step: Persist to DB and emit plan for approval."""
-        state.build_state.phase = "awaiting_approval"
-        await save_pending_plan(state.project_id, state.build_state.model_dump_json())
+        await pause_turn(state.project_id, "awaiting_approval", state.build_state.model_dump_json())
         await state.emit_fn({"type": "phase", "phase": "awaiting_approval"})
         await state.emit_fn({"type": "plan_overview", "overview": state.build_state.user_plan_overview.model_dump()})
 
@@ -203,7 +204,6 @@ class PlanAgent(BaseAgent):
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
-        self._state.model = self.model
         self._setup_trace(["plan-agent", "rebuild"])
 
         await self.emit({"type": "phase", "phase": "planning"})
@@ -226,8 +226,7 @@ class PlanAgent(BaseAgent):
         )
         self._state.user_plan_overview = UserPlanOverview.model_validate(parse_json_response(raw))
 
-        self._state.phase = "awaiting_approval"
-        await save_pending_plan(self.project_id, self._state.model_dump_json())
+        await pause_turn(self.project_id, "awaiting_approval", self._state.model_dump_json())
         await self.emit({"type": "phase", "phase": "awaiting_approval"})
         await self.emit({"type": "plan_overview", "overview": self._state.user_plan_overview.model_dump()})
 

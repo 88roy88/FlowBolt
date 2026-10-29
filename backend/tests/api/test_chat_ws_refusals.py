@@ -34,7 +34,7 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
     writes = {
         "save_message": AsyncMock(),
         "emit_event": AsyncMock(),
-        "delete_pending_plan": AsyncMock(),
+        "clear_paused_turn": AsyncMock(),
     }
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project),
@@ -45,7 +45,7 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
         patch("flow44.api.chat._is_new_project", new_callable=AsyncMock, return_value=True),
         patch("flow44.api.chat.save_message", writes["save_message"]),
         patch("flow44.api.chat.emit_event", writes["emit_event"]),
-        patch("flow44.api.chat.delete_pending_plan", writes["delete_pending_plan"]),
+        patch("flow44.api.chat.clear_paused_turn", writes["clear_paused_turn"]),
     ):
         sandbox = MagicMock()
         sandbox.project_id = PROJECT_ID
@@ -100,18 +100,18 @@ def test_message_refused_as_busy_saves_nothing() -> None:
     assert "already running" in reply["message"]
 
 
-def test_refused_plan_accept_keeps_the_pending_plan() -> None:
+def test_refused_plan_accept_keeps_the_paused_turn() -> None:
     state = MagicMock()
     state.model = "claude-opus-5"
-    state.phase = "awaiting_approval"
+    turn = MagicMock(phase="awaiting_approval", state_json="{}")
     with (
-        patch("flow44.api.chat.get_pending_plan", new_callable=AsyncMock, return_value="{}"),
+        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=turn),
         patch("flow44.api.chat.BuildState") as build_state,
     ):
         build_state.model_validate_json.return_value = state
         reply, writes = _send({"type": "plan_response", "action": "accept"}, _locked("previewing"))
 
-    writes["delete_pending_plan"].assert_not_awaited()
+    writes["clear_paused_turn"].assert_not_awaited()
     assert reply == PREVIEWING
 
 

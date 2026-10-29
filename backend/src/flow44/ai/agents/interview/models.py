@@ -48,6 +48,14 @@ class InterviewAnswer(BaseModel):
         return [value.strip()[:MAX_ANSWER_LENGTH] for value in values if value.strip()][:MAX_ANSWER_VALUES]
 
 
+class InterviewSession(BaseModel):
+    content: str
+    questions: list[InterviewQuestion]
+    paused_agent: str
+    paused_state: str
+    model: str | None = None
+
+
 class InterviewQuestionsPayload(BaseModel):
     questions: list[InterviewQuestion] = Field(default_factory=list)
 

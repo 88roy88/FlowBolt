@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from flow44.ai.agents.plan import agent as plan_agent_module
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.state import BuildState
@@ -72,9 +73,25 @@ class TestRunFromDesign:
 
         agent._run_flow = _run_flow  # type: ignore[method-assign]
 
-        state = BuildState(project_id="proj-1", user_content="build a dashboard")
-        await agent.run_from_design(state)
+        state = BuildState(project_id="proj-1", user_content="original")
+        await agent.run_from_design("build a dashboard\n\nClarifications", state.model_dump_json())
 
         assert ran == ["design"]
-        assert agent._state is state
+        assert agent._state.project_id == "proj-1"
+        assert agent._state.user_content == "build a dashboard\n\nClarifications"
         assert agent._state.model == agent.model
+
+
+class TestPersist:
+    async def test_pauses_the_turn_as_awaiting_approval(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        agent = _make_agent()
+        paused: list[tuple[str, str, str]] = []
+
+        async def _pause(project_id: str, phase: str, state_json: str) -> None:
+            paused.append((project_id, phase, state_json))
+
+        monkeypatch.setattr(plan_agent_module, "pause_turn", _pause)
+
+        await agent._step_persist(agent._make_plan_state())
+
+        assert paused == [("proj-1", "awaiting_approval", agent._state.model_dump_json())]
