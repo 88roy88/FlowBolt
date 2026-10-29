@@ -259,7 +259,7 @@ def _init_env() -> None:
     """Initialize Opik + litellm callbacks (same as main.py lifespan)."""
     import litellm as _litellm  # noqa: PLC0415
 
-    from flow44.ai.core.opik_failure_logger import FailureAwareOpikLogger  # noqa: PLC0415
+    from flow44.ai.core.opik_utils import FailureAwareOpikLogger  # noqa: PLC0415
 
     if settings.OPIK_API_KEY:
         # Credentials already in os.environ via OpikSettings.model_post_init

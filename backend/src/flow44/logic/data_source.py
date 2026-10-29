@@ -21,6 +21,7 @@ from flow44.logic.models import (
     ParamDefinition,
     ParamOption,
     ParamType,
+    QuickParamInfo,
     parse_param_value,
 )
 
@@ -33,7 +34,6 @@ __all__ = [
     "DataSourceUsage",
     "FlapiUpstreamError",
     "can_run_without_params",
-    "fetch_data_source",
     "get_display_name",
     "get_params_info",
     "get_usage",
@@ -112,6 +112,14 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
                     name=p.name,
                     display_name=p.display_name,
                     description=p.description,
+                    quick_info=(
+                        QuickParamInfo(
+                            display_name=p.quick_parameter_info.display_name,
+                            description=p.quick_parameter_info.description,
+                        )
+                        if p.quick_parameter_info
+                        else None
+                    ),
                     type=_FLAPI_PARAM_TYPE.get(p.type_, "string"),
                     is_required=p.is_required,
                     is_single_value=p.is_single_value,
@@ -154,11 +162,16 @@ async def get_params_info(
 async def run_data_source(
     data_source_id: str | int,
     *,
+    execute_continued_process: bool,
     authorization: str | None = None,
     params: QuickParams | None = None,
 ) -> DataSourceResult:
     raw = await data_source_client.run_data_source(
-        data_source_id, authorization=authorization, quick_params=params, all_queries=True
+        data_source_id,
+        authorization=authorization,
+        quick_params=params,
+        all_queries=True,
+        execute_continued_process=execute_continued_process,
     )
     return _to_result(raw)
 
@@ -175,16 +188,6 @@ async def get_display_name(
     if not name:
         raise LookupError(f"Data source {data_source_id} has no display name")
     return name
-
-
-async def fetch_data_source(
-    data_source_id: str | int,
-    *,
-    authorization: str | None = None,
-) -> tuple[str, DataSourceResult]:
-    name = await get_display_name(data_source_id, authorization=authorization)
-    result = await run_data_source(data_source_id, authorization=authorization)
-    return name, result
 
 
 def _default_for(param: ParamDefinition) -> QuickParamValue | None:
@@ -289,6 +292,7 @@ async def get_usage(
         try:
             result = await run_data_source(
                 data_source_id,
+                execute_continued_process=False,
                 authorization=authorization,
                 params=minimal,
             )

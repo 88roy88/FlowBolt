@@ -34,16 +34,16 @@ async def get_project(project_id: str) -> Project | None:
         return await session.get(Project, project_id)
 
 
-async def list_user_projects(user_id: str) -> list[Project]:
+async def list_all_projects() -> list[Project]:
     async with database.async_session() as session:
-        query = select(Project).where(Project.user_id == user_id).order_by(col(Project.created_at).desc())
+        query = select(Project).order_by(col(Project.created_at).desc())
         result = await session.execute(query)
         return list(result.scalars().all())
 
 
-async def list_all_projects() -> list[Project]:
+async def list_published_projects() -> list[Project]:
     async with database.async_session() as session:
-        query = select(Project).order_by(col(Project.created_at).desc())
+        query = select(Project).where(col(Project.published_at).is_not(None)).order_by(col(Project.published_at).desc())
         result = await session.execute(query)
         return list(result.scalars().all())
 
@@ -105,7 +105,7 @@ async def update_project_published_url(project_id: str, handle: str) -> None:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if not project:
-            raise Exception("project not found")  # noqa: TRY002
+            raise ValueError("project not found")
         now = datetime.now(UTC).isoformat()
         project.published_url = handle
         project.published_at = now

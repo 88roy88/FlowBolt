@@ -1,4 +1,11 @@
-import { getAppSuffix } from '../../utils/easterEgg';
+import { useSessionStore } from '../../stores/session';
+import { useFilesStore } from '../../stores/files';
+
+function goHome() {
+  if (!useSessionStore.getState().currentProject) return;
+  useSessionStore.getState().goHome();
+  useFilesStore.getState().reset();
+}
 
 interface FlowLogoProps {
   size?: number;
@@ -32,15 +39,13 @@ export function FlowBrand({ size = 'md', className }: FlowBrandProps) {
     lg: { icon: 28, text: 'text-[28px]', gap: 'gap-2' },
   }[size];
 
-  const suffix = getAppSuffix();
-
   return (
-    <div className={`flex items-center ${config.gap} ${className ?? ''}`}>
+    <button type="button" onClick={goHome} className={`flex items-center ${config.gap} cursor-pointer ${className ?? ''}`}>
       <FlowLogo size={config.icon} className="text-brand" />
       <span className={`font-bold tracking-tight ${config.text}`}>
-        <span className="text-brand">FLOW</span>
-        <span className="text-foreground">{suffix}</span>
+        <span className="text-brand">Build</span>
+        <span className="text-foreground">App</span>
       </span>
-    </div>
+    </button>
   );
 }

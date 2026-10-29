@@ -9,6 +9,7 @@ from flow44.logic.models import (
     DataSourceQuerySchema,
     ParamDefinition,
     ParamOption,
+    QuickParamInfo,
 )
 
 
@@ -80,7 +81,10 @@ class TestRequiredParam:
             params_info=params,
             queries=_queries("person"),
         )
-        assert "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number; // Person\n}): Promise<PersonResults>" in result
+        assert (
+            "export async function dataSourcePerson({\n  personId,\n}: {\n  personId: number; // Person\n}): Promise<PersonResults>"
+            in result
+        )
         assert "body['people']['person_id'] = personId;" in result
         assert "fetchDataSource('/api/data-source/7/run', body)" in result
 
@@ -138,7 +142,10 @@ class TestMixedParams:
             params_info=params,
             queries=_queries("mixed"),
         )
-        assert "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };" in result
+        assert (
+            "  type,\n  priority,\n  createdAfter,\n}: {\n  type: string;\n  priority?: string | string[];\n  createdAfter?: { From: Date; To: Date };"
+            in result
+        )
         assert "body['tasks']['type'] = type;" in result
         assert "if (priority !== undefined) {\n    body['tasks']['priority'] = priority;\n  }" in result
         assert "if (createdAfter !== undefined) {\n    body['tasks']['created_after'] = createdAfter;\n  }" in result
@@ -179,6 +186,41 @@ class TestDisplayNameComment:
         )
         assert "name: string;\n  deptId: string; // Department" in result
         assert "name: string; // Name" not in result
+
+    def test_comment_prefers_quick_info_display_name_and_description(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="dept_id",
+                    display_name="Dept",
+                    quick_info=QuickParamInfo(display_name="Department", description="Owning\ndepartment"),
+                    type="string",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="employees",
+                ),
+                ParamDefinition(
+                    name="name",
+                    display_name="Name",
+                    quick_info=QuickParamInfo(display_name=None, description="Full name"),
+                    type="string",
+                    is_required=False,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="employees",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="1",
+            sanitized_name="Employee",
+            params_info=params,
+            queries=_queries("employee"),
+        )
+        assert "deptId: string; // Department — Owning department\n" in result
+        assert "name?: string; // Full name\n" in result
 
 
 class TestArrayParam:
@@ -440,6 +482,52 @@ class TestCubeIdDisambiguation:
         assert "body['1reports']['start_date'] = _1reports_startDate;" in result
         assert "body['2filters']['start_date'] = _2filters_startDate;" in result
 
+    def test_dashed_cube_id_prefix_is_valid_ts_identifier(self) -> None:
+        params = DataSourceParamsInfo(
+            parameters=[
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="sales-reports",
+                ),
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="123-123",
+                ),
+                ParamDefinition(
+                    name="start_date",
+                    display_name="Start date",
+                    type="datetime",
+                    is_required=True,
+                    is_single_value=True,
+                    options=[],
+                    cube_id="1231-23",
+                ),
+            ],
+            require_any=False,
+        )
+        result = generate_data_source_module(
+            data_source_id="10",
+            sanitized_name="Report",
+            params_info=params,
+            queries=_queries("report"),
+        )
+        assert "sales_reports_startDate: { From: Date; To: Date }" in result
+        assert "_123_123_startDate: { From: Date; To: Date }" in result
+        assert "_1231_23_startDate: { From: Date; To: Date }" in result
+        assert "body['sales-reports']['start_date'] = sales_reports_startDate;" in result
+        assert "body['123-123']['start_date'] = _123_123_startDate;" in result
+        assert "body['1231-23']['start_date'] = _1231_23_startDate;" in result
+
 
 class TestAllParamTypes:
     def test_all_four_param_types_map_to_correct_ts_types(self) -> None:
@@ -648,8 +736,14 @@ class TestDatetimeFieldConversion:
         # Conversion loops emitted after envelope cast
         assert "  try {\n" in result
         assert "    for (const row of envelope.data['Events'])" in result
-        assert "      if (row['created_at'] != null) row['created_at'] = new Date(row['created_at'] as unknown as string);" in result
-        assert "      if (row['updated_at'] != null) row['updated_at'] = new Date(row['updated_at'] as unknown as string);" in result
+        assert (
+            "      if (row['created_at'] != null) row['created_at'] = new Date(row['created_at'] as unknown as string);"
+            in result
+        )
+        assert (
+            "      if (row['updated_at'] != null) row['updated_at'] = new Date(row['updated_at'] as unknown as string);"
+            in result
+        )
         assert "  } catch (e) {\n    console.warn('Failed to convert date fields', e);\n  }" in result
         # Non-datetime fields don't get a conversion line
         assert "row['id']" not in result

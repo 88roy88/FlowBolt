@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flow44.ai.agents.file_diffs import DiffTracker, compute_diff
+from flow44.ai.agents.file_diffs import DiffTracker
 
 
 class TestDiffTracker:

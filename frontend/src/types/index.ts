@@ -6,7 +6,11 @@ export interface Message {
   timestamp: number;
   dataSources?: { id: number; name: string }[];
   agentCard?: AgentCard;
+  version?: string; // commit_sha
 }
+
+export type VersionAuthor = 'ai' | 'user' | 'system';
+export type VersionErrorCode = 'run_active' | 'dirty_workspace' | 'previewing' | 'busy' | 'failed';
 
 export interface ProjectSummary {
   summary: string;
@@ -21,6 +25,7 @@ export type AgentCard =
   | { type: 'task_progress'; tasks: ExecutionTask[] }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'error_fix_request'; errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string }
+  | { type: 'user_edit'; diffs?: FileDiff[]; author?: VersionAuthor }
   | { type: 'fix_progress'; steps: FixStep[]; diffs?: FileDiff[] }
   | { type: 'data_sources_fetched'; dataSources: { dataSourceId: string; dataSourceName: string; dataSchema: string; relevantFields?: string }[] }
 
@@ -30,7 +35,6 @@ export type AgentCard =
 export interface Action {
   type: 'file' | 'shell';
   path?: string;
-  content?: string;
   command?: string;
   output?: string;
 }
@@ -80,15 +84,42 @@ export interface Project {
 
 export interface ProjectMember {
   user_id: string;
+  display_name: string;
   role: AssignableRole;
   created_at: string;
   invited_by: string;
+}
+
+export interface ProjectGroupGrant {
+  group_id: string;
+  group_name: string;
+  email: string;
+  role: AssignableRole;
+  created_at: string;
+  invited_by: string;
+}
+
+export interface PlatformUser {
+  user_id: string;
+  display_name: string;
+  invited_by: string;
+  created_at: string;
+}
+
+export interface PlatformGroup {
+  group_id: string;
+  group_name: string;
+  email: string;
+  invited_by: string;
+  created_at: string;
 }
 
 export interface UserStatus {
   user_id: string;
   is_admin: boolean;
   is_platform_user: boolean;
+  can_use_terminal: boolean;
+  terminal_admin_only: boolean;
 }
 
 export interface AIModel {
@@ -101,6 +132,25 @@ export interface DataSourceSearchResult {
   id: number;
   name: string;
   description?: string | null;
+}
+
+export interface AdUser {
+  cn: string;
+  displayName: string;
+  distinguishedName: string;
+  mail: string;
+  sAMAccountName: string;
+  uniqueId: string;
+}
+
+export interface AdGroup {
+  cn: string;
+  displayName: string;
+  distinguishedName: string;
+  description: string;
+  mail: string;
+  sAMAccountName: string;
+  objectGUID: string;
 }
 
 // Agent types
@@ -214,4 +264,15 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'file_diffs'; diffs: FileDiff[] }
   | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
   | { type: 'plan_accepted'; overview: PlanOverview }
+  | { type: 'version_committed'; commit_sha: string; author?: VersionAuthor; diffs?: FileDiff[] }
+  | { type: 'version_preview_active'; commit_sha: string; is_latest: boolean }
+  | { type: 'version_restored'; commit_sha: string }
+  | { type: 'version_error'; message: string; code: VersionErrorCode; files?: string[] }
+  | { type: 'workspace_dirty'; files: string[] }
+  | { type: 'workspace_reset' }
+  | { type: 'preview_version'; commit_sha: string }
+  | { type: 'exit_preview' }
+  | { type: 'restore_version'; commit_sha: string }
+  | { type: 'save_version' }
+  | { type: 'discard_edits' }
 );

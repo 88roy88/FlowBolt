@@ -1,5 +1,6 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, UserStatus } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
+import type { LogEvent } from './logger';
 
 const BASE = '/api';
 
@@ -23,18 +24,32 @@ async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry
   return res;
 }
 
+export class ApiError extends Error {
+  constructor(readonly status: number, readonly detail: unknown, text: string) {
+    super(`API error ${status}: ${text}`);
+  }
+}
+
+function apiError(status: number, text: string): ApiError {
+  try {
+    return new ApiError(status, JSON.parse(text).detail, text);
+  } catch {
+    return new ApiError(status, text, text);
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers = new Headers(options?.headers);
   const isFormDataBody = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   // Only set JSON Content-Type when body is not FormData.
   if (options?.body && !isFormDataBody) {
-    headers['Content-Type'] = 'application/json';
+    headers.set('Content-Type', 'application/json');
   }
 
   const res = await fetchWithAuth(path, { ...options, headers });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${text}`);
+    throw apiError(res.status, text);
   }
   if (!text) return undefined as T; // 204 No Content or empty body
   return JSON.parse(text) as T;
@@ -85,8 +100,7 @@ export async function uploadFileEntry(projectId: string, path: string, file: Blo
     body: file,
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text}`);
+    throw apiError(res.status, await res.text());
   }
 }
 
@@ -112,8 +126,19 @@ export async function searchFiles(
   return data.results;
 }
 
-export async function fetchProjects(): Promise<Project[]> {
-  return request<Project[]>('/projects');
+export type ProjectPage = { projects: Project[]; next_cursor: string | null };
+
+export async function fetchProjects(opts?: { query?: string; cursor?: string; limit?: number }): Promise<ProjectPage> {
+  const params = new URLSearchParams();
+  if (opts?.query) params.set('q', opts.query);
+  if (opts?.cursor) params.set('cursor', opts.cursor);
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  return request<ProjectPage>(qs ? `/projects?${qs}` : '/projects');
+}
+
+export async function fetchProject(id: string): Promise<Project> {
+  return request<Project>(`/projects/${id}`);
 }
 
 export async function createProject(name: string): Promise<Project> {
@@ -230,10 +255,15 @@ export async function fetchProjectMembers(projectId: string): Promise<ProjectMem
   return request<ProjectMember[]>(`/projects/${projectId}/members`);
 }
 
-export async function addProjectMember(projectId: string, userId: string, role: AssignableRole): Promise<ProjectMember> {
+export async function addProjectMember(
+  projectId: string,
+  userId: string,
+  role: AssignableRole,
+  displayName = ''
+): Promise<ProjectMember> {
   return request<ProjectMember>(`/projects/${projectId}/members`, {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId, role }),
+    body: JSON.stringify({ user_id: userId, display_name: displayName, role }),
   });
 }
 
@@ -248,19 +278,110 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   await request(`/projects/${projectId}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
-// --- Admin: platform user management ---
+// --- Project group grants (share a project with a whole directory group) ---
 
-export async function fetchPlatformUsers(): Promise<{ user_id: string; invited_by: string; created_at: string }[]> {
-  return request('/admin/users');
+export async function fetchProjectGroups(projectId: string): Promise<ProjectGroupGrant[]> {
+  return request<ProjectGroupGrant[]>(`/projects/${projectId}/members/groups`);
 }
 
-export async function invitePlatformUser(userId: string): Promise<{ user_id: string; invited_by: string; created_at: string }> {
-  return request('/admin/users', {
+export async function addProjectGroup(
+  projectId: string,
+  groupId: string,
+  groupName: string,
+  role: AssignableRole,
+  email = ''
+): Promise<ProjectGroupGrant> {
+  return request<ProjectGroupGrant>(`/projects/${projectId}/members/groups`, {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ group_id: groupId, group_name: groupName, email, role }),
+  });
+}
+
+export async function updateProjectGroupRole(
+  projectId: string,
+  groupId: string,
+  role: AssignableRole
+): Promise<ProjectGroupGrant> {
+  return request<ProjectGroupGrant>(`/projects/${projectId}/members/groups/${encodeURIComponent(groupId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeProjectGroup(projectId: string, groupId: string): Promise<void> {
+  await request(`/projects/${projectId}/members/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+}
+
+// --- Admin: platform user management ---
+
+export async function fetchPlatformUsers(): Promise<PlatformUser[]> {
+  return request<PlatformUser[]>('/admin/users');
+}
+
+export async function invitePlatformUser(userId: string, displayName = ''): Promise<PlatformUser> {
+  return request<PlatformUser>('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, display_name: displayName }),
   });
 }
 
 export async function revokePlatformUser(userId: string): Promise<void> {
   await request(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+export async function fetchPublishedApps(): Promise<{
+  project_id: string;
+  name: string;
+  owner_id: string;
+  project_url: string;
+  public_path: string;
+  created_at: string;
+  published_at: string;
+}[]> {
+  return request('/admin/published-apps');
+}
+
+export async function fetchPlatformGroups(): Promise<PlatformGroup[]> {
+  return request<PlatformGroup[]>('/admin/groups');
+}
+
+export async function invitePlatformGroup(groupId: string, groupName: string, email = ''): Promise<PlatformGroup> {
+  return request<PlatformGroup>('/admin/groups', {
+    method: 'POST',
+    body: JSON.stringify({ group_id: groupId, group_name: groupName, email }),
+  });
+}
+
+export async function revokePlatformGroup(groupId: string): Promise<void> {
+  await request(`/admin/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+}
+
+// --- Directory (users & groups) search ---
+// Proxied through the backend (/api/directory/*) rather than hitting the directory
+// service directly: in production the directory service is internal-only and
+// doesn't serve CORS, so the browser can only reach it via our own authenticated backend.
+
+// The backend matches the term against sAMAccountName, displayName and mail.
+export async function searchAdUsers(query: string): Promise<AdUser[]> {
+  return request<AdUser[]>(`/directory/users?q=${encodeURIComponent(query)}`);
+}
+
+export async function searchAdGroups(query: string): Promise<AdGroup[]> {
+  return request<AdGroup[]>(`/directory/groups?q=${encodeURIComponent(query)}`);
+}
+
+// --- Logging ---
+
+export async function sendLogs(events: LogEvent[], options?: { keepalive?: boolean }): Promise<void> {
+  try {
+    const version = import.meta.env.VITE_APP_VERSION || 'unknown';
+    await request('/bi/events', {
+      method: 'POST',
+      headers: { 'X-Client-Version': version },
+      body: JSON.stringify(events),
+      keepalive: options?.keepalive,
+    });
+  } catch (error) {
+    console.warn('Log send failed:', error);
+  }
 }

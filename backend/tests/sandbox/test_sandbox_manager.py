@@ -21,7 +21,8 @@ def manager(tmp_path):  # type: ignore[type-arg]
         mock_s.PNPM_STORE_DIR = str(tmp_path / ".pnpm-store")
         mock_s.WORKSPACE_BASE_DIR = workspace_base
         mgr = SandboxManager()
-        yield mgr, workspace_base, mock_s
+        with patch("flow44.sandbox.base.settings", mock_s):
+            yield mgr, workspace_base, mock_s
 
 
 @pytest.mark.asyncio

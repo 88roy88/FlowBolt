@@ -1,12 +1,15 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { formatDayDivider, sameDay } from '../../utils/formatTime';
 import type { Message } from '../../types';
 import { useChatStore } from '../../stores/chat';
 import { isAgentAlive } from '../../stores/chatAgentState';
 import { ChatMessage } from './ChatMessage';
+import { UnsavedEditsRow } from '../version/UnsavedEditsRow';
 import { PromptInput } from './PromptInput';
+import { ChatSkeleton } from './ChatSkeleton';
 import { WorkPlanView } from './WorkPlanView';
 import { InterviewCard } from './InterviewCard';
 import { TaskProgress } from './TaskProgress';
@@ -41,8 +44,14 @@ export function ChatPanel() {
   const {
     messages, currentAssistantMessage, actions, error, clearError,
     agentPhase, planOverview, interviewQuestions, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
-  } = useChatStore();
+  } = useChatStore(useShallow((s) => ({
+    messages: s.messages, currentAssistantMessage: s.currentAssistantMessage, actions: s.actions,
+    error: s.error, clearError: s.clearError, agentPhase: s.agentPhase, planOverview: s.planOverview,
+    interviewQuestions: s.interviewQuestions, executionTasks: s.executionTasks, designProgress: s.designProgress,
+    fixSteps: s.fixSteps, followUpSteps: s.followUpSteps, fileDiffs: s.fileDiffs,
+  })));
   const agentActive = useChatStore(isAgentAlive);
+  const historyLoaded = useChatStore((s) => s.historyLoaded);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -66,6 +75,10 @@ export function ChatPanel() {
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     stickToBottomRef.current = distFromBottom < 150;
     setShowScrollBtn(distFromBottom > 200);
+  };
+
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[aria-expanded]')) stickToBottomRef.current = false;
   };
 
   const jumpToBottom = () => {
@@ -99,8 +112,9 @@ export function ChatPanel() {
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Messages */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-auto p-4">
+      <div ref={scrollContainerRef} onScroll={handleScroll} onClickCapture={handleClickCapture} className="flex-1 overflow-y-auto overflow-x-hidden p-4">
         <div ref={observeContentForPinning} className="flex flex-col gap-4">
+        {!historyLoaded && <ChatSkeleton />}
         {dayGroups.map((group) => (
           <div key={group.key} className="flex flex-col gap-4">
             <DayDivider label={formatDayDivider(group.ts, i18n.language, t)} />
@@ -149,6 +163,8 @@ export function ChatPanel() {
             isStreaming
           />
         )}
+
+        <UnsavedEditsRow />
 
         </div>
       </div>

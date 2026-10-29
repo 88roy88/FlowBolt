@@ -44,7 +44,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
                 style={{ animation: `staggerFadeIn 0.3s cubic-bezier(0.16,1,0.3,1) ${i * 60}ms both` }}
               >
                 <Sparkles size={14} className="text-primary shrink-0 mt-0.5" />
-                <div>
+                <div className="min-w-0">
                   <span className="font-medium">{feature.title}</span>
                   <span className="text-muted-foreground"> — {feature.description}</span>
                 </div>
@@ -91,12 +91,12 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
       )}
 
       {/* Action buttons */}
-      <div className="flex flex-col sm:flex-row justify-evenly gap-2">
-        <Button variant="success" onClick={() => respondToPlan('accept')} className="w-full sm:w-auto hover:-translate-y-0.5 transition-transform duration-150">
+      <div className="flex flex-wrap gap-2">
+        <Button variant="success" onClick={() => respondToPlan('accept')} className="grow h-auto min-h-8 whitespace-normal text-center hover:-translate-y-0.5 transition-transform duration-150">
           <Check size={14} />
           {t('chat.plan.looksGood')}
         </Button>
-        <Button variant="warning" onClick={handleModify} className="w-full sm:w-auto hover:-translate-y-0.5 transition-transform duration-150">
+        <Button variant="warning" onClick={handleModify} className="grow h-auto min-h-8 whitespace-normal text-center hover:-translate-y-0.5 transition-transform duration-150">
           <Pencil size={14} />
           {modifyMode ? t('chat.plan.sendFeedback') : t('chat.plan.changeSomething')}
         </Button>

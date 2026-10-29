@@ -1,10 +1,11 @@
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from flow44.api.deps import Permission, SandboxDep, require_permission
+from flow44.api.deps import Permission, SandboxDep, require_permission, require_writable_workspace
 from flow44.sandbox.search_mixin import SearchToolError
+from flow44.services.logging import log_bi_event
 
 router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
 
@@ -81,9 +82,11 @@ async def put_file_content(
     sandbox: SandboxDep,
     body: WriteFileRequest,
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.write_file(body.path, body.content)
+        log_bi_event("code_edited_manually", file_path=body.path)
         return {"status": "ok", "path": body.path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -96,9 +99,14 @@ async def post_create_file(
     sandbox: SandboxDep,
     body: CreateFileRequest,
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.create_file(body.path, body.content)
+
+        file_type = body.path.split(".")[-1] if "." in body.path else ""
+        log_bi_event("file_created", file_path=body.path, file_type=file_type, created_by="user")
+
         return {"status": "ok", "path": body.path}
     except FileExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
@@ -111,9 +119,11 @@ async def patch_rename_file(
     sandbox: SandboxDep,
     body: RenamePathRequest,
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.rename_file(body.old_path, body.new_path)
+        log_bi_event("file_renamed", old_path=body.old_path, new_path=body.new_path)
         return {"status": "ok", "old_path": body.old_path, "new_path": body.new_path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -128,9 +138,11 @@ async def delete_entry(
     sandbox: SandboxDep,
     path: str = Query(...),
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.delete_file(path)
+        log_bi_event("file_deleted", file_path=path, deleted_by="user")
         return {"status": "ok", "path": path}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -146,9 +158,12 @@ async def post_upload_entry(
     path: str = Query(...),
     body: bytes = Body(...),
     _perms: set[Permission] = require_permission(Permission.write),
+    _writable: None = Depends(require_writable_workspace),
 ) -> dict[str, str]:
     try:
         await sandbox.write_binary_file(path, body)
+        file_type = path.rsplit(".", maxsplit=1)[-1] if "." in path else ""
+        log_bi_event("file_created", file_path=path, file_type=file_type, created_by="user")
         return {"status": "ok", "path": path}
     except FileExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None

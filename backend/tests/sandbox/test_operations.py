@@ -46,7 +46,7 @@ class TestInlineCssAssets:
 
         assert "<style>" in result
         assert "color: red" in result
-        assert '<link' not in result
+        assert "<link" not in result
 
     def test_inlines_stylesheet_href_first(self, tmp_path) -> None:  # type: ignore[type-arg]
         dist = tmp_path / "dist"
@@ -64,7 +64,7 @@ class TestInlineCssAssets:
         dist.mkdir()
         html = '<link rel="stylesheet" href="/missing.css">'
         result = _inline_css_assets(html, str(dist))
-        assert '<link' in result  # unchanged
+        assert "<link" in result  # unchanged
 
     def test_non_stylesheet_link_untouched(self, tmp_path) -> None:  # type: ignore[type-arg]
         dist = tmp_path / "dist"
@@ -85,7 +85,7 @@ class TestInlineJsAssets:
 
         assert "<script>" in result or "<script " in result
         assert "console.log" in result
-        assert 'src=' not in result
+        assert "src=" not in result
 
     def test_preserves_type_attribute(self, tmp_path) -> None:  # type: ignore[type-arg]
         dist = tmp_path / "dist"
@@ -103,7 +103,7 @@ class TestInlineJsAssets:
         dist.mkdir()
         html = '<script src="/missing.js"></script>'
         result = _inline_js_assets(html, str(dist))
-        assert 'src=' in result  # unchanged
+        assert "src=" in result  # unchanged
 
 
 class TestInlineFavicon:

@@ -103,7 +103,7 @@ export function quickParam(opts: QuickParamOptions): QuickParamDefinition {
   const displayName = opts.displayName || name.charAt(0).toUpperCase() + name.slice(1);
   const type = opts.type || 'String';
   // OntologyType narrowed on the FLAPI side — only TEXT is meaningful for
-  // the scalar types we emit. Everything else is specialty (geo/PSTN/etc).
+  // the scalar types we emit. Everything else is specialty (location/contact/etc).
   const ontology = 'TEXT';
 
   return {
@@ -116,6 +116,10 @@ export function quickParam(opts: QuickParamOptions): QuickParamDefinition {
     IsRequired: opts.required || false,
     IsRequireAny: opts.requireAny || false,
     Value: (opts.defaultValues || []).map((v) => ({ Name: String(v), Value: String(v) })),
+    quickParameterInfo: {
+      DisplayName: displayName,
+      Description: opts.description || null,
+    },
   };
 }
 
@@ -132,7 +136,7 @@ export function quickParamsQuery(
 // tags). OntologyType was narrowed on the FLAPI side; only TEXT lines up
 // with the scalar shapes we emit, so that's what we always send.
 type FieldType = 'string' | 'int' | 'double' | 'bool' | 'datetime' | 'Haphoch' | 'wkt';
-type OntologyType = 'TEXT' | 'GEOMETRY' | 'TOOLID' | 'PSTN' | 'IMEI' | 'IMSI' | 'TIME';
+type OntologyType = 'TEXT' | 'LOCATION' | 'ENTITY_ID' | 'CONTACT_INFO' | 'DEVICE_ID' | 'TIMESTAMP';
 
 function inferFieldType(value: unknown): { fieldType: FieldType; ontologyType: OntologyType } {
   if (typeof value === 'number') {

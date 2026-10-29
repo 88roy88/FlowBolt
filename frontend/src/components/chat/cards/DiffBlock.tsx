@@ -17,6 +17,7 @@ export function DiffBlock({ fileDiff }: { fileDiff: FileDiff }) {
     <div className="border border-border rounded-md overflow-hidden">
       <div
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
         className="flex items-center gap-2 px-2.5 py-1.5 bg-background cursor-pointer text-xs"
       >
         {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}

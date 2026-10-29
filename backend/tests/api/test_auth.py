@@ -31,10 +31,14 @@ def _gen_keypair() -> tuple[str, str]:
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption(),
     ).decode()
-    public_pem = key.public_key().public_bytes(
-        serialization.Encoding.PEM,
-        serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode()
+    public_pem = (
+        key.public_key()
+        .public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode()
+    )
     return private_pem, public_pem
 
 
@@ -65,9 +69,9 @@ def _use_test_key(monkeypatch):
 
 
 class TestNoToken:
-    def test_raises_401(self):
+    async def test_raises_401(self):
         with pytest.raises(HTTPException) as exc:
-            get_user_id(None)
+            await get_user_id(None)
         assert exc.value.status_code == 401
 
 
@@ -77,50 +81,50 @@ class TestNoToken:
 
 
 class TestJwt:
-    def test_url_unique_id_claim_returned(self):
+    async def test_url_unique_id_claim_returned(self):
         token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-123"})
-        assert get_user_id(token) == "user-123"
+        assert await get_user_id(token) == "user-123"
 
-    def test_first_matching_url_claim_wins(self):
+    async def test_first_matching_url_claim_wins(self):
         token = _make_jwt(
             {
                 "https://other.example/claims/UniqueID": "first",
                 CLAIM_UNIQUE_ID_URL: "second",
             }
         )
-        assert get_user_id(token) == "first"
+        assert await get_user_id(token) == "first"
 
-    def test_no_unique_id_claim_rejected(self):
+    async def test_no_unique_id_claim_rejected(self):
         """Signed, unexpired token without a UniqueID claim → 401 missing identification."""
         token = _make_jwt({"sub": "ignored", "role": "admin"})
         with pytest.raises(HTTPException) as exc:
-            get_user_id(token)
+            await get_user_id(token)
         assert exc.value.status_code == 401
         assert "missing user identification" in exc.value.detail.lower()
 
-    def test_expired_token_rejected(self):
+    async def test_expired_token_rejected(self):
         token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-x", "exp": int(time.time()) - 10})
         with pytest.raises(HTTPException) as exc:
-            get_user_id(token)
+            await get_user_id(token)
         assert exc.value.status_code == 401
         assert "invalid or expired" in exc.value.detail.lower()
 
-    def test_unexpired_token_accepted(self):
+    async def test_unexpired_token_accepted(self):
         token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-y"})
-        assert get_user_id(token) == "user-y"
+        assert await get_user_id(token) == "user-y"
 
-    def test_malformed_token_rejected(self):
+    async def test_malformed_token_rejected(self):
         # Exactly two dots; payload segment decodes to non-JSON bytes.
         bad = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.YWFh.YWFh"
         with pytest.raises(HTTPException) as exc:
-            get_user_id(bad)
+            await get_user_id(bad)
         assert exc.value.status_code == 401
         assert "invalid or expired" in exc.value.detail.lower()
 
-    def test_bad_signature_rejected(self):
+    async def test_bad_signature_rejected(self):
         token = _make_jwt({CLAIM_UNIQUE_ID_URL: "user-z"}, key=WRONG_PRIVATE_KEY)
         with pytest.raises(HTTPException) as exc:
-            get_user_id(token)
+            await get_user_id(token)
         assert exc.value.status_code == 401
         assert "invalid or expired" in exc.value.detail.lower()
 
@@ -131,9 +135,9 @@ class TestJwt:
 
 
 class TestOpaque:
-    def test_rejected(self):
+    async def test_rejected(self):
         with pytest.raises(HTTPException) as exc:
-            get_user_id("some-opaque-api-key")
+            await get_user_id("some-opaque-api-key")
         assert exc.value.status_code == 401
         assert "invalid or expired" in exc.value.detail.lower()
 

@@ -42,7 +42,7 @@ FieldType = (
     ]
     | str
 )
-# OntologyType = Literal["TEXT", "GEOMETRY", "TOOLID", "PSTN", "IMEI", "IMSI", "TIME"]
+# OntologyType = Literal["TEXT", "LOCATION", "ENTITY_ID", "CONTACT_INFO", "DEVICE_ID", "TIMESTAMP"]
 
 type CubeId = str
 type QueryDisplayName = str
@@ -135,6 +135,11 @@ class DataSourceRunResult(BaseModel):
 # -- Quick params info: GET /package/v1/quick/{id} -----------------------
 
 
+class QuickParameterInfo(PascalCaseBaseModel):
+    display_name: str | None = None
+    description: str | None = None
+
+
 class QuickParamDefinition(PascalCaseBaseModel):
     name: str
     display_name: str
@@ -144,7 +149,8 @@ class QuickParamDefinition(PascalCaseBaseModel):
     is_single_value: bool
     is_required: bool
     is_require_any: bool = False
-    value: QuickParamValue
+    value: QuickParamValue | None = None
+    quick_parameter_info: QuickParameterInfo | None = Field(default=None, alias="quickParameterInfo")
 
     @field_validator("type_", mode="before")
     def _normalize_type(cls, v: object) -> object:
@@ -195,6 +201,6 @@ class Query(PascalCaseBaseModel):
 class PackageMetadata(PascalCaseBaseModel):
     id_: int = Field(alias="Id")
     name: str
-    description: str
+    description: str | None = None
     # output_queries_id: list[Any]
     queries: list[Query]

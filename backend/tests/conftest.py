@@ -1,11 +1,13 @@
+import contextlib
 import functools
 import os
 from pathlib import Path
 
-import pytest  # noqa: E402
+import psycopg
+import pytest
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
-from sqlalchemy.pool import NullPool  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 # Load test.env to satisfy required environment variables in tests
 # Must happen before importing flow44.config (which reads env vars)
@@ -13,7 +15,13 @@ load_dotenv(Path(__file__).parent / "test.env")
 
 import flow44.config  # noqa: E402
 import flow44.db.database  # noqa: E402
-from flow44.api.deps import TokenPayload, get_user_id, get_user_permissions, validate_token, validate_ws_token  # noqa: E402
+from flow44.api.deps import (  # noqa: E402
+    TokenPayload,
+    get_user_id,
+    get_user_permissions,
+    validate_token,
+    validate_ws_token,
+)
 from flow44.auth.permissions import get_owner_permissions  # noqa: E402
 from flow44.db.database import build_db_url, init_db, reset  # noqa: E402
 from flow44.main import app  # noqa: E402
@@ -60,14 +68,19 @@ async def setup_test_db():
     worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
     dbname = f"test_flow44_{worker}"
 
-    with DatabaseJanitor(
+    janitor = DatabaseJanitor(
         user=settings.DB_USER,
         host=settings.DB_HOST,
         port=settings.DB_PORT,
         dbname=dbname,
         version="16",
         password=settings.DB_PASSWORD,
-    ):
+    )
+    # Pre-drop the DB if it exists from prior aborted runs (suppresses error if it doesn't exist yet).
+    with contextlib.suppress(psycopg.errors.InvalidCatalogName):
+        janitor.drop()
+
+    with janitor:
         settings.DB_NAME = dbname
         await reset()
         await init_db()
@@ -90,7 +103,10 @@ async def test_db(setup_test_db):
 
     async with engine.connect() as conn:
         trans = await conn.begin()
-        bound_factory = async_sessionmaker(bind=conn, class_=AsyncSession, expire_on_commit=False)
+        # Savepoints: a session rolling back (e.g. a failed locked operation) must not undo the whole test.
+        bound_factory = async_sessionmaker(
+            bind=conn, class_=AsyncSession, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
 
         flow44.db.database.async_session = lambda: bound_factory()  # noqa: PLW0108
 
@@ -99,3 +115,16 @@ async def test_db(setup_test_db):
 
         flow44.db.database.async_session = original_async_session
         await trans.rollback()
+
+
+@pytest.fixture
+async def async_client():
+    """HTTP client that drives the app on the test's own event loop.
+
+    The sync TestClient runs the app in a separate loop, which the asyncpg
+    connection `test_db` binds the session to can't be shared with.
+    """
+    from httpx import ASGITransport, AsyncClient  # noqa: PLC0415
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        yield client

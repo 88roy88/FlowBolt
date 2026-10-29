@@ -5,6 +5,7 @@ import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
 import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
 import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState } from './chatHandlers';
+import { armTurn, handleVersionMessage, useVersionStore } from './version';
 import { requestPermissionIfNeeded } from '../utils/notifications';
 import { AGENT_PHASE } from './chatAgentState';
 import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
@@ -33,8 +34,11 @@ export interface ChatState {
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
   agentAlive: boolean | null;
   agentAlivePollId: number;
+  draft: string;
+  setDraft: (draft: string) => void;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
+  rollbackTurn: (id: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
   respondToInterview: (action: 'submit' | 'skip', answers?: InterviewAnswer[]) => void;
   setInterviewMode: (mode: InterviewMode) => void;
@@ -121,6 +125,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   buildCompleted: false,
   agentAlive: null,
   agentAlivePollId: 0,
+  draft: '',
+
+  setDraft(draft: string) {
+    set({ draft });
+  },
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {
     const projectId = useSessionStore.getState().projectId;
@@ -161,6 +170,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (currentProject && selectedModel) {
       updateProjectModel(currentProject.id, selectedModel).catch(() => {});
     }
+
+    armTurn({
+      run: () => get().sendFixError(errorMessage, errorFile, errorLine, errorStack),
+      undo: () => get().rollbackTurn(userMessage.id),
+    });
   },
 
   sendMessage(content: string) {
@@ -182,6 +196,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
       agentAlive: true,
+      draft: '',
       ...RESET_STATE,
       designProgress: { architecture: null, ux: null },
     }));
@@ -206,6 +221,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     set({ selectedDataSources: [] });
+    armTurn({
+      run: () => get().sendMessage(content),
+      undo: () => {
+        get().rollbackTurn(userMessage.id);
+        set({ draft: content });
+      },
+    });
+  },
+
+  rollbackTurn(id: string) {
+    stopAgentAlivePolling();
+    set((state) => ({
+      messages: state.messages.filter((m) => m.id !== id),
+      isStreaming: false,
+      agentAlive: false,
+      ...RESET_STATE,
+    }));
   },
 
   respondToPlan(action: 'accept' | 'modify', feedback?: string) {
@@ -244,40 +276,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async loadHistory(projectId: string) {
-    // Detach any existing handler from the previous session
-    if (activeHandler && activeProjectId && activeProjectId !== projectId) {
+    // Detach any existing handlers from the previous session
+    if (activeProjectId && activeProjectId !== projectId) {
       stopAgentAlivePolling();
       const oldSocket = getChatSocket(activeProjectId);
-      detachHandler(oldSocket, activeHandler);
+      if (activeHandler) detachHandler(oldSocket, activeHandler);
+      oldSocket.offMessage(handleVersionMessage);
     }
 
     try {
       // Reset state, then replay all events — events are the single source of truth
       // for both user messages and assistant messages/cards
-      set({ ...PROJECT_RESET_STATE, isStreaming: false });
+      set({ ...PROJECT_RESET_STATE, isStreaming: false, draft: '' });
+      useVersionStore.getState().reset();
 
       const currentProject = useSessionStore.getState().currentProject;
       const canWrite = !currentProject?.role || WRITE_ROLES.has(currentProject.role);
 
-      let handler: ((msg: WSMessage) => void) | null = null;
+      let turnHandler: ((msg: WSMessage) => void) | null = null;
 
       if (canWrite) {
         const socket = getChatSocket(projectId);
-        handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler!));
-        attachHandler(projectId, socket, handler);
+        turnHandler = createSendMessageHandler(set, get, () => detachHandler(socket, turnHandler!));
+        attachHandler(projectId, socket, turnHandler);
+        socket.onMessage(handleVersionMessage);
       }
 
+      // Kept separate: the turn handler detaches after each turn, the version handler stays for the session.
       const events = await fetchAgentEvents(projectId);
-      if (handler) {
-        for (const evt of events) {
-          handler(evt as WSMessage);
-        }
-      } else {
-        // Read-only: replay events through a temporary handler without WS
-        const tempHandler = createSendMessageHandler(set, get, () => {});
-        for (const evt of events) {
-          tempHandler(evt as WSMessage);
-        }
+      const replayHandler = turnHandler ?? createSendMessageHandler(set, get, () => {});
+      for (const evt of events) {
+        replayHandler(evt as WSMessage);
+        handleVersionMessage(evt as WSMessage);
       }
 
       finalizeHistoryReplayState(set, get, events);
@@ -294,6 +324,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearMessages() {
     stopAgentAlivePolling();
     set(PROJECT_RESET_STATE);
+    useVersionStore.getState().reset();
   },
 
   clearError() {

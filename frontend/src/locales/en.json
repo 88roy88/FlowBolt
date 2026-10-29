@@ -20,14 +20,14 @@
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
     "retryConnection": "Retry Connection",
-    "createFirstProject": "Create your first project to get started",
-    "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation.",
+    "noAccessMessage": "You don't have access to create projects yet. Ask your administrator for an invitation."
+  },
+  "onboarding": {
     "tagline": "Describe what you want to build and the AI will design, plan, and code it for you.",
-    "hints": {
-      "dashboard": "A dashboard with charts",
-      "todo": "A todo app with drag & drop",
-      "landing": "A landing page with animations"
-    }
+    "taglineMobile": "Describe what you want to build and the AI will generate it for you.",
+    "hintDashboard": "A dashboard with charts",
+    "hintTodoApp": "A todo app with drag & drop",
+    "hintLandingPage": "A landing page with animations"
   },
   "sidebar": {
     "collapseSidebar": "Collapse sidebar",
@@ -39,7 +39,10 @@
     "sleep": "Sleep",
     "confirmDelete": "Confirm delete?",
     "searchPlaceholder": "Search projects...",
-    "noProjectsMatch": "No projects match"
+    "noProjectsMatch": "No projects match",
+    "loadMore": "Load more",
+    "untitledProject": "Untitled",
+    "createProjectError": "Failed to create project. Please try again."
   },
   "settings": {
     "title": "Settings",
@@ -90,8 +93,6 @@
     "deleteFile": "Delete",
     "deletedTab": "Deleted file (tab kept open)",
     "readOnlyUntilFirstAiResponse": "Editing is enabled after the first AI build completes.",
-    "readOnlyWhileAiWorking": "Editing is temporarily locked while AI is working.",
-    "readOnlyNoPermission": "View-only access",
     "newFilePrompt": "Enter a new file path",
     "renamePrompt": "Enter a new name",
     "confirmDeleteFile": "Delete {{name}}?",
@@ -101,6 +102,7 @@
   },
   "terminal": {
     "terminal": "Terminal",
+    "adminOnly": "Visible to admins only",
     "console": "Console",
     "server": "Server",
     "serverLog": "Server Log",
@@ -147,11 +149,12 @@
     "model": "Model",
     "placeholder": {
       "selectProject": "Select a project first",
+      "creatingProject": "Creating project...",
       "reviewPlan": "Review the plan above, then accept or modify",
       "reviewInterview": "Answer the questions above, or skip",
       "working": "AI is working...",
       "readOnly": "View-only access",
-      "default": "Describe what you want to build..."
+      "default": "What do you want to build? Click on + to add flow packages."
     },
     "phase": {
       "analyzing": "Analyzing",
@@ -208,14 +211,65 @@
     "title": "Share",
     "share": "Share",
     "owner": "Owner",
-    "userIdPlaceholder": "User ID",
+    "inviteAs": "Invite as",
     "noMembers": "No members yet"
   },
   "admin": {
-    "title": "Platform Users",
-    "userIdPlaceholder": "User ID to invite",
+    "title": "Admin",
+    "usersTab": "Platform Users",
+    "publishedTab": "Published Apps",
     "invite": "Invite",
-    "noUsers": "No platform users yet"
+    "noUsers": "No platform users yet",
+    "noPublished": "No published apps yet",
+    "searchAll": "All",
+    "searchUsers": "Users",
+    "searchGroups": "Groups",
+    "searchPlaceholder": "Search users & groups by name or email…",
+    "searchUsersPlaceholder": "Search users by name or email…",
+    "searchGroupsPlaceholder": "Search groups by name or email…",
+    "searchMinChars": "Type at least 3 characters to search",
+    "searchNoResults": "No results",
+    "searchUnavailable": "Directory search is unavailable",
+    "searchInvite": "Invite",
+    "colName": "Project",
+    "colOwner": "Owner",
+    "colUrl": "URL",
+    "colCreated": "Created",
+    "colPublished": "Published",
+    "openProject": "Open project",
+    "searchApps": "Search by project, owner or URL",
+    "noMatches": "No matching apps"
+  },
+  "version": {
+    "currentVersion": "Current version",
+    "preview": "Preview",
+    "exitPreview": "Exit preview",
+    "restoreHere": "Restore here",
+    "confirmRestore": "Yes, restore",
+    "returnToLatest": "Return to latest",
+    "previewingBanner": "Previewing {{version}}",
+    "restoreDialogTitle": "Restore version {{version}}?",
+    "restoreDialogBody": "This will discard all versions after {{version}}. This action cannot be undone.",
+    "previewReadOnly": "Return to latest to edit",
+    "previewTooltip": "View version without restoring",
+    "exitPreviewTooltip": "Back to latest",
+    "restoreTooltip": "Discard newer versions",
+    "busyTooltip": "Unavailable while the AI works",
+    "previewingShared": "Everyone viewing this project sees this version.",
+    "unsavedBody": "Save these edits as a version, or discard them, before continuing.",
+    "unsavedTitle": "You have unsaved edits",
+    "saveAndContinue": "Save and continue",
+    "discardEdits": "Discard edits",
+    "discardTitle": "Discard your edits?",
+    "discardBody": "The files below will revert to the last saved version. This action cannot be undone.",
+    "discardTooltip": "Discard your unsaved edits",
+    "dirtyFilesLabel": "Files with unsaved edits",
+    "unsavedRow_one": "Unsaved edits · 1 file",
+    "unsavedRow_other": "Unsaved edits · {{count}} files",
+    "saveAsVersion": "Save as version",
+    "saveTooltip": "Save your edits as a version you can restore later",
+    "yourEdits": "Your edits",
+    "platformUpdate": "Platform update"
   },
   "publish": {
     "publishFailed": "Publish Failed",

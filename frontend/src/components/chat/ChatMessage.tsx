@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +16,9 @@ import {
   FixProgressCard,
   FollowUpProgress,
   InterviewAnsweredCard,
+  UserEditCard,
 } from './cards';
+import { VersionControl } from './VersionControl';
 
 interface ChatMessageProps {
   message: Message;
@@ -43,6 +46,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
         errorLine={card.errorLine}
         errorStack={card.errorStack}
       />;
+    case 'user_edit':
+      return <UserEditCard diffs={card.diffs} author={card.author} />;
     case 'fix_progress':
       return <FixProgressCard steps={card.steps} content={message.content} diffs={card.diffs} />;
     case 'followup_progress':
@@ -73,13 +78,19 @@ function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: st
   );
 }
 
-export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   const { i18n } = useTranslation();
   const isUser = message.role === 'user';
 
   if (!message.content && !message.agentCard && !message.actions?.length && !isStreaming) {
     return null;
   }
+
+  const versionControl = message.version && (
+    <div className="max-w-[85%] px-1">
+      <VersionControl commit_sha={message.version} />
+    </div>
+  );
 
   const timestamp = !isStreaming && (
     <span className="px-1 text-[11px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -92,6 +103,7 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
     return (
       <div className={`group flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} animate-message-in`}>
         <AgentCardRenderer message={message} />
+        {versionControl}
         {message.agentCard.type === 'error_fix_request' && timestamp}
       </div>
     );
@@ -114,6 +126,13 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
+                table({ children, ...props }) {
+                  return (
+                    <div className="overflow-x-auto max-w-full">
+                      <table {...props}>{children}</table>
+                    </div>
+                  );
+                },
                 code({ children, className, ...props }) {
                   const isInline = !className;
                   if (isInline) {
@@ -160,7 +179,8 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
           </div>
         )}
       </div>
+      {versionControl}
       {timestamp}
     </div>
   );
-}
+});

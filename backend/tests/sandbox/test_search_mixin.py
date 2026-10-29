@@ -72,7 +72,9 @@ class TestGrep:
         assert matches[0].line == 2
         assert "hello world" in matches[0].content
 
-    async def test_max_results_passes_expected_flag(self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_max_results_passes_expected_flag(
+        self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(search_mixin_module.shutil, "which", lambda _name: "rg")
         seen: dict[str, str] = {}
 
@@ -100,7 +102,9 @@ class TestGrep:
         matches = await sandbox.grep("match_", max_results=None)
         assert len(matches) == 2
 
-    async def test_file_pattern_passes_expected_flag(self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_file_pattern_passes_expected_flag(
+        self, sandbox: DummySandbox, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(search_mixin_module.shutil, "which", lambda _name: "rg")
         seen: dict[str, str] = {}
 

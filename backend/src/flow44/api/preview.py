@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import Response
 
 from flow44.api.deps import ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
+from flow44.db.locks import LockNamespace, advisory_lock
 from flow44.sandbox.manager import sandbox_manager
 
 logger = logging.getLogger(__name__)
@@ -117,20 +118,21 @@ async def proxy_to_sandbox(
 @router.websocket("/{project_id}/proxy")
 async def proxy_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandboxDep) -> None:
     """Proxy WebSocket connections for Vite HMR."""
-    await websocket.accept()
+    await websocket.accept(subprotocol="vite-hmr")
 
     import asyncio  # noqa: PLC0415
 
     import websockets  # noqa: PLC0415
+    from websockets.typing import Subprotocol  # noqa: PLC0415
 
-    proxy_prefix = f"/api/preview/{project.id}/proxy"
+    # Vite upgrades only an exact match of its base (trailing slash included) carrying the vite-hmr subprotocol.
+    target_url = f"ws://127.0.0.1:{sandbox.port}/api/preview/{project.id}/proxy/"
     query = websocket.scope.get("query_string", b"").decode()
-    target_url = f"ws://127.0.0.1:{sandbox.port}{proxy_prefix}"
     if query:
         target_url += f"?{query}"
 
     try:
-        async with websockets.connect(target_url) as upstream:
+        async with websockets.connect(target_url, subprotocols=[Subprotocol("vite-hmr")]) as upstream:
 
             async def client_to_upstream() -> None:
                 try:
@@ -143,7 +145,9 @@ async def proxy_ws(websocket: WebSocket, project: WsProjectDep, sandbox: WsSandb
             async def upstream_to_client() -> None:
                 try:
                     async for msg in upstream:
-                        await websocket.send_text(str(msg))
+                        # Checkouts hold this lock; an update sent mid-checkout refetches half-written files.
+                        async with advisory_lock(LockNamespace.workspace, project.id):
+                            await websocket.send_text(str(msg))
                 except Exception:
                     logger.debug("HMR upstream→client relay ended")
 

@@ -11,12 +11,13 @@ from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import UX_DESIGN_PROMPT, render_architecture, render_user_plan
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_failure_logger import record_span_error
+from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
 from flow44.db.pending_plan import save_pending_plan
 from flow44.sandbox.main import PnpmSandbox
+from flow44.services.logging.helpers import bi_logger
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,7 @@ class PlanAgent(BaseAgent):
             from flow44.db.project_data_source import update_project_data_sources  # noqa: PLC0415
 
             await update_project_data_sources(state.project_id, state.build_state.data_source_contexts)
+            bi_logger.data_sources_added(state.build_state.data_source_contexts)
             await state.emit_fn(
                 {
                     "type": "data_sources_fetched",

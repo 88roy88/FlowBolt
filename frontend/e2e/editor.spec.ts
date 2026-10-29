@@ -440,7 +440,7 @@ test.describe('Editor read-only gating', () => {
       const createRoot = fileTreeContainer(page).getByRole('button', { name: 'Create file' });
       await expect(createRoot.first()).toBeVisible();
 
-      const chatInput = page.getByPlaceholder(/describe what you want/i);
+      const chatInput = page.getByPlaceholder(/what do you want to build/i);
       await expect(chatInput).toBeVisible({ timeout: 10_000 });
       await chatInput.fill('Please continue with a tiny follow-up change');
       await page.getByRole('button', { name: /send message/i }).click();

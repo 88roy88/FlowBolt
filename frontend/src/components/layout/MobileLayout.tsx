@@ -1,24 +1,29 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, Eye, Menu } from 'lucide-react';
 import { ChatPanel } from '../chat/ChatPanel';
 import { Preview } from '../preview/Preview';
 import { Sidebar } from './Sidebar';
 import { GlobalProgress } from './GlobalProgress';
+import { PreviewVersionBanner } from '../preview/PreviewVersionBanner';
 import { FlowBrand } from '../ui/flow-logo';
 import { PromptInput } from '../chat/PromptInput';
 import { useChatStore } from '../../stores/chat';
+import { useSessionStore } from '../../stores/session';
 
 type MobileTab = 'chat' | 'preview';
 
 export function MobileLayout() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<MobileTab>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
+  const projectId = useSessionStore((s) => s.projectId);
 
-  const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
+  const isEmptyState = !projectId || (historyLoaded && messages.length === 0 && !isStreaming);
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -32,6 +37,7 @@ export function MobileLayout() {
       </div>
 
       <GlobalProgress />
+      <PreviewVersionBanner />
 
       {/* Content */}
       {isEmptyState ? (
@@ -46,7 +52,7 @@ export function MobileLayout() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground text-center leading-relaxed">
-              Describe what you want to build and the AI will generate it for you.
+              {t('onboarding.taglineMobile')}
             </p>
             <div className="w-full">
               <PromptInput />

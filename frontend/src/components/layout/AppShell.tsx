@@ -7,6 +7,7 @@ import { ClassicLayout } from './ClassicLayout';
 import { FlexibleLayout } from './FlexibleLayout';
 import { MobileLayout } from './MobileLayout';
 import { BottomDrawer } from './BottomDrawer';
+import { PreviewVersionBanner } from '../preview/PreviewVersionBanner';
 import { PublishModal } from '../publish/PublishModal';
 import { AdminPanel } from '../admin/AdminPanel';
 import { FlowBrand, FlowLogo } from '../ui/flow-logo';
@@ -15,7 +16,10 @@ import { Settings, Shield } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
+import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { startProjectFromPrompt } from '../../utils/newProject';
+import { getProjectHasMessages, setProjectHasMessages } from '../../utils/projectHasMessagesCache';
 
 const SIDEBAR_WIDTH = 280;
 const RAIL_WIDTH = 56;
@@ -35,23 +39,6 @@ function loadSidebarExpanded(): boolean {
   } catch {
     return false;
   }
-}
-
-function getProjectHasMessages(projectId: string): boolean | null {
-  try {
-    const v = localStorage.getItem(`project-has-messages:${projectId}`);
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-    return null; // No cache
-  } catch {
-    return null;
-  }
-}
-
-function setProjectHasMessages(projectId: string, hasMessages: boolean) {
-  try {
-    localStorage.setItem(`project-has-messages:${projectId}`, hasMessages ? 'true' : 'false');
-  } catch {}
 }
 
 export function AppShell() {
@@ -76,12 +63,15 @@ export function AppShell() {
   };
 
   // Shared state
+  const { lock } = useWorkspaceLock();
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
   const projects = useSessionStore((s) => s.projects);
   const currentProject = useSessionStore((s) => s.currentProject);
   const userStatus = useSessionStore((s) => s.userStatus);
+  const isCreating = useSessionStore((s) => s.isCreating);
+  const canCreate = userStatus?.is_platform_user || userStatus?.is_admin;
 
   // Use cache to determine layout before history loads to prevent flicker
   // Read project ID from URL hash immediately (don't wait for currentProject to be set)
@@ -89,9 +79,9 @@ export function AppShell() {
   const projectIdForCache = currentProject?.id || urlProjectId;
   const cachedHasMessages = projectIdForCache ? getProjectHasMessages(projectIdForCache) : null;
 
-  const isNewProject = historyLoaded
+  const isNewProject = !projectIdForCache || (historyLoaded
     ? (messages.length === 0 && !isStreaming)
-    : (cachedHasMessages !== true); // Show empty state unless cache explicitly says has messages
+    : cachedHasMessages === false);
   const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
 
   // Update cache after history loads
@@ -101,6 +91,11 @@ export function AppShell() {
       setProjectHasMessages(currentProject.id, hasMessages);
     }
   }, [historyLoaded, messages.length, currentProject?.id]);
+
+  const handleHint = (hint: string) => {
+    if (currentProject) useChatStore.getState().sendMessage(hint);
+    else void startProjectFromPrompt(hint);
+  };
 
 
   // Project colors + initials for icon rail
@@ -204,6 +199,7 @@ export function AppShell() {
       {/* Main content */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <GlobalProgress />
+        <PreviewVersionBanner />
 
         {isNewProject ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8 relative overflow-hidden">
@@ -223,16 +219,17 @@ export function AppShell() {
                 </div>
               </div>
               <p className="text-base text-muted-foreground max-w-md text-center leading-relaxed">
-                {t('app.tagline')}
+                {t('onboarding.tagline')}
               </p>
               <div className="w-full">
                 <PromptInput />
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
-                {[t('app.hints.dashboard'), t('app.hints.todo'), t('app.hints.landing')].map((hint) => (
+                {[t('onboarding.hintDashboard'), t('onboarding.hintTodoApp'), t('onboarding.hintLandingPage')].map((hint) => (
                   <button
                     key={hint}
-                    onClick={() => useChatStore.getState().sendMessage(hint)}
+                    onClick={() => handleHint(hint)}
+                    disabled={lock !== null || isCreating || (!currentProject && !canCreate)}
                     className="px-3 py-1.5 text-xs bg-primary/5 text-primary/60 border border-primary/20 rounded-full hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-150 cursor-pointer"
                   >
                     {hint}

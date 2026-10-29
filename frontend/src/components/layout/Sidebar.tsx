@@ -1,4 +1,4 @@
-import { useState, useRef, type CSSProperties } from 'react';
+import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSessionStore } from '../../stores/session';
 import { useChatStore } from '../../stores/chat';
@@ -8,11 +8,12 @@ import { FlowBrand } from '../ui/flow-logo';
 import { DELETE_ROLES, MANAGE_ROLES, type ProjectSummary } from '../../types';
 import { SummaryModal } from './SummaryModal';
 import { ShareModal } from '../sharing/ShareModal';
-import { reapProject } from '../../services/api';
-import { isSpecialUser } from '../../utils/easterEgg';
 import { pollFileTree } from '../../utils/pollFileTree';
+import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { useDebouncedValue } from '../../hooks/useDebounce';
+import { logger } from '../../services/logger';
 
 type SidebarProps = {
   onCollapse?: () => void;
@@ -38,6 +39,8 @@ function getProjectColor(name: string) {
   return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
 }
 
+const SEARCH_DEBOUNCE_MS = 250;
+
 const anchorName = (id: string) => `--a${id.replace(/-/g, '')}`;
 
 function getInitials(name: string) {
@@ -48,14 +51,18 @@ function getInitials(name: string) {
 
 export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProps) {
   const { t } = useTranslation();
-  const { projects, currentProject, setCurrentProject, createProject, deleteProject, renameProject, isCreating, userStatus } = useSessionStore();
+  const {
+    projects, projectsCursor, projectSearch, isLoadingMoreProjects, loadMoreProjects, searchProjects,
+    currentProject, setCurrentProject, createProject, deleteProject, renameProject, goHome, isCreating, userStatus,
+  } = useSessionStore();
   const { clearMessages, loadHistory } = useChatStore();
   const { loadFileTree, reset: resetFiles } = useFilesStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [failedSearch, setFailedSearch] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [showInput, setShowInput] = useState(false);
-  const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary } | null>(null);
-  const [shareModal, setShareModal] = useState<{ projectId: string; projectName: string; ownerUserId?: string } | null>(null);
+  const [summaryModal, setSummaryModal] = useState<{ projectName: string; summary: ProjectSummary; } | null>(null);
+  const [shareModal, setShareModal] = useState<{ projectId: string; projectName: string; ownerUserId?: string; } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -82,6 +89,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
 
   const handleSelect = (project: typeof projects[number]) => {
     setCurrentProject(project);
+    logger.info('project_opened', { entry_point: 'project_list' });
     window.location.hash = `#/project/${project.id}`;
     resetFiles();
     loadFileTree();
@@ -98,18 +106,8 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
     const wasSelected = currentProject?.id === id;
     await deleteProject(id);
     if (wasSelected) {
-      const next = useSessionStore.getState().currentProject;
-      if (next) {
-        window.location.hash = `#/project/${next.id}`;
-        resetFiles();
-        loadFileTree();
-        clearMessages();
-        loadHistory(next.id);
-      } else {
-        window.location.hash = '';
-        resetFiles();
-        clearMessages();
-      }
+      goHome();
+      resetFiles();
     }
   };
 
@@ -139,12 +137,23 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
     }
   };
 
-  const menuProject = projects.find((p) => p.id === menuProjectId);
-  const canSearchProjects = projects.length > 10;
-  const normalizedSearch = canSearchProjects ? searchQuery.trim().toLowerCase() : '';
-  const visibleProjects = normalizedSearch
-    ? projects.filter((p) => p.name.toLowerCase().includes(normalizedSearch))
-    : projects;
+  const canSearchProjects = projects.length > 10 || projectsCursor !== null;
+  const trimmedSearch = canSearchProjects ? searchQuery.trim() : '';
+
+  const debouncedSearch = useDebouncedValue(trimmedSearch, SEARCH_DEBOUNCE_MS);
+  const searchTerm = trimmedSearch ? debouncedSearch : '';
+
+  useEffect(() => {
+    searchProjects(searchTerm).catch((err) => {
+      console.error('Project search failed:', err);
+      setFailedSearch(searchTerm);
+    });
+  }, [searchTerm, searchProjects]);
+
+  const isSearching = trimmedSearch !== '' && trimmedSearch !== projectSearch?.query && trimmedSearch !== failedSearch;
+  const visibleProjects = projectSearch?.results ?? projects;
+  const hasMoreProjects = !isSearching && (projectSearch ? projectSearch.cursor : projectsCursor) !== null;
+  const menuProject = visibleProjects.find((p) => p.id === menuProjectId);
 
   return (
     <div className="flex flex-col h-full">
@@ -204,11 +213,16 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
       {canSearchProjects && (
         <div className="px-3 mb-2">
           <div className="flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-lg">
-            <Search size={14} className="shrink-0 text-muted-foreground" />
+            {isSearching
+              ? <Loader2 size={14} className="shrink-0 animate-spin text-muted-foreground" data-testid="project-search-loading" />
+              : <Search size={14} className="shrink-0 text-muted-foreground" />}
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setFailedSearch(null);
+              }}
               placeholder={t('sidebar.searchPlaceholder')}
               data-testid="project-search"
               className="flex-1 text-[13px] bg-transparent"
@@ -218,7 +232,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
       )}
 
       {/* Project list */}
-      <div className="flex-1 overflow-auto px-2">
+      <div className={`flex-1 overflow-auto px-2 transition-opacity ${isSearching ? 'opacity-50' : ''}`} aria-busy={isSearching}>
         {visibleProjects.map((project) => {
           const isActive = currentProject?.id === project.id;
           const colorClass = getProjectColor(project.name);
@@ -227,9 +241,8 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
               <div
                 onClick={() => handleSelect(project)}
                 data-testid={`project-item-${project.id}`}
-                className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${
-                  isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
-                }`}
+                className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
+                  }`}
               >
                 <div className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${colorClass}`}>
                   {getInitials(project.name)}
@@ -277,10 +290,23 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
             </div>
           );
         })}
-        {normalizedSearch && visibleProjects.length === 0 && (
+        {projectSearch && !isSearching && visibleProjects.length === 0 && (
           <div className="px-2 py-2 text-[13px] text-muted-foreground">
             {t('sidebar.noProjectsMatch')}
           </div>
+        )}
+        {hasMoreProjects && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadMoreProjects().catch((err) => console.error('Failed to load more projects:', err))}
+            disabled={isLoadingMoreProjects}
+            data-testid="load-more-projects"
+            className="w-full my-1 text-[13px] text-muted-foreground hover:text-foreground"
+          >
+            {isLoadingMoreProjects && <Loader2 size={14} className="animate-spin" />}
+            {t('sidebar.loadMore')}
+          </Button>
         )}
       </div>
 
@@ -326,7 +352,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
                 {t('sharing.share', 'Share')}
               </button>
             )}
-            {isSpecialUser() && (
+            {userStatus?.is_admin && (
               <button
                 onClick={async () => {
                   closeMenu();
@@ -343,11 +369,10 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
             {(!menuProject.role || DELETE_ROLES.has(menuProject.role)) && (
               <button
                 onClick={() => handleDelete(menuProject.id)}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${
-                  pendingDeleteId === menuProject.id
-                    ? 'text-destructive bg-destructive/10'
-                    : 'text-foreground hover:bg-muted/50'
-                }`}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[13px] transition-colors text-left ${pendingDeleteId === menuProject.id
+                  ? 'text-destructive bg-destructive/10'
+                  : 'text-foreground hover:bg-muted/50'
+                  }`}
               >
                 <Trash2 size={13} className={pendingDeleteId === menuProject.id ? 'text-destructive' : 'text-muted-foreground'} />
                 {pendingDeleteId === menuProject.id ? t('sidebar.confirmDelete') : t('common.delete')}

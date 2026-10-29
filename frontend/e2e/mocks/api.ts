@@ -122,6 +122,8 @@ export interface MockAPIOptions {
   searchUnavailable?: boolean;
   /** Return 401 on the first GET /api/projects, then succeed — exercises the refresh-on-401 retry. */
   failProjectsOnce?: boolean;
+  /** Flags returned by GET /api/projects/me. Defaults to an admin. */
+  userStatus?: { is_admin: boolean; is_platform_user: boolean };
 }
 
 function escapeRegExp(value: string): string {
@@ -151,7 +153,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     if (options.failProjectsOnce && projectsGetCount === 1) {
       return route.fulfill({ status: 401, body: 'unauthorized' });
     }
-    return route.fulfill({ json: [...projects] });
+    return route.fulfill({ json: { projects: [...projects], next_cursor: null } });
   });
 
   await page.route('**/api/projects/*', async (route) => {
@@ -159,7 +161,8 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
 
     // User status endpoint
     if (url.endsWith('/me')) {
-      return route.fulfill({ json: { user_id: 'test-user', is_admin: true, is_platform_user: true } });
+      const status = options.userStatus ?? { is_admin: true, is_platform_user: true };
+      return route.fulfill({ json: { user_id: 'test-user', ...status } });
     }
 
     // Skip sub-routes like /name, /model, /members
@@ -175,7 +178,8 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
       if (idx >= 0) projects.splice(idx, 1);
       return route.fulfill({ status: 204, body: '' });
     }
-    return route.fulfill({ json: projects[0] ?? MOCK_PROJECT });
+    const requestedId = new URL(url).pathname.split('/').pop();
+    return route.fulfill({ json: projects.find((p) => p.id === requestedId) ?? projects[0] ?? MOCK_PROJECT });
   });
 
   // --- Files ---

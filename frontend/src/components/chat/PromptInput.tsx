@@ -1,49 +1,49 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
-import { isAgentAlive, isAwaitingPlanApproval, isAwaitingInterview } from '../../stores/chatAgentState';
+import { isAwaitingPlanApproval, isAwaitingInterview } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
-import { ArrowUp, Loader2, Database, X } from 'lucide-react';
+import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
+import { ArrowUp, CirclePlus, Loader2, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
 import { Badge } from '../ui/badge';
-
-import { WRITE_ROLES } from '../../types';
+import { startProjectFromPrompt } from '../../utils/newProject';
 
 export function PromptInput() {
   const { t } = useTranslation();
-  const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const [showDsSelector, setShowDsSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const value = useChatStore((s) => s.draft);
+  const setValue = useChatStore((s) => s.setDraft);
   const agentPhase = useChatStore((s) => s.agentPhase);
-  const agentAlive = useChatStore(isAgentAlive);
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
   const awaitingInterview = useChatStore(isAwaitingInterview);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const projectId = useSessionStore((s) => s.projectId);
-  const currentProject = useSessionStore((s) => s.currentProject);
-  const projectRole = currentProject?.role;
-  const canWrite = !projectRole || WRITE_ROLES.has(projectRole);
-  const inputBlocked = agentAlive || awaitingPlan || awaitingInterview || !canWrite;
+  const isCreating = useSessionStore((s) => s.isCreating);
+  const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
+  const { lock, agentBusy } = useWorkspaceLock();
+  const inputBlocked = lock !== null || awaitingPlan || awaitingInterview || isCreating;
+  // No project open: submitting starts a new one, if the user may create projects
+  const startsProject = !projectId && canCreate;
 
-  const adjustHeight = useCallback(() => {
+  useLayoutEffect(() => {
     const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
-    }
-  }, []);
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  }, [value]);
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || inputBlocked || !projectId) return;
-    sendMessage(trimmed);
-    setValue('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    if (!trimmed || inputBlocked) return;
+    if (projectId) sendMessage(trimmed);
+    else if (startsProject) void startProjectFromPrompt(trimmed);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -53,7 +53,7 @@ export function PromptInput() {
     }
   };
 
-  const disabled = inputBlocked || !projectId;
+  const disabled = inputBlocked || (!projectId && !startsProject);
   const canSend = !!value.trim() && !disabled;
   const dsOpen = showDsSelector && !disabled;
 
@@ -70,11 +70,11 @@ export function PromptInput() {
   }, []);
 
   const placeholderText = () => {
-    if (!projectId) return t('chat.placeholder.selectProject');
-    if (!canWrite) return t('chat.placeholder.readOnly');
+    if (isCreating) return t('chat.placeholder.creatingProject');
+    if (!projectId && !startsProject) return t('chat.placeholder.selectProject');
     if (awaitingPlan) return t('chat.placeholder.reviewPlan');
     if (awaitingInterview) return t('chat.placeholder.reviewInterview');
-    if (inputBlocked) return t('chat.placeholder.working');
+    if (lock) return t(LOCK_MESSAGES[lock]);
     return t('chat.placeholder.default');
   };
   const placeholder = placeholderText();
@@ -103,7 +103,7 @@ export function PromptInput() {
         <div className="flex items-center justify-center gap-1.5 text-xs text-warning mb-2">
           <span>↑ {t('chat.placeholder.reviewPlan')}</span>
         </div>
-      ) : agentAlive ? (
+      ) : agentBusy ? (
         <div className="flex items-center justify-center gap-1.5 text-xs text-primary mb-2">
           <Loader2 size={13} className="animate-spin" />
           <span>{busyLabel}...</span>
@@ -138,7 +138,7 @@ export function PromptInput() {
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => { setValue(e.target.value); adjustHeight(); }}
+          onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -151,7 +151,7 @@ export function PromptInput() {
 
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}
-          {projectId && (
+          {(projectId || startsProject) && (
             <button
               onClick={() => setShowDsSelector((v) => !v)}
               disabled={disabled}
@@ -160,7 +160,7 @@ export function PromptInput() {
               } ${selectedDataSources.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
               title={dsOpen ? 'Hide data source selector' : 'Attach data sources'}
             >
-              <Database size={15} />
+              <CirclePlus size={18} />
               {selectedDataSources.length > 0 && (
                 <span className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 rounded-full bg-primary text-text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
                   {selectedDataSources.length}

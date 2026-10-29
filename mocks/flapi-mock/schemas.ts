@@ -26,12 +26,11 @@ const ParamType = Type.Union([
 
 const OntologyType = Type.Union([
   Type.Literal('TEXT'),
-  Type.Literal('GEOMETRY'),
-  Type.Literal('TOOLID'),
-  Type.Literal('PSTN'),
-  Type.Literal('IMEI'),
-  Type.Literal('IMSI'),
-  Type.Literal('TIME'),
+  Type.Literal('LOCATION'),
+  Type.Literal('ENTITY_ID'),
+  Type.Literal('CONTACT_INFO'),
+  Type.Literal('DEVICE_ID'),
+  Type.Literal('TIMESTAMP'),
 ]);
 
 const SearchResultType = Type.Literal('Package');
@@ -121,6 +120,13 @@ export const QuickParamDefinitionSchema = Type.Object({
   IsRequireAny: Type.Boolean(),   // Is it even exist?
 
   Value: Type.Array(QuickParamValueSchema),
+
+  quickParameterInfo: Type.Optional(
+    Type.Object({
+      DisplayName: Type.Union([Type.String(), Type.Null()]),
+      Description: Type.Union([Type.String(), Type.Null()]),
+    }),
+  ),
 });
 
 export type QuickParamDefinition = Static<typeof QuickParamDefinitionSchema>;
