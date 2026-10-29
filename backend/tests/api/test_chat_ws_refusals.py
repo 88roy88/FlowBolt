@@ -103,6 +103,7 @@ def test_message_refused_as_busy_saves_nothing() -> None:
 def test_refused_plan_accept_keeps_the_pending_plan() -> None:
     state = MagicMock()
     state.model = "claude-opus-5"
+    state.phase = "awaiting_approval"
     with (
         patch("flow44.api.chat.get_pending_plan", new_callable=AsyncMock, return_value="{}"),
         patch("flow44.api.chat.BuildState") as build_state,

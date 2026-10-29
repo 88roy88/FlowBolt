@@ -18,7 +18,7 @@ from flow44.db.project_data_source import DataSourceContext
 def _make_agent(monkeypatch: pytest.MonkeyPatch) -> tuple[InterviewAgent, list[dict[str, Any]], list[str]]:
     sandbox = SimpleNamespace(project_id="proj-1")
     agent = InterviewAgent(project_id="proj-1", sandbox=sandbox, user_id="user-1")  # type: ignore[arg-type]
-    agent._setup_trace = lambda tags: None  # type: ignore[method-assign, assignment]  # noqa: ARG005
+    agent._setup_trace = lambda tags: None  # type: ignore[method-assign, assignment]
 
     emitted: list[dict[str, Any]] = []
 
@@ -235,9 +235,7 @@ class TestRun:
 
         agent._generate_questions = _generate  # type: ignore[method-assign]
 
-        await agent.run(
-            "build a dashboard", ["sales"], gather_context=_gather, continue_with=host.continue_with
-        )
+        await agent.run("build a dashboard", ["sales"], gather_context=_gather, continue_with=host.continue_with)
 
         assert order == ["gather", "generate"]
         persisted = BuildState.model_validate_json(saved[-1])
@@ -292,7 +290,8 @@ class TestResume:
             )
         ]
 
-        await agent.resume(state, [InterviewAnswer(question_id="q-1", values=["My team"])], continue_with=host.continue_with)
+        answers = [InterviewAnswer(question_id="q-1", values=["My team"])]
+        await agent.resume(state, answers, continue_with=host.continue_with)
 
         assert host.continued == [state]
         assert saved == [], "the plan flow's persist step owns the save; an interim one is unreachable"

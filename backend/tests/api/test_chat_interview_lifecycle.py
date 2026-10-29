@@ -43,12 +43,13 @@ def _connect_and_send_all(payloads: list[dict[str, object]], state: BuildState) 
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=_mock_project()),
         patch("flow44.api.deps.get_project_member", new_callable=AsyncMock, return_value=object()),
-        patch("flow44.api.deps.get_user_id", return_value="user-a"),
+        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"),
         patch("flow44.api.chat.sandbox_manager") as mock_mgr,
+        patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
         patch("flow44.api.chat.subscribe", return_value=queue),
         patch("flow44.api.chat.unsubscribe"),
         patch("flow44.api.chat.get_pending_plan", new_callable=AsyncMock, return_value=state.model_dump_json()),
-        patch("flow44.api.chat._start_agent", new_callable=AsyncMock) as mock_start_agent,
+        patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as mock_start_turn,
     ):
         mock_mgr.wake_sandbox = AsyncMock(return_value=sandbox)
         responses: list[dict[str, object]] = []
@@ -56,7 +57,7 @@ def _connect_and_send_all(payloads: list[dict[str, object]], state: BuildState) 
             for payload in payloads:
                 ws.send_json(payload)
                 responses.append(ws.receive_json())
-        assert mock_start_agent.await_count == 0
+        assert mock_start_turn.await_count == 0
         return responses
 
 

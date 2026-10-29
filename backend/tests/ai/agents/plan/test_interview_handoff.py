@@ -16,7 +16,7 @@ from flow44.db.project_data_source import DataSourceContext
 def _make_agent() -> PlanAgent:
     sandbox = SimpleNamespace(project_id="proj-1")
     agent = PlanAgent(project_id="proj-1", sandbox=sandbox, user_id="user-1")  # type: ignore[arg-type]
-    agent._setup_trace = lambda tags: None  # type: ignore[method-assign, assignment]  # noqa: ARG005
+    agent._setup_trace = lambda tags: None  # type: ignore[method-assign, assignment]
 
     async def emit(event: dict[str, Any]) -> None:
         return None
