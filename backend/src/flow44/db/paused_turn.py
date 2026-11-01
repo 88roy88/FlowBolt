@@ -1,8 +1,11 @@
 from datetime import UTC, datetime
+from typing import Literal
 
 from sqlmodel import Field, SQLModel
 
 from flow44.db import database
+
+PausedPhase = Literal["awaiting_approval", "awaiting_interview"]
 
 
 class PausedTurn(SQLModel, table=True):
@@ -14,7 +17,7 @@ class PausedTurn(SQLModel, table=True):
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
-async def pause_turn(project_id: str, phase: str, state_json: str) -> None:
+async def pause_turn(project_id: str, phase: PausedPhase, state_json: str) -> None:
     async with database.async_session() as session:
         await session.merge(PausedTurn(project_id=project_id, phase=phase, state_json=state_json))
         await session.commit()
