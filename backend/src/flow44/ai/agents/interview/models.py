@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from flow44.db.project_data_source import DataSourceContext
+
 logger = logging.getLogger(__name__)
 
 MAX_QUESTIONS = 4
@@ -50,9 +52,9 @@ class InterviewAnswer(BaseModel):
 
 class InterviewSession(BaseModel):
     content: str
-    questions: list[InterviewQuestion]
-    paused_agent: str
-    paused_state: str
+    data_source_ids: list[str] = Field(default_factory=list)
+    data_source_contexts: list[DataSourceContext] = Field(default_factory=list)
+    questions: list[InterviewQuestion] = Field(default_factory=list)
     model: str | None = None
 
 

@@ -16,16 +16,15 @@ from pydantic import ValidationError
 
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
-from flow44.ai.agents.followup.agent import FollowUpAgent
-from flow44.ai.agents.interview.agent import InterviewAgent
 from flow44.ai.agents.interview.models import InterviewAnswer, InterviewSession
 from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.agents.routing import AgentRouter
 from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
 from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
-from flow44.db.events import emit_event, get_events, get_latest_event, subscribe, unsubscribe
+from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.paused_turn import clear_paused_turn, get_paused_turn
 from flow44.logic import data_source as ds_logic
@@ -38,11 +37,6 @@ logger = logging.getLogger(__name__)
 
 http_router = APIRouter(prefix="/api/chat", tags=["chat"])
 ws_router = APIRouter()
-
-
-async def _is_new_project(project_id: str) -> bool:
-    """A project is 'new' if no build has completed yet (no action_complete event)."""
-    return await get_latest_event(project_id, "action_complete") is None
 
 
 # Strong refs: asyncio holds tasks weakly, so a run could be GC'd mid-flight.
@@ -215,17 +209,7 @@ async def chat_ws(  # noqa: C901, PLR0915
             return None
         return turn.state_json
 
-    paused_agents = {
-        "plan": lambda model: (
-            PlanAgent(
-                project_id=project.id,
-                sandbox=sandbox,
-                model=model,
-                user_id=user_id,
-                data_source_authorization=data_source_authorization,
-            ).run_from_design
-        )
-    }
+    router = AgentRouter(project.id, sandbox, user_id=user_id, data_source_authorization=data_source_authorization)
 
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
@@ -256,34 +240,16 @@ async def chat_ws(  # noqa: C901, PLR0915
                         ]
 
                     source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
-                    agent_cls = PlanAgent if await _is_new_project(project.id) else FollowUpAgent
-                    agent = agent_cls(
-                        project_id=project.id,
-                        sandbox=sandbox,
-                        model=selected_model,
-                        user_id=user_id,
-                        data_source_authorization=data_source_authorization,
-                    )
-                    run = partial(agent.run, user_content, data_source_ids=source_ids)
-                    if isinstance(agent, PlanAgent) and mode == "interview":
-                        interview_agent = InterviewAgent(
-                            project_id=project.id,
-                            sandbox=sandbox,
-                            model=selected_model,
-                            user_id=user_id,
-                        )
-                        run = partial(
-                            interview_agent.run,
-                            user_content,
-                            source_ids,
-                            gather_context=agent.prefetch_data_sources,
-                            paused_agent="plan",
-                            continue_with=agent.run_from_design,
-                        )
                     # Claim first: a refused turn must not leave the message behind.
                     await _start_turn(
                         project.id,
-                        run,
+                        partial(
+                            router.handle_message,
+                            user_content,
+                            source_ids,
+                            model=selected_model,
+                            interview=mode == "interview",
+                        ),
                         prepare=partial(_save_user_turn, project.id, user_content, user_event),
                     )
 
@@ -349,18 +315,9 @@ async def chat_ws(  # noqa: C901, PLR0915
                         else []
                     )
 
-                    model = selected_model or session.model
-                    interview_agent = InterviewAgent(
-                        project_id=project.id, sandbox=sandbox, model=model, user_id=user_id
-                    )
                     await _start_turn(
                         project.id,
-                        partial(
-                            interview_agent.resume,
-                            session,
-                            answers,
-                            continue_with=paused_agents[session.paused_agent](model),
-                        ),
+                        partial(router.resume_interview, session, answers, model=selected_model or session.model),
                     )
 
                 elif msg_type == "fix_error":

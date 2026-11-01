@@ -42,7 +42,6 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
         patch("flow44.api.chat.sandbox_manager") as mgr,
         patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
         patch("flow44.api.chat.versioning.begin_turn", claim),
-        patch("flow44.api.chat._is_new_project", new_callable=AsyncMock, return_value=True),
         patch("flow44.api.chat.save_message", writes["save_message"]),
         patch("flow44.api.chat.emit_event", writes["emit_event"]),
         patch("flow44.api.chat.clear_paused_turn", writes["clear_paused_turn"]),

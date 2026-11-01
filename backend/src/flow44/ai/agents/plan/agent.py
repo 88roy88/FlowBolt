@@ -5,7 +5,7 @@ import logging
 from opik import track
 
 from flow44.ai.agents._base import BaseAgent
-from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
+from flow44.ai.agents.analyze_data_source import fetch_data_sources, generate_data_source_files
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
@@ -20,6 +20,7 @@ from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
 from flow44.db.paused_turn import pause_turn
+from flow44.db.project_data_source import DataSourceContext
 from flow44.sandbox.main import PnpmSandbox
 from flow44.services.logging.helpers import bi_logger
 
@@ -55,8 +56,20 @@ class PlanAgent(BaseAgent):
 
         return flow
 
-    def _make_plan_state(self) -> PlanState:
-        return PlanState(
+    @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
+    async def run(
+        self,
+        content: str,
+        data_source_ids: list[str] | None = None,
+        data_source_contexts: list[DataSourceContext] | None = None,
+    ) -> None:
+        self._state.user_content = content
+        self._state.data_source_ids = data_source_ids or []
+        self._state.data_source_contexts = data_source_contexts or []
+        self._setup_trace(["plan-agent"])
+
+        # Initialize plan state for Flow
+        plan_state = PlanState(
             build_state=self._state,
             project_id=self.project_id,
             sandbox_ref=self.sandbox,
@@ -67,67 +80,25 @@ class PlanAgent(BaseAgent):
             data_source_authorization=self._data_source_authorization,
         )
 
-    async def _run_flow(self, start: str | None = None) -> None:
-        start_step = start or ("fetch_data_sources" if self._state.data_source_ids else "design")
-        await self._flow.run(self._make_plan_state(), start=start_step)
+        # Run the flow
+        start_step = "fetch_data_sources" if self._state.data_source_ids else "design"
+        await self._flow.run(plan_state, start=start_step)
+
         self._set_trace_output({"user_plan_overview": self._state.user_plan_overview.model_dump()})
-
-    def _set_input(self, content: str, data_source_ids: list[str] | None) -> None:
-        self._state.user_content = content
-        self._state.data_source_ids = data_source_ids or []
-
-    @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
-    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
-        self._set_input(content, data_source_ids)
-        self._setup_trace(["plan-agent"])
-        await self._run_flow()
-
-    @track(name="plan-agent-prefetch")  # type: ignore[untyped-decorator]
-    async def prefetch_data_sources(self, content: str, data_source_ids: list[str] | None = None) -> BuildState:
-        # No _setup_trace: this runs nested inside another agent's trace, and setup_trace retags the current one.
-        self._set_input(content, data_source_ids)
-
-        if self._state.data_source_ids:
-            await self._step_fetch_data_sources(self._make_plan_state())
-
-        return self._state
-
-    @track(name="plan-agent-from-design", ignore_arguments=["paused_state"])  # type: ignore[untyped-decorator]
-    async def run_from_design(self, content: str, paused_state: str) -> None:
-        self._state = BuildState.model_validate_json(paused_state)
-        self._state.user_content = content
-        self._state.model = self.model
-        self._setup_trace(["plan-agent", "post-interview"])
-
-        await self._run_flow(start="design")
 
     # -- Flow Steps --
 
     async def _step_fetch_data_sources(self, state: PlanState) -> PlanState:
         """Step: Fetch and analyze data sources."""
-        await state.emit_fn({"type": "phase", "phase": "fetching_data_sources"})
-
-        try:
-            results = await asyncio.gather(
-                *[
-                    fetch_and_analyze_data_source(
-                        sid,
-                        self._state.user_content,
-                        self._data_source_authorization,
-                        self.model,
-                        self._llm_metadata,
-                    )
-                    for sid in state.build_state.data_source_ids
-                ]
+        if not state.build_state.data_source_contexts:
+            state.build_state.data_source_contexts = await fetch_data_sources(
+                state.build_state.data_source_ids,
+                self._state.user_content,
+                self._data_source_authorization,
+                self.model,
+                self._llm_metadata,
+                state.emit_fn,
             )
-        except Exception:
-            await state.emit_fn(
-                {"type": "error", "message": "Build aborted: failed to fetch required data source data."}
-            )
-            await state.emit_fn({"type": "phase", "phase": "idle"})
-            raise
-
-        state.build_state.data_source_contexts = [ctx for ctx in results if ctx is not None]
 
         # Generate deterministic hook + type files and write to sandbox
         for ctx in state.build_state.data_source_contexts:

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 from flow44.ai.agents.interview.models import InterviewOption, InterviewQuestion, InterviewSession
-from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.agents.routing import AgentRouter
 from flow44.main import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -34,9 +34,7 @@ def _base_interview_question() -> InterviewQuestion:
 
 
 def _turn(phase: str) -> MagicMock:
-    session = InterviewSession(
-        content="build a todo app", questions=[_base_interview_question()], paused_agent="plan", paused_state="{}"
-    )
+    session = InterviewSession(content="build a todo app", questions=[_base_interview_question()])
     return MagicMock(phase=phase, state_json=session.model_dump_json())
 
 
@@ -99,7 +97,7 @@ def test_non_object_frame_does_not_kill_the_session() -> None:
     assert responses[1] == {"type": "error", "message": "Invalid interview action"}
 
 
-def test_message_without_mode_skips_the_interview() -> None:
+def _start_turn_call(message: dict[str, object]) -> Any:
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
 
     with (
@@ -110,19 +108,30 @@ def test_message_without_mode_skips_the_interview() -> None:
         patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
         patch("flow44.api.chat.subscribe", return_value=queue),
         patch("flow44.api.chat.unsubscribe"),
-        patch("flow44.api.chat._is_new_project", new_callable=AsyncMock, return_value=True),
         patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as mock_start_turn,
-        patch("flow44.api.chat.InterviewAgent") as mock_interview_agent,
     ):
         mock_mgr.wake_sandbox = AsyncMock(return_value=MagicMock(project_id="proj-123"))
         with client.websocket_connect("/ws/chat/proj-123", headers={"cookie": "flow44_token=test-token"}) as ws:
-            ws.send_json({"type": "message", "content": "build a todo app"})
+            ws.send_json(message)
             ws.send_json({"type": "interview_response", "action": "submitt"})
             ws.receive_json()
 
     assert mock_start_turn.await_count == 1
-    assert isinstance(mock_start_turn.call_args.args[1].func.__self__, PlanAgent)
-    mock_interview_agent.assert_not_called()
+    return mock_start_turn.call_args.args[1]
+
+
+def test_message_without_mode_skips_the_interview() -> None:
+    turn = _start_turn_call({"type": "message", "content": "build a todo app"})
+
+    assert turn.func.__func__ is AgentRouter.handle_message
+    assert turn.keywords["interview"] is False
+
+
+def test_message_in_interview_mode_asks_the_router_to_interview() -> None:
+    turn = _start_turn_call({"type": "message", "content": "build a todo app", "mode": "interview"})
+
+    assert turn.func.__func__ is AgentRouter.handle_message
+    assert turn.keywords["interview"] is True
 
 
 def test_non_iterable_answers_do_not_kill_the_session() -> None:
