@@ -199,13 +199,10 @@ async def chat_ws(  # noqa: C901, PLR0915
         except Exception:
             logger.debug("Event forwarding stopped for session %s", project.id)
 
-    async def _paused_state(phase: str, missing: str, wrong_phase: str) -> str | None:
+    async def _paused_state(phase: str, missing: str) -> str | None:
         turn = await get_paused_turn(project.id)
-        if turn is None:
+        if turn is None or turn.phase != phase:
             await websocket.send_json({"type": "error", "message": missing})
-            return None
-        if turn.phase != phase:
-            await websocket.send_json({"type": "error", "message": wrong_phase})
             return None
         return turn.state_json
 
@@ -258,11 +255,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     feedback = data.get("feedback")
                     selected_model = data.get("model")
 
-                    state_json = await _paused_state(
-                        "awaiting_approval",
-                        "No pending plan found",
-                        "Plan response is only allowed while awaiting approval",
-                    )
+                    state_json = await _paused_state("awaiting_approval", "No pending plan found")
                     if state_json is None:
                         continue
                     state = BuildState.model_validate_json(state_json)
@@ -295,29 +288,23 @@ async def chat_ws(  # noqa: C901, PLR0915
 
                 elif msg_type == "interview_response":
                     action = data.get("action")
-                    selected_model = data.get("model")
                     if action not in ("submit", "skip"):
                         await websocket.send_json({"type": "error", "message": "Invalid interview action"})
                         continue
 
-                    state_json = await _paused_state(
-                        "awaiting_interview",
-                        "No pending interview found",
-                        "Interview response is only allowed while awaiting interview",
-                    )
+                    state_json = await _paused_state("awaiting_interview", "No pending interview found")
                     if state_json is None:
                         continue
                     session = InterviewSession.model_validate_json(state_json)
 
-                    answers = (
-                        [InterviewAnswer.model_validate(a) for a in data.get("answers") or []]
-                        if action == "submit"
-                        else []
-                    )
+                    answers: list[InterviewAnswer] = []
+                    if action == "submit":
+                        answers = [InterviewAnswer.model_validate(a) for a in data.get("answers") or []]
 
                     await _start_turn(
                         project.id,
-                        partial(router.resume_interview, session, answers, model=selected_model or session.model),
+                        partial(router.resume_interview, session, answers, model=session.model),
+                        prepare=partial(clear_paused_turn, project.id),
                     )
 
                 elif msg_type == "fix_error":

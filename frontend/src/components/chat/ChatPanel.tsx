@@ -98,7 +98,7 @@ export function ChatPanel() {
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
-  const showInterview = agentPhase === 'awaiting_interview' && interviewQuestions && interviewQuestions.length > 0;
+  const showInterview = agentPhase === 'awaiting_interview' && interviewQuestions;
   const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
   const showFixProgress = fixSteps.length > 0 && agentActive;
   const showFollowUpProgress = followUpSteps.length > 0 && agentActive;

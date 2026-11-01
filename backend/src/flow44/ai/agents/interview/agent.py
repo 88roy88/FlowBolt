@@ -23,8 +23,6 @@ def _describe_values(question: InterviewQuestion, values: list[str]) -> str:
 
 
 def _format_clarifications(questions: list[InterviewQuestion], answers: list[InterviewAnswer]) -> str:
-    if not answers:
-        return ""
     chosen = {a.question_id: a.values for a in answers if a.values}
     lines = [
         f"- {q.question}: {_describe_values(q, chosen[q.id])}"
@@ -89,8 +87,9 @@ class InterviewAgent(BaseAgent):
             }
         )
 
-        clarifications = _format_clarifications(session.questions, answers)
-        return f"{session.content}\n\n{clarifications}" if clarifications else session.content
+        if not answers:
+            return session.content
+        return f"{session.content}\n\n{_format_clarifications(session.questions, answers)}"
 
     @track(name="generate-interview")  # type: ignore[untyped-decorator]
     async def _generate_questions(

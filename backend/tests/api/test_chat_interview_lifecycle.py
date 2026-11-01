@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from flow44.ai.agents.interview.models import InterviewOption, InterviewQuestion, InterviewSession
 from flow44.ai.agents.routing import AgentRouter
+from flow44.db.paused_turn import clear_paused_turn
 from flow44.main import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -69,12 +70,12 @@ def _connect_and_send_all(payloads: list[Any], phase: str) -> list[dict[str, obj
 
 def test_plan_response_rejected_while_awaiting_interview() -> None:
     response = _connect_and_send({"type": "plan_response", "action": "accept"}, "awaiting_interview")
-    assert response == {"type": "error", "message": "Plan response is only allowed while awaiting approval"}
+    assert response == {"type": "error", "message": "No pending plan found"}
 
 
 def test_interview_response_rejected_while_awaiting_approval() -> None:
     response = _connect_and_send({"type": "interview_response", "action": "skip"}, "awaiting_approval")
-    assert response == {"type": "error", "message": "Interview response is only allowed while awaiting interview"}
+    assert response == {"type": "error", "message": "No pending interview found"}
 
 
 def test_interview_response_rejects_invalid_action() -> None:
@@ -108,6 +109,7 @@ def _start_turn_call(message: dict[str, object]) -> Any:
         patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
         patch("flow44.api.chat.subscribe", return_value=queue),
         patch("flow44.api.chat.unsubscribe"),
+        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=_turn("awaiting_interview")),
         patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as mock_start_turn,
     ):
         mock_mgr.wake_sandbox = AsyncMock(return_value=MagicMock(project_id="proj-123"))
@@ -117,21 +119,37 @@ def _start_turn_call(message: dict[str, object]) -> Any:
             ws.receive_json()
 
     assert mock_start_turn.await_count == 1
-    return mock_start_turn.call_args.args[1]
+    return mock_start_turn.call_args
 
 
 def test_message_without_mode_skips_the_interview() -> None:
-    turn = _start_turn_call({"type": "message", "content": "build a todo app"})
+    turn = _start_turn_call({"type": "message", "content": "build a todo app"}).args[1]
 
     assert turn.func.__func__ is AgentRouter.handle_message
     assert turn.keywords["interview"] is False
 
 
 def test_message_in_interview_mode_asks_the_router_to_interview() -> None:
-    turn = _start_turn_call({"type": "message", "content": "build a todo app", "mode": "interview"})
+    turn = _start_turn_call({"type": "message", "content": "build a todo app", "mode": "interview"}).args[1]
 
     assert turn.func.__func__ is AgentRouter.handle_message
     assert turn.keywords["interview"] is True
+
+
+def test_interview_response_clears_the_paused_turn_when_it_starts() -> None:
+    call = _start_turn_call({"type": "interview_response", "action": "submit", "answers": []})
+
+    assert call.args[1].func.__func__ is AgentRouter.resume_interview
+    assert call.kwargs["prepare"].func is clear_paused_turn
+    assert call.kwargs["prepare"].args == ("proj-123",)
+
+
+def test_skip_discards_answers_sent_by_the_client() -> None:
+    call = _start_turn_call(
+        {"type": "interview_response", "action": "skip", "answers": [{"question_id": "q-1", "values": ["Me"]}]}
+    )
+
+    assert call.args[1].args[1] == []
 
 
 def test_non_iterable_answers_do_not_kill_the_session() -> None:

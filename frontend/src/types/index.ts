@@ -239,7 +239,7 @@ export interface FollowUpStep {
 }
 
 export type WSMessage = { _ts?: string } & (
-  | { type: 'message'; content: string; model?: string; dataSourceIds?: number[]; mode?: 'interview' | 'build' }
+  | { type: 'message'; content: string; model?: string; dataSourceIds?: number[]; mode?: InterviewMode }
   | { type: 'text'; content: string }
   | { type: 'file'; path: string; content: string }
   | { type: 'shell_output'; command: string; output: string }
@@ -253,7 +253,7 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'plan_response'; action: 'accept' | 'modify'; feedback?: string }
   | { type: 'interview_questions'; questions: InterviewQuestion[] }
   | { type: 'interview_answered'; questions: InterviewQuestion[]; answers: InterviewAnswer[] }
-  | { type: 'interview_response'; action: 'submit' | 'skip'; answers?: InterviewAnswer[]; model?: string }
+  | { type: 'interview_response'; action: 'submit' | 'skip'; answers?: InterviewAnswer[] }
   | { type: 'project_summary'; summary: ProjectSummary }
   | { type: 'fix_step'; step: 'discover' | 'generate' | 'write' | 'validate' | 'retry'; status: 'running' | 'completed' | 'failed'; message: string }
   | { type: 'fix_error'; error_message: string; error_file?: string; error_line?: number; error_stack?: string; model?: string }
