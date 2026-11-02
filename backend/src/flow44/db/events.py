@@ -105,9 +105,7 @@ async def get_latest_event(project_id: str, event_type: str) -> AgentEvent | Non
 
 async def get_last_event_id(project_id: str) -> int:
     async with database.async_session() as session:
-        result = await session.execute(
-            select(func.max(AgentEvent.id)).where(AgentEvent.project_id == project_id)  # type: ignore[arg-type]
-        )
+        result = await session.execute(select(func.max(AgentEvent.id)).where(AgentEvent.project_id == project_id))
         return result.scalar_one_or_none() or 0
 
 
