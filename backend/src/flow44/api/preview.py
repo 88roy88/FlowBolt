@@ -5,7 +5,8 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
 
-from flow44.api.deps import ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
+from flow44.api.deps import PermissionsDep, ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
+from flow44.auth.permissions import Permission, has_permission
 from flow44.db.locks import LockNamespace, advisory_lock
 from flow44.sandbox.manager import sandbox_manager
 
@@ -67,6 +68,7 @@ async def get_preview_port(project: ProjectDep, sandbox: SandboxDep) -> dict[str
 )
 async def proxy_to_sandbox(
     project: ProjectDep,
+    permissions: PermissionsDep,
     path: str,
     request: Request,
 ) -> Response:
@@ -124,7 +126,11 @@ async def proxy_to_sandbox(
         response_headers.pop(h, None)
 
     content = resp.content
-    if content and resp.headers.get("content-type", "").startswith("text/html"):
+    if (
+        content
+        and resp.headers.get("content-type", "").startswith("text/html")
+        and has_permission(permissions, Permission.write)
+    ):
         content = _inject_toolbar(content)
 
     return Response(
