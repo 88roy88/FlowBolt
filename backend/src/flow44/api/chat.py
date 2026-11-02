@@ -206,7 +206,6 @@ async def _start_turn(
     try:
         if prepare is not None:
             await prepare()
-        # Everything after this point belongs to the AI's turn, so an abort trims back to here.
         rollback = partial(
             _rollback_turn, project_id, await get_last_event_id(project_id), datetime.now(UTC).isoformat(), on_abort
         )
@@ -340,7 +339,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                             project.id,
                             execute_agent.run,
                             prepare=partial(delete_pending_plan, project.id),
-                            # an abort trims back to the plan overview, so the plan must be approvable again
                             on_abort=partial(save_pending_plan, project.id, state_json),
                         )
 
