@@ -325,7 +325,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 <a
                   href={projectHref(a.project_id)}
                   onClick={(e) => { if (isPlainClick(e)) onClose(); }}
-                  className="min-w-0 text-[13px] truncate text-start hover:underline"
+                  className="min-w-0 text-[13px] text-inherit truncate text-start hover:underline"
                   title={`${t('admin.openProject', 'Open project')} (${a.project_id})`}
                 >
                   {a.name}

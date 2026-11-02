@@ -268,7 +268,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
                       e.preventDefault();
                       handleSelect(project);
                     }}
-                    className="flex-1 text-[13px] truncate after:absolute after:inset-0 after:rounded-md"
+                    className="flex-1 text-[13px] text-inherit truncate after:absolute after:inset-0 after:rounded-md"
                   >
                     {project.name}
                     {project.role && (
