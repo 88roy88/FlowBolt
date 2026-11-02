@@ -74,6 +74,10 @@ export function isAwaitingInterview(state: AwaitingInterviewState): boolean {
   );
 }
 
+export function isAwaitingUserInput(state: AwaitingPlanState & AwaitingInterviewState): boolean {
+  return isAwaitingPlanApproval(state) || isAwaitingInterview(state);
+}
+
 export function isAgentWorking(state: AgentActivityState): boolean {
   return state.isStreaming || ACTIVE_AGENT_PHASES.includes(state.agentPhase);
 }
