@@ -12,7 +12,6 @@ from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import ValidationError
 
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
@@ -211,12 +210,10 @@ async def chat_ws(  # noqa: C901, PLR0915
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
             raw = await websocket.receive_text()
-            msg_type = None
+            data = json.loads(raw)
+            msg_type = data.get("type")
 
             try:
-                data = json.loads(raw)
-                msg_type = data.get("type")
-
                 if msg_type == "message":
                     user_content: str = data["content"]
                     selected_model: str | None = data.get("model")
@@ -283,8 +280,6 @@ async def chat_ws(  # noqa: C901, PLR0915
                             user_id=user_id,
                         )
                         await _start_turn(project.id, partial(plan_agent.rebuild_with_feedback, state, feedback))
-                    else:
-                        await websocket.send_json({"type": "error", "message": "Invalid plan response action"})
 
                 elif msg_type == "interview_response":
                     action = data.get("action")
@@ -354,11 +349,6 @@ async def chat_ws(  # noqa: C901, PLR0915
             except (GitError, versioning.UnknownVersionError):
                 logger.exception("[versioning] %s failed for %s", msg_type, project.id)
                 await websocket.send_json(_VERSION_FAILED)
-            except ValidationError as exc:
-                await websocket.send_json({"type": "error", "message": f"Invalid payload: {exc.errors()[0]['msg']}"})
-            except (TypeError, KeyError, ValueError, AttributeError):
-                logger.warning("[chat] Malformed %s frame for session %s", msg_type, project.id, exc_info=True)
-                await websocket.send_json({"type": "error", "message": "Invalid payload"})
 
     forward_task = asyncio.create_task(_forward_events())
 

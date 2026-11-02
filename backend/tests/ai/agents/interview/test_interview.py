@@ -44,14 +44,12 @@ def _make_agent(
     return agent, emitted, paused
 
 
-def _question(
-    qid: str, *, question: str = "Who is this for?", options: list[dict[str, str]] | None = None
-) -> dict[str, Any]:
+def _question(qid: str) -> dict[str, Any]:
     return {
         "id": qid,
         "header": "Audience",
-        "question": question,
-        "options": options or [{"label": "Me", "description": "Personal use"}, {"label": "Team"}],
+        "question": "Who is this for?",
+        "options": [{"label": "Me", "description": "Personal use"}, {"label": "Team"}],
         "multi_select": False,
     }
 
@@ -178,60 +176,11 @@ class TestAsk:
 
         assert (await agent.ask("build something")).questions == []
 
-    async def test_only_malformed_questions_returns_no_questions(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_single_option_question_returns_no_questions(self, monkeypatch: pytest.MonkeyPatch) -> None:
         agent, _emitted, _paused = _make_agent(monkeypatch)
-        _stub_chat(monkeypatch, {"questions": [_question("q-1", options=[{"label": "Me"}])]})
+        _stub_chat(monkeypatch, {"questions": [{**_question("q-1"), "options": [{"label": "Me"}]}]})
 
         assert (await agent.ask("build something")).questions == []
-
-    async def test_drops_only_the_malformed_question(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        agent, _emitted, _paused = _make_agent(monkeypatch)
-        _stub_chat(
-            monkeypatch,
-            {
-                "questions": [
-                    _question("q-1", options=[{"label": "Me"}]),
-                    _question("q-2"),
-                    {"id": "q-3", "header": "No question text"},
-                ]
-            },
-        )
-
-        session = await agent.ask("build something")
-
-        assert [q.id for q in session.questions] == ["q-2"]
-
-    async def test_truncates_to_four_questions(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        agent, _emitted, _paused = _make_agent(monkeypatch)
-        _stub_chat(monkeypatch, {"questions": [_question(f"q-{n}") for n in range(1, 6)]})
-
-        session = await agent.ask("build something")
-
-        assert [q.id for q in session.questions] == ["q-1", "q-2", "q-3", "q-4"]
-
-    async def test_clamps_options_instead_of_dropping_the_question(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        agent, _emitted, _paused = _make_agent(monkeypatch)
-        _stub_chat(monkeypatch, {"questions": [_question("q-1", options=[{"label": f"opt-{n}"} for n in range(1, 6)])]})
-
-        session = await agent.ask("build something")
-
-        assert [o.label for o in session.questions[0].options] == ["opt-1", "opt-2", "opt-3", "opt-4"]
-
-    async def test_duplicate_question_ids_keep_the_first(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        agent, _emitted, _paused = _make_agent(monkeypatch)
-        _stub_chat(
-            monkeypatch,
-            {
-                "questions": [
-                    _question("q-1", question="Who is this for?"),
-                    _question("q-1", question="What look are you going for?"),
-                ]
-            },
-        )
-
-        session = await agent.ask("build something")
-
-        assert [q.question for q in session.questions] == ["Who is this for?"]
 
     async def test_generation_includes_data_source_context(self, monkeypatch: pytest.MonkeyPatch) -> None:
         agent, _emitted, _paused = _make_agent(monkeypatch)

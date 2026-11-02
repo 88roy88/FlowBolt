@@ -156,17 +156,11 @@ export function InterviewCard({ questions }: InterviewCardProps) {
         <Button variant="ghost" size="sm" disabled={isStreaming} onClick={() => respondToInterview('skip')} className="ms-auto text-muted-foreground">
           {t('chat.interview.skipAll')}
         </Button>
-        {isLast ? (
-          <Button variant="success" size="sm" disabled={isStreaming} onClick={advance}>
-            <Check size={13} />
-            {t('chat.interview.submit')}
-          </Button>
-        ) : (
-          <Button variant="success" size="sm" disabled={isStreaming} onClick={advance}>
-            {t('chat.interview.next')}
-            <ChevronRight size={13} className="rtl:rotate-180" />
-          </Button>
-        )}
+        <Button variant="success" size="sm" disabled={isStreaming} onClick={advance}>
+          {isLast && <Check size={13} />}
+          {t(isLast ? 'chat.interview.submit' : 'chat.interview.next')}
+          {!isLast && <ChevronRight size={13} className="rtl:rotate-180" />}
+        </Button>
       </div>
     </CardWrapper>
   );

@@ -1,4 +1,7 @@
+import logging
+
 from opik import track
+from pydantic import ValidationError
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_data_sources
@@ -10,11 +13,14 @@ from flow44.ai.agents.interview.models import (
 )
 from flow44.ai.agents.interview.prompts import render_interview
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.db.paused_turn import pause_turn
 from flow44.db.project_data_source import DataSourceContext
 from flow44.sandbox.main import PnpmSandbox
+
+logger = logging.getLogger(__name__)
 
 
 def _describe_values(question: InterviewQuestion, values: list[str]) -> str:
@@ -101,4 +107,9 @@ class InterviewAgent(BaseAgent):
             model=self.model,
             metadata=self._llm_metadata("generate_interview"),
         )
-        return InterviewQuestionsPayload.model_validate(parse_json_response(raw)).questions
+        try:
+            return InterviewQuestionsPayload.model_validate(parse_json_response(raw)).questions
+        except ValidationError as exc:
+            logger.exception("[interview] Invalid questions payload")
+            record_span_error(exc)
+            return []

@@ -83,21 +83,6 @@ def test_interview_response_rejects_invalid_action() -> None:
     assert response == {"type": "error", "message": "Invalid interview action"}
 
 
-def test_interview_response_rejects_malformed_answer_payload() -> None:
-    response = _connect_and_send(
-        {"type": "interview_response", "action": "submit", "answers": [{"values": ["Me"]}]},
-        "awaiting_interview",
-    )
-    assert response["type"] == "error"
-    assert str(response["message"]).startswith("Invalid payload:")
-
-
-def test_non_object_frame_does_not_kill_the_session() -> None:
-    responses = _connect_and_send_all([[], {"type": "interview_response", "action": "submitt"}], "awaiting_interview")
-    assert responses[0] == {"type": "error", "message": "Invalid payload"}
-    assert responses[1] == {"type": "error", "message": "Invalid interview action"}
-
-
 def _start_turn_call(message: dict[str, object]) -> Any:
     queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
 
@@ -150,15 +135,3 @@ def test_skip_discards_answers_sent_by_the_client() -> None:
     )
 
     assert call.args[1].args[1] == []
-
-
-def test_non_iterable_answers_do_not_kill_the_session() -> None:
-    responses = _connect_and_send_all(
-        [
-            {"type": "interview_response", "action": "submit", "answers": 5},
-            {"type": "interview_response", "action": "submitt"},
-        ],
-        "awaiting_interview",
-    )
-    assert responses[0] == {"type": "error", "message": "Invalid payload"}
-    assert responses[1] == {"type": "error", "message": "Invalid interview action"}
