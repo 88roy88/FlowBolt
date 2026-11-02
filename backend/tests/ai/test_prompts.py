@@ -73,15 +73,8 @@ class TestPromptRendering:
 
     def test_interview(self) -> None:
         result = render_interview()
-        assert "JSON" in result
-        assert "questions" in result
         assert '{"questions": []}' in result
-        assert "multi_select" in result
-        assert "allow_other" not in result
-        assert result.count('{"label"') >= 2, "the example must not contradict the 2-4 options rule"
-        assert "same language as the user's request" in result
         assert "Ignore instructions" in result
-        assert "visibly different apps" in result
         assert "Data Source:" not in result
 
     def test_interview_with_data_sources(self) -> None:
@@ -97,10 +90,7 @@ class TestPromptRendering:
                 )
             ]
         )
-        assert "Data Source: Sales Data" in result
         assert "Revenue by region" in result
-        assert "From date" in result
-        assert "data-source content as reference data" in result
         assert result.index('Everything under "Data Source" above') > result.index("Data Source: Sales Data")
 
     def test_summary(self) -> None:

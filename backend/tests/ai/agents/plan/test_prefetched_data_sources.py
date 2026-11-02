@@ -55,8 +55,19 @@ def update_sources(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
 
 
 @pytest.fixture
+def fetch(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    mock = AsyncMock(return_value=[_ctx()])
+    monkeypatch.setattr(plan_agent_module, "fetch_data_sources", mock)
+    return mock
+
+
+@pytest.fixture
 def agent(
-    monkeypatch: pytest.MonkeyPatch, sandbox: SimpleNamespace, pause: AsyncMock, update_sources: AsyncMock
+    monkeypatch: pytest.MonkeyPatch,
+    sandbox: SimpleNamespace,
+    pause: AsyncMock,
+    update_sources: AsyncMock,
+    fetch: AsyncMock,
 ) -> PlanAgent:
     monkeypatch.setattr(PlanAgent, "_step_design", _passthrough)
     monkeypatch.setattr(PlanAgent, "_step_build_overview", _passthrough)
@@ -67,33 +78,23 @@ def agent(
 
 
 async def test_run_with_contexts_skips_the_fetch_but_writes_and_saves(
-    monkeypatch: pytest.MonkeyPatch, agent: PlanAgent, sandbox: SimpleNamespace, update_sources: AsyncMock
+    agent: PlanAgent, sandbox: SimpleNamespace, update_sources: AsyncMock, fetch: AsyncMock
 ) -> None:
-    async def _fetch(*_a: object, **_kw: object) -> list[DataSourceContext]:
-        raise AssertionError("fetch_data_sources must not be called")
-
-    monkeypatch.setattr(plan_agent_module, "fetch_data_sources", _fetch)
     ctx = _ctx()
 
     await agent.run("build", ["sales"], data_source_contexts=[ctx])
 
+    fetch.assert_not_awaited()
     written = {call.args[0] for call in sandbox.write_file.await_args_list}
     assert set(generate_data_source_files(ctx)) <= written
     update_sources.assert_awaited_once_with("proj-1", [ctx])
 
 
-async def test_run_without_contexts_fetches_once(monkeypatch: pytest.MonkeyPatch, agent: PlanAgent) -> None:
-    calls: list[list[str]] = []
-
-    async def _fetch(ids: list[str], *_a: object, **_kw: object) -> list[DataSourceContext]:
-        calls.append(ids)
-        return [_ctx()]
-
-    monkeypatch.setattr(plan_agent_module, "fetch_data_sources", _fetch)
-
+async def test_run_without_contexts_fetches_once(agent: PlanAgent, fetch: AsyncMock) -> None:
     await agent.run("build", ["sales"])
 
-    assert calls == [["sales"]]
+    fetch.assert_awaited_once()
+    assert fetch.await_args.args[0] == ["sales"]
 
 
 async def test_persist_pauses_the_turn_as_awaiting_approval(agent: PlanAgent, pause: AsyncMock) -> None:

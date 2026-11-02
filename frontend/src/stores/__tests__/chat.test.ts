@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+const send = vi.hoisted(() => vi.fn());
 vi.mock('../../services/websocket', () => ({
-  getChatSocket: () => ({ send: vi.fn(), onMessage: vi.fn(), offMessage: vi.fn() }),
+  getChatSocket: () => ({ send, onMessage: vi.fn(), offMessage: vi.fn() }),
 }));
 
 vi.mock('../../services/api', () => ({
@@ -27,15 +28,26 @@ vi.mock('../session', () => ({
 import { useChatStore } from '../chat';
 import { fetchAgentEvents } from '../../services/api';
 
-describe('chatStore interviewMode', () => {
+describe('chatStore interview', () => {
   beforeEach(() => {
+    send.mockClear();
     useChatStore.setState({ interviewMode: 'interview', messages: [] });
   });
 
-  it('keeps the selected mode while the project stays open', () => {
+  it('sends the selected mode and keeps it while the project stays open', () => {
     useChatStore.getState().setInterviewMode('build');
     useChatStore.getState().sendMessage('build me a todo app');
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'message', mode: 'build' }));
     expect(useChatStore.getState().interviewMode).toBe('build');
+  });
+
+  it('sends the interview answers', () => {
+    const answers = [{ question_id: 'q-1', values: ['Me'] }];
+
+    useChatStore.getState().respondToInterview('submit', answers);
+
+    expect(send).toHaveBeenCalledWith({ type: 'interview_response', action: 'submit', answers });
   });
 
   it('keeps the selected mode across loadHistory', async () => {

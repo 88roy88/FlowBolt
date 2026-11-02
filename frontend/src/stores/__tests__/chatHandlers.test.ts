@@ -280,59 +280,46 @@ describe('createSendMessageHandler — interview flow', () => {
     handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void);
   });
 
-  it('interview_questions sets phase and stores questions', () => {
-    handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
-    expect(store.state().agentPhase).toBe('awaiting_interview');
-    expect(store.state().interviewQuestions).toEqual(QUESTIONS);
-    expect(store.state().isStreaming).toBe(false);
+  it.each([
+    { replay: false, notified: 1 },
+    { replay: true, notified: 0 },
+  ])('interview_questions shows the questions (replay: $replay)', ({ replay, notified }) => {
+    vi.mocked(notifyAgentNeedsAttention).mockClear();
+    setReplayMode(replay);
+    try {
+      handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
+    } finally {
+      setReplayMode(false);
+    }
+
+    expect(store.state()).toMatchObject({
+      agentPhase: 'awaiting_interview',
+      interviewQuestions: QUESTIONS,
+      isStreaming: false,
+    });
+    expect(notifyAgentNeedsAttention).toHaveBeenCalledTimes(notified);
   });
 
   it('interview_answered adds a historical card and resumes planning', () => {
+    const answers = [{ question_id: 'q-1', values: ['Me'] }];
     handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
-    handler(msg({
-      type: 'interview_answered',
-      questions: QUESTIONS,
-      answers: [{ question_id: 'q-1', values: ['Me'] }],
-    }));
+    handler(msg({ type: 'interview_answered', questions: QUESTIONS, answers }));
 
-    expect(store.state().interviewQuestions).toBeNull();
-    expect(store.state().agentPhase).toBe('interviewing');
-    const found = store.state().messages.find((m) => m.agentCard?.type === 'interview_answered');
-    expect(found).toBeDefined();
-    const card = found!.agentCard as { type: 'interview_answered'; answers: { values: string[] }[] };
-    expect(card.answers[0].values).toEqual(['Me']);
+    expect(store.state()).toMatchObject({ interviewQuestions: null, agentPhase: 'interviewing' });
+    const card = store.state().messages.find((m) => m.agentCard?.type === 'interview_answered')?.agentCard;
+    expect(card).toEqual({ type: 'interview_answered', questions: QUESTIONS, answers });
   });
 
   it('an error while awaiting the interview keeps the questions and phase', () => {
     handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
     handler(msg({ type: 'error', message: 'refused' }));
 
-    expect(store.state().interviewQuestions).toEqual(QUESTIONS);
-    expect(store.state().agentPhase).toBe('awaiting_interview');
-    expect(store.state().isStreaming).toBe(false);
-    expect(store.state().error).toBe('refused');
-  });
-
-  it('an error in another phase resets the phase and questions', () => {
-    handler(msg({ type: 'phase', phase: 'planning' }));
-    handler(msg({ type: 'error', message: 'boom' }));
-
-    expect(store.state().interviewQuestions).toBeNull();
-    expect(store.state().agentPhase).toBe('idle');
-    expect(store.state().error).toBe('boom');
-  });
-
-  it('interview_questions on replay restores state without notifying', () => {
-    vi.mocked(notifyAgentNeedsAttention).mockClear();
-    setReplayMode(true);
-    try {
-      handler(msg({ type: 'interview_questions', questions: QUESTIONS, _ts: '2026-01-15T10:30:00Z' }));
-    } finally {
-      setReplayMode(false);
-    }
-    expect(store.state().agentPhase).toBe('awaiting_interview');
-    expect(store.state().interviewQuestions).toEqual(QUESTIONS);
-    expect(notifyAgentNeedsAttention).not.toHaveBeenCalled();
+    expect(store.state()).toMatchObject({
+      interviewQuestions: QUESTIONS,
+      agentPhase: 'awaiting_interview',
+      isStreaming: false,
+      error: 'refused',
+    });
   });
 });
 

@@ -4,133 +4,98 @@ import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
-from flow44.ai.agents.interview.models import InterviewOption, InterviewQuestion, InterviewSession
+from flow44.ai.agents.interview.models import InterviewAnswer, InterviewOption, InterviewQuestion, InterviewSession
 from flow44.ai.agents.routing import AgentRouter
 from flow44.db.paused_turn import clear_paused_turn
 from flow44.main import app
 
 client = TestClient(app, raise_server_exceptions=False)
 
+SESSION = InterviewSession(
+    content="build a todo app",
+    model="claude-opus-5",
+    questions=[
+        InterviewQuestion(
+            id="q-1",
+            header="Audience",
+            question="Who is this for?",
+            options=[InterviewOption(label="Me"), InterviewOption(label="Team")],
+        )
+    ],
+)
+# _start_turn is mocked so a handled message sends no reply; this one's error reply marks the one before it as done.
+SYNC = {"type": "interview_response", "action": "sync"}
 
-def _mock_project(user_id: str = "user-a", project_id: str = "proj-123") -> MagicMock:
-    project = MagicMock()
-    project.id = project_id
-    project.user_id = user_id
-    return project
+
+def _send(messages: list[dict[str, Any]], phase: str = "awaiting_interview") -> tuple[dict[str, Any], AsyncMock]:
+    project = MagicMock(id="proj-123", user_id="user-a")
+    turn = MagicMock(phase=phase, state_json=SESSION.model_dump_json())
+    with (
+        patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project),
+        patch("flow44.api.deps.get_project_member", new_callable=AsyncMock, return_value=object()),
+        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"),
+        patch("flow44.api.chat.sandbox_manager") as mgr,
+        patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
+        patch("flow44.api.chat.subscribe", return_value=asyncio.Queue()),
+        patch("flow44.api.chat.unsubscribe"),
+        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=turn),
+        patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as start_turn,
+    ):
+        mgr.wake_sandbox = AsyncMock(return_value=MagicMock(project_id="proj-123"))
+        with client.websocket_connect("/ws/chat/proj-123", headers={"cookie": "flow44_token=t"}) as ws:
+            for message in messages:
+                ws.send_json(message)
+            reply = ws.receive_json()
+    return reply, start_turn
 
 
-def _base_interview_question() -> InterviewQuestion:
-    return InterviewQuestion(
-        id="q-1",
-        header="Audience",
-        question="Who is this for?",
-        options=[
-            InterviewOption(label="Me", description="Personal use"),
-            InterviewOption(label="Team", description="Internal users"),
-        ],
-        multi_select=False,
+def _started_turn(message: dict[str, Any]) -> Any:
+    _, start_turn = _send([message, SYNC])
+    start_turn.assert_awaited_once()
+    return start_turn.call_args
+
+
+@pytest.mark.parametrize(
+    ("message", "phase", "error"),
+    [
+        ({"type": "plan_response", "action": "accept"}, "awaiting_interview", "No pending plan found"),
+        ({"type": "interview_response", "action": "skip"}, "awaiting_approval", "No pending interview found"),
+        ({"type": "interview_response", "action": "submitt"}, "awaiting_interview", "Invalid interview action"),
+    ],
+)
+def test_rejected_response_starts_no_turn(message: dict[str, Any], phase: str, error: str) -> None:
+    reply, start_turn = _send([message], phase)
+
+    assert reply == {"type": "error", "message": error}
+    start_turn.assert_not_awaited()
+
+
+@pytest.mark.parametrize(("extra", "interview"), [({}, False), ({"mode": "interview"}, True)])
+def test_message_mode_decides_the_interview(extra: dict[str, str], interview: bool) -> None:
+    turn = _started_turn({"type": "message", "content": "build a todo app", **extra}).args[1]
+
+    assert turn.func.__func__ is AgentRouter.handle_message
+    assert turn.keywords["interview"] is interview
+
+
+def test_submit_resumes_with_the_answers_and_clears_the_paused_turn() -> None:
+    call = _started_turn(
+        {"type": "interview_response", "action": "submit", "answers": [{"question_id": "q-1", "values": ["Me"]}]}
     )
 
-
-def _turn(phase: str) -> MagicMock:
-    session = InterviewSession(content="build a todo app", questions=[_base_interview_question()])
-    return MagicMock(phase=phase, state_json=session.model_dump_json())
-
-
-def _connect_and_send(payload: dict[str, object], phase: str) -> dict[str, object]:
-    return _connect_and_send_all([payload], phase)[0]
-
-
-def _connect_and_send_all(payloads: list[Any], phase: str) -> list[dict[str, object]]:
-    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
-    sandbox = MagicMock()
-
-    with (
-        patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=_mock_project()),
-        patch("flow44.api.deps.get_project_member", new_callable=AsyncMock, return_value=object()),
-        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"),
-        patch("flow44.api.chat.sandbox_manager") as mock_mgr,
-        patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
-        patch("flow44.api.chat.subscribe", return_value=queue),
-        patch("flow44.api.chat.unsubscribe"),
-        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=_turn(phase)),
-        patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as mock_start_turn,
-    ):
-        mock_mgr.wake_sandbox = AsyncMock(return_value=sandbox)
-        responses: list[dict[str, object]] = []
-        with client.websocket_connect("/ws/chat/proj-123", headers={"cookie": "flow44_token=test-token"}) as ws:
-            for payload in payloads:
-                ws.send_json(payload)
-                responses.append(ws.receive_json())
-        assert mock_start_turn.await_count == 0
-        return responses
-
-
-def test_plan_response_rejected_while_awaiting_interview() -> None:
-    response = _connect_and_send({"type": "plan_response", "action": "accept"}, "awaiting_interview")
-    assert response == {"type": "error", "message": "No pending plan found"}
-
-
-def test_interview_response_rejected_while_awaiting_approval() -> None:
-    response = _connect_and_send({"type": "interview_response", "action": "skip"}, "awaiting_approval")
-    assert response == {"type": "error", "message": "No pending interview found"}
-
-
-def test_interview_response_rejects_invalid_action() -> None:
-    response = _connect_and_send({"type": "interview_response", "action": "submitt"}, "awaiting_interview")
-    assert response == {"type": "error", "message": "Invalid interview action"}
-
-
-def _start_turn_call(message: dict[str, object]) -> Any:
-    queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
-
-    with (
-        patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=_mock_project()),
-        patch("flow44.api.deps.get_project_member", new_callable=AsyncMock, return_value=object()),
-        patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"),
-        patch("flow44.api.chat.sandbox_manager") as mock_mgr,
-        patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
-        patch("flow44.api.chat.subscribe", return_value=queue),
-        patch("flow44.api.chat.unsubscribe"),
-        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=_turn("awaiting_interview")),
-        patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as mock_start_turn,
-    ):
-        mock_mgr.wake_sandbox = AsyncMock(return_value=MagicMock(project_id="proj-123"))
-        with client.websocket_connect("/ws/chat/proj-123", headers={"cookie": "flow44_token=test-token"}) as ws:
-            ws.send_json(message)
-            ws.send_json({"type": "interview_response", "action": "submitt"})
-            ws.receive_json()
-
-    assert mock_start_turn.await_count == 1
-    return mock_start_turn.call_args
-
-
-def test_message_without_mode_skips_the_interview() -> None:
-    turn = _start_turn_call({"type": "message", "content": "build a todo app"}).args[1]
-
-    assert turn.func.__func__ is AgentRouter.handle_message
-    assert turn.keywords["interview"] is False
-
-
-def test_message_in_interview_mode_asks_the_router_to_interview() -> None:
-    turn = _start_turn_call({"type": "message", "content": "build a todo app", "mode": "interview"}).args[1]
-
-    assert turn.func.__func__ is AgentRouter.handle_message
-    assert turn.keywords["interview"] is True
-
-
-def test_interview_response_clears_the_paused_turn_when_it_starts() -> None:
-    call = _start_turn_call({"type": "interview_response", "action": "submit", "answers": []})
-
-    assert call.args[1].func.__func__ is AgentRouter.resume_interview
+    resume = call.args[1]
+    assert resume.func.__func__ is AgentRouter.resume_interview
+    assert resume.args == (SESSION, [InterviewAnswer(question_id="q-1", values=["Me"])])
+    assert resume.keywords == {"model": "claude-opus-5"}
     assert call.kwargs["prepare"].func is clear_paused_turn
     assert call.kwargs["prepare"].args == ("proj-123",)
 
 
 def test_skip_discards_answers_sent_by_the_client() -> None:
-    call = _start_turn_call(
+    call = _started_turn(
         {"type": "interview_response", "action": "skip", "answers": [{"question_id": "q-1", "values": ["Me"]}]}
     )
 

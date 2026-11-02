@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
 const alive = vi.fn();
 vi.mock('../../services/api', () => ({
@@ -13,42 +13,37 @@ vi.mock('../session', () => ({
 }));
 
 import { useChatStore } from '../chat';
-import { startAgentAlivePolling, handleChatConnectionLost } from '../agentAlivePoll';
-import { createSendMessageHandler } from '../chatHandlers';
+import { startAgentAlivePolling, stopAgentAlivePolling, handleChatConnectionLost } from '../agentAlivePoll';
 
+const initial = useChatStore.getState();
 const questions = [{ id: 'q-1', header: 'Who', question: 'Who?', options: [], multi_select: false }];
 
-function showQuestions() {
-  const handle = createSendMessageHandler(useChatStore.setState, useChatStore.getState, () => {});
-  handle({ type: 'phase', phase: 'awaiting_interview' });
-  handle({ type: 'interview_questions', questions });
-}
-
 describe('agent alive poll with the interview card', () => {
+  beforeEach(() => {
+    useChatStore.setState({ ...initial, agentPhase: 'awaiting_interview', interviewQuestions: questions });
+  });
+
   afterEach(() => {
+    stopAgentAlivePolling();
     vi.useRealTimers();
   });
 
   it('keeps the questions when a poll lands mid-turn and the next one sees the agent gone', async () => {
     vi.useFakeTimers();
-    showQuestions();
     alive.mockResolvedValueOnce({ alive: true, phase: 'awaiting_interview' });
     alive.mockResolvedValueOnce({ alive: false, phase: 'idle' });
 
     startAgentAlivePolling('p');
     await vi.advanceTimersByTimeAsync(20000);
 
-    const state = useChatStore.getState();
-    expect(state.interviewQuestions).not.toBeNull();
-    expect(state.agentPhase).toBe('awaiting_interview');
+    expect(useChatStore.getState()).toMatchObject({ interviewQuestions: questions, agentPhase: 'awaiting_interview' });
   });
 
   it('keeps the questions when the socket drops', () => {
-    showQuestions();
     useChatStore.setState({ isStreaming: true });
 
     handleChatConnectionLost();
 
-    expect(useChatStore.getState().interviewQuestions).not.toBeNull();
+    expect(useChatStore.getState().interviewQuestions).toEqual(questions);
   });
 });
