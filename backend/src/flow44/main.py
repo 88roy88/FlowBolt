@@ -30,13 +30,13 @@ from flow44.api import (
 from flow44.api.deps import validate_token, validate_ws_token
 from flow44.config import settings
 from flow44.db.database import init_db
-from flow44.db.events import event_listener
 from flow44.db.project import list_all_projects
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.heartbeat_reaper import heartbeat_reaper
 from flow44.services.logging import setup_logging
+from flow44.services.run_abort import abort_listener
 
 if os.name == "posix":
     # Sandbox workspaces live on an NFS PVC written to by pods with varying uids; the default umask
@@ -56,9 +56,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await init_db()
     logger.info("Database ready.")
 
-    event_listener.start()
-    logger.info("Event listener started.")
-
     logger.info("Restoring existing sandbox workspaces...")
 
     live_projects = await list_all_projects()
@@ -73,13 +70,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     heartbeat_reaper.start()
     logger.info("Heartbeat reaper started (stale=%ds).", settings.AGENT_RUN_STALE_TIMEOUT)
 
+    abort_listener.start()
+    logger.info("Abort listener started.")
+
     async with s3_storage.setup():
         yield
 
     logger.info("Shutting down — stopping reapers and destroying all sandboxes...")
     await idle_reaper.stop()
     await heartbeat_reaper.stop()
-    await event_listener.stop()
+    await abort_listener.stop()
     await sandbox_manager.suspend_all()
     flush_opik_traces()
     logger.info("Shutdown complete.")

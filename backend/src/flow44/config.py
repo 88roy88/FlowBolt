@@ -33,7 +33,6 @@ class SandboxSettings(BuildAppSettings):
     SANDBOX_MODE: Literal["local", "namespaced"] = "local"
     AGENT_RUN_TIMEOUT: int = 1800  # whole-run budget
     AGENT_RUN_STALE_TIMEOUT: int = 60  # when a heartbeat is considered dead (beat=/4, sweep=/2)
-    AGENT_ABORT_POLL_INTERVAL: float = 1.0  # how often a running agent checks for a user abort
     SANDBOX_IDLE_TTL_SECONDS: int = 5 * 60  # 5 minutes
     SANDBOX_IDLE_CHECK_INTERVAL_SECONDS: int = 60
     # Public base URL of this backend, used in HTML exports so API calls work standalone.

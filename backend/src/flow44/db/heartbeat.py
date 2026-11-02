@@ -2,7 +2,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, delete, false, func, update
+from sqlalchemy import Column, DateTime, ForeignKey, String, delete, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Field, SQLModel, col
 
@@ -18,8 +18,6 @@ class AgentRunHeartbeat(SQLModel, table=True):
 
     project_id: str = Field(sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True))
     beat_at: datetime = Field(sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False))
-    # Set by whichever pod receives the user's abort; the pod running the agent polls it.
-    abort_requested: bool = Field(default=False, sa_column=Column(Boolean, server_default=false(), nullable=False))
 
 
 def _stale_cutoff() -> datetime:
@@ -53,9 +51,7 @@ async def try_claim_run(project_id: str) -> datetime | None:
     stmt = (
         insert(AgentRunHeartbeat)
         .values(project_id=project_id, beat_at=now)
-        .on_conflict_do_update(
-            index_elements=["project_id"], set_={"beat_at": now, "abort_requested": False}, where=_stale()
-        )
+        .on_conflict_do_update(index_elements=["project_id"], set_={"beat_at": now}, where=_stale())
         .returning(col(AgentRunHeartbeat.project_id))
     )
     return now if (await _commit(stmt)).first() is not None else None
@@ -71,17 +67,6 @@ async def clear_heartbeat(project_id: str, *, only_beat: datetime | None = None)
     if only_beat is not None:
         stmt = stmt.where(col(AgentRunHeartbeat.beat_at) == only_beat)
     await _commit(stmt)
-
-
-async def request_abort(project_id: str) -> None:
-    await _commit(
-        update(AgentRunHeartbeat).where(col(AgentRunHeartbeat.project_id) == project_id).values(abort_requested=True)
-    )
-
-
-async def is_abort_requested(project_id: str) -> bool:
-    hb = await get_heartbeat(project_id)
-    return hb is not None and hb.abort_requested
 
 
 def _is_fresh(ts: datetime, window_seconds: int) -> bool:

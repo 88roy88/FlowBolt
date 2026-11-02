@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from flow44.api import chat
+from flow44.services import run_abort
 
 PROJECT_ID = "test-project-run-agent-safe"
 CLAIMED_AT = datetime(2026, 1, 1, tzinfo=UTC)
@@ -20,7 +21,6 @@ def _patch_boundary(monkeypatch: pytest.MonkeyPatch) -> tuple[AsyncMock, AsyncMo
     monkeypatch.setattr(chat, "emit_event", emit)
     monkeypatch.setattr(chat, "clear_heartbeat", clear)
     monkeypatch.setattr(chat.versioning, "commit_turn", commit)
-    monkeypatch.setattr(chat, "is_abort_requested", AsyncMock(return_value=False))
     return emit, clear, commit
 
 
@@ -124,19 +124,13 @@ async def test_start_agent_runs_under_the_supervisor(monkeypatch: pytest.MonkeyP
     assert set() == chat._RUNNING
 
 
-async def test_abort_flag_cancels_and_rolls_back_instead_of_committing(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_abort_cancels_and_rolls_back_instead_of_committing(monkeypatch: pytest.MonkeyPatch) -> None:
     emit, clear, commit = _patch_boundary(monkeypatch)
-    monkeypatch.setattr(chat.settings, "AGENT_ABORT_POLL_INTERVAL", 0.01)
     transient = AsyncMock()
     monkeypatch.setattr(chat, "emit_transient", transient)
     rollback = AsyncMock()
     started = asyncio.Event()
     cancelled = asyncio.Event()
-
-    async def abort_once_started(_project_id: str) -> bool:
-        return started.is_set()
-
-    monkeypatch.setattr(chat, "is_abort_requested", abort_once_started)
 
     async def hang() -> None:
         started.set()
@@ -146,7 +140,10 @@ async def test_abort_flag_cancels_and_rolls_back_instead_of_committing(monkeypat
             cancelled.set()
             raise
 
-    await asyncio.wait_for(chat._run_agent_safe(PROJECT_ID, hang(), CLAIMED_AT, rollback), timeout=1)
+    run = asyncio.create_task(chat._run_agent_safe(PROJECT_ID, hang(), CLAIMED_AT, rollback))
+    await asyncio.wait_for(started.wait(), timeout=1)
+    run_abort._wake(PROJECT_ID)
+    await asyncio.wait_for(run, timeout=1)
 
     assert cancelled.is_set()
     rollback.assert_awaited_once_with()
@@ -154,22 +151,7 @@ async def test_abort_flag_cancels_and_rolls_back_instead_of_committing(monkeypat
     emit.assert_not_awaited()
     clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
     transient.assert_awaited_once_with(PROJECT_ID, {"type": "turn_aborted"})
-
-
-async def test_failed_abort_check_keeps_the_run_going(monkeypatch: pytest.MonkeyPatch) -> None:
-    _, _, commit = _patch_boundary(monkeypatch)
-    monkeypatch.setattr(chat.settings, "AGENT_ABORT_POLL_INTERVAL", 0.01)
-    monkeypatch.setattr(chat, "is_abort_requested", AsyncMock(side_effect=RuntimeError("db blip")))
-    finished = asyncio.Event()
-
-    async def work() -> None:
-        await asyncio.sleep(0.05)
-        finished.set()
-
-    await chat._run_agent_safe(PROJECT_ID, work(), CLAIMED_AT)
-
-    assert finished.is_set()
-    commit.assert_awaited_once_with(PROJECT_ID)
+    assert PROJECT_ID not in run_abort._watchers
 
 
 async def test_rollback_trims_back_to_the_turn_start_and_runs_the_abort_hook(monkeypatch: pytest.MonkeyPatch) -> None:

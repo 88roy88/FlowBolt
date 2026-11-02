@@ -32,10 +32,11 @@ from flow44.db.events import (
     trim_events_after,
     unsubscribe,
 )
-from flow44.db.heartbeat import clear_heartbeat, is_abort_requested, request_abort, touch_heartbeat
+from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan, save_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services import run_abort
 from flow44.services.logging import log_bi_event
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import GitError
@@ -67,7 +68,7 @@ class _RunBudgetExceeded(Exception):
 
 
 class _RunAborted(Exception):
-    """The user asked to stop the run, from any pod."""
+    """The user asked to stop the run."""
 
 
 @dataclass
@@ -77,36 +78,32 @@ class _Beat:
     at: datetime
 
 
-async def _abort_requested(project_id: str) -> bool:
-    try:
-        return await is_abort_requested(project_id)
-    except Exception:
-        # Same as a failed beat: a DB blip must not tear down the run; the next poll retries.
-        logger.warning("[chat] Abort check failed for session %s; continuing", project_id, exc_info=True)
-        return False
-
-
 async def _heartbeat_until_done(project_id: str, run_task: asyncio.Task[Any], beat: _Beat) -> None:
     deadline = time.monotonic() + settings.AGENT_RUN_TIMEOUT
     beat_interval = settings.AGENT_RUN_STALE_TIMEOUT / 4
-    next_beat = time.monotonic() + beat_interval
-    while (now := time.monotonic()) < deadline:
-        timeout = min(settings.AGENT_ABORT_POLL_INTERVAL, next_beat - now, deadline - now)
-        done, _ = await asyncio.wait({run_task}, timeout=timeout)
-        if run_task in done:
-            return
-        if await _abort_requested(project_id):
-            raise _RunAborted
-        if time.monotonic() < next_beat:
-            continue
-        next_beat = time.monotonic() + beat_interval
+    with run_abort.watch(project_id) as abort_requested:
+        abort_wait = asyncio.create_task(abort_requested.wait())
         try:
-            beat.at = await touch_heartbeat(project_id)
-        except Exception:
-            # A transient DB blip must not tear down a healthy run; the reaper covers a
-            # genuinely dead one if writes keep failing past the stale window.
-            logger.warning("[chat] Heartbeat write failed for session %s; continuing", project_id, exc_info=True)
-    raise _RunBudgetExceeded
+            while time.monotonic() < deadline:
+                timeout = min(beat_interval, deadline - time.monotonic())
+                done, _ = await asyncio.wait(
+                    {run_task, abort_wait}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
+                )
+                if run_task in done:
+                    return
+                if abort_wait in done:
+                    raise _RunAborted
+                try:
+                    beat.at = await touch_heartbeat(project_id)
+                except Exception:
+                    # A transient DB blip must not tear down a healthy run; the reaper covers a
+                    # genuinely dead one if writes keep failing past the stale window.
+                    logger.warning(
+                        "[chat] Heartbeat write failed for session %s; continuing", project_id, exc_info=True
+                    )
+            raise _RunBudgetExceeded
+        finally:
+            await _cancel_task(abort_wait)
 
 
 async def _cancel_task(task: asyncio.Task[Any]) -> None:
@@ -379,8 +376,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     )
 
                 elif msg_type == "abort":
-                    # The run may live on another pod, which picks this up on its next poll.
-                    await request_abort(project.id)
+                    await run_abort.request_abort(project.id)
 
                 else:
                     await versioning.handle_action(project.id, msg_type, data)

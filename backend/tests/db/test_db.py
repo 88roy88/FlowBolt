@@ -14,10 +14,8 @@ from flow44.db.heartbeat import (
     AgentRunHeartbeat,
     clear_heartbeat,
     get_heartbeat,
-    is_abort_requested,
     is_run_active,
     reap_stale_runs,
-    request_abort,
     touch_heartbeat,
     try_claim_run,
 )
@@ -329,31 +327,6 @@ class TestRunLiveness:
         # Second sweep is a no-op — the heartbeat is already cleared.
         assert await reap_stale_runs() == 0
         assert len([e for e in await get_events(project.id) if e.payload.get("type") == "error"]) == 1
-
-    async def test_abort_request_is_seen_by_the_running_pod_and_survives_beats(self, test_db):
-        project = await create_project("App", user_id="test-user")
-        assert await try_claim_run(project.id) is not None
-
-        await request_abort(project.id)
-        await touch_heartbeat(project.id)
-
-        assert await is_abort_requested(project.id) is True
-
-    async def test_abort_request_without_a_run_is_a_no_op(self, test_db):
-        project = await create_project("App", user_id="test-user")
-
-        await request_abort(project.id)
-
-        assert await get_heartbeat(project.id) is None
-        assert await is_abort_requested(project.id) is False
-
-    async def test_reclaiming_a_stale_run_clears_its_abort_request(self, test_db):
-        project = await create_project("App", user_id="test-user")
-        await _seed_heartbeat(project.id, age_seconds=settings.AGENT_RUN_STALE_TIMEOUT + 10)
-        await request_abort(project.id)
-
-        assert await try_claim_run(project.id) is not None
-        assert await is_abort_requested(project.id) is False
 
     async def test_reap_stale_runs_keeps_fresh_run(self, test_db):
         project = await create_project("App", user_id="test-user")
