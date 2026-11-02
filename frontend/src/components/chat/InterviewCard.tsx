@@ -3,11 +3,24 @@ import { useTranslation } from 'react-i18next';
 import { Check, Sparkles, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { InterviewQuestion, InterviewAnswer } from '../../types';
 import { useChatStore } from '../../stores/chat';
+import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { CardWrapper } from './cards/CardWrapper';
 
 interface InterviewCardProps {
   questions: InterviewQuestion[];
+}
+
+interface Draft {
+  values: string[];
+  other: string;
+}
+
+const EMPTY_DRAFT: Draft = { values: [], other: '' };
+
+function rowClass(active: boolean, className: string) {
+  const state = active ? 'border-primary bg-accent-bg-strong' : 'border-border hover:bg-muted/50';
+  return cn('flex gap-2 px-2.5 py-1.5 rounded-lg border transition-colors', state, className);
 }
 
 function OptionIndicator({ multiSelect, active }: { multiSelect: boolean; active: boolean }) {
@@ -28,43 +41,37 @@ function OptionIndicator({ multiSelect, active }: { multiSelect: boolean; active
 export function InterviewCard({ questions }: InterviewCardProps) {
   const { t } = useTranslation();
   const respondToInterview = useChatStore((s) => s.respondToInterview);
-  const [step, setStep] = useState(0);
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
-  const [otherText, setOtherText] = useState<Record<string, string>>({});
   const isStreaming = useChatStore((s) => s.isStreaming);
+  const [step, setStep] = useState(0);
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   const q = questions[step];
   const isLast = step === questions.length - 1;
-  const cur = selected[q.id] ?? [];
-  const otherActive = !!(otherText[q.id] ?? '').trim();
+  const draft = drafts[q.id] ?? EMPTY_DRAFT;
+  const otherActive = !!draft.other.trim();
 
-  const changeOther = (value: string) => {
-    setOtherText((prev) => ({ ...prev, [q.id]: value }));
-    if (!q.multi_select && value.trim()) {
-      setSelected((prev) => ({ ...prev, [q.id]: [] }));
-    }
+  const update = (next: Draft) => setDrafts((prev) => ({ ...prev, [q.id]: next }));
+
+  const changeOther = (other: string) => {
+    const replacesChoice = !q.multi_select && other.trim();
+    update({ values: replacesChoice ? [] : draft.values, other });
   };
 
   const toggle = (label: string) => {
-    setSelected((prev) => {
-      const prevValues = prev[q.id] ?? [];
-      if (q.multi_select) {
-        const next = prevValues.includes(label) ? prevValues.filter((l) => l !== label) : [...prevValues, label];
-        return { ...prev, [q.id]: next };
-      }
-      return { ...prev, [q.id]: prevValues.includes(label) ? [] : [label] };
-    });
+    const has = draft.values.includes(label);
     if (!q.multi_select) {
-      setOtherText((prev) => ({ ...prev, [q.id]: '' }));
+      update({ values: has ? [] : [label], other: '' });
+      return;
     }
+    const values = has ? draft.values.filter((l) => l !== label) : [...draft.values, label];
+    update({ ...draft, values });
   };
 
   const submit = () => {
     const answers: InterviewAnswer[] = questions.map((question) => {
-      const values = [...(selected[question.id] ?? [])];
-      const extra = (otherText[question.id] ?? '').trim();
-      if (extra) values.push(extra);
-      return { question_id: question.id, values };
+      const { values, other } = drafts[question.id] ?? EMPTY_DRAFT;
+      const extra = other.trim();
+      return { question_id: question.id, values: extra ? [...values, extra] : values };
     });
     respondToInterview('submit', answers);
   };
@@ -90,78 +97,70 @@ export function InterviewCard({ questions }: InterviewCardProps) {
         </div>
       )}
 
-      <div key={step} className="animate-message-in">
-        {q.header && (
+      <fieldset disabled={isStreaming} className="min-w-0">
+        <div key={step} className="animate-message-in">
           <p dir="auto" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">{q.header}</p>
-        )}
-        <div dir="auto" className="text-[15px] font-semibold leading-snug mb-2">{q.question}</div>
-        {q.multi_select && (
-          <p className="text-[11px] text-muted-foreground mb-2">{t('chat.interview.selectHint')}</p>
-        )}
-        <div className="flex flex-col gap-1">
-          {q.options.map((opt) => {
-            const active = cur.includes(opt.label);
-            return (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => toggle(opt.label)}
-                disabled={isStreaming}
-                aria-pressed={active}
-                className={`w-full flex items-start gap-2 px-2.5 py-1.5 text-start rounded-lg border text-[13px] transition-colors ${
-                  active ? 'border-primary bg-accent-bg-strong' : 'border-border hover:bg-muted/50'
-                }`}
-              >
-                <OptionIndicator multiSelect={q.multi_select} active={active} />
-                <span dir="auto" className="min-w-0">
-                  <span className={active ? 'font-medium' : ''}>{opt.label}</span>
-                  {opt.description && <span className="block text-[11px] text-muted-foreground leading-snug">{opt.description}</span>}
-                </span>
-              </button>
-            );
-          })}
+          <div dir="auto" className="text-[15px] font-semibold leading-snug mb-2">{q.question}</div>
+          {q.multi_select && (
+            <p className="text-[11px] text-muted-foreground mb-2">{t('chat.interview.selectHint')}</p>
+          )}
+          <div className="flex flex-col gap-1">
+            {q.options.map((opt) => {
+              const active = draft.values.includes(opt.label);
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => toggle(opt.label)}
+                  aria-pressed={active}
+                  className={rowClass(active, 'w-full items-start text-start text-[13px]')}
+                >
+                  <OptionIndicator multiSelect={q.multi_select} active={active} />
+                  <span dir="auto" className="min-w-0">
+                    <span className={active ? 'font-medium' : ''}>{opt.label}</span>
+                    {opt.description && <span className="block text-[11px] text-muted-foreground leading-snug">{opt.description}</span>}
+                  </span>
+                </button>
+              );
+            })}
 
-          <label
-            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-text transition-colors focus-within:border-primary focus-within:bg-accent-bg-strong ${
-              otherActive ? 'border-primary bg-accent-bg-strong' : 'border-border hover:bg-muted/50'
-            }`}
-          >
-            <OptionIndicator multiSelect={q.multi_select} active={otherActive} />
-            <Pencil size={11} className="text-muted-foreground shrink-0" />
-            <input
-              dir="auto"
-              value={otherText[q.id] ?? ''}
-              disabled={isStreaming}
-              onChange={(e) => changeOther(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                if (otherActive) advance();
-              }}
-              placeholder={t('chat.interview.other')}
-              aria-label={t('chat.interview.other')}
-              className="flex-1 min-w-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
-            />
-          </label>
+            <label className={rowClass(otherActive, 'items-center cursor-text focus-within:border-primary focus-within:bg-accent-bg-strong')}>
+              <OptionIndicator multiSelect={q.multi_select} active={otherActive} />
+              <Pencil size={11} className="text-muted-foreground shrink-0" />
+              <input
+                dir="auto"
+                value={draft.other}
+                onChange={(e) => changeOther(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  if (otherActive) advance();
+                }}
+                placeholder={t('chat.interview.other')}
+                aria-label={t('chat.interview.other')}
+                className="flex-1 min-w-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
+              />
+            </label>
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-border">
-        {step > 0 && (
-          <Button variant="ghost" size="sm" disabled={isStreaming} onClick={() => setStep((s) => s - 1)} className="text-muted-foreground">
-            <ChevronLeft size={13} className="rtl:rotate-180" />
-            {t('chat.interview.back')}
+        <div className="flex flex-wrap items-center justify-end gap-2 mt-3 pt-2.5 border-t border-border">
+          {step > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setStep((s) => s - 1)} className="text-muted-foreground">
+              <ChevronLeft size={13} className="rtl:rotate-180" />
+              {t('chat.interview.back')}
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => respondToInterview('skip')} className="ms-auto text-muted-foreground">
+            {t('chat.interview.skipAll')}
           </Button>
-        )}
-        <Button variant="ghost" size="sm" disabled={isStreaming} onClick={() => respondToInterview('skip')} className="ms-auto text-muted-foreground">
-          {t('chat.interview.skipAll')}
-        </Button>
-        <Button variant="success" size="sm" disabled={isStreaming} onClick={advance}>
-          {isLast && <Check size={13} />}
-          {t(isLast ? 'chat.interview.submit' : 'chat.interview.next')}
-          {!isLast && <ChevronRight size={13} className="rtl:rotate-180" />}
-        </Button>
-      </div>
+          <Button variant="success" size="sm" onClick={advance}>
+            {isLast && <Check size={13} />}
+            {t(isLast ? 'chat.interview.submit' : 'chat.interview.next')}
+            {!isLast && <ChevronRight size={13} className="rtl:rotate-180" />}
+          </Button>
+        </div>
+      </fieldset>
     </CardWrapper>
   );
 }

@@ -280,7 +280,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       // Reset state, then replay all events — events are the single source of truth
       // for both user messages and assistant messages/cards
-      set({ messages: [], isStreaming: false, historyLoaded: false, buildCompleted: false, agentAlive: null, draft: '', ...RESET_STATE });
+      set({
+        messages: [],
+        isStreaming: false,
+        historyLoaded: false,
+        buildCompleted: false,
+        agentAlive: null,
+        draft: '',
+        ...RESET_STATE,
+      });
       useVersionStore.getState().reset();
 
       const currentProject = useSessionStore.getState().currentProject;
@@ -321,7 +329,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearMessages() {
     stopAgentAlivePolling();
-    set({ messages: [], historyLoaded: false, buildCompleted: false, agentAlive: null, interviewMode: 'interview', ...RESET_STATE });
+    set({
+      messages: [],
+      historyLoaded: false,
+      buildCompleted: false,
+      agentAlive: null,
+      interviewMode: 'interview',
+      ...RESET_STATE,
+    });
     useVersionStore.getState().reset();
   },
 
