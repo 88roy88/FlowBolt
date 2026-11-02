@@ -54,8 +54,6 @@ def _listen_dsn() -> str:
 
 
 class AbortListener:
-    """Holds this pod's LISTEN connection for abort requests."""
-
     def __init__(self) -> None:
         self.listening = False
         self._task: asyncio.Task[None] | None = None
@@ -64,7 +62,6 @@ class AbortListener:
         self._task = asyncio.create_task(self._listen_loop())
 
     async def stop(self) -> None:
-        # Cancelling is safe at any point: the loop only waits or pings, and the finally closes the connection.
         if self._task is not None:
             self._task.cancel()
             with suppress(asyncio.CancelledError):
