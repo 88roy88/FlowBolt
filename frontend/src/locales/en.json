@@ -142,7 +142,8 @@
   },
   "chat": {
     "chat": "Chat",
-    "model": "Model",
+    "send": "send",
+    "newLine": "new line",
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -196,7 +197,6 @@
       "modeBuildHint": "Skip the questions and plan right away"
     },
     "design": {
-      "designing": "Designing...",
       "designComplete": "Design complete",
       "architecture": "Architecture",
       "uiux": "UI/UX"
