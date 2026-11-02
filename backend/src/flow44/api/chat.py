@@ -7,7 +7,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
@@ -21,10 +21,19 @@ from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
-from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
-from flow44.db.events import emit_event, get_events, get_latest_event, subscribe, unsubscribe
+from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message, trim_messages_after
+from flow44.db.events import (
+    emit_event,
+    emit_transient,
+    get_events,
+    get_last_event_id,
+    get_latest_event,
+    subscribe,
+    trim_events_after,
+    unsubscribe,
+)
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
-from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
+from flow44.db.pending_plan import delete_pending_plan, get_pending_plan, save_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
@@ -44,6 +53,10 @@ async def _is_new_project(project_id: str) -> bool:
 
 # Strong refs: asyncio holds tasks weakly, so a run could be GC'd mid-flight.
 _RUNNING: set[asyncio.Task[None]] = set()
+# The live agent task per project, so an abort from any socket can cancel it.
+_AGENT_TASKS: dict[str, asyncio.Task[Any]] = {}
+# Projects whose run the user aborted: the turn is discarded instead of committed.
+_ABORTED: set[str] = set()
 
 _AGENT_BUSY = {"type": "error", "message": "An agent is already running for this project"}
 _VERSION_FAILED = {"type": "version_error", "message": "Version operation failed", "code": "failed"}
@@ -94,13 +107,40 @@ async def _report_run_failure(project_id: str, message: str) -> None:
     await emit_event(project_id, {"type": "error", "message": message})
 
 
-async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> None:
+Rollback = Callable[[], Awaitable[None]]
+
+
+async def _rollback_turn(
+    project_id: str, after_event_id: int, after_ts: str, on_abort: Callable[[], Awaitable[Any]] | None
+) -> None:
+    await versioning.discard_turn(project_id)
+    await trim_events_after(project_id, after_event_id)
+    await trim_messages_after(project_id, after_ts)
+    if on_abort is not None:
+        await on_abort()
+
+
+def abort_run(project_id: str) -> None:
+    task = _AGENT_TASKS.get(project_id)
+    # A finished task is already committing; aborting it now would discard a completed turn.
+    if task is None or task.done():
+        return
+    _ABORTED.add(project_id)
+    task.cancel()
+
+
+async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime, rollback: Rollback | None = None) -> None:
     """Run the agent under a heartbeat + timeout, surfacing failures to the client."""
     run_task = asyncio.create_task(coro)
+    _AGENT_TASKS[project_id] = run_task
     beat = _Beat(at=claimed_at)
     try:
         await _heartbeat_until_done(project_id, run_task, beat)
         await run_task
+    except asyncio.CancelledError:
+        if project_id not in _ABORTED:
+            raise
+        logger.info("[chat] Run aborted by the user for session %s", project_id)
     except _RunBudgetExceeded:
         logger.error(
             "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
@@ -118,8 +158,21 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         await _report_run_failure(project_id, "AI processing failed")
     finally:
         await _cancel_task(run_task)
-        await versioning.commit_turn(project_id)
+        if _AGENT_TASKS.get(project_id) is run_task:
+            del _AGENT_TASKS[project_id]
+        aborted = project_id in _ABORTED
+        _ABORTED.discard(project_id)
+        if aborted:
+            try:
+                await (rollback or partial(versioning.discard_turn, project_id))()
+            except Exception:
+                logger.exception("[chat] Rolling back the aborted turn failed for session %s", project_id)
+        else:
+            await versioning.commit_turn(project_id)
         await clear_heartbeat(project_id, only_beat=beat.at)
+        if aborted:
+            # Last, so clients reload a released, trimmed project.
+            await emit_transient(project_id, {"type": "turn_aborted"})
 
 
 async def _claim_run(project_id: str) -> datetime:
@@ -129,8 +182,8 @@ async def _claim_run(project_id: str) -> datetime:
     return claimed_at
 
 
-def _start_agent(project_id: str, coro: Any, claimed_at: datetime) -> None:
-    task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at))
+def _start_agent(project_id: str, coro: Any, claimed_at: datetime, rollback: Rollback | None = None) -> None:
+    task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at, rollback))
     _RUNNING.add(task)
     task.add_done_callback(_RUNNING.discard)
 
@@ -139,12 +192,17 @@ async def _start_turn(
     project_id: str,
     make_coro: Callable[[], Any],
     prepare: Callable[[], Awaitable[Any]] | None = None,
+    on_abort: Callable[[], Awaitable[Any]] | None = None,
 ) -> None:
     claimed_at = await _claim_run(project_id)
     try:
         if prepare is not None:
             await prepare()
-        _start_agent(project_id, make_coro(), claimed_at)
+        # Everything after this point belongs to the AI's turn, so an abort trims back to here.
+        rollback = partial(
+            _rollback_turn, project_id, await get_last_event_id(project_id), datetime.now(UTC).isoformat(), on_abort
+        )
+        _start_agent(project_id, make_coro(), claimed_at, rollback)
     except Exception:
         await clear_heartbeat(project_id, only_beat=claimed_at)
         raise
@@ -268,6 +326,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                             project.id,
                             execute_agent.run,
                             prepare=partial(delete_pending_plan, project.id),
+                            # an abort trims back to the plan overview, so the plan must be approvable again
+                            on_abort=partial(save_pending_plan, project.id, state_json),
                         )
 
                     elif action == "modify" and feedback:
@@ -316,6 +376,9 @@ async def chat_ws(  # noqa: C901, PLR0915
                         ),
                         prepare=partial(_save_user_turn, project.id, error_desc, fix_event),
                     )
+
+                elif msg_type == "abort":
+                    abort_run(project.id)
 
                 else:
                     await versioning.handle_action(project.id, msg_type, data)

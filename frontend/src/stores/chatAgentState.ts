@@ -42,6 +42,7 @@ export const TRANSIENT_RESET: Partial<ChatState> = {
   fixSteps: [],
   executionTasks: [],
   designProgress: { architecture: null, ux: null },
+  aborting: false,
 };
 
 export type AgentActivityState = Pick<ChatState, 'isStreaming' | 'agentPhase'>;

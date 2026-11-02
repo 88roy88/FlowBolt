@@ -266,6 +266,33 @@ async def test_discard_removes_tracked_and_untracked_edits_and_broadcasts(
     assert queue.get_nowait() == {"type": "workspace_dirty", "files": []}
 
 
+async def test_discard_turn_reverts_the_ai_changes_while_the_run_is_active(
+    project_id: str, version_chain: VersionChain
+) -> None:
+    claimed_at = await versioning.begin_turn(project_id)
+    assert claimed_at is not None
+    original = (version_chain.workspace / "a.txt").read_text()
+    (version_chain.workspace / "a.txt").write_text("ai change")
+    (version_chain.workspace / "new.txt").write_text("ai file")
+    try:
+        await versioning.discard_turn(project_id)
+    finally:
+        await clear_heartbeat(project_id, only_beat=claimed_at)
+
+    assert (version_chain.workspace / "a.txt").read_text() == original
+    assert not (version_chain.workspace / "new.txt").exists()
+    assert not await version_chain.git.is_dirty()
+
+
+async def test_discard_turn_leaves_a_detached_workspace_alone(project_id: str, version_chain: VersionChain) -> None:
+    await version_chain.git.checkout(version_chain.shas[0])
+    (version_chain.workspace / "new.txt").write_text("untouched")
+
+    await versioning.discard_turn(project_id)
+
+    assert (version_chain.workspace / "new.txt").exists()
+
+
 async def test_connect_broadcast_reports_unsaved_files(project_id: str, dirty_chain: VersionChain) -> None:
     queue = subscribe(project_id)
     try:

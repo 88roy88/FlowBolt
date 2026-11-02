@@ -121,3 +121,57 @@ async def test_start_agent_runs_under_the_supervisor(monkeypatch: pytest.MonkeyP
     await asyncio.wait_for(started.wait(), timeout=1)
     await asyncio.wait_for(task, timeout=1)
     assert set() == chat._RUNNING
+
+
+async def test_abort_cancels_rolls_back_instead_of_committing(monkeypatch: pytest.MonkeyPatch) -> None:
+    emit, clear, commit = _patch_boundary(monkeypatch)
+    transient = AsyncMock()
+    monkeypatch.setattr(chat, "emit_transient", transient)
+    rollback = AsyncMock()
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def hang() -> None:
+        started.set()
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    run = asyncio.create_task(chat._run_agent_safe(PROJECT_ID, hang(), CLAIMED_AT, rollback))
+    await asyncio.wait_for(started.wait(), timeout=1)
+    chat.abort_run(PROJECT_ID)
+    await asyncio.wait_for(run, timeout=1)
+
+    assert cancelled.is_set()
+    rollback.assert_awaited_once_with()
+    commit.assert_not_awaited()
+    emit.assert_not_awaited()
+    clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
+    transient.assert_awaited_once_with(PROJECT_ID, {"type": "turn_aborted"})
+    assert PROJECT_ID not in chat._AGENT_TASKS
+    assert PROJECT_ID not in chat._ABORTED
+
+
+async def test_abort_without_a_run_is_ignored() -> None:
+    chat.abort_run(PROJECT_ID)
+
+    assert PROJECT_ID not in chat._ABORTED
+
+
+async def test_rollback_trims_back_to_the_turn_start_and_runs_the_abort_hook(monkeypatch: pytest.MonkeyPatch) -> None:
+    discard = AsyncMock()
+    trim_events = AsyncMock()
+    trim_messages = AsyncMock()
+    on_abort = AsyncMock()
+    monkeypatch.setattr(chat.versioning, "discard_turn", discard)
+    monkeypatch.setattr(chat, "trim_events_after", trim_events)
+    monkeypatch.setattr(chat, "trim_messages_after", trim_messages)
+
+    await chat._rollback_turn(PROJECT_ID, 42, "2026-01-01T00:00:00+00:00", on_abort)
+
+    discard.assert_awaited_once_with(PROJECT_ID)
+    trim_events.assert_awaited_once_with(PROJECT_ID, 42)
+    trim_messages.assert_awaited_once_with(PROJECT_ID, "2026-01-01T00:00:00+00:00")
+    on_abort.assert_awaited_once_with()

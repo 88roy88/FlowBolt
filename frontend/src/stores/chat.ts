@@ -32,11 +32,14 @@ export interface ChatState {
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
   agentAlive: boolean | null;
   agentAlivePollId: number;
+  /** An abort was sent and the server hasn't confirmed it yet. */
+  aborting: boolean;
   draft: string;
   setDraft: (draft: string) => void;
   sendMessage: (content: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   rollbackTurn: (id: string) => void;
+  abortTurn: () => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
@@ -86,6 +89,7 @@ const RESET_STATE = {
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [] as ExecutionTask[],
+  aborting: false,
 };
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -109,6 +113,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   buildCompleted: false,
   agentAlive: null,
   agentAlivePollId: 0,
+  aborting: false,
   draft: '',
 
   setDraft(draft: string) {
@@ -221,6 +226,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       agentAlive: false,
       ...RESET_STATE,
     }));
+  },
+
+  abortTurn() {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId || get().aborting) return;
+    // The server discards the turn and sends turn_aborted, which reloads the trimmed history.
+    getChatSocket(projectId).send({ type: 'abort' });
+    set({ aborting: true });
   },
 
   respondToPlan(action: 'accept' | 'modify', feedback?: string) {

@@ -168,6 +168,12 @@ function handleVersionRestored(msg: { commit_sha: string }) {
   settle(true);
 }
 
+function handleTurnAborted() {
+  const projectId = useSessionStore.getState().projectId;
+  // Replaying the trimmed events drops the aborted AI output and brings back a pending plan.
+  if (projectId) void useChatStore.getState().loadHistory(projectId);
+}
+
 function handleVersionError(msg: { message: string; code: string; files?: string[] }) {
   const refused = pending;
   settle(false);
@@ -185,6 +191,7 @@ const versionRoutes: { [M in WSMessage as M['type']]?: (msg: M) => void } = {
   version_error: handleVersionError,
   workspace_dirty: (msg) => useVersionStore.setState({ dirtyFiles: msg.files }),
   workspace_reset: refreshEditorFiles,
+  turn_aborted: handleTurnAborted,
   error: () => settle(false),
   phase: () => { if (pending?.op === 'send') settle(true); },
 };

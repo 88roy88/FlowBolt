@@ -4,7 +4,7 @@ import { useChatStore } from '../../stores/chat';
 import { isAwaitingPlanApproval } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
-import { ArrowUp, CirclePlus, Loader2, X } from 'lucide-react';
+import { ArrowUp, CirclePlus, Loader2, Square, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
@@ -16,6 +16,8 @@ export function PromptInput() {
   const [showDsSelector, setShowDsSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const abortTurn = useChatStore((s) => s.abortTurn);
+  const aborting = useChatStore((s) => s.aborting);
   const value = useChatStore((s) => s.draft);
   const setValue = useChatStore((s) => s.setDraft);
   const agentPhase = useChatStore((s) => s.agentPhase);
@@ -52,6 +54,7 @@ export function PromptInput() {
   };
 
   const disabled = inputBlocked || (!projectId && !startsProject);
+  const canStop = agentBusy && !awaitingPlan && !!projectId;
   const canSend = !!value.trim() && !disabled;
   const dsOpen = showDsSelector && !disabled;
 
@@ -169,19 +172,31 @@ export function PromptInput() {
             <ModelSelector />
           </div>
 
-          <button
-            onClick={handleSubmit}
-            disabled={!canSend}
-            data-testid="send-button"
-            className={`w-8 h-8 ms-2 flex items-center justify-center rounded-full shrink-0 transition-all duration-150 ${
-              canSend
-                ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
-                : 'bg-muted text-muted-foreground opacity-50 cursor-default'
-            }`}
-            title={t('common.sendMessage')}
-          >
-            <ArrowUp size={16} strokeWidth={2.5} />
-          </button>
+          {canStop ? (
+            <button
+              onClick={abortTurn}
+              disabled={aborting}
+              data-testid="stop-button"
+              className="w-8 h-8 ms-2 flex items-center justify-center rounded-full shrink-0 transition-all duration-150 bg-primary text-text-on-accent cursor-pointer enabled:hover:scale-105 enabled:active:scale-95 disabled:opacity-50 disabled:cursor-default"
+              title={t('chat.stop')}
+            >
+              {aborting ? <Loader2 size={14} className="animate-spin" /> : <Square size={12} fill="currentColor" />}
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={!canSend}
+              data-testid="send-button"
+              className={`w-8 h-8 ms-2 flex items-center justify-center rounded-full shrink-0 transition-all duration-150 ${
+                canSend
+                  ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
+                  : 'bg-muted text-muted-foreground opacity-50 cursor-default'
+              }`}
+              title={t('common.sendMessage')}
+            >
+              <ArrowUp size={16} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -242,6 +242,20 @@ async def commit_turn(project_id: str) -> str | None:
         return None
 
 
+async def discard_turn(project_id: str) -> None:
+    # No _not_busy: the aborted run still holds the heartbeat, and a turn starts on a clean tree.
+    try:
+        async with _locked_workspace(project_id) as git:
+            if git.is_detached():
+                logger.warning("[versioning] refusing to discard while detached for %s", project_id)
+                return
+            await git.discard_all()
+            await emit_transient(project_id, {"type": "workspace_reset"})
+            await _emit_dirty_files(project_id, git)
+    except Exception:
+        logger.exception("[versioning] discard_turn failed for %s", project_id)
+
+
 async def broadcast_dirty(project_id: str) -> None:
     try:
         async with _locked_workspace(project_id) as git:
