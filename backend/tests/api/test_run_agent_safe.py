@@ -159,7 +159,7 @@ async def test_rollback_discards_back_to_the_turn_start_and_runs_the_abort_hook(
 ) -> None:
     discard = AsyncMock()
     on_abort = AsyncMock()
-    monkeypatch.setattr(chat.versioning, "discard_agent_turn", discard)
+    monkeypatch.setattr(chat.versioning, "discard_agent_response", discard)
 
     await chat._rollback_turn(PROJECT_ID, 42, "2026-01-01T00:00:00+00:00", on_abort)
 
