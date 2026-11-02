@@ -10,6 +10,7 @@ import { DirectorySearch } from './DirectorySearch';
 import { cn } from '@/lib/utils';
 import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
+import { middleClickOpens, projectHref } from '../../utils/newTab';
 
 // Rows whose id is in `hits` sort first; ties preserve order under a stable sort.
 function rankHit(hits: Set<string>, a: string, b: string): number {
@@ -323,7 +324,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 {/* The hashchange listener in App selects the project; admins' project list includes every project. */}
                 <button
                   type="button"
-                  onClick={() => { window.location.hash = `#/project/${a.project_id}`; onClose(); }}
+                  onClick={() => { window.location.hash = projectHref(a.project_id); onClose(); }}
+                  {...middleClickOpens(projectHref(a.project_id))}
                   className="min-w-0 text-[13px] truncate text-start hover:underline"
                   title={`${t('admin.openProject', 'Open project')} (${a.project_id})`}
                 >

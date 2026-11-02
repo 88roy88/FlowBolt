@@ -19,6 +19,7 @@ import { useFilesStore } from '../../stores/files';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { startProjectFromPrompt } from '../../utils/newProject';
+import { middleClickOpens, projectHref } from '../../utils/newTab';
 import { getProjectHasMessages, setProjectHasMessages } from '../../utils/projectHasMessagesCache';
 
 const SIDEBAR_WIDTH = 280;
@@ -140,6 +141,7 @@ export function AppShell() {
           <button
             key={p.id}
             onClick={() => handleRailSelect(p)}
+            {...middleClickOpens(projectHref(p.id))}
             className={`w-8 h-8 rounded-md text-xs font-bold flex items-center justify-center transition-all duration-150 shrink-0 ${
               p.id === currentProject?.id
                 ? `${getColor(p.name)} ring-1 ring-primary/40`

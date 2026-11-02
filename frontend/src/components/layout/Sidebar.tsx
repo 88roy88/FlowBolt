@@ -13,6 +13,7 @@ import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useDebouncedValue } from '../../hooks/useDebounce';
+import { middleClickOpens, projectHref } from '../../utils/newTab';
 import { logger } from '../../services/logger';
 
 type SidebarProps = {
@@ -240,6 +241,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
             <div key={project.id}>
               <div
                 onClick={() => handleSelect(project)}
+                {...middleClickOpens(projectHref(project.id))}
                 data-testid={`project-item-${project.id}`}
                 className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
                   }`}

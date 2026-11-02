@@ -2,6 +2,7 @@
  * Home page navigation E2E tests:
  * - Which page the app opens on (admins vs. everyone else)
  * - Getting back to the home page (Back button, logo)
+ * - Middle clicking a project or the logo to open it in a new tab
  */
 import { test, expect } from './fixtures';
 import { MOCK_PROJECT, PROJECT_ID } from './mocks/data';
@@ -80,5 +81,51 @@ test.describe('Returning home', () => {
     await page.getByRole('button', { name: 'Expand sidebar' }).click();
     await page.getByRole('button', { name: 'BuildApp' }).click();
     await expectHomePage(page);
+  });
+});
+
+test.describe('Middle click opens a new tab', () => {
+  test.use({ mockOptions: { seedChatHistory: true } });
+
+  test.beforeEach(async ({ page }) => {
+    // Record window.open calls instead of opening a tab the page-level mocks don't cover
+    await page.addInitScript(() => {
+      const w = window as unknown as { openedUrls: string[] };
+      w.openedUrls = [];
+      window.open = (url) => {
+        w.openedUrls.push(String(url));
+        return null;
+      };
+    });
+  });
+
+  const openedUrls = (page: import('@playwright/test').Page) =>
+    page.evaluate(() => (window as unknown as { openedUrls: string[] }).openedUrls);
+
+  test('on a project in the icon rail', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'ET', exact: true }).click({ button: 'middle' });
+
+    await expect.poll(() => openedUrls(page)).toEqual([`#/project/${PROJECT_ID}`]);
+    await expectHomePage(page);
+  });
+
+  test('on a project in the sidebar', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Expand sidebar' }).click();
+    await page.getByTestId(`project-item-${PROJECT_ID}`).click({ button: 'middle' });
+
+    await expect.poll(() => openedUrls(page)).toEqual([`#/project/${PROJECT_ID}`]);
+    await expectHomePage(page);
+  });
+
+  test('on the logo', async ({ page }) => {
+    await page.goto(`/#/project/${PROJECT_ID}`);
+    await expectProjectView(page);
+    await page.getByRole('button', { name: 'Expand sidebar' }).click();
+    await page.getByRole('button', { name: 'BuildApp' }).click({ button: 'middle' });
+
+    await expect.poll(() => openedUrls(page)).toEqual(['/']);
+    await expect(page).toHaveURL(PROJECT_URL);
   });
 });
