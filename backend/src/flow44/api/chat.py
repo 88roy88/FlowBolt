@@ -32,7 +32,7 @@ from flow44.db.events import (
     trim_events_after,
     unsubscribe,
 )
-from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
+from flow44.db.heartbeat import clear_heartbeat, is_abort_requested, request_abort, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan, save_pending_plan
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
@@ -53,10 +53,6 @@ async def _is_new_project(project_id: str) -> bool:
 
 # Strong refs: asyncio holds tasks weakly, so a run could be GC'd mid-flight.
 _RUNNING: set[asyncio.Task[None]] = set()
-# The live agent task per project, so an abort from any socket can cancel it.
-_AGENT_TASKS: dict[str, asyncio.Task[Any]] = {}
-# Projects whose run the user aborted: the turn is discarded instead of committed.
-_ABORTED: set[str] = set()
 
 _AGENT_BUSY = {"type": "error", "message": "An agent is already running for this project"}
 _VERSION_FAILED = {"type": "version_error", "message": "Version operation failed", "code": "failed"}
@@ -70,6 +66,10 @@ class _RunBudgetExceeded(Exception):
     """The run outlived AGENT_RUN_TIMEOUT (distinct from a TimeoutError the agent raises)."""
 
 
+class _RunAborted(Exception):
+    """The user asked to stop the run, from any pod."""
+
+
 @dataclass
 class _Beat:
     """The heartbeat timestamp this run currently owns — its lock token."""
@@ -77,14 +77,29 @@ class _Beat:
     at: datetime
 
 
+async def _abort_requested(project_id: str) -> bool:
+    try:
+        return await is_abort_requested(project_id)
+    except Exception:
+        # Same as a failed beat: a DB blip must not tear down the run; the next poll retries.
+        logger.warning("[chat] Abort check failed for session %s; continuing", project_id, exc_info=True)
+        return False
+
+
 async def _heartbeat_until_done(project_id: str, run_task: asyncio.Task[Any], beat: _Beat) -> None:
     deadline = time.monotonic() + settings.AGENT_RUN_TIMEOUT
     beat_interval = settings.AGENT_RUN_STALE_TIMEOUT / 4
-    while time.monotonic() < deadline:
-        timeout = min(beat_interval, deadline - time.monotonic())
+    next_beat = time.monotonic() + beat_interval
+    while (now := time.monotonic()) < deadline:
+        timeout = min(settings.AGENT_ABORT_POLL_INTERVAL, next_beat - now, deadline - now)
         done, _ = await asyncio.wait({run_task}, timeout=timeout)
         if run_task in done:
             return
+        if await _abort_requested(project_id):
+            raise _RunAborted
+        if time.monotonic() < next_beat:
+            continue
+        next_beat = time.monotonic() + beat_interval
         try:
             beat.at = await touch_heartbeat(project_id)
         except Exception:
@@ -120,27 +135,17 @@ async def _rollback_turn(
         await on_abort()
 
 
-def abort_run(project_id: str) -> None:
-    task = _AGENT_TASKS.get(project_id)
-    # A finished task is already committing; aborting it now would discard a completed turn.
-    if task is None or task.done():
-        return
-    _ABORTED.add(project_id)
-    task.cancel()
-
-
 async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime, rollback: Rollback | None = None) -> None:
     """Run the agent under a heartbeat + timeout, surfacing failures to the client."""
     run_task = asyncio.create_task(coro)
-    _AGENT_TASKS[project_id] = run_task
     beat = _Beat(at=claimed_at)
+    aborted = False
     try:
         await _heartbeat_until_done(project_id, run_task, beat)
         await run_task
-    except asyncio.CancelledError:
-        if project_id not in _ABORTED:
-            raise
+    except _RunAborted:
         logger.info("[chat] Run aborted by the user for session %s", project_id)
+        aborted = True
     except _RunBudgetExceeded:
         logger.error(
             "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
@@ -158,10 +163,6 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime, roll
         await _report_run_failure(project_id, "AI processing failed")
     finally:
         await _cancel_task(run_task)
-        if _AGENT_TASKS.get(project_id) is run_task:
-            del _AGENT_TASKS[project_id]
-        aborted = project_id in _ABORTED
-        _ABORTED.discard(project_id)
         if aborted:
             try:
                 await (rollback or partial(versioning.discard_turn, project_id))()
@@ -378,7 +379,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                     )
 
                 elif msg_type == "abort":
-                    abort_run(project.id)
+                    # The run may live on another pod, which picks this up on its next poll.
+                    await request_abort(project.id)
 
                 else:
                     await versioning.handle_action(project.id, msg_type, data)
