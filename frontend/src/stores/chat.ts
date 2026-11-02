@@ -7,9 +7,9 @@ import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } 
 import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState, setReplayMode } from './chatHandlers';
 import { armTurn, handleVersionMessage, useVersionStore } from './version';
 import { requestPermissionIfNeeded } from '../utils/notifications';
-import { AGENT_PHASE } from './chatAgentState';
+import { AGENT_PHASE, TERMINAL_EVENT_TYPES } from './chatAgentState';
 import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
-import { forgetAbortRequest, markAbortRequested } from './abortOutcome';
+import { logger } from '../services/logger';
 
 export interface ChatState {
   messages: Message[];
@@ -83,6 +83,24 @@ function attachHandler(
 function detachHandler(socket: ReturnType<typeof getChatSocket>, handler: (msg: WSMessage) => void) {
   socket.offMessage(handler);
   activeHandler = null;
+}
+
+function logAbortOutcome(socket: ReturnType<typeof getChatSocket>, projectId: string) {
+  const requestedAt = performance.now();
+  const onMessage = (msg: WSMessage) => {
+    if (useSessionStore.getState().projectId !== projectId) {
+      socket.offMessage(onMessage);
+      return;
+    }
+    const outcome =
+      msg.type === 'turn_aborted' ? 'aborted' :
+      (TERMINAL_EVENT_TYPES as readonly string[]).includes(msg.type) ? 'too_late' :
+      null;
+    if (!outcome) return;
+    socket.offMessage(onMessage);
+    logger.info('response_aborted', { outcome, elapsed_ms: Math.round(performance.now() - requestedAt) });
+  };
+  socket.onMessage(onMessage);
 }
 
 const RESET_STATE = {
@@ -240,8 +258,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   abortTurn() {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId || get().aborting) return;
-    getChatSocket(projectId).send({ type: 'abort' });
-    markAbortRequested();
+    const socket = getChatSocket(projectId);
+    logAbortOutcome(socket, projectId);
+    socket.send({ type: 'abort' });
     set({ aborting: true });
   },
 
@@ -272,7 +291,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const oldSocket = getChatSocket(activeProjectId);
       if (activeHandler) detachHandler(oldSocket, activeHandler);
       oldSocket.offMessage(handleVersionMessage);
-      forgetAbortRequest();
     }
 
     try {
