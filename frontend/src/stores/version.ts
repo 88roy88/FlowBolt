@@ -6,6 +6,7 @@ import { useChatStore } from './chat';
 import { useFilesStore } from './files';
 import { useErrorStore } from './errors';
 import { getTimestamp, isReplaying } from './chatHandlers';
+import { settleAbort } from './abortOutcome';
 
 type Attempt =
   | { op: 'preview'; commit_sha: string }
@@ -169,6 +170,7 @@ function handleVersionRestored(msg: { commit_sha: string }) {
 }
 
 function handleTurnAborted() {
+  settleAbort('aborted');
   const projectId = useSessionStore.getState().projectId;
   // Replaying the trimmed events drops the aborted AI output and brings back a pending plan.
   if (projectId) void useChatStore.getState().loadHistory(projectId);
@@ -192,7 +194,13 @@ const versionRoutes: { [M in WSMessage as M['type']]?: (msg: M) => void } = {
   workspace_dirty: (msg) => useVersionStore.setState({ dirtyFiles: msg.files }),
   workspace_reset: refreshEditorFiles,
   turn_aborted: handleTurnAborted,
-  error: () => settle(false),
+  error: () => {
+    settleAbort('too_late');
+    settle(false);
+  },
+  // The turn ended on its own before a pending abort reached it.
+  action_complete: () => settleAbort('too_late'),
+  plan_overview: () => settleAbort('too_late'),
   phase: () => { if (pending?.op === 'send') settle(true); },
 };
 

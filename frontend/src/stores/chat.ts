@@ -9,6 +9,7 @@ import { armTurn, handleVersionMessage, useVersionStore } from './version';
 import { requestPermissionIfNeeded } from '../utils/notifications';
 import { AGENT_PHASE } from './chatAgentState';
 import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
+import { forgetAbortRequest, markAbortRequested } from './abortOutcome';
 
 export interface ChatState {
   messages: Message[];
@@ -242,6 +243,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!projectId || get().aborting) return;
     // The server discards the turn and sends turn_aborted, which reloads the trimmed history.
     getChatSocket(projectId).send({ type: 'abort' });
+    markAbortRequested();
     set({ aborting: true });
   },
 
@@ -272,6 +274,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const oldSocket = getChatSocket(activeProjectId);
       if (activeHandler) detachHandler(oldSocket, activeHandler);
       oldSocket.offMessage(handleVersionMessage);
+      forgetAbortRequest();
     }
 
     try {

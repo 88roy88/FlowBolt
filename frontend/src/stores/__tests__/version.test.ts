@@ -4,6 +4,7 @@ import { useChatStore } from '../chat';
 import { useErrorStore } from '../errors';
 import { createSendMessageHandler } from '../chatHandlers';
 import { handleVersionMessage, useVersionStore } from '../version';
+import { forgetAbortRequest, markAbortRequested } from '../abortOutcome';
 
 vi.mock('../chat', () => {
   let state: Record<string, unknown> = { messages: [] };
@@ -35,6 +36,11 @@ vi.mock('../session', () => ({
 }));
 
 const socketSend = vi.fn();
+const logInfo = vi.fn();
+vi.mock('../../services/logger', () => ({
+  logger: { info: (...args: unknown[]) => logInfo(...args) },
+}));
+
 vi.mock('../../services/websocket', () => ({
   getChatSocket: () => ({ send: socketSend }),
 }));
@@ -49,6 +55,8 @@ describe('version store wire contracts', () => {
     useChatStore.setState({ messages: [], agentAlive: undefined });
     useErrorStore.setState({ errors: [] });
     socketSend.mockReset();
+    logInfo.mockReset();
+    forgetAbortRequest();
   });
 
   it('stamps AI versions and gives user edits their own version row', () => {
@@ -212,5 +220,25 @@ describe('version store wire contracts', () => {
     handleVersionMessage(msg({ type: 'turn_aborted' }));
 
     expect(loadHistory).toHaveBeenCalledWith('proj-1');
+  });
+
+  it('logs whether a Stop aborted the turn or arrived too late', () => {
+    useChatStore.setState({ loadHistory: vi.fn() });
+
+    markAbortRequested();
+    handleVersionMessage(msg({ type: 'turn_aborted' }));
+    markAbortRequested();
+    handleVersionMessage(msg({ type: 'action_complete' }));
+
+    expect(logInfo.mock.calls.map(([event, props]) => [event, props.outcome])).toEqual([
+      ['response_aborted', 'aborted'],
+      ['response_aborted', 'too_late'],
+    ]);
+  });
+
+  it('logs no abort outcome when the user never pressed Stop', () => {
+    handleVersionMessage(msg({ type: 'action_complete' }));
+
+    expect(logInfo).not.toHaveBeenCalled();
   });
 });
