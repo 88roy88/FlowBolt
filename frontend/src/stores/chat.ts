@@ -34,7 +34,6 @@ export interface ChatState {
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
   agentAlive: boolean | null;
   agentAlivePollId: number;
-  /** An abort was sent and the server hasn't confirmed it yet. */
   aborting: boolean;
   draft: string;
   setDraft: (draft: string) => void;
@@ -241,7 +240,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   abortTurn() {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId || get().aborting) return;
-    // The server discards the turn and sends turn_aborted, which reloads the trimmed history.
     getChatSocket(projectId).send({ type: 'abort' });
     markAbortRequested();
     set({ aborting: true });

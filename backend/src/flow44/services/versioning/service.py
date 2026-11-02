@@ -210,7 +210,6 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
 
 
 async def discard_agent_response(project_id: str, after_event_id: int, after_ts: str) -> None:
-    # No _not_busy: the aborted run still holds the heartbeat, and a turn starts on a clean tree.
     async with _locked_workspace(project_id, [_not_detached]) as git:
         await git.discard_all()
         await trim_events_after(project_id, after_event_id)
