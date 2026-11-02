@@ -85,6 +85,7 @@ Trigger: the user sends an instruction to the model.
 | `prompt_length` | integer | Yes | Character count of the prompt. |
 | `prompt_sequence_number` | integer | Yes | Position of this prompt within its project, starting at 1. If a part of another branch, the position in that tree. |
 | `version_id` | string | Yes | The version ID the prompt was sent in. |
+| `selected_element_count` | integer | Yes | Number of preview elements the user attached to the prompt, 0 when none. |
 
 
 #### `response_received` || Not yet implemented
