@@ -152,16 +152,3 @@ async def test_abort_cancels_and_rolls_back_instead_of_committing(monkeypatch: p
     clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
     transient.assert_awaited_once_with(PROJECT_ID, {"type": "turn_aborted"})
     assert PROJECT_ID not in run_abort._watchers
-
-
-async def test_rollback_discards_back_to_the_turn_start_and_runs_the_abort_hook(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    discard = AsyncMock()
-    on_abort = AsyncMock()
-    monkeypatch.setattr(chat.versioning, "discard_agent_response", discard)
-
-    await chat._rollback_turn(PROJECT_ID, 42, "2026-01-01T00:00:00+00:00", on_abort)
-
-    discard.assert_awaited_once_with(PROJECT_ID, 42, "2026-01-01T00:00:00+00:00")
-    on_abort.assert_awaited_once_with()

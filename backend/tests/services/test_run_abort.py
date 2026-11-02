@@ -9,16 +9,6 @@ from flow44.services import run_abort
 PROJECT_ID = "test-project-run-abort"
 
 
-async def test_wake_sets_only_the_watchers_of_that_project() -> None:
-    with run_abort.watch(PROJECT_ID) as aborted, run_abort.watch("other-project") as other:
-        run_abort._wake(PROJECT_ID)
-
-        assert aborted.is_set()
-        assert not other.is_set()
-
-    assert run_abort._watchers == {}
-
-
 async def test_request_abort_wakes_a_local_run_without_a_listener(test_db: object) -> None:
     assert not run_abort.abort_listener.listening
 

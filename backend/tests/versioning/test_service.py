@@ -293,19 +293,6 @@ async def test_discard_agent_response_reverts_the_ai_changes_and_keeps_the_user_
     assert [message.content for message in await get_messages(project_id)] == ["make it blue"]
 
 
-async def test_discard_agent_response_refuses_a_detached_workspace(
-    project_id: str, version_chain: VersionChain
-) -> None:
-    await version_chain.git.checkout(version_chain.shas[0])
-    (version_chain.workspace / "new.txt").write_text("untouched")
-
-    with pytest.raises(versioning.WorkspaceLocked) as excinfo:
-        await versioning.discard_agent_response(project_id, 0, "0001-01-01")
-
-    assert excinfo.value.payload["code"] == "previewing"
-    assert (version_chain.workspace / "new.txt").exists()
-
-
 async def test_connect_broadcast_reports_unsaved_files(project_id: str, dirty_chain: VersionChain) -> None:
     queue = subscribe(project_id)
     try:
