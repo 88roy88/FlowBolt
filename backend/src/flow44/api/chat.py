@@ -136,7 +136,7 @@ Rollback = Callable[[], Awaitable[None]]
 async def _rollback_turn(
     project_id: str, after_event_id: int, after_ts: str, on_abort: Callable[[], Awaitable[Any]] | None
 ) -> None:
-    await versioning.discard_turn(project_id, after_event_id, after_ts)
+    await versioning.discard_agent_turn(project_id, after_event_id, after_ts)
     if on_abort is not None:
         await on_abort()
 

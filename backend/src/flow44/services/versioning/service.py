@@ -209,8 +209,7 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
         await _emit_dirty_files(project_id, git)
 
 
-async def discard_turn(project_id: str, after_event_id: int, after_ts: str) -> None:
-    """Undo an aborted AI turn: its file changes, and its events and messages after the given point."""
+async def discard_agent_turn(project_id: str, after_event_id: int, after_ts: str) -> None:
     # No _not_busy: the aborted run still holds the heartbeat, and a turn starts on a clean tree.
     async with _locked_workspace(project_id, [_not_detached]) as git:
         await git.discard_all()
