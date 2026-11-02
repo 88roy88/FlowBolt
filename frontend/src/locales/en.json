@@ -142,6 +142,7 @@
   },
   "chat": {
     "chat": "Chat",
+    "stop": "Stop and discard changes",
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",

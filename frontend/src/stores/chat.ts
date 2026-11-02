@@ -7,8 +7,9 @@ import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } 
 import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState, setReplayMode } from './chatHandlers';
 import { armTurn, handleVersionMessage, useVersionStore } from './version';
 import { requestPermissionIfNeeded } from '../utils/notifications';
-import { AGENT_PHASE } from './chatAgentState';
+import { AGENT_PHASE, TERMINAL_EVENT_TYPES } from './chatAgentState';
 import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
+import { logger } from '../services/logger';
 
 export interface ChatState {
   messages: Message[];
@@ -33,11 +34,13 @@ export interface ChatState {
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
   agentAlive: boolean | null;
   agentAlivePollId: number;
+  aborting: boolean;
   draft: string;
   setDraft: (draft: string) => void;
   sendMessage: (content: string, opts?: { keepDraft?: boolean }) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   rollbackTurn: (id: string) => void;
+  abortTurn: () => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
@@ -82,6 +85,24 @@ function detachHandler(socket: ReturnType<typeof getChatSocket>, handler: (msg: 
   activeHandler = null;
 }
 
+function logAbortOutcome(socket: ReturnType<typeof getChatSocket>, projectId: string) {
+  const requestedAt = performance.now();
+  const onMessage = (msg: WSMessage) => {
+    if (useSessionStore.getState().projectId !== projectId) {
+      socket.offMessage(onMessage);
+      return;
+    }
+    const outcome =
+      msg.type === 'turn_aborted' ? 'aborted' :
+      (TERMINAL_EVENT_TYPES as readonly string[]).includes(msg.type) ? 'too_late' :
+      null;
+    if (!outcome) return;
+    socket.offMessage(onMessage);
+    logger.info('response_aborted', { outcome, elapsed_ms: Math.round(performance.now() - requestedAt) });
+  };
+  socket.onMessage(onMessage);
+}
+
 const RESET_STATE = {
   currentAssistantMessage: '',
   actions: [] as Action[],
@@ -92,6 +113,7 @@ const RESET_STATE = {
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
   executionTasks: [] as ExecutionTask[],
+  aborting: false,
 };
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -116,6 +138,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   buildCompleted: false,
   agentAlive: null,
   agentAlivePollId: 0,
+  aborting: false,
   draft: '',
 
   setDraft(draft: string) {
@@ -230,6 +253,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       agentAlive: false,
       ...RESET_STATE,
     }));
+  },
+
+  abortTurn() {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId || get().aborting) return;
+    const socket = getChatSocket(projectId);
+    logAbortOutcome(socket, projectId);
+    socket.send({ type: 'abort' });
+    set({ aborting: true });
   },
 
   respondToPlan(action: 'accept' | 'modify', feedback?: string) {
