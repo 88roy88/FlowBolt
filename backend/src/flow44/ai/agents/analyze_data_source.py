@@ -14,6 +14,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.db.project_data_source import DataSourceContext
+from flow44.integrations.enrichment import fetch_data_source_summary
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
 
@@ -33,14 +34,16 @@ async def fetch_and_analyze_data_source(
     model: str | None,
     llm_metadata_fn: Callable[[str], dict[str, Any]],
 ) -> DataSourceContext:
-    ds_name, usage = await asyncio.gather(
+    ds_name, usage, data_source_summary = await asyncio.gather(
         ds_logic.get_display_name(data_source_id, authorization=authorization),
         ds_logic.get_usage(data_source_id, authorization=authorization),
+        fetch_data_source_summary(data_source_id),
     )
     sanitized = sanitize_to_pascal_case(ds_name) or f"DataSource{data_source_id}"
     prompt = render_data_source_analysis(
         user_content=user_content,
         data_source_name=ds_name,
+        data_source_summary=data_source_summary,
         sample_data=usage.sample,
         queries=[q.model_dump() for q in usage.queries],
         params_info=usage.params.model_dump(),
@@ -69,6 +72,7 @@ async def fetch_and_analyze_data_source(
         data_source_id=data_source_id,
         data_source_name=ds_name,
         sanitized_name=sanitized,
+        data_source_summary=data_source_summary,
         queries=[q.model_dump() for q in usage.queries],
         params_info=usage.params.model_dump(),
         sample_data=usage.sample,

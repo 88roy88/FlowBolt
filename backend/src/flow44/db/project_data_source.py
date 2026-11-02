@@ -15,6 +15,7 @@ class DataSourceBase(SQLModel):
     data_source_id: str = ""
     data_source_name: str = ""
     sanitized_name: str = ""
+    data_source_summary: str = ""
     queries: list[dict[str, Any]] = Field(default_factory=list, sa_type=JSON)
     params_info: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
     can_run_without_input: bool = False

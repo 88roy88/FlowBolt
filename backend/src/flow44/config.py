@@ -116,6 +116,11 @@ class DirectorySettings(BuildAppSettings):
     DIRECTORY_DEFAULT_DOMAIN: str = "corp"
 
 
+class DataSourceEnrichmentSettings(BuildAppSettings):
+    DATA_SOURCE_ENRICHMENT_URL: str | None = None
+    DATA_SOURCE_ENRICHMENT_TIMEOUT_SECONDS: float = 15.0
+
+
 class S3Settings(BuildAppSettings):
     S3_ENDPOINT_URL: str
     S3_USE_SSL: bool = True
@@ -157,6 +162,7 @@ class Settings(
     AuthSettings,
     FlapiSettings,
     DirectorySettings,
+    DataSourceEnrichmentSettings,
     S3Settings,
     OpikSettings,
     LoggerSettings,

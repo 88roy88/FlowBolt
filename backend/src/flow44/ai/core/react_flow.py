@@ -26,6 +26,7 @@ LEAKED_TOOL_CALL_MARKERS = (
     "<function_calls>",
     "[TOOL_CALLS]",
     "<|python_tag|>",
+    '[{"tool_call',
 )
 
 

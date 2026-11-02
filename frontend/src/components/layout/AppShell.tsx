@@ -19,6 +19,7 @@ import { useFilesStore } from '../../stores/files';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { startProjectFromPrompt } from '../../utils/newProject';
+import { getProjectHasMessages, setProjectHasMessages } from '../../utils/projectHasMessagesCache';
 
 const SIDEBAR_WIDTH = 280;
 const RAIL_WIDTH = 56;
@@ -38,23 +39,6 @@ function loadSidebarExpanded(): boolean {
   } catch {
     return false;
   }
-}
-
-function getProjectHasMessages(projectId: string): boolean | null {
-  try {
-    const v = localStorage.getItem(`project-has-messages:${projectId}`);
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-    return null; // No cache
-  } catch {
-    return null;
-  }
-}
-
-function setProjectHasMessages(projectId: string, hasMessages: boolean) {
-  try {
-    localStorage.setItem(`project-has-messages:${projectId}`, hasMessages ? 'true' : 'false');
-  } catch {}
 }
 
 export function AppShell() {
@@ -95,9 +79,9 @@ export function AppShell() {
   const projectIdForCache = currentProject?.id || urlProjectId;
   const cachedHasMessages = projectIdForCache ? getProjectHasMessages(projectIdForCache) : null;
 
-  const isNewProject = historyLoaded
+  const isNewProject = !projectIdForCache || (historyLoaded
     ? (messages.length === 0 && !isStreaming)
-    : (cachedHasMessages !== true); // Show empty state unless cache explicitly says has messages
+    : cachedHasMessages === false);
   const isEmptyState = historyLoaded && messages.length === 0 && !isStreaming;
 
   // Update cache after history loads

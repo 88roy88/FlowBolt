@@ -92,6 +92,17 @@ async def get_events(project_id: str, after_id: int = 0) -> list[AgentEvent]:
         return list(result.scalars().all())
 
 
+async def get_latest_event(project_id: str, event_type: str) -> AgentEvent | None:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(AgentEvent)
+            .where(AgentEvent.project_id == project_id, AgentEvent.event_type == event_type)
+            .order_by(AgentEvent.id.desc())  # type: ignore[union-attr]
+            .limit(1)
+        )
+        return result.scalars().first()
+
+
 async def clear_events(project_id: str) -> None:
     async with database.async_session() as session:
         await session.execute(delete(AgentEvent).where(col(AgentEvent.project_id) == project_id))

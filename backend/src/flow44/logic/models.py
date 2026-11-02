@@ -24,10 +24,16 @@ class ParamOption(BaseModel):
     value: str
 
 
+class QuickParamInfo(BaseModel):
+    display_name: str | None = None
+    description: str | None = None
+
+
 class ParamDefinition(BaseModel):
     name: str
     display_name: str
     description: str | None = None
+    quick_info: QuickParamInfo | None = None
     type: ParamType
     is_required: bool
     is_single_value: bool

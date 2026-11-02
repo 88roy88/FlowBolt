@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
@@ -88,7 +89,7 @@ function SelectedElementBadges({ elements }: { elements: SelectedElement[] }) {
   );
 }
 
-export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, isStreaming }: ChatMessageProps) {
   const { i18n } = useTranslation();
   const isUser = message.role === 'user';
 
@@ -196,4 +197,4 @@ export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
       {timestamp}
     </div>
   );
-}
+});

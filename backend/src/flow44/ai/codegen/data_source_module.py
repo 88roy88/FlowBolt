@@ -59,7 +59,8 @@ def generate_data_source_module(
     used_types = {p.type for p in params_info.parameters}
     type_defs = "\n".join(v for k, v in _TYPE_DEFS.items() if k in used_types)
 
-    parts = ["import { fetchDataSource } from '../api/client';"]
+    imports = "convertDateFields, fetchDataSource" if _has_datetime_fields(queries) else "fetchDataSource"
+    parts = [f"import {{ {imports} }} from '../api/client';"]
     if type_defs:
         parts.append(type_defs)
     parts.append(types_block)
@@ -122,11 +123,9 @@ def _build_signature(
     param_names = "".join(f"\n  {idents[id(p)]}," for p in all_params)
     fields: list[str] = []
     for p in required:
-        comment = "" if _redundant_display_name(p.name, p.display_name) else f" // {p.display_name}"
-        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)};{comment}")
+        fields.append(f"\n  {idents[id(p)]}: {_ts_type(p)};{_quick_param_comment(p)}")
     for p in optional:
-        comment = "" if _redundant_display_name(p.name, p.display_name) else f" // {p.display_name}"
-        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};{comment}")
+        fields.append(f"\n  {idents[id(p)]}?: {_ts_type(p)};{_quick_param_comment(p)}")
     type_body = "".join(fields)
 
     sig = f"export async function {function_name}({{{param_names}\n}}: {{{type_body}\n}}): Promise<{response_type}>"
@@ -134,6 +133,19 @@ def _build_signature(
         names = ", ".join(p.name for p in require_any)
         return f"/** At least one of the following must be provided: {names}. */\n{sig}"
     return sig
+
+
+def _quick_param_comment(p: ParamDefinition) -> str:
+    info = p.quick_info
+    display_name = (info and info.display_name) or p.display_name
+    description = (info and info.description) or p.description
+    parts: list[str] = []
+    if display_name and not _redundant_display_name(p.name, display_name):
+        parts.append(display_name)
+    if description:
+        parts.append(description)
+    text = " ".join(" — ".join(parts).split())
+    return f" // {text}" if text else ""
 
 
 def _build_body(
@@ -173,35 +185,34 @@ def _build_body(
     return "".join(lines)
 
 
+def _has_datetime_fields(queries: list[DataSourceQuerySchema] | None) -> bool:
+    return any(f.type == "datetime" for q in queries or [] for f in q.fields)
+
+
 def _build_date_conversions(queries: list[DataSourceQuerySchema]) -> list[str]:
     lines: list[str] = []
     for query in queries:
-        datetime_fields = [f for f in query.fields if f.type == "datetime"]
+        datetime_fields = [_js_string(f.name) for f in query.fields if f.type == "datetime"]
         if not datetime_fields:
             continue
-        lines.append("  try {\n")
-        lines.append(f"    for (const row of envelope.data[{_js_string(query.display_name)}]) {{\n")
-        for field in datetime_fields:
-            k = _js_string(field.name)
-            lines.append(f"      if (row[{k}] != null) row[{k}] = new Date(row[{k}] as unknown as string);\n")
-        lines.append("    }\n")
-        lines.append("  } catch (e) {\n")
-        lines.append("    console.warn('Failed to convert date fields', e);\n")
-        lines.append("  }\n")
+        rows = f"envelope.data[{_js_string(query.display_name)}]"
+        lines.append(f"  convertDateFields({rows}, [{', '.join(datetime_fields)}]);\n")
     return lines
 
 
 def _ts_ident(name: str) -> str:
     """Turn a FLAPI param name into a safe TS identifier.
 
-    Snake-case is camel-cased; reserved words get a trailing underscore so the
+    Snake-case is camel-cased; any characters invalid in an identifier are
+    replaced with underscores; reserved words get a trailing underscore so the
     emitted signature stays valid TS. The FLAPI wire name used for the body
     key is handled separately and always uses the original string.
     """
     parts = re.split(r"_+", name)
     head, *rest = parts
     ident = head + "".join(p[:1].upper() + p[1:] for p in rest if p)
-    if ident[:1].isdigit():
+    ident = re.sub(r"\W", "_", ident)
+    if not ident or ident[:1].isdigit():
         ident = "_" + ident
     if ident in _TS_RESERVED:
         return f"{ident}_"
