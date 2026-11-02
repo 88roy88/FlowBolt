@@ -142,8 +142,6 @@
   },
   "chat": {
     "chat": "צ'אט",
-    "send": "שלח",
-    "newLine": "שורה חדשה",
     "scrollToBottom": "גלול לתחתית",
     "today": "היום",
     "yesterday": "אתמול",
@@ -180,6 +178,7 @@
       "sendFeedback": "שלח משוב"
     },
     "design": {
+      "designing": "מתכנן...",
       "designComplete": "עיצוב הושלם",
       "architecture": "ארכיטקטורה",
       "uiux": "ממשק משתמש/חווית משתמש"
