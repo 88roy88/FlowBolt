@@ -704,7 +704,7 @@ class TestResultsKeyUsesDisplayName:
             queries=queries,
         )
         assert '"Order Rows": SalesRows[]' in result
-        assert "    for (const row of envelope.data['Order Rows'])" in result
+        assert "convertDateFields(envelope.data['Order Rows'], ['created_at']);" in result
         assert "rows: SalesRows[]" not in result
         assert "envelope.data['rows']" not in result
 
@@ -733,21 +733,9 @@ class TestDatetimeFieldConversion:
         # Interface uses Date
         assert "created_at: Date;" in result
         assert "updated_at: Date;" in result
-        # Conversion loops emitted after envelope cast
-        assert "  try {\n" in result
-        assert "    for (const row of envelope.data['Events'])" in result
-        assert (
-            "      if (row['created_at'] != null) row['created_at'] = new Date(row['created_at'] as unknown as string);"
-            in result
-        )
-        assert (
-            "      if (row['updated_at'] != null) row['updated_at'] = new Date(row['updated_at'] as unknown as string);"
-            in result
-        )
-        assert "  } catch (e) {\n    console.warn('Failed to convert date fields', e);\n  }" in result
-        # Non-datetime fields don't get a conversion line
-        assert "row['id']" not in result
-        assert "row['label']" not in result
+        # Conversion helper called with only the datetime fields
+        assert "import { convertDateFields, fetchDataSource } from '../api/client';" in result
+        assert "  convertDateFields(envelope.data['Events'], ['created_at', 'updated_at']);\n" in result
 
     def test_no_datetime_fields_no_conversion_loop(self) -> None:
         result = generate_data_source_module(
@@ -756,5 +744,4 @@ class TestDatetimeFieldConversion:
             params_info=_empty_params(),
             queries=_queries("plain"),
         )
-        assert "for (const row of" not in result
-        assert "new Date(" not in result
+        assert "convertDateFields" not in result

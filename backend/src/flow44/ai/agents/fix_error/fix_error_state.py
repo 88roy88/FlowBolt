@@ -28,7 +28,11 @@ class FixErrorState(BaseModel):
 
     # Working state
     discovered_files: dict[str, str] = Field(default_factory=dict)
-    generated_files: list[tuple[str, str]] = Field(default_factory=list)
+    new_files: list[tuple[str, str]] = Field(default_factory=list)
+    # Edit actions: (path, [(search, replace), ...])
+    edits: list[tuple[str, list[tuple[str, str]]]] = Field(default_factory=list)
+    changed_files: dict[str, str] = Field(default_factory=dict)
+    edit_failures: list[str] = Field(default_factory=list)
     diffs: DiffTracker = Field(default_factory=DiffTracker)
     full_response: str = ""
     explanation: str = ""

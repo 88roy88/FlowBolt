@@ -59,7 +59,8 @@ def generate_data_source_module(
     used_types = {p.type for p in params_info.parameters}
     type_defs = "\n".join(v for k, v in _TYPE_DEFS.items() if k in used_types)
 
-    parts = ["import { fetchDataSource } from '../api/client';"]
+    imports = "convertDateFields, fetchDataSource" if _has_datetime_fields(queries) else "fetchDataSource"
+    parts = [f"import {{ {imports} }} from '../api/client';"]
     if type_defs:
         parts.append(type_defs)
     parts.append(types_block)
@@ -184,21 +185,18 @@ def _build_body(
     return "".join(lines)
 
 
+def _has_datetime_fields(queries: list[DataSourceQuerySchema] | None) -> bool:
+    return any(f.type == "datetime" for q in queries or [] for f in q.fields)
+
+
 def _build_date_conversions(queries: list[DataSourceQuerySchema]) -> list[str]:
     lines: list[str] = []
     for query in queries:
-        datetime_fields = [f for f in query.fields if f.type == "datetime"]
+        datetime_fields = [_js_string(f.name) for f in query.fields if f.type == "datetime"]
         if not datetime_fields:
             continue
-        lines.append("  try {\n")
-        lines.append(f"    for (const row of envelope.data[{_js_string(query.display_name)}]) {{\n")
-        for field in datetime_fields:
-            k = _js_string(field.name)
-            lines.append(f"      if (row[{k}] != null) row[{k}] = new Date(row[{k}] as unknown as string);\n")
-        lines.append("    }\n")
-        lines.append("  } catch (e) {\n")
-        lines.append("    console.warn('Failed to convert date fields', e);\n")
-        lines.append("  }\n")
+        rows = f"envelope.data[{_js_string(query.display_name)}]"
+        lines.append(f"  convertDateFields({rows}, [{', '.join(datetime_fields)}]);\n")
     return lines
 
 

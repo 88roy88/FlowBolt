@@ -1,5 +1,5 @@
 import re
-from pathlib import PurePath
+from pathlib import PurePosixPath
 
 from pydantic import BaseModel
 
@@ -15,11 +15,16 @@ _VITE_ERROR_START = re.compile(r"\[vite\].*(?:error|ERROR)|ERROR\s+")
 # TypeScript-style:  src/App.tsx(12,5): error TS2304: ...
 _TS_ERROR = re.compile(r"(?P<file>[^\s(]+)\((?P<line>\d+),(?P<col>\d+)\):\s*error\s+\w+:\s*(?P<msg>.+)")
 
+# Start of an absolute path:  /home/...  or  C:\Users\...  (Windows dev workspaces)
+_ABS_PATH_START = r"(?:/|[A-Za-z]:[\\/])"
+
 # Vite / esbuild / SWC:  /path/to/file.tsx:12:5
-_FILE_LINE_COL = re.compile(r"(?P<file>/[^\s:]+\.\w+):(?P<line>\d+):(?P<col>\d+)")
+_FILE_LINE_COL = re.compile(rf"(?P<file>{_ABS_PATH_START}[^\s:]+\.\w+):(?P<line>\d+):(?P<col>\d+)")
 
 # Vite internal server error:  /path/to/file.tsx: Message. (12:5)
-_VITE_INTERNAL = re.compile(r"(?P<file>/\S+\.(?:tsx?|jsx?|css|html)):\s*(?P<msg>.+?)\s*\((?P<line>\d+):(?P<col>\d+)\)")
+_VITE_INTERNAL = re.compile(
+    rf"(?P<file>{_ABS_PATH_START}\S+\.(?:tsx?|jsx?|css|html)):\s*(?P<msg>.+?)\s*\((?P<line>\d+):(?P<col>\d+)\)"
+)
 
 # Fallback
 _GENERIC_ERROR = re.compile(r"(?:error|Error|ERROR)[:\s]")
@@ -67,7 +72,7 @@ class BuildError(BaseModel):
 
 def _is_user_source(path: str) -> bool:
     """Return True if path looks like a user source file (not node_modules or partial)."""
-    parts = PurePath(path).parts
+    parts = PurePosixPath(path.replace("\\", "/")).parts
     return "src" in parts and "node_modules" not in parts
 
 

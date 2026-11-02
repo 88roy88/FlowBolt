@@ -22,14 +22,14 @@ type SetState = (
   partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>),
 ) => void;
 
-let _skipMessages = false;
+let _replaying = false;
 
 export function setReplayMode(replay: boolean) {
-  _skipMessages = replay;
+  _replaying = replay;
 }
 
 export function isReplaying() {
-  return _skipMessages;
+  return _replaying;
 }
 
 let _lastEventTs = 0;
@@ -66,9 +66,21 @@ function generateId(): string {
 const _treeRefresh = throttle(() => void useFilesStore.getState().loadFileTree(), 1000);
 
 function refreshFileTreeAfterAgentWrite() {
-  if (_skipMessages) return;
+  if (_replaying) return;
   useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
   _treeRefresh();
+}
+
+function refreshOpenFilesAfterAgentWrite() {
+  if (_replaying) return;
+  void useFilesStore.getState().refreshOpenFiles();
+}
+
+function endTurn(cleanup: () => void, isError = false) {
+  if (_replaying) return;
+  notifyBuildComplete(useSessionStore.getState().currentProject?.name, isError);
+  if (!isError) useErrorStore.getState().clearErrors();
+  cleanup();
 }
 
 function handleFileUpdate(msg: { path: string; content: string }, set: SetState) {
@@ -78,11 +90,12 @@ function handleFileUpdate(msg: { path: string; content: string }, set: SetState)
       { type: 'file', path: msg.path },
     ],
   }));
+  if (_replaying) return;
   const filesStore = useFilesStore.getState();
   if (filesStore.openFiles.has(msg.path)) {
     filesStore.updateFileContent(msg.path, msg.content);
   }
-  if (!_skipMessages) _treeRefresh();
+  _treeRefresh();
 }
 
 function handleText(msg: { content: string }, set: SetState) {
@@ -94,10 +107,7 @@ function handleText(msg: { content: string }, set: SetState) {
 function handleError(msg: { message: string }, set: SetState, get: GetState, cleanup: () => void) {
   const reset = get().agentPhase === AGENT_PHASE.awaiting_interview ? { isStreaming: false } : getTransientReset();
   set({ ...reset, agentAlive: false, error: msg.message });
-  if (!_skipMessages) {
-    notifyBuildComplete(useSessionStore.getState().currentProject?.name, true);
-  }
-  cleanup();
+  endTurn(cleanup, true);
 }
 
 function handleFixStep(msg: WSMessage & { type: 'fix_step' }, set: SetState) {
@@ -189,13 +199,9 @@ export function createFixErrorHandler(
         } else {
           set({ ...getTransientReset(), agentAlive: false, buildCompleted: true });
         }
-        if (!_skipMessages) {
-          notifyBuildComplete(useSessionStore.getState().currentProject?.name);
-          useErrorStore.getState().clearErrors();
-        }
-        cleanup();
+        endTurn(cleanup);
         refreshFileTreeAfterAgentWrite();
-        useFilesStore.getState().refreshOpenFiles();
+        refreshOpenFilesAfterAgentWrite();
         break;
       }
     }
@@ -206,9 +212,7 @@ export function createSendMessageHandler(
   set: SetState,
   get: GetState,
   cleanup: () => void,
-  options?: { replay?: boolean },
 ) {
-  _skipMessages = options?.replay ?? false;
   return (msg: WSMessage) => {
     getTimestamp(msg);
     switch (msg.type) {
@@ -228,7 +232,7 @@ export function createSendMessageHandler(
           planOverview: msg.overview,
           agentPhase: AGENT_PHASE.awaiting_approval,
         });
-        if (!_skipMessages) {
+        if (!_replaying) {
           notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
         }
         break;
@@ -239,7 +243,7 @@ export function createSendMessageHandler(
           interviewQuestions: msg.questions,
           agentPhase: AGENT_PHASE.awaiting_interview,
         });
-        if (!_skipMessages) {
+        if (!_replaying) {
           notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
         }
         break;
@@ -253,7 +257,7 @@ export function createSendMessageHandler(
           agentCard: { type: 'interview_answered', questions: msg.questions, answers: msg.answers },
         };
         set((s) => ({
-          messages: _skipMessages ? s.messages : [...s.messages, answeredMsg],
+          messages: [...s.messages, answeredMsg],
           isStreaming: true,
           agentAlive: true,
           agentPhase: AGENT_PHASE.interviewing,
@@ -271,7 +275,7 @@ export function createSendMessageHandler(
           agentCard: { type: 'plan_overview', overview: msg.overview },
         };
         set((s) => ({
-          messages: _skipMessages ? s.messages : [...s.messages, acceptedMsg],
+          messages: [...s.messages, acceptedMsg],
           isStreaming: true,
           agentAlive: true,
           agentPhase: AGENT_PHASE.planning,
@@ -356,14 +360,14 @@ function handlePhaseChange(
         ux: dp.ux === 'complete',
       },
     };
-    if (!_skipMessages) set((s) => ({ messages: [...s.messages, designMsg] }));
+    set((s) => ({ messages: [...s.messages, designMsg] }));
   }
 
   set({
     agentPhase: msg.phase,
     ...(ACTIVE_AGENT_PHASES.includes(msg.phase) ? { isStreaming: true } : {}),
   });
-  if (msg.phase === AGENT_PHASE.executing) {
+  if (msg.phase === AGENT_PHASE.executing && !_replaying) {
     requestPermissionIfNeeded();
   }
 }
@@ -377,11 +381,8 @@ function handleTaskUpdate(
       t.id === msg.taskId ? { ...t, status: msg.status as 'running' | 'completed' | 'failed' } : t
     ),
   }));
-  if (msg.file) {
-    const filesStore = useFilesStore.getState();
-    if (filesStore.openFiles.has(msg.file)) {
-      filesStore.refreshOpenFiles();
-    }
+  if (msg.file && useFilesStore.getState().openFiles.has(msg.file)) {
+    refreshOpenFilesAfterAgentWrite();
   }
   // Task progress UI updates per task; refresh tree here so new files appear before the whole run ends.
   if (
@@ -458,7 +459,7 @@ function handleDataSourcesFetched(
       })),
     },
   };
-  if (!_skipMessages) set((s) => ({ messages: [...s.messages, dsMsg] }));
+  set((s) => ({ messages: [...s.messages, dsMsg] }));
 }
 
 function handleActionComplete(set: SetState, get: GetState, cleanup: () => void) {
@@ -527,18 +528,14 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
   }
 
   set((s) => ({
-    messages: _skipMessages ? s.messages : [...s.messages, ...newMessages],
+    messages: [...s.messages, ...newMessages],
     ...getTransientReset(),
     agentAlive: false,
     planOverview: null,
     projectSummary: null,
     buildCompleted: true,
   }));
-  if (!_skipMessages) {
-    notifyBuildComplete(useSessionStore.getState().currentProject?.name);
-    useErrorStore.getState().clearErrors();
-  }
-  cleanup();
+  endTurn(cleanup);
   refreshFileTreeAfterAgentWrite();
-  useFilesStore.getState().refreshOpenFiles();
+  refreshOpenFilesAfterAgentWrite();
 }

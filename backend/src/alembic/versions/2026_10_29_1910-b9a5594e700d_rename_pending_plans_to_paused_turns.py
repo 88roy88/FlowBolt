@@ -1,7 +1,7 @@
 """rename pending_plans to paused_turns
 
 Revision ID: b9a5594e700d
-Revises: f7b4e12871c0
+Revises: 7f3e2a9c1b4d
 Create Date: 2026-10-29 19:10:25.645408
 
 """
@@ -14,7 +14,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = 'b9a5594e700d'
-down_revision: Union[str, Sequence[str], None] = 'f7b4e12871c0'
+down_revision: Union[str, Sequence[str], None] = '7f3e2a9c1b4d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
