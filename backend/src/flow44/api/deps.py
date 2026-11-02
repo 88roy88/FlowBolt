@@ -61,8 +61,9 @@ class TokenPayload(BaseModel):
     @classmethod
     def _surface_url_claims(cls, data: dict[str, object]) -> dict[str, object]:
         return data | {
-            "unique_id": _claim_with_suffix(data, "/UniqueID"),
-            "email": _claim_with_suffix(data, "/emailaddress"),
+            # Casefolded: tokens may send user@CORP, stored ids are lowercase.
+            "unique_id": (_claim_with_suffix(data, "/UniqueID") or "").casefold(),
+            "email": (_claim_with_suffix(data, "/emailaddress") or "").casefold(),
             "given_name": _claim_with_suffix(data, "/givenname"),
             "surname": _claim_with_suffix(data, "/surname"),
         }
