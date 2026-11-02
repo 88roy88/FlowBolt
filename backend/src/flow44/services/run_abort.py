@@ -17,7 +17,7 @@ from flow44.db import database
 
 logger = logging.getLogger(__name__)
 
-_CHANNEL = "flow44_run_abort"
+_CHANNEL = "run_abort"
 _PING_INTERVAL = 10.0
 _RECONNECT_DELAY = 2.0
 

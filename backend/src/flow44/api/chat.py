@@ -22,7 +22,7 @@ from flow44.ai.selected_elements_context import format_selected_elements, parse_
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
-from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message, trim_messages_after
+from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
 from flow44.db.events import (
     emit_event,
     emit_transient,
@@ -30,7 +30,6 @@ from flow44.db.events import (
     get_last_event_id,
     get_latest_event,
     subscribe,
-    trim_events_after,
     unsubscribe,
 )
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
@@ -137,9 +136,7 @@ Rollback = Callable[[], Awaitable[None]]
 async def _rollback_turn(
     project_id: str, after_event_id: int, after_ts: str, on_abort: Callable[[], Awaitable[Any]] | None
 ) -> None:
-    await versioning.discard_turn(project_id)
-    await trim_events_after(project_id, after_event_id)
-    await trim_messages_after(project_id, after_ts)
+    await versioning.discard_turn(project_id, after_event_id, after_ts)
     if on_abort is not None:
         await on_abort()
 
@@ -174,7 +171,8 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime, roll
         await _cancel_task(run_task)
         if aborted:
             try:
-                await (rollback or partial(versioning.discard_turn, project_id))()
+                if rollback is not None:
+                    await rollback()
             except Exception:
                 logger.exception("[chat] Rolling back the aborted turn failed for session %s", project_id)
         else:

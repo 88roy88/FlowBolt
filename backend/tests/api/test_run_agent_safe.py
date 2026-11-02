@@ -154,18 +154,14 @@ async def test_abort_cancels_and_rolls_back_instead_of_committing(monkeypatch: p
     assert PROJECT_ID not in run_abort._watchers
 
 
-async def test_rollback_trims_back_to_the_turn_start_and_runs_the_abort_hook(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_rollback_discards_back_to_the_turn_start_and_runs_the_abort_hook(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     discard = AsyncMock()
-    trim_events = AsyncMock()
-    trim_messages = AsyncMock()
     on_abort = AsyncMock()
     monkeypatch.setattr(chat.versioning, "discard_turn", discard)
-    monkeypatch.setattr(chat, "trim_events_after", trim_events)
-    monkeypatch.setattr(chat, "trim_messages_after", trim_messages)
 
     await chat._rollback_turn(PROJECT_ID, 42, "2026-01-01T00:00:00+00:00", on_abort)
 
-    discard.assert_awaited_once_with(PROJECT_ID)
-    trim_events.assert_awaited_once_with(PROJECT_ID, 42)
-    trim_messages.assert_awaited_once_with(PROJECT_ID, "2026-01-01T00:00:00+00:00")
+    discard.assert_awaited_once_with(PROJECT_ID, 42, "2026-01-01T00:00:00+00:00")
     on_abort.assert_awaited_once_with()
