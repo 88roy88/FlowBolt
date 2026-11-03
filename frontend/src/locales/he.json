@@ -142,8 +142,6 @@
   },
   "chat": {
     "chat": "צ'אט",
-    "send": "שלח",
-    "newLine": "שורה חדשה",
     "scrollToBottom": "גלול לתחתית",
     "today": "היום",
     "yesterday": "אתמול",
@@ -197,6 +195,7 @@
       "modeBuildHint": "דלג על השאלות ותכנן מיד"
     },
     "design": {
+      "designing": "מתכנן...",
       "designComplete": "עיצוב הושלם",
       "architecture": "ארכיטקטורה",
       "uiux": "ממשק משתמש/חווית משתמש"
@@ -205,6 +204,9 @@
       "removeDataSource": "הסר מקור נתונים",
       "searchPlaceholder": "חפש מקורות נתונים (אופציונלי)",
       "usedInProject": "שימש בפרויקט זה"
+    },
+    "selectedElement": {
+      "remove": "הסר רכיב"
     }
   },
   "sharing": {

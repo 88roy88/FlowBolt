@@ -142,8 +142,6 @@
   },
   "chat": {
     "chat": "Chat",
-    "send": "send",
-    "newLine": "new line",
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -197,6 +195,7 @@
       "modeBuildHint": "Skip the questions and plan right away"
     },
     "design": {
+      "designing": "Designing...",
       "designComplete": "Design complete",
       "architecture": "Architecture",
       "uiux": "UI/UX"
@@ -205,6 +204,9 @@
       "removeDataSource": "Remove data source",
       "searchPlaceholder": "Search data sources (optional)",
       "usedInProject": "Used in this project"
+    },
+    "selectedElement": {
+      "remove": "Remove element"
     }
   },
   "sharing": {

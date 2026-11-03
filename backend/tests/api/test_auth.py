@@ -187,9 +187,9 @@ class TestTokenPayload:
         assert payload.iss == "ex"
         assert payload.exp == 1700000000
 
-    def test_unique_id_is_none_when_claim_absent(self):
+    def test_unique_id_is_empty_when_claim_absent(self):
         payload = TokenPayload.model_validate({"sub": "x", "exp": 1700000000})
-        assert payload.unique_id is None
+        assert not payload.unique_id
 
     def test_preserves_unknown_claims_via_extra(self):
         payload = TokenPayload.model_validate(

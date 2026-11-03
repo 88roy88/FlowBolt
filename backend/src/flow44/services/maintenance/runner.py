@@ -30,7 +30,7 @@ async def run_over_projects(operation: Callable[[Project], Awaitable[str]]) -> l
                 project_id=project.id, project_name=project.name, success=False, detail=str(exc)
             )
         results.append(result)
-        logger.debug(
+        logger.info(
             "[%s] project %s (%s): %s",
             "ok" if result.success else "FAILED",
             result.project_id,
