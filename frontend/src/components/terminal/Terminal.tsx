@@ -42,7 +42,6 @@ export function Terminal() {
       if (pendingReplays === 0) socket.send(data);
     });
 
-    // The PTY must match xterm's size, or the shell's cursor positioning lands in the wrong place.
     socket.resize(term.cols, term.rows);
     term.onResize(({ cols, rows }) => {
       socket.resize(cols, rows);

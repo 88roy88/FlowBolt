@@ -110,7 +110,6 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
   return instance;
 }
 
-/** Returns the data of a backend scrollback replay frame, or null for any other text frame. */
 function parseScrollback(text: string): string | null {
   try {
     const msg = JSON.parse(text);
