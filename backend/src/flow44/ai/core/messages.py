@@ -15,6 +15,24 @@ class TextContent(ContentBlock):
     text: str
 
 
+class ImageContent(ContentBlock):
+    type: Literal["image_url"] = "image_url"
+    image_url: dict[str, str]
+
+    @classmethod
+    def from_data_uri(cls, data_uri: str) -> ImageContent:
+        return cls(image_url={"url": data_uri})
+
+
+class FileContent(ContentBlock):
+    type: Literal["file"] = "file"
+    file: dict[str, str]
+
+    @classmethod
+    def from_data_uri(cls, data_uri: str) -> FileContent:
+        return cls(file={"file_data": data_uri})
+
+
 class ToolUseContent(ContentBlock):
     type: Literal["tool_use"] = "tool_use"
     id: str
@@ -37,6 +55,12 @@ class Message(BaseModel):
     @classmethod
     def user(cls, text: str) -> Message:
         return cls(role="user", content=text)
+
+    @classmethod
+    def user_with_attachments(cls, text: str, attachments: Sequence[ContentBlock]) -> Message:
+        if not attachments:
+            return cls.user(text)
+        return cls(role="user", content=[*attachments, TextContent(text=text)])
 
     @classmethod
     def assistant(cls, text: str) -> Message:

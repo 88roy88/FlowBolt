@@ -31,6 +31,7 @@ import flow44.db.project  # noqa
 import flow44.db.project_data_source  # noqa
 import flow44.db.project_member  # noqa
 import flow44.db.project_member_group  # noqa
+import flow44.db.uploads  # noqa
 
 target_metadata = SQLModel.metadata
 

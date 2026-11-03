@@ -13,8 +13,9 @@ from flow44.ai.agents.plan.prompts import (
     render_architecture,
     render_user_plan,
 )
+from flow44.ai.attachments import load_attachment_blocks
 from flow44.ai.core.flow import Flow
-from flow44.ai.core.messages import Message
+from flow44.ai.core.messages import ContentBlock, Message
 from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
@@ -42,6 +43,7 @@ class PlanAgent(BaseAgent):
         super().__init__(project_id, sandbox, user_id, model=model, trace_id=trace_id)
         self._state = BuildState(project_id=self.project_id, model=self.model)
         self._data_source_authorization = data_source_authorization
+        self._attachment_blocks: list[ContentBlock] = []
         self._flow = self._build_flow()
 
     def _build_flow(self) -> Flow[PlanState]:
@@ -56,10 +58,14 @@ class PlanAgent(BaseAgent):
         return flow
 
     @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
-    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
+    async def run(
+        self, content: str, data_source_ids: list[str] | None = None, attachment_ids: list[str] | None = None
+    ) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
+        self._state.attachment_ids = attachment_ids or []
         self._setup_trace(["plan-agent"])
+        self._attachment_blocks = await load_attachment_blocks(self.project_id, self._state.attachment_ids)
 
         # Initialize plan state for Flow
         plan_state = PlanState(
@@ -219,7 +225,7 @@ class PlanAgent(BaseAgent):
         prompt = render_architecture(data_source_contexts=self._state.data_source_contexts or None)
         try:
             raw = await complete_chat(
-                [Message.user(self._state.user_content)],
+                [Message.user_with_attachments(self._state.user_content, self._attachment_blocks)],
                 prompt,
                 model=self.model,
                 metadata=self._llm_metadata("design_architecture"),
@@ -236,7 +242,7 @@ class PlanAgent(BaseAgent):
     async def _design_ux(self) -> UXDesign:
         try:
             raw = await complete_chat(
-                [Message.user(self._state.user_content)],
+                [Message.user_with_attachments(self._state.user_content, self._attachment_blocks)],
                 UX_DESIGN_PROMPT,
                 model=self.model,
                 metadata=self._llm_metadata("design_ux"),

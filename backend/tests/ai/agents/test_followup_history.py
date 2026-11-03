@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from flow44.ai.agents.followup.agent import FollowUpAgent
+from flow44.ai.core.messages import ImageContent, TextContent
 from flow44.config import settings
 from flow44.db.chat import ChatMessage, ChatRole
 
@@ -90,3 +91,22 @@ def test_rows_without_content_leave_no_placeholder() -> None:
     history = [_row(ChatRole.user, "hi"), _row(ChatRole.assistant, "  "), _row(ChatRole.user, "again")]
 
     assert [m.content for m in _convert(history)] == ["hi", "again"]
+
+
+def test_user_turns_carry_their_attachment_blocks_before_the_text() -> None:
+    image = ImageContent.from_data_uri("data:image/png;base64,AAAA")
+    history = [_row(ChatRole.user, "match this"), _row(ChatRole.assistant, "ok")]
+
+    [user, _] = object.__new__(FollowUpAgent)._history_to_messages(history, {history[0].id: [image]})
+
+    assert user.content == [image, TextContent(text="match this")]
+
+
+def test_attachments_count_toward_the_history_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "AI_HISTORY_MIN_RUNS", 1)
+    monkeypatch.setattr(settings, "AI_HISTORY_CHAR_BUDGET", 1000)
+    monkeypatch.setattr(settings, "AI_ATTACHMENT_CHAR_ESTIMATE", 1000)
+    history = _history(2)
+    history[0].attachment_ids = ["shot"]
+
+    assert _user_requests(_convert(history)) == ["request 1"]

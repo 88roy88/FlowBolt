@@ -26,6 +26,7 @@ from flow44.api import (
     server_log,
     shared,
     terminal,
+    uploads,
 )
 from flow44.api.deps import validate_token, validate_ws_token
 from flow44.config import settings
@@ -109,6 +110,7 @@ app.add_middleware(
 auth_routes = APIRouter(dependencies=[Depends(validate_token)])
 auth_routes.include_router(projects.router)
 auth_routes.include_router(files.router)
+auth_routes.include_router(uploads.router)
 auth_routes.include_router(preview.router)
 auth_routes.include_router(export.router)
 auth_routes.include_router(publish.router)

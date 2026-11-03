@@ -61,10 +61,18 @@ async def test_setup_ensures_bucket(storage):
     storage._session = session
     bucket_name = "test-bucket"
 
-    with patch.object(settings, "S3_BUCKET_NAME", bucket_name):
+    with (
+        patch.object(settings, "S3_BUCKET_NAME", bucket_name),
+        patch.object(settings, "S3_UPLOADS_BUCKET_NAME", "test-uploads"),
+    ):
         async with storage.setup():
-            client.create_bucket.assert_awaited_once_with(Bucket=bucket_name)
+            assert [c.kwargs for c in client.create_bucket.await_args_list] == [
+                {"Bucket": bucket_name},
+                {"Bucket": "test-uploads"},
+            ]
+            # The uploads bucket stays private and keeps its files.
             client.put_bucket_policy.assert_awaited_once()
+            client.put_bucket_lifecycle_configuration.assert_awaited_once()
             _, kwargs = client.put_bucket_policy.call_args
             assert kwargs["Bucket"] == bucket_name
             assert "Statement" in kwargs["Policy"]
@@ -256,3 +264,68 @@ async def test_get_asset_missing_returns_none(storage):
 
     with patch.object(settings, "S3_BUCKET_NAME", "my-bucket"):
         assert await storage.get_asset("proj-123", "missing.png") is None
+
+
+async def _chunks(*parts: bytes):
+    for part in parts:
+        yield part
+
+
+def _multipart_client() -> AsyncMock:
+    client = AsyncMock()
+    client.create_multipart_upload = AsyncMock(return_value={"UploadId": "up-1"})
+    client.upload_part = AsyncMock(side_effect=lambda **kw: {"ETag": f"etag-{kw['PartNumber']}"})
+    return client
+
+
+@pytest.mark.asyncio
+async def test_upload_stream_rechunks_into_parts(storage):
+    client = _multipart_client()
+    storage._client = client
+
+    with (
+        patch.object(settings, "S3_UPLOADS_BUCKET_NAME", "uploads"),
+        patch("flow44.integrations.s3._MULTIPART_PART_SIZE", 4),
+    ):
+        size = await storage.upload_stream("k", _chunks(b"abc", b"defgh", b"ij"), "image/png")
+
+    assert size == 10
+    assert [c.kwargs["Body"] for c in client.upload_part.await_args_list] == [b"abcd", b"efgh", b"ij"]
+    client.create_multipart_upload.assert_awaited_once_with(Bucket="uploads", Key="k", ContentType="image/png")
+    parts = client.complete_multipart_upload.await_args.kwargs["MultipartUpload"]["Parts"]
+    assert parts == [{"PartNumber": n, "ETag": f"etag-{n}"} for n in (1, 2, 3)]
+
+
+@pytest.mark.asyncio
+async def test_upload_stream_of_an_empty_file_sends_one_empty_part(storage):
+    client = _multipart_client()
+    storage._client = client
+
+    assert await storage.upload_stream("k", _chunks(), "text/plain") == 0
+    assert [c.kwargs["Body"] for c in client.upload_part.await_args_list] == [b""]
+    client.complete_multipart_upload.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_upload_stream_aborts_when_the_source_fails(storage):
+    client = _multipart_client()
+    storage._client = client
+
+    async def failing():
+        yield b"abc"
+        raise ValueError("client went away")
+
+    with pytest.raises(ValueError, match="client went away"):
+        await storage.upload_stream("k", failing(), "image/png")
+
+    client.abort_multipart_upload.assert_awaited_once()
+    client.complete_multipart_upload.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_read_upload_missing_returns_none(storage):
+    client = AsyncMock()
+    client.get_object = AsyncMock(side_effect=ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject"))
+    storage._client = client
+
+    assert await storage.read_upload("missing") is None

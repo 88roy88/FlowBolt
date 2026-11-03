@@ -23,13 +23,20 @@ class ChatMessage(SQLModel, table=True):
     role: ChatRole
     content: str
     raw_message: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
+    attachment_ids: list[str] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 async def save_message(
-    project_id: str, role: ChatRole, content: str, raw_message: dict[str, Any] | None = None
+    project_id: str,
+    role: ChatRole,
+    content: str,
+    raw_message: dict[str, Any] | None = None,
+    attachment_ids: list[str] | None = None,
 ) -> ChatMessage:
-    msg = ChatMessage(project_id=project_id, role=role, content=content, raw_message=raw_message)
+    msg = ChatMessage(
+        project_id=project_id, role=role, content=content, raw_message=raw_message, attachment_ids=attachment_ids
+    )
     async with database.async_session() as session:
         session.add(msg)
         await session.commit()
