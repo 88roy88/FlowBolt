@@ -10,8 +10,6 @@ export function getServerLogSocket(projectId: string): ReadOnlySocket {
   if (existing) return existing;
 
   const handlers: Array<(data: string) => void> = [];
-  // Output received on the current connection, replayed to handlers that
-  // subscribe later (e.g. when the tab is reopened and a new xterm mounts).
   let history = '';
   let socket: WebSocket | null = null;
   let closed = false;
