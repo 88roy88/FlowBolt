@@ -36,7 +36,7 @@ export function Terminal() {
     const socket = getTerminalSocket(projectId);
     termRef.current = term;
 
-    // Don't forward xterm's automatic replies to queries in replayed history.
+    // Skip xterm's automatic replies to the shell's status queries (e.g. terminal type) in replayed history.
     let pendingReplays = 0;
     term.onData((data) => {
       if (pendingReplays === 0) socket.send(data);
