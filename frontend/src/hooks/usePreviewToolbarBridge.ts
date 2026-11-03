@@ -27,11 +27,13 @@ export function usePreviewToolbarBridge() {
         reply.postMessage({ source: BUILDER_SOURCE, ...msg }, window.location.origin);
 
       const role = useSessionStore.getState().currentProject?.role;
-      const canWrite = !role || WRITE_ROLES.has(role);
       const chat = useChatStore.getState();
+      const hasWriteRole = !role || WRITE_ROLES.has(role);
+      const unbuilt = hasWriteRole && !chat.buildCompleted;
+      const canWrite = hasWriteRole && !unbuilt;
 
       if (data.type === 'hello') {
-        send({ type: 'ready', canWrite, count: chat.selectedElements.length });
+        send({ type: 'ready', canWrite, unbuilt, count: chat.selectedElements.length });
       } else if (data.type === 'element-picked' && canWrite) {
         const element = parseSelectedElement(data.element);
         if (!element) return;
@@ -42,7 +44,9 @@ export function usePreviewToolbarBridge() {
       } else if (data.type === 'send-prompt') {
         const content = typeof data.content === 'string' ? data.content.trim() : '';
         const count = chat.selectedElements.length;
-        if (!canWrite) {
+        if (unbuilt) {
+          send({ type: 'prompt-result', ok: false, reason: 'unbuilt', count });
+        } else if (!canWrite) {
           send({ type: 'prompt-result', ok: false, reason: 'readonly', count });
         } else if (!content) {
           send({ type: 'prompt-result', ok: false, reason: 'empty', count });
