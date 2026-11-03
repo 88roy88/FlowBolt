@@ -123,9 +123,12 @@ class WinPTY(BasePTY):
         try:
             if not self._proc.isalive():
                 return b""
-            return self._proc.read(size).encode("utf-8", errors="replace")  # type: ignore[no-any-return]
+            data: bytes = self._proc.read(size).encode("utf-8", errors="replace")
         except Exception:
             return b""
+        if data:
+            self._push_scrollback(data)
+        return data
 
     def write(self, data: bytes) -> None:
         self._proc.write(data.decode("utf-8", errors="replace"))
