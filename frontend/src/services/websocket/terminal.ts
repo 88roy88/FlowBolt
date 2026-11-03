@@ -10,8 +10,6 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
   if (existing) return existing;
 
   const handlers: Array<(data: string) => void> = [];
-  // Output received on the current connection, replayed to handlers that
-  // subscribe later (e.g. when the tab is reopened and a new xterm mounts).
   let history = '';
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
