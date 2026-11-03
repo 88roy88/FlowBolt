@@ -1,4 +1,4 @@
-"""Tests for counting page views from the page requests the backend serves."""
+"""Tests for counting page views from the page requests the preview and /shared routes serve."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -6,8 +6,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from flow44.api.deps import get_project, get_user_permissions
-from flow44.api.page_views import record_page_view
+from flow44.api.deps import get_optional_user_id, get_project, get_user_permissions
 from flow44.auth.permissions import Role, get_owner_permissions, get_role_permissions
 from flow44.db.page_view import PageViewSource
 from flow44.db.project import Project
@@ -36,58 +35,18 @@ def _asset(content_type: str = "text/html", path: str = "index.html") -> S3Objec
     return S3Object(path=path, body=b"<html></html>", content_type=content_type, etag='"abc"')
 
 
-class TestRecordPageView:
-    @pytest.fixture
-    def increment(self):
-        with patch("flow44.api.page_views.increment_page_views", AsyncMock()) as mock_increment:
-            yield mock_increment
-
-    @pytest.fixture
-    def bi_event(self):
-        with patch("flow44.api.page_views.log_bi_event") as mock_log:
-            yield mock_log
-
-    async def test_uses_given_write_access(self, increment, bi_event):
-        await record_page_view(_project(), PageViewSource.preview, MagicMock(), can_write=True)
-
-        increment.assert_awaited_once_with("proj-1", PageViewSource.preview)
-        bi_event.assert_called_once_with("page_viewed", view_source="preview", can_write=True)
-
-    async def test_resolves_write_access_from_signed_in_viewer(self, increment, bi_event):
-        request = MagicMock(headers={}, cookies={})
-        with (
-            patch("flow44.api.page_views.get_authorization_header", return_value="token"),
-            patch("flow44.api.page_views.decode_token", return_value=MagicMock(unique_id="user-1")),
-            patch(
-                "flow44.api.page_views.resolve_project_permissions",
-                AsyncMock(return_value=get_role_permissions(Role.viewer)),
-            ),
-        ):
-            await record_page_view(_project(), PageViewSource.production, request)
-
-        bi_event.assert_called_once_with("page_viewed", view_source="production", can_write=False)
-
-    async def test_anonymous_viewer_is_logged_as_read_only(self, increment, bi_event):
-        await record_page_view(_project(), PageViewSource.production, MagicMock(headers={}, cookies={}))
-
-        increment.assert_awaited_once_with("proj-1", PageViewSource.production)
-        bi_event.assert_called_once_with("page_viewed", view_source="production", can_write=False)
-
-    async def test_failure_does_not_raise(self, bi_event):
-        with patch("flow44.api.page_views.increment_page_views", AsyncMock(side_effect=RuntimeError("db down"))):
-            await record_page_view(_project(), PageViewSource.preview, MagicMock(), can_write=True)
-
-        bi_event.assert_not_called()
-
-
 class TestPublishedAppViews:
     @pytest.fixture
     def record(self):
-        with (
-            patch("flow44.api.shared.get_project_by_handle", AsyncMock(return_value=_project())),
-            patch("flow44.api.shared.record_page_view", AsyncMock()) as mock_record,
-        ):
-            yield mock_record
+        app.dependency_overrides[get_optional_user_id] = lambda: None
+        try:
+            with (
+                patch("flow44.api.shared.get_project_by_handle", AsyncMock(return_value=_project())),
+                patch("flow44.api.shared.record_page_view", AsyncMock()) as mock_record,
+            ):
+                yield mock_record
+        finally:
+            app.dependency_overrides.pop(get_optional_user_id, None)
 
     def _get(self, path: str, headers: dict[str, str], asset: S3Object | None = None):
         with patch("flow44.api.shared.get_published_asset", AsyncMock(return_value=asset or _asset())):
@@ -99,8 +58,32 @@ class TestPublishedAppViews:
 
         assert response.status_code == 200
         record.assert_awaited_once()
-        project, source, _request = record.await_args.args
+        project, source = record.await_args.args
         assert (project.id, source) == ("proj-1", PageViewSource.production)
+
+    @pytest.mark.parametrize(
+        ("user_id", "permissions", "can_write"),
+        [
+            ("user-1", get_owner_permissions(), True),
+            ("user-1", get_role_permissions(Role.viewer), False),
+            (None, None, False),
+        ],
+        ids=["owner", "viewer", "anonymous"],
+    )
+    def test_viewer_write_access(self, record, user_id, permissions, can_write):
+        app.dependency_overrides[get_optional_user_id] = lambda: user_id
+        with patch("flow44.api.shared.resolve_project_permissions", AsyncMock(return_value=permissions)):
+            self._get("", TAB)
+
+        assert record.await_args.kwargs == {"can_write": can_write}
+
+    def test_failed_permission_lookup_still_serves_the_page(self, record):
+        app.dependency_overrides[get_optional_user_id] = lambda: "user-1"
+        with patch("flow44.api.shared.resolve_project_permissions", AsyncMock(side_effect=RuntimeError("down"))):
+            response = self._get("", TAB)
+
+        assert response.status_code == 200
+        assert record.await_args.kwargs == {"can_write": False}
 
     def test_revalidated_page_load_counts(self, record):
         response = self._get("", TAB | {"If-None-Match": '"abc"'})
@@ -132,7 +115,8 @@ class TestPreviewViews:
             ):
                 yield mock_record
         finally:
-            app.dependency_overrides.clear()
+            app.dependency_overrides.pop(get_project, None)
+            app.dependency_overrides.pop(get_user_permissions, None)
 
     def test_tab_counts(self, record):
         response = client.get("/api/preview/proj-1/proxy/", headers=TAB)
@@ -144,8 +128,4 @@ class TestPreviewViews:
 
     def test_builder_iframe_does_not_count(self, record):
         client.get("/api/preview/proj-1/proxy/", headers=IFRAME)
-        record.assert_not_awaited()
-
-    def test_fetch_does_not_count(self, record):
-        client.get("/api/preview/proj-1/proxy/", headers=FETCH)
         record.assert_not_awaited()

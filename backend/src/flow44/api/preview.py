@@ -6,11 +6,11 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import FileResponse, Response
 
 from flow44.api.deps import PermissionsDep, ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
-from flow44.api.page_views import is_iframe, is_page_load, record_page_view
 from flow44.auth.permissions import Permission, has_permission
 from flow44.db.locks import LockNamespace, advisory_lock
 from flow44.db.page_view import PageViewSource
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.page_view_service import is_iframe, is_page_load, record_page_view
 
 logger = logging.getLogger(__name__)
 
@@ -129,9 +129,7 @@ async def proxy_to_sandbox(
 
     content_type = resp.headers.get("content-type")
     if resp.status_code == 200 and is_page_load(request, content_type) and not is_iframe(request):
-        await record_page_view(
-            project, PageViewSource.preview, request, can_write=has_permission(permissions, Permission.write)
-        )
+        await record_page_view(project, PageViewSource.preview, can_write=has_permission(permissions, Permission.write))
 
     content = resp.content
     if (

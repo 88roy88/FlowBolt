@@ -103,7 +103,7 @@ async def invite_user(user_id: AdminDep, body: InviteUserRequest) -> PlatformUse
 async def list_published_apps(user_id: AdminDep) -> list[PublishedAppResponse]:
     """List every published project across the platform."""
     projects = await list_published_projects()
-    view_counts = await list_page_view_counts()
+    view_counts = await list_page_view_counts([p.id for p in projects])
     no_views = ProjectViewCount(project_id="")
     return [
         PublishedAppResponse(

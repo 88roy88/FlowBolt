@@ -2,7 +2,7 @@ from enum import StrEnum
 
 from sqlalchemy import Column, ForeignKey, String
 from sqlalchemy.dialects.postgresql import insert
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
 
@@ -32,7 +32,9 @@ async def increment_page_views(project_id: str, source: PageViewSource) -> None:
         await session.commit()
 
 
-async def list_page_view_counts() -> dict[str, ProjectViewCount]:
+async def list_page_view_counts(project_ids: list[str]) -> dict[str, ProjectViewCount]:
     async with database.async_session() as session:
-        result = await session.execute(select(ProjectViewCount))
+        result = await session.execute(
+            select(ProjectViewCount).where(col(ProjectViewCount.project_id).in_(project_ids))
+        )
         return {row.project_id: row for row in result.scalars().all()}
