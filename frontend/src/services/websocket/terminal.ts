@@ -9,7 +9,7 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
   const existing = terminalSockets.get(projectId);
   if (existing) return existing;
 
-  const handlers: Array<(data: string) => void> = [];
+  const handlers: Array<(data: string, replay: boolean) => void> = [];
   let history = '';
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -18,10 +18,17 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
   let closed = false;
   let retryDelay = 1000;
   const pendingQueue: ArrayBuffer[] = [];
+  let size: { cols: number; rows: number } | null = null;
 
   function flushQueue() {
     while (pendingQueue.length > 0 && socket?.readyState === WebSocket.OPEN) {
       socket.send(pendingQueue.shift()!);
+    }
+  }
+
+  function sendSize() {
+    if (size && socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'resize', ...size }));
     }
   }
 
@@ -35,15 +42,22 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
 
     ws.addEventListener('open', () => {
       retryDelay = 1000;
+      sendSize();
       flushQueue();
     });
 
     ws.addEventListener('message', (event) => {
-      const text = event.data instanceof ArrayBuffer
-        ? decoder.decode(event.data)
-        : event.data as string;
+      let text: string;
+      let replay = false;
+      if (event.data instanceof ArrayBuffer) {
+        text = decoder.decode(event.data);
+      } else {
+        const scrollback = parseScrollback(event.data as string);
+        replay = scrollback !== null;
+        text = scrollback ?? event.data as string;
+      }
       history = (history + text).slice(-MAX_HISTORY_CHARS);
-      handlers.forEach((h) => h(text));
+      handlers.forEach((h) => h(text, replay));
     });
 
     ws.addEventListener('close', () => {
@@ -72,8 +86,12 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
         pendingQueue.push(buf.buffer);
       }
     },
-    onData(handler: (data: string) => void) {
-      if (history) handler(history);
+    resize(cols: number, rows: number) {
+      size = { cols, rows };
+      sendSize();
+    },
+    onData(handler: (data: string, replay: boolean) => void) {
+      if (history) handler(history, true);
       handlers.push(handler);
       return () => {
         const idx = handlers.indexOf(handler);
@@ -90,6 +108,16 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
 
   terminalSockets.set(projectId, instance);
   return instance;
+}
+
+/** Returns the data of a backend scrollback replay frame, or null for any other text frame. */
+function parseScrollback(text: string): string | null {
+  try {
+    const msg = JSON.parse(text);
+    return msg?.type === 'scrollback' && typeof msg.data === 'string' ? msg.data : null;
+  } catch {
+    return null;
+  }
 }
 
 export function closeTerminalSocket(projectId: string): void {

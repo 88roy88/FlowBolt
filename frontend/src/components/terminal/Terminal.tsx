@@ -36,12 +36,28 @@ export function Terminal() {
     const socket = getTerminalSocket(projectId);
     termRef.current = term;
 
+    // Replayed history can contain terminal queries (e.g. device attributes) that were
+    // already answered; xterm's automatic replies to them must not reach the shell as input.
+    let pendingReplays = 0;
     term.onData((data) => {
-      socket.send(data);
+      if (pendingReplays === 0) socket.send(data);
     });
 
-    const handler = (data: string) => {
-      term.write(data);
+    // The PTY must match xterm's size, or the shell's cursor positioning lands in the wrong place.
+    socket.resize(term.cols, term.rows);
+    term.onResize(({ cols, rows }) => {
+      socket.resize(cols, rows);
+    });
+
+    const handler = (data: string, replay: boolean) => {
+      if (!replay) {
+        term.write(data);
+        return;
+      }
+      pendingReplays++;
+      term.write(data, () => {
+        pendingReplays--;
+      });
     };
     const unsubscribe = socket.onData(handler);
 

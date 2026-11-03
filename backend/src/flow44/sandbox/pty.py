@@ -4,9 +4,14 @@ import atexit
 import logging
 import os
 import signal
+import struct
 from abc import ABC, abstractmethod
 from collections import deque
 from typing import Any, ClassVar
+
+if os.name == "posix":
+    import fcntl
+    import termios
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,9 @@ class BasePTY(ABC):
 
     @abstractmethod
     def write(self, data: bytes) -> None: ...
+
+    @abstractmethod
+    def resize(self, rows: int, cols: int) -> None: ...
 
     @abstractmethod
     def _kill(self) -> None: ...
@@ -85,6 +93,9 @@ class UnixPTY(BasePTY):
     def write(self, data: bytes) -> None:
         os.write(self.write_fd, data)
 
+    def resize(self, rows: int, cols: int) -> None:
+        fcntl.ioctl(self.write_fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+
     def _kill(self) -> None:
         try:
             os.close(self.read_fd)
@@ -132,6 +143,9 @@ class WinPTY(BasePTY):
 
     def write(self, data: bytes) -> None:
         self._proc.write(data.decode("utf-8", errors="replace"))
+
+    def resize(self, rows: int, cols: int) -> None:
+        self._proc.setwinsize(rows, cols)
 
     def _kill(self) -> None:
         try:

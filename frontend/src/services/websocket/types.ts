@@ -9,7 +9,9 @@ export interface ChatSocket {
 
 export interface TerminalSocket {
   send(data: string): void;
-  onData(handler: (data: string) => void): () => void;
+  resize(cols: number, rows: number): void;
+  /** `replay` is true for history being replayed rather than live output. */
+  onData(handler: (data: string, replay: boolean) => void): () => void;
   close(): void;
 }
 
