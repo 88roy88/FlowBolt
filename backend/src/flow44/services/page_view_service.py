@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlsplit
 
 from fastapi import Request
 
@@ -22,18 +21,6 @@ def is_page_load(request: Request, content_type: str | None) -> bool:
 
 def is_iframe(request: Request) -> bool:
     return request.headers.get("sec-fetch-dest") == "iframe"
-
-
-# Generated app pages: navigating from one of these is the app itself, not the builder.
-_APP_PATH_PREFIXES = ("/api/preview/", "/shared/")
-
-
-def is_opened_from_builder(request: Request) -> bool:
-    # Sec-Fetch-Site is set by the browser, so it holds even when a proxy rewrites the Host header.
-    if request.headers.get("sec-fetch-site") != "same-origin":
-        return False
-    referer_path = urlsplit(request.headers.get("referer", "")).path
-    return bool(referer_path) and not referer_path.startswith(_APP_PATH_PREFIXES)
 
 
 async def record_page_view(project: Project, source: PageViewSource) -> None:

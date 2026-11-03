@@ -260,7 +260,7 @@ Trigger: a user shares the link to a published app.
 ### 4.7 App View Events
 
 #### `page_viewed`
-Trigger: the backend serves a page load of a generated app: a published app at `/shared/<handle>/` (including inside an iframe), or a preview opened in its own tab. The builder's preview iframe and previews opened from the builder (e.g. its open-in-new-tab button) do not count. A reload counts again; navigation inside the app does not. Published apps are served without sign-in: for their views `user_id` is present only when the viewer's browser sends the builder's sign-in cookie, and absent otherwise (for example on the first load from a link on another site).
+Trigger: the backend serves a page load of a generated app: a published app at `/shared/<handle>/` (including inside an iframe), or a preview opened in its own tab. The builder's preview iframe does not count. A reload counts again; navigation inside the app does not. Published apps are served without sign-in: for their views `user_id` is present only when the viewer's browser sends the builder's sign-in cookie, and absent otherwise (for example on the first load from a link on another site).
 
 | Field | Type | Required | Description |
 |---|---|---|---|

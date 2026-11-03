@@ -115,16 +115,3 @@ class TestPreviewViews:
     def test_builder_iframe_does_not_count(self, record):
         client.get("/api/preview/proj-1/proxy/", headers=IFRAME)
         record.assert_not_awaited()
-
-    def test_tab_opened_from_builder_does_not_count(self, record):
-        headers = TAB | {"Sec-Fetch-Site": "same-origin", "Referer": "https://flowbolt.example/?project=proj-1"}
-        client.get("/api/preview/proj-1/proxy/", headers=headers)
-        record.assert_not_awaited()
-
-    def test_navigation_within_the_preview_counts(self, record):
-        headers = TAB | {
-            "Sec-Fetch-Site": "same-origin",
-            "Referer": "https://flowbolt.example/api/preview/proj-1/proxy/",
-        }
-        client.get("/api/preview/proj-1/proxy/about", headers=headers)
-        record.assert_awaited_once()
