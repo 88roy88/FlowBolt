@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 
+from flow44.api.page_views import is_page_load, record_page_view
 from flow44.config import settings
+from flow44.db.page_view import PageViewSource
+from flow44.db.project import get_project_by_handle
 from flow44.integrations.s3 import S3Object
 from flow44.services.shared_service import AppNotPublishedError, get_published_asset
 
@@ -44,6 +47,9 @@ async def redirect_published_app(handle: str) -> RedirectResponse:
 @router.get("/{handle}/{path:path}", response_class=Response)
 async def proxy_published_asset(request: Request, handle: str, path: str) -> Response:
     asset = await _resolve_asset(handle, path)
+    # Published apps count in iframes too: there an iframe is someone embedding the app, not the builder.
+    if is_page_load(request, asset.content_type) and (project := await get_project_by_handle(handle)):
+        await record_page_view(project, PageViewSource.production, request)
     headers = _cache_headers(asset)
     if asset.etag and request.headers.get("if-none-match") == asset.etag:
         return Response(status_code=304, headers=headers)

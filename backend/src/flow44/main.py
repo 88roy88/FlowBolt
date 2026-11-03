@@ -20,7 +20,6 @@ from flow44.api import (
     iaagent,
     members,
     models,
-    page_views,
     preview,
     projects,
     publish,
@@ -120,7 +119,6 @@ auth_routes.include_router(members.router)
 auth_routes.include_router(directory.router)
 auth_routes.include_router(admin.router)
 auth_routes.include_router(bi_events.router)
-auth_routes.include_router(page_views.router)
 app.include_router(auth_routes)
 
 # Public HTTP routes
