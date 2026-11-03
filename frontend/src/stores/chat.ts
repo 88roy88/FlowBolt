@@ -1,14 +1,27 @@
 import { create } from 'zustand';
-import type { Message, SelectedElement, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
+import type { ChatAttachment, Message, SelectedElement, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
 import { WRITE_ROLES } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
-import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel } from '../services/api';
+import { fetchModels, fetchDefaultModel, fetchAgentEvents, updateProjectModel, uploadAttachment } from '../services/api';
+import { attachmentKind, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, prepareImage, type AttachmentKind } from '../utils/attachments';
+// The bare singleton: '../i18n' initialises it at startup but touches localStorage on import.
+import i18n from 'i18next';
 import { createFixErrorHandler, createSendMessageHandler, finalizeHistoryReplayState, setReplayMode } from './chatHandlers';
 import { armTurn, handleVersionMessage, useVersionStore } from './version';
 import { requestPermissionIfNeeded } from '../utils/notifications';
 import { AGENT_PHASE } from './chatAgentState';
 import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
+
+export interface PendingAttachment {
+  localId: string;
+  name: string;
+  kind: AttachmentKind;
+  previewUrl: string | null;
+  status: 'uploading' | 'ready' | 'failed';
+  progress: number;
+  upload?: ChatAttachment;
+}
 
 export interface ChatState {
   messages: Message[];
@@ -28,6 +41,7 @@ export interface ChatState {
   projectSummary: ProjectSummary | null;
   selectedDataSources: { id: number; name: string }[];
   selectedElements: SelectedElement[];
+  pendingAttachments: PendingAttachment[];
   /** True after the project has completed at least one AI action cycle. */
   buildCompleted: boolean;
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
@@ -52,10 +66,47 @@ export interface ChatState {
   addSelectedElement: (element: SelectedElement) => boolean;
   removeSelectedElement: (id: string) => void;
   clearSelectedElements: () => void;
+  addAttachments: (files: File[]) => void;
+  removeAttachment: (localId: string) => void;
   loadModels: () => Promise<void>;
 }
 
 export const MAX_SELECTED_ELEMENTS = 5;
+
+class AttachmentTooLarge extends Error {}
+
+function currentModel(state: Pick<ChatState, 'models' | 'selectedModel'>): AIModel | undefined {
+  return state.models.find((m) => m.id === state.selectedModel) ?? state.models[0];
+}
+
+function dropAttachments(attachments: PendingAttachment[]): [] {
+  for (const a of attachments) if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+  return [];
+}
+
+async function uploadPending(
+  projectId: string,
+  file: File,
+  pending: PendingAttachment,
+  update: (patch: Partial<PendingAttachment>) => void,
+): Promise<void> {
+  try {
+    const prepared = pending.kind === 'image' ? await prepareImage(file) : { blob: file, width: undefined, height: undefined };
+    if (prepared.blob.size > MAX_ATTACHMENT_BYTES) {
+      throw new AttachmentTooLarge(i18n.t('chat.attachment.tooLarge', { name: file.name, mb: MAX_ATTACHMENT_BYTES / (1024 * 1024) }));
+    }
+    const upload = await uploadAttachment(projectId, prepared.blob, {
+      name: file.name,
+      width: prepared.width,
+      height: prepared.height,
+      onProgress: (progress) => update({ progress }),
+    });
+    update({ status: 'ready', progress: 1, upload });
+  } catch (err) {
+    update({ status: 'failed' });
+    throw err;
+  }
+}
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -113,6 +164,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   projectSummary: null,
   selectedDataSources: [],
   selectedElements: [],
+  pendingAttachments: [],
   buildCompleted: false,
   agentAlive: null,
   agentAlivePollId: 0,
@@ -173,7 +225,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!projectId) return;
     void requestPermissionIfNeeded();
 
-    const { selectedDataSources, selectedElements, selectedModel } = get();
+    const { selectedDataSources, selectedElements, selectedModel, pendingAttachments } = get();
+    const attachments = pendingAttachments.flatMap((a) => (a.upload ? [a.upload] : []));
 
     const userMessage: Message = {
       id: generateId(),
@@ -182,6 +235,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       timestamp: Date.now(),
       dataSources: selectedDataSources.length > 0 ? [...selectedDataSources] : undefined,
       selectedElements: selectedElements.length > 0 ? [...selectedElements] : undefined,
+      attachments: attachments.length > 0 ? attachments : undefined,
     };
 
     set((state) => ({
@@ -204,6 +258,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ...(selectedModel && { model: selectedModel }),
       ...(selectedDataSources.length > 0 && { dataSourceIds: selectedDataSources.map((c) => c.id) }),
       ...(selectedElements.length > 0 && { selectedElements: selectedElements.map(({ id: _id, ...e }) => e) }),
+      ...(attachments.length > 0 && { attachmentIds: attachments.map((a) => a.id) }),
     });
 
     // Persist the model to the project so it's restored on next visit
@@ -212,12 +267,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updateProjectModel(currentProject.id, selectedModel).catch(() => {});
     }
 
-    set({ selectedDataSources: [], selectedElements: [] });
+    set({ selectedDataSources: [], selectedElements: [], pendingAttachments: [] });
     armTurn({
       run: () => get().sendMessage(content, opts),
       undo: () => {
         get().rollbackTurn(userMessage.id);
-        set({ selectedElements, ...((!opts?.keepDraft || !get().draft) && { draft: content }) });
+        set({
+          selectedElements,
+          pendingAttachments,
+          ...((!opts?.keepDraft || !get().draft) && { draft: content }),
+        });
       },
     });
   },
@@ -272,6 +331,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         agentAlive: null,
         draft: '',
         selectedElements: [],
+        pendingAttachments: dropAttachments(get().pendingAttachments),
         ...RESET_STATE,
       });
       useVersionStore.getState().reset();
@@ -320,6 +380,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       buildCompleted: false,
       agentAlive: null,
       selectedElements: [],
+      pendingAttachments: dropAttachments(get().pendingAttachments),
       ...RESET_STATE,
     });
     useVersionStore.getState().reset();
@@ -370,6 +431,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearSelectedElements() {
     set({ selectedElements: [] });
+  },
+
+  addAttachments(files: File[]) {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+    const room = MAX_ATTACHMENTS - get().pendingAttachments.length;
+    if (files.length > room) set({ error: i18n.t('chat.attachment.tooMany', { max: MAX_ATTACHMENTS }) });
+    const imagesAllowed = currentModel(get())?.supports_vision !== false;
+
+    for (const file of files.slice(0, Math.max(room, 0))) {
+      const kind = attachmentKind(file.type, file.name);
+      if (!kind) {
+        set({ error: i18n.t('chat.attachment.unsupported', { name: file.name }) });
+        continue;
+      }
+      if (kind === 'image' && !imagesAllowed) {
+        set({ error: i18n.t('chat.attachment.noVision') });
+        continue;
+      }
+      const pending: PendingAttachment = {
+        localId: generateId(),
+        name: file.name,
+        kind,
+        previewUrl: kind === 'image' ? URL.createObjectURL(file) : null,
+        status: 'uploading',
+        progress: 0,
+      };
+      set((state) => ({ pendingAttachments: [...state.pendingAttachments, pending] }));
+      void uploadPending(projectId, file, pending, (patch) => {
+        set((state) => ({
+          pendingAttachments: state.pendingAttachments.map((a) => (a.localId === pending.localId ? { ...a, ...patch } : a)),
+        }));
+      }).catch((err: unknown) => {
+        set({ error: err instanceof AttachmentTooLarge ? err.message : i18n.t('chat.attachment.failed', { name: file.name }) });
+      });
+    }
+  },
+
+  removeAttachment(localId: string) {
+    const removed = get().pendingAttachments.filter((a) => a.localId === localId);
+    dropAttachments(removed);
+    set((state) => ({ pendingAttachments: state.pendingAttachments.filter((a) => a.localId !== localId) }));
   },
 
   async loadModels() {

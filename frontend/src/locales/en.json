@@ -190,6 +190,20 @@
     },
     "selectedElement": {
       "remove": "Remove element"
+    },
+    "attachment": {
+      "attach": "Attach images or files",
+      "attachNoVision": "Attach files (the selected model can't read images)",
+      "remove": "Remove attachment",
+      "uploading": "Uploading…",
+      "failedShort": "Upload failed",
+      "failed": "Couldn't upload {{name}}.",
+      "tooLarge": "{{name}} is larger than {{mb}} MB.",
+      "unsupported": "{{name}} can't be attached. Use an image, PDF or text file.",
+      "tooMany": "You can attach up to {{max}} files per message.",
+      "noVision": "The selected model can't read images. Pick a model with vision support.",
+      "dropHere": "Drop files to attach",
+      "open": "Open {{name}}"
     }
   },
   "sharing": {

@@ -4,18 +4,22 @@ import { useChatStore } from '../../stores/chat';
 import { isAwaitingPlanApproval } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
-import { ArrowUp, CirclePlus, Loader2, SquareDashedMousePointer, X } from 'lucide-react';
+import { ArrowUp, CirclePlus, Loader2, Paperclip, SquareDashedMousePointer, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
+import { PendingAttachments } from './PendingAttachments';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
+import { ATTACHMENT_ACCEPT } from '../../utils/attachments';
 
 export function PromptInput() {
   const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [showDsSelector, setShowDsSelector] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const value = useChatStore((s) => s.draft);
   const setValue = useChatStore((s) => s.setDraft);
@@ -25,6 +29,11 @@ export function PromptInput() {
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const selectedElements = useChatStore((s) => s.selectedElements);
   const removeSelectedElement = useChatStore((s) => s.removeSelectedElement);
+  const addAttachments = useChatStore((s) => s.addAttachments);
+  const attachmentsSettled = useChatStore((s) => s.pendingAttachments.every((a) => a.status === 'ready'));
+  const modelReadsImages = useChatStore(
+    (s) => (s.models.find((m) => m.id === s.selectedModel) ?? s.models[0])?.supports_vision !== false,
+  );
   const projectId = useSessionStore((s) => s.projectId);
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
@@ -42,7 +51,7 @@ export function PromptInput() {
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || inputBlocked) return;
+    if (!trimmed || inputBlocked || !attachmentsSettled) return;
     if (projectId) sendMessage(trimmed);
     else if (startsProject) void startProjectFromPrompt(trimmed);
   };
@@ -55,7 +64,34 @@ export function PromptInput() {
   };
 
   const disabled = inputBlocked || (!projectId && !startsProject);
-  const canSend = !!value.trim() && !disabled;
+  const canSend = !!value.trim() && !disabled && attachmentsSettled;
+  // Uploads belong to a project, so a prompt that starts one can't carry attachments yet.
+  const canAttach = !!projectId && !disabled;
+
+  const attach = (files: FileList | File[] | null | undefined) => {
+    const list = Array.from(files ?? []);
+    if (list.length > 0 && canAttach) addAttachments(list);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (e.clipboardData.files.length === 0 || !canAttach) return;
+    e.preventDefault();
+    attach(e.clipboardData.files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!canAttach || !e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDragging(true);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    setDragging(false);
+    if (!canAttach || e.dataTransfer.files.length === 0) return;
+    e.preventDefault();
+    attach(e.dataTransfer.files);
+  };
   const dsOpen = showDsSelector && !disabled;
 
   // Global keyboard shortcut: Cmd+K to focus chat
@@ -110,12 +146,26 @@ export function PromptInput() {
       ) : null}
 
       <div
-        className={`flex flex-col gap-2 bg-surface rounded-2xl p-2.5 transition-all duration-200 ${
-          focused && !disabled
+        onDragOver={handleDragOver}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
+        onDrop={handleDrop}
+        data-testid="prompt-box"
+        className={`relative flex flex-col gap-2 bg-surface rounded-2xl p-2.5 transition-all duration-200 ${
+          dragging
+            ? 'border border-dashed border-primary bg-primary/5'
+            : focused && !disabled
             ? 'border border-primary/60 shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_8%,transparent),0_2px_8px_color-mix(in_srgb,var(--primary)_6%,transparent)]'
             : 'border border-border shadow-[var(--shadow-md)]'
         }`}
       >
+        {dragging && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl text-sm text-primary">
+            {t('chat.attachment.dropHere')}
+          </div>
+        )}
+
+        <PendingAttachments />
+
         {/* Selected element and data source badges */}
         {((!dsOpen && selectedDataSources.length > 0) || selectedElements.length > 0) && (
           <div className="flex flex-wrap gap-1.5 px-1">
@@ -152,6 +202,7 @@ export function PromptInput() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
@@ -179,6 +230,32 @@ export function PromptInput() {
                 </span>
               )}
             </button>
+          )}
+
+          {projectId && (
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canAttach}
+                className="w-7 h-7 flex items-center justify-center rounded-full shrink-0 text-muted-foreground transition-colors enabled:hover:bg-muted/50 disabled:opacity-40 disabled:cursor-default"
+                title={modelReadsImages ? t('chat.attachment.attach') : t('chat.attachment.attachNoVision')}
+                data-testid="attach-button"
+              >
+                <Paperclip size={17} />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ATTACHMENT_ACCEPT}
+                className="hidden"
+                data-testid="attachment-input"
+                onChange={(e) => {
+                  attach(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+            </>
           )}
 
           <div className="flex items-center gap-1 ms-auto min-w-0">

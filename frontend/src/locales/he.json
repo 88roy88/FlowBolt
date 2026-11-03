@@ -190,6 +190,20 @@
     },
     "selectedElement": {
       "remove": "הסר רכיב"
+    },
+    "attachment": {
+      "attach": "צרף תמונות או קבצים",
+      "attachNoVision": "צרף קבצים (המודל שנבחר לא קורא תמונות)",
+      "remove": "הסר קובץ מצורף",
+      "uploading": "מעלה…",
+      "failedShort": "ההעלאה נכשלה",
+      "failed": "לא ניתן להעלות את {{name}}.",
+      "tooLarge": "{{name}} גדול מ-{{mb}} MB.",
+      "unsupported": "לא ניתן לצרף את {{name}}. השתמש בתמונה, PDF או קובץ טקסט.",
+      "tooMany": "אפשר לצרף עד {{max}} קבצים להודעה.",
+      "noVision": "המודל שנבחר לא קורא תמונות. בחר מודל שתומך בראייה.",
+      "dropHere": "שחרר קבצים כדי לצרף",
+      "open": "פתח את {{name}}"
     }
   },
   "sharing": {

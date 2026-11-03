@@ -19,6 +19,7 @@ import {
   UserEditCard,
 } from './cards';
 import { VersionControl } from './VersionControl';
+import { MessageAttachments } from './MessageAttachments';
 
 interface ChatMessageProps {
   message: Message;
@@ -132,6 +133,9 @@ export const ChatMessage = memo(function ChatMessage({ message, isStreaming }: C
         )}
         {isUser && message.selectedElements && message.selectedElements.length > 0 && (
           <SelectedElementBadges elements={message.selectedElements} />
+        )}
+        {isUser && message.attachments && message.attachments.length > 0 && (
+          <MessageAttachments attachments={message.attachments} />
         )}
         {isUser ? (
           <p className="whitespace-pre-wrap break-words">{message.content}</p>

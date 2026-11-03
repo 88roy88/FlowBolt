@@ -144,6 +144,9 @@ function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetSt
   if (msg.selected_elements && msg.selected_elements.length > 0) {
     userMsg.selectedElements = msg.selected_elements.map((e) => ({ ...e, id: generateId() }));
   }
+  if (msg.attachments && msg.attachments.length > 0) {
+    userMsg.attachments = msg.attachments;
+  }
   if (msg.error_fix_request) {
     userMsg.agentCard = { type: 'error_fix_request', ...msg.error_fix_request };
   }

@@ -1,15 +1,19 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
+import type { AssignableRole, ChatAttachment, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
 import type { LogEvent } from './logger';
 
 const BASE = '/api';
+
+function bearer(token: string): string {
+  return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+}
 
 // Fetch with a Bearer token; on a 401, re-acquire credentials and retry once.
 async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry = true): Promise<Response> {
   const token = await authSession.ensureFreshToken();
   const headers = new Headers(options.headers);
   if (token) {
-    headers.set('Authorization', token.startsWith('Bearer ') ? token : `Bearer ${token}`);
+    headers.set('Authorization', bearer(token));
   }
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
@@ -102,6 +106,55 @@ export async function uploadFileEntry(projectId: string, path: string, file: Blo
   if (!res.ok) {
     throw apiError(res.status, await res.text());
   }
+}
+
+export interface AttachmentUploadOptions {
+  name: string;
+  width?: number;
+  height?: number;
+  onProgress?: (fraction: number) => void;
+}
+
+// XHR rather than fetch: fetch can't report upload progress.
+function postWithProgress(url: string, body: Blob, token: string | undefined, onProgress?: (fraction: number) => void) {
+  return new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    if (token) xhr.setRequestHeader('Authorization', bearer(token));
+    xhr.setRequestHeader('Content-Type', body.type || 'application/octet-stream');
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total); };
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () => reject(new Error('Upload failed'));
+    xhr.send(body);
+  });
+}
+
+export async function uploadAttachment(
+  projectId: string,
+  body: Blob,
+  options: AttachmentUploadOptions,
+  allowRetry = true,
+): Promise<ChatAttachment> {
+  const params = new URLSearchParams({ name: options.name });
+  if (options.width) params.set('width', String(options.width));
+  if (options.height) params.set('height', String(options.height));
+  const token = await authSession.ensureFreshToken();
+  const { status, text } = await postWithProgress(
+    `${BASE}/uploads/${projectId}/attachments?${params}`, body, token, options.onProgress,
+  );
+  if (status === 401 && allowRetry) {
+    await authSession.refreshCredentials();
+    if (!authSession.hasValidSession()) throw new Error('API error 401: authentication required');
+    return uploadAttachment(projectId, body, options, false);
+  }
+  if (status < 200 || status >= 300) throw apiError(status, text);
+  return JSON.parse(text) as ChatAttachment;
+}
+
+// Loaded by <img>, which can't send a Bearer header, so this relies on the auth cookie.
+export function attachmentContentUrl(projectId: string, attachmentId: string): string {
+  credentialsStore.ensureCookie();
+  return `${BASE}/uploads/${projectId}/${attachmentId}/content`;
 }
 
 export type SearchHit = { line: number; column: number; preview: string };
