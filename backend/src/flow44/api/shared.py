@@ -49,7 +49,7 @@ async def redirect_published_app(handle: str) -> RedirectResponse:
 @router.get("/{handle}/{path:path}", response_class=Response, dependencies=[Depends(get_optional_user_id)])
 async def proxy_published_asset(request: Request, handle: str, path: str) -> Response:
     asset = await _resolve_asset(handle, path)
-    if is_page_load(request, asset.content_type) and (project := await get_project_by_handle(handle)):
+    if is_page_load(request) and (project := await get_project_by_handle(handle)):
         await record_page_view(project, PageViewSource.production)
     headers = _cache_headers(asset)
     if asset.etag and request.headers.get("if-none-match") == asset.etag:

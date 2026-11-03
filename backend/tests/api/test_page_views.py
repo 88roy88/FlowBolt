@@ -33,8 +33,8 @@ def _project() -> Project:
     )
 
 
-def _asset(content_type: str = "text/html", path: str = "index.html") -> S3Object:
-    return S3Object(path=path, body=b"<html></html>", content_type=content_type, etag='"abc"')
+def _asset() -> S3Object:
+    return S3Object(path="index.html", body=b"<html></html>", content_type="text/html", etag='"abc"')
 
 
 class TestPublishedAppViews:
@@ -46,8 +46,8 @@ class TestPublishedAppViews:
         ):
             yield mock_record
 
-    def _get(self, path: str, headers: dict[str, str], asset: S3Object | None = None):
-        with patch("flow44.api.shared.get_published_asset", AsyncMock(return_value=asset or _asset())):
+    def _get(self, path: str, headers: dict[str, str]):
+        with patch("flow44.api.shared.get_published_asset", AsyncMock(return_value=_asset())):
             return client.get(f"/shared/my-app/{path}", headers=headers)
 
     @pytest.mark.parametrize("headers", [TAB, IFRAME], ids=["tab", "iframe"])
@@ -82,10 +82,6 @@ class TestPublishedAppViews:
         self._get("", FETCH)
         record.assert_not_awaited()
 
-    def test_asset_does_not_count(self, record):
-        self._get("assets/index.js", TAB, _asset("application/javascript", "assets/index.js"))
-        record.assert_not_awaited()
-
 
 class TestPreviewViews:
     @pytest.fixture
@@ -111,6 +107,19 @@ class TestPreviewViews:
         assert response.status_code == 200
         record.assert_awaited_once()
         assert record.await_args.args[1] == PageViewSource.preview
+
+    def test_revalidated_reload_counts(self, record):
+        with patch("flow44.api.preview._proxy_client.request", AsyncMock(return_value=httpx.Response(304))):
+            response = client.get("/api/preview/proj-1/proxy/", headers=TAB | {"If-None-Match": '"abc"'})
+
+        assert response.status_code == 304
+        record.assert_awaited_once()
+
+    def test_dev_server_error_does_not_count(self, record):
+        with patch("flow44.api.preview._proxy_client.request", AsyncMock(return_value=httpx.Response(500))):
+            client.get("/api/preview/proj-1/proxy/", headers=TAB)
+
+        record.assert_not_awaited()
 
     def test_builder_iframe_does_not_count(self, record):
         client.get("/api/preview/proj-1/proxy/", headers=IFRAME)

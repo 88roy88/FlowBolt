@@ -11,12 +11,8 @@ from flow44.services.logging import log_bi_event
 logger = logging.getLogger(__name__)
 
 
-def is_page_load(request: Request, content_type: str | None) -> bool:
-    return (
-        request.method == "GET"
-        and request.headers.get("sec-fetch-mode") == "navigate"
-        and (content_type or "").startswith("text/html")
-    )
+def is_page_load(request: Request) -> bool:
+    return request.method == "GET" and request.headers.get("sec-fetch-mode") == "navigate"
 
 
 def is_iframe(request: Request) -> bool:

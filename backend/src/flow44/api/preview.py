@@ -127,8 +127,7 @@ async def proxy_to_sandbox(
     for h in ("content-encoding", "content-length", "transfer-encoding", "connection"):
         response_headers.pop(h, None)
 
-    content_type = resp.headers.get("content-type")
-    if resp.status_code == 200 and is_page_load(request, content_type) and not is_iframe(request):
+    if resp.status_code in (200, 304) and is_page_load(request) and not is_iframe(request):
         await record_page_view(project, PageViewSource.preview)
 
     content = resp.content
