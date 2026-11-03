@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import UserDep, is_admin
 from flow44.config import settings
-from flow44.db.page_view import list_page_view_counts
+from flow44.db.page_view import ProjectViewCount, list_page_view_counts
 from flow44.db.platform_user import (
     add_platform_user,
     list_platform_users,
@@ -104,6 +104,7 @@ async def list_published_apps(user_id: AdminDep) -> list[PublishedAppResponse]:
     """List every published project across the platform."""
     projects = await list_published_projects()
     view_counts = await list_page_view_counts()
+    no_views = ProjectViewCount(project_id="")
     return [
         PublishedAppResponse(
             project_id=p.id,
@@ -113,8 +114,8 @@ async def list_published_apps(user_id: AdminDep) -> list[PublishedAppResponse]:
             public_path=f"/shared/{handle}",
             created_at=p.created_at,
             published_at=published_at,
-            production_views=views.production_views if (views := view_counts.get(p.id)) else 0,
-            preview_views=views.preview_views if views else 0,
+            production_views=view_counts.get(p.id, no_views).production_views,
+            preview_views=view_counts.get(p.id, no_views).preview_views,
         )
         # published_url/published_at are non-null for every row the query returns;
         # the walrus bindings narrow them for the type checker.
