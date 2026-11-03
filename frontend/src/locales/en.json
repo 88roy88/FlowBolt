@@ -221,6 +221,8 @@
     "colUrl": "URL",
     "colCreated": "Created",
     "colPublished": "Published",
+    "colLiveViews": "Live views",
+    "colPreviewViews": "Preview views",
     "openProject": "Open project",
     "searchApps": "Search by project, owner or URL",
     "noMatches": "No matching apps"

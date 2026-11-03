@@ -221,6 +221,8 @@
     "colUrl": "כתובת",
     "colCreated": "נוצר",
     "colPublished": "פורסם",
+    "colLiveViews": "צפיות באתר",
+    "colPreviewViews": "צפיות בתצוגה מקדימה",
     "openProject": "פתח פרויקט",
     "searchApps": "חיפוש לפי פרויקט, בעלים או כתובת",
     "noMatches": "אין אפליקציות תואמות"

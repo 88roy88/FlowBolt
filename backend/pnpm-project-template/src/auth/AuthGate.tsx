@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { authSession, PopupBlockedError } from './session';
 import { authConfig, isProviderConfigured } from './config';
 import { IframeModal } from './IframeModal';
+import { trackPageView } from '../platform/pageView';
 import type { SessionBootstrapResult } from './session';
 
 type AuthState = 'loading' | 'ready' | 'needs_sign_in' | 'signing_in' | 'error';
@@ -29,6 +30,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (state === 'ready') trackPageView();
+  }, [state]);
 
   // Watch for token being cleared (e.g. by refreshCredentials in iframe mode)
   useEffect(() => {

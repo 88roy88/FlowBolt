@@ -337,6 +337,8 @@ export async function fetchPublishedApps(): Promise<{
   public_path: string;
   created_at: string;
   published_at: string;
+  production_views: number;
+  preview_views: number;
 }[]> {
   return request('/admin/published-apps');
 }

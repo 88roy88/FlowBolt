@@ -20,7 +20,8 @@ function rankHit(hits: Set<string>, a: string, b: string): number {
 
 type Tab = 'users' | 'published';
 
-type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at';
+type ViewsSortKey = 'production_views' | 'preview_views';
+type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at' | ViewsSortKey;
 type SortDir = 'asc' | 'desc';
 
 const INITIAL_SORT_DIR: Record<SortKey, SortDir> = {
@@ -29,9 +30,15 @@ const INITIAL_SORT_DIR: Record<SortKey, SortDir> = {
   project_url: 'asc',
   created_at: 'desc',
   published_at: 'desc',
+  production_views: 'desc',
+  preview_views: 'desc',
 };
 
-const APPS_GRID ='grid grid-cols-[1fr_130px_150px_80px_80px] gap-2';
+const APPS_GRID ='grid grid-cols-[1fr_130px_150px_80px_80px_60px_60px] gap-2';
+
+function isViewsSortKey(key: SortKey): key is ViewsSortKey {
+  return key === 'production_views' || key === 'preview_views';
+}
 
 /** Date only, with the full date + time of day on hover. */
 function Timestamp({ iso }: { iso: string }) {
@@ -98,8 +105,11 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     const matchingApps = apps.filter((app) =>
       [app.name, app.owner_id, app.project_url].some((field) => field.toLowerCase().includes(query)));
 
+    const { key } = appsSort;
     return matchingApps.sort((a, b) => {
-      const order = a[appsSort.key].localeCompare(b[appsSort.key], undefined, { sensitivity: 'base' });
+      const order = isViewsSortKey(key)
+        ? a[key] - b[key]
+        : a[key].localeCompare(b[key], undefined, { sensitivity: 'base' });
       return appsSort.dir === 'asc' ? order : -order;
     });
   }, [apps, appsSearch, appsSort]);
@@ -183,7 +193,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       <DialogContent
         className={cn(
           'max-h-[85vh] flex flex-col overflow-hidden',
-          tab === 'published' ? 'w-[760px] max-w-[760px]' : 'w-[440px]',
+          tab === 'published' ? 'w-[900px] max-w-[900px]' : 'w-[440px]',
         )}
       >
         <DialogClose onClose={onClose} />
@@ -227,6 +237,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
               {sortHeader('project_url', t('admin.colUrl', 'URL'))}
               {sortHeader('created_at', t('admin.colCreated', 'Created'))}
               {sortHeader('published_at', t('admin.colPublished', 'Published'))}
+              {sortHeader('production_views', t('admin.colLiveViews', 'Live views'))}
+              {sortHeader('preview_views', t('admin.colPreviewViews', 'Preview views'))}
             </div>
           )}
         </div>
@@ -343,6 +355,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 </a>
                 <Timestamp iso={a.created_at} />
                 <Timestamp iso={a.published_at} />
+                <span className="text-muted-foreground text-xs tabular-nums">{a.production_views}</span>
+                <span className="text-muted-foreground text-xs tabular-nums">{a.preview_views}</span>
               </div>
             ))
           )}
