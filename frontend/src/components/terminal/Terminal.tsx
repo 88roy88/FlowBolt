@@ -36,8 +36,7 @@ export function Terminal() {
     const socket = getTerminalSocket(projectId);
     termRef.current = term;
 
-    // Replayed history can contain terminal queries (e.g. device attributes) that were
-    // already answered; xterm's automatic replies to them must not reach the shell as input.
+    // Don't forward xterm's automatic replies to queries in replayed history.
     let pendingReplays = 0;
     term.onData((data) => {
       if (pendingReplays === 0) socket.send(data);

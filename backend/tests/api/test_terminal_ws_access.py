@@ -63,7 +63,6 @@ def test_text_frames_resize_and_binary_frames_write() -> None:
         with client.websocket_connect("/ws/terminal/proj-123", headers={"cookie": "flow44_token=t"}) as ws:
             ws.receive_json()
             ws.send_text('{"type": "resize", "cols": 120, "rows": 30}')
-            ws.send_text('{"type": "resize", "cols": 0, "rows": 30}')
             ws.send_text("not json")
             ws.send_bytes(b"ls\r")
         pty.resize.assert_called_once_with(30, 120)

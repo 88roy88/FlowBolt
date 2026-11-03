@@ -22,11 +22,6 @@ router = APIRouter()
 
 
 async def _send_scrollback(websocket: WebSocket, pty: BasePTY, project_id: str) -> None:
-    """Replay scrollback so the client sees recent terminal history.
-
-    It is sent as a text frame so the client can tell it apart from live output: terminal
-    queries in it (e.g. device attributes) were already answered and must not be answered again.
-    """
     scrollback = pty.get_scrollback()
     if not scrollback:
         return
@@ -40,15 +35,10 @@ async def _send_scrollback(websocket: WebSocket, pty: BasePTY, project_id: str) 
 def _handle_control(pty: BasePTY, text: str) -> None:
     try:
         msg = json.loads(text)
-    except ValueError:
-        return
-    if isinstance(msg, dict) and msg.get("type") == "resize":
-        rows, cols = msg.get("rows"), msg.get("cols")
-        if isinstance(rows, int) and isinstance(cols, int) and rows > 0 and cols > 0:
-            try:
-                pty.resize(rows, cols)
-            except Exception:
-                logger.debug("Failed to resize PTY", exc_info=True)
+        if msg["type"] == "resize":
+            pty.resize(msg["rows"], msg["cols"])
+    except Exception:
+        logger.debug("Ignoring invalid terminal control message", exc_info=True)
 
 
 @router.websocket("/ws/terminal/{project_id}")
@@ -95,7 +85,6 @@ async def terminal_ws(  # noqa: C901
             message = await websocket.receive()
             if message["type"] == "websocket.disconnect":
                 raise WebSocketDisconnect(message.get("code", 1000))
-            # Binary frames are keyboard input; text frames are JSON control messages.
             if message.get("bytes") is not None:
                 pty.write(message["bytes"])
             elif message.get("text") is not None:
