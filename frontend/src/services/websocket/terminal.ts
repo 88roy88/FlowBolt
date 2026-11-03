@@ -2,6 +2,7 @@ import type { TerminalSocket } from './types';
 import { credentialsStore } from '../../auth';
 import { getWsBase } from './reconnecting';
 
+const MAX_HISTORY_CHARS = 256 * 1024;
 const terminalSockets = new Map<string, TerminalSocket>();
 
 export function getTerminalSocket(projectId: string): TerminalSocket {
@@ -9,6 +10,9 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
   if (existing) return existing;
 
   const handlers: Array<(data: string) => void> = [];
+  // Output received on the current connection, replayed to handlers that
+  // subscribe later (e.g. when the tab is reopened and a new xterm mounts).
+  let history = '';
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
 
@@ -29,6 +33,7 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
     const ws = new WebSocket(`${getWsBase()}/ws/terminal/${projectId}`);
     ws.binaryType = 'arraybuffer';
     socket = ws;
+    history = '';
 
     ws.addEventListener('open', () => {
       retryDelay = 1000;
@@ -39,6 +44,7 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
       const text = event.data instanceof ArrayBuffer
         ? decoder.decode(event.data)
         : event.data as string;
+      history = (history + text).slice(-MAX_HISTORY_CHARS);
       handlers.forEach((h) => h(text));
     });
 
@@ -69,6 +75,7 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
       }
     },
     onData(handler: (data: string) => void) {
+      if (history) handler(history);
       handlers.push(handler);
       return () => {
         const idx = handlers.indexOf(handler);
