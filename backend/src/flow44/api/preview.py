@@ -10,7 +10,7 @@ from flow44.auth.permissions import Permission, has_permission
 from flow44.db.locks import LockNamespace, advisory_lock
 from flow44.db.page_view import PageViewSource
 from flow44.sandbox.manager import sandbox_manager
-from flow44.services.page_view_service import is_iframe, is_page_load, record_page_view
+from flow44.services.page_view_service import is_iframe, is_opened_from_builder, is_page_load, record_page_view
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,12 @@ async def proxy_to_sandbox(
         response_headers.pop(h, None)
 
     content_type = resp.headers.get("content-type")
-    if resp.status_code == 200 and is_page_load(request, content_type) and not is_iframe(request):
+    if (
+        resp.status_code == 200
+        and is_page_load(request, content_type)
+        and not is_iframe(request)
+        and not is_opened_from_builder(request)
+    ):
         await record_page_view(project, PageViewSource.preview)
 
     content = resp.content

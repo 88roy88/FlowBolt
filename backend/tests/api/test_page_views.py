@@ -8,10 +8,12 @@ from fastapi.testclient import TestClient
 
 from flow44.api.deps import get_project, get_user_permissions
 from flow44.auth.permissions import get_owner_permissions
+from flow44.config import settings
 from flow44.db.page_view import PageViewSource
 from flow44.db.project import Project
 from flow44.integrations.s3 import S3Object
 from flow44.main import app
+from flow44.services.logging import _user_id as _log_user_id
 
 client = TestClient(app)
 
@@ -57,6 +59,19 @@ class TestPublishedAppViews:
         project, source = record.await_args.args
         assert (project.id, source) == ("proj-1", PageViewSource.production)
 
+    @pytest.mark.parametrize(
+        ("payload", "user_id"),
+        [(MagicMock(unique_id="user-1"), "user-1"), (None, None)],
+        ids=["signed-in", "anonymous"],
+    )
+    def test_viewer_is_put_on_the_log(self, record, payload, user_id):
+        logged_user_ids = []
+        record.side_effect = lambda *_: logged_user_ids.append(_log_user_id.get())
+        with patch("flow44.api.deps.decode_token", return_value=payload):
+            self._get("", TAB | {"Cookie": f"{settings.AUTH_COOKIE_NAME}=token"})
+
+        assert logged_user_ids == [user_id]
+
     def test_revalidated_page_load_counts(self, record):
         response = self._get("", TAB | {"If-None-Match": '"abc"'})
 
@@ -100,3 +115,16 @@ class TestPreviewViews:
     def test_builder_iframe_does_not_count(self, record):
         client.get("/api/preview/proj-1/proxy/", headers=IFRAME)
         record.assert_not_awaited()
+
+    def test_tab_opened_from_builder_does_not_count(self, record):
+        headers = TAB | {"Sec-Fetch-Site": "same-origin", "Referer": "https://flowbolt.example/?project=proj-1"}
+        client.get("/api/preview/proj-1/proxy/", headers=headers)
+        record.assert_not_awaited()
+
+    def test_navigation_within_the_preview_counts(self, record):
+        headers = TAB | {
+            "Sec-Fetch-Site": "same-origin",
+            "Referer": "https://flowbolt.example/api/preview/proj-1/proxy/",
+        }
+        client.get("/api/preview/proj-1/proxy/about", headers=headers)
+        record.assert_awaited_once()

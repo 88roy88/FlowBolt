@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlsplit
 
 from fastapi import Request
 
@@ -12,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def is_page_load(request: Request, content_type: str | None) -> bool:
-    """A browser navigation to an HTML page (a tab, a link, an iframe), not a fetch or an asset."""
     return (
         request.method == "GET"
         and request.headers.get("sec-fetch-mode") == "navigate"
@@ -24,8 +24,19 @@ def is_iframe(request: Request) -> bool:
     return request.headers.get("sec-fetch-dest") == "iframe"
 
 
+# Generated app pages: navigating from one of these is the app itself, not the builder.
+_APP_PATH_PREFIXES = ("/api/preview/", "/shared/")
+
+
+def is_opened_from_builder(request: Request) -> bool:
+    # Sec-Fetch-Site is set by the browser, so it holds even when a proxy rewrites the Host header.
+    if request.headers.get("sec-fetch-site") != "same-origin":
+        return False
+    referer_path = urlsplit(request.headers.get("referer", "")).path
+    return bool(referer_path) and not referer_path.startswith(_APP_PATH_PREFIXES)
+
+
 async def record_page_view(project: Project, source: PageViewSource) -> None:
-    """Count one page view. Never raises: counting must not affect serving the app."""
     try:
         await increment_page_views(project.id, source)
         _log_project_id.set(project.id)
