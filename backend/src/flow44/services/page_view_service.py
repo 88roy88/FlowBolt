@@ -24,12 +24,12 @@ def is_iframe(request: Request) -> bool:
     return request.headers.get("sec-fetch-dest") == "iframe"
 
 
-async def record_page_view(project: Project, source: PageViewSource, can_write: bool) -> None:
+async def record_page_view(project: Project, source: PageViewSource) -> None:
     """Count one page view. Never raises: counting must not affect serving the app."""
     try:
         await increment_page_views(project.id, source)
         _log_project_id.set(project.id)
         _log_project_name.set(project.name)
-        log_bi_event("page_viewed", view_source=source.value, can_write=can_write)
+        log_bi_event("page_viewed", view_source=source.value)
     except Exception:
         logger.exception("Failed to record %s page view for project %s", source.value, project.id)

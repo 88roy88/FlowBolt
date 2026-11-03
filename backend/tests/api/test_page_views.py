@@ -6,8 +6,8 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from flow44.api.deps import get_optional_user_id, get_project, get_user_permissions
-from flow44.auth.permissions import Role, get_owner_permissions, get_role_permissions
+from flow44.api.deps import get_project, get_user_permissions
+from flow44.auth.permissions import get_owner_permissions
 from flow44.db.page_view import PageViewSource
 from flow44.db.project import Project
 from flow44.integrations.s3 import S3Object
@@ -38,15 +38,11 @@ def _asset(content_type: str = "text/html", path: str = "index.html") -> S3Objec
 class TestPublishedAppViews:
     @pytest.fixture
     def record(self):
-        app.dependency_overrides[get_optional_user_id] = lambda: None
-        try:
-            with (
-                patch("flow44.api.shared.get_project_by_handle", AsyncMock(return_value=_project())),
-                patch("flow44.api.shared.record_page_view", AsyncMock()) as mock_record,
-            ):
-                yield mock_record
-        finally:
-            app.dependency_overrides.pop(get_optional_user_id, None)
+        with (
+            patch("flow44.api.shared.get_project_by_handle", AsyncMock(return_value=_project())),
+            patch("flow44.api.shared.record_page_view", AsyncMock()) as mock_record,
+        ):
+            yield mock_record
 
     def _get(self, path: str, headers: dict[str, str], asset: S3Object | None = None):
         with patch("flow44.api.shared.get_published_asset", AsyncMock(return_value=asset or _asset())):
@@ -60,30 +56,6 @@ class TestPublishedAppViews:
         record.assert_awaited_once()
         project, source = record.await_args.args
         assert (project.id, source) == ("proj-1", PageViewSource.production)
-
-    @pytest.mark.parametrize(
-        ("user_id", "permissions", "can_write"),
-        [
-            ("user-1", get_owner_permissions(), True),
-            ("user-1", get_role_permissions(Role.viewer), False),
-            (None, None, False),
-        ],
-        ids=["owner", "viewer", "anonymous"],
-    )
-    def test_viewer_write_access(self, record, user_id, permissions, can_write):
-        app.dependency_overrides[get_optional_user_id] = lambda: user_id
-        with patch("flow44.api.shared.resolve_project_permissions", AsyncMock(return_value=permissions)):
-            self._get("", TAB)
-
-        assert record.await_args.kwargs == {"can_write": can_write}
-
-    def test_failed_permission_lookup_still_serves_the_page(self, record):
-        app.dependency_overrides[get_optional_user_id] = lambda: "user-1"
-        with patch("flow44.api.shared.resolve_project_permissions", AsyncMock(side_effect=RuntimeError("down"))):
-            response = self._get("", TAB)
-
-        assert response.status_code == 200
-        assert record.await_args.kwargs == {"can_write": False}
 
     def test_revalidated_page_load_counts(self, record):
         response = self._get("", TAB | {"If-None-Match": '"abc"'})
@@ -124,7 +96,6 @@ class TestPreviewViews:
         assert response.status_code == 200
         record.assert_awaited_once()
         assert record.await_args.args[1] == PageViewSource.preview
-        assert record.await_args.kwargs == {"can_write": True}
 
     def test_builder_iframe_does_not_count(self, record):
         client.get("/api/preview/proj-1/proxy/", headers=IFRAME)
