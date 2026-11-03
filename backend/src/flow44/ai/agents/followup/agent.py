@@ -27,18 +27,18 @@ MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
 
 
-def _history_size(m: ChatMessage) -> int:
+def _history_size(m: ChatMessage, attachments: list[ContentBlock]) -> int:
     if m.raw_message:
         return len(json.dumps(m.raw_message))
-    return len(m.content) + len(m.attachment_ids or []) * settings.AI_ATTACHMENT_CHAR_ESTIMATE
+    return len(m.content) + sum(len(b.model_dump_json()) for b in attachments)
 
 
-def _trim_start(history: list[ChatMessage]) -> int:
+def _trim_start(history: list[ChatMessage], attachments: dict[str, list[ContentBlock]]) -> int:
     run_starts = [i for i, m in enumerate(history) if m.role == ChatRole.user]
     if not run_starts:
         return 0
     budget = settings.AI_HISTORY_CHAR_BUDGET
-    sizes = [_history_size(m) for m in history]
+    sizes = [_history_size(m, attachments.get(m.id, [])) for m in history]
     suffix_sizes = list(accumulate(reversed(sizes)))[::-1]
     if suffix_sizes[0] <= budget:
         return 0
@@ -251,10 +251,11 @@ class FollowUpAgent(ChatAgent):
         self, history: list[ChatMessage], attachments: dict[str, list[ContentBlock]] | None = None
     ) -> list[dict[str, Any] | Message]:
         messages: list[dict[str, Any] | Message] = []
+        attachments = attachments or {}
 
-        for m in history[_trim_start(history) :]:
+        for m in history[_trim_start(history, attachments) :]:
             if m.role == ChatRole.user:
-                messages.append(Message.user_with_attachments(m.content, (attachments or {}).get(m.id, [])))
+                messages.append(Message.user_with_attachments(m.content, attachments.get(m.id, [])))
             elif m.raw_message is not None:
                 messages.append(m.raw_message)
             elif m.role == ChatRole.assistant and m.content.strip() and not looks_like_leaked_tool_call(m.content):

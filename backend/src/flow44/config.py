@@ -69,8 +69,6 @@ class AIModelSettings(BuildAppSettings):
     AI_HISTORY_MIN_RUNS: int = 5
     # Only the latest user turns resend their attachments; older ones become a text placeholder.
     AI_HISTORY_ATTACHMENT_TURNS: int = 3
-    # History-budget cost of one attachment, standing in for its base64 size.
-    AI_ATTACHMENT_CHAR_ESTIMATE: int = 20_000
 
     # if ai_model starts with bedrock/ set base_url and api_key to None
     # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)
@@ -135,7 +133,7 @@ class S3Settings(BuildAppSettings):
     S3_STORAGE_CLASS: str = "STANDARD_IA"
     S3_PENDING_DELETION_DAYS: int = 7
     # Private bucket for user uploads; the published bucket is public-read.
-    S3_UPLOADS_BUCKET_NAME: str = "flow44-uploads"
+    S3_UPLOADS_BUCKET_NAME: str = "flowbolt-uploads"
     UPLOAD_MAX_ATTACHMENT_BYTES: int = 20 * 1024 * 1024
 
 

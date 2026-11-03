@@ -1,5 +1,3 @@
-"""Turn chat attachments into content blocks the model can read."""
-
 import asyncio
 import base64
 from collections.abc import Iterable
@@ -16,7 +14,6 @@ MAX_ATTACHMENTS_PER_MESSAGE = 10
 _MAX_TEXT_CHARS = 100_000
 
 _IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
-# An allowlist, not text/*: uploads are served from our origin, so text/html would be stored XSS.
 _TEXT_TYPES = frozenset({"text/plain", "text/csv", "text/markdown", "text/tab-separated-values", "application/json"})
 
 AttachmentKind = Literal["image", "pdf", "text"]

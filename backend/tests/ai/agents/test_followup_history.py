@@ -105,8 +105,13 @@ def test_user_turns_carry_their_attachment_blocks_before_the_text() -> None:
 def test_attachments_count_toward_the_history_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "AI_HISTORY_MIN_RUNS", 1)
     monkeypatch.setattr(settings, "AI_HISTORY_CHAR_BUDGET", 1000)
-    monkeypatch.setattr(settings, "AI_ATTACHMENT_CHAR_ESTIMATE", 1000)
     history = _history(2)
-    history[0].attachment_ids = ["shot"]
+    image = ImageContent.from_data_uri("data:image/png;base64," + "A" * 1000)
+    placeholder = TextContent(text="[attached image: shot.png]")
+    agent = object.__new__(FollowUpAgent)
 
-    assert _user_requests(_convert(history)) == ["request 1"]
+    assert _user_requests(agent._history_to_messages(history, {history[0].id: [image]})) == ["request 1"]
+    assert _user_requests(agent._history_to_messages(history, {history[0].id: [placeholder]})) == [
+        [placeholder, TextContent(text="request 0")],
+        "request 1",
+    ]
