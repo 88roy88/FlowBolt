@@ -59,7 +59,7 @@ class PlanAgent(BaseAgent):
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
-        self._setup_trace(["plan-agent"])
+        await self._setup_trace(["plan-agent"])
 
         # Initialize plan state for Flow
         plan_state = PlanState(
@@ -183,7 +183,7 @@ class PlanAgent(BaseAgent):
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
-        self._setup_trace(["plan-agent", "rebuild"])
+        await self._setup_trace(["plan-agent", "rebuild"])
 
         await self.emit({"type": "phase", "phase": "planning"})
 

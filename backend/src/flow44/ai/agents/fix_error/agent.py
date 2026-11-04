@@ -78,7 +78,7 @@ class FixErrorAgent(ChatAgent):
         error_line: int | None = None,
         error_stack: str | None = None,
     ) -> None:
-        self._setup_trace(["fix-error-agent"])
+        await self._setup_trace(["fix-error-agent"])
         await self.emit({"type": "phase", "phase": "fixing"})
 
         # Initialize fix error state for Flow

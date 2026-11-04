@@ -163,7 +163,7 @@ class FollowUpAgent(ChatAgent):
 
     @track(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
-        self._setup_trace(["follow-up-agent"])
+        await self._setup_trace(["follow-up-agent"])
 
         new_data_source_contexts: list[DataSourceContext] = []
         existing_data_source_contexts: list[DataSourceContext] = []
