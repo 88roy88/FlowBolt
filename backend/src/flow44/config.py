@@ -142,6 +142,7 @@ class OpikSettings(BuildAppSettings):
     OPIK_WORKSPACE: str | None = None
     OPIK_PROJECT_NAME: str = "flow44"
     OPIK_URL_OVERRIDE: str | None = None
+    OPIK_ENVIRONMENT: str | None = None
 
     def model_post_init(self, __context: Any) -> None:
         """Propagate Opik credentials to os.environ so the SDK can read them."""
@@ -152,6 +153,8 @@ class OpikSettings(BuildAppSettings):
             os.environ["OPIK_PROJECT_NAME"] = self.OPIK_PROJECT_NAME
             if self.OPIK_URL_OVERRIDE:
                 os.environ["OPIK_URL_OVERRIDE"] = self.OPIK_URL_OVERRIDE
+            if self.OPIK_ENVIRONMENT:
+                os.environ["OPIK_ENVIRONMENT"] = self.OPIK_ENVIRONMENT
 
 
 class Settings(

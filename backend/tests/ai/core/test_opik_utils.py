@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import os
 import threading
 import time
 import uuid
@@ -17,6 +18,7 @@ from litellm.integrations.opik.opik_payload_builder import payload_builders
 from opik.rest_api.errors import NotFoundError
 
 from flow44.ai.core import opik_utils
+from flow44.config import OpikSettings
 from flow44.services.logging import _project_name as _log_project_name
 
 
@@ -258,3 +260,11 @@ def test_llm_spans_are_named_after_their_step() -> None:
 
     assert [span["name"] for span in spans] == ["followup-react-2", "model_failure"]
     assert client.flush is print
+
+
+def test_opik_environment_reaches_the_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPIK_ENVIRONMENT", "unset")
+
+    OpikSettings(OPIK_API_KEY="key", OPIK_ENVIRONMENT="staging")
+
+    assert os.environ["OPIK_ENVIRONMENT"] == "staging"
