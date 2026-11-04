@@ -22,21 +22,22 @@ class AgentRouter:
     async def handle_message(
         self, content: str, data_source_ids: list[str] | None, *, model: str | None, interview: bool
     ) -> None:
-        if interview and await is_new_project(self._project_id):
+        new_project = await is_new_project(self._project_id)
+        if interview and new_project:
             session = await self._interviewer(model).ask(content, data_source_ids)
             if not session.questions:
-                await self._continue(await self._agent(model), content, session)
+                await self._continue(self._agent(model, new_project), content, session)
             return
-        await (await self._agent(model)).run(content, data_source_ids)
+        await self._agent(model, new_project).run(content, data_source_ids)
 
     async def resume_interview(
         self, session: InterviewSession, answers: list[InterviewAnswer], *, model: str | None
     ) -> None:
         content = await self._interviewer(model).apply_answers(session, answers)
-        await self._continue(await self._agent(model), content, session)
+        await self._continue(self._agent(model, await is_new_project(self._project_id)), content, session)
 
-    async def _agent(self, model: str | None) -> PlanAgent | FollowUpAgent:
-        agent_cls = PlanAgent if await is_new_project(self._project_id) else FollowUpAgent
+    def _agent(self, model: str | None, new_project: bool) -> PlanAgent | FollowUpAgent:
+        agent_cls = PlanAgent if new_project else FollowUpAgent
         return agent_cls(
             self._project_id,
             self._sandbox,

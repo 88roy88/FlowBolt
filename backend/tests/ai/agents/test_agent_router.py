@@ -73,6 +73,7 @@ async def test_interview_without_questions_runs_plan_with_its_contexts(agents: S
     await _router().handle_message("hi", ["s"], model=None, interview=True)
 
     agents.plan_run.assert_awaited_once_with("hi", ["s"], data_source_contexts=[CTX])
+    agents.is_new.assert_awaited_once()
 
 
 async def test_interview_ignored_for_followup(agents: SimpleNamespace) -> None:

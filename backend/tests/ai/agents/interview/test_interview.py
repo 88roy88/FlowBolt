@@ -9,6 +9,7 @@ import pytest
 from flow44.ai.agents.interview import agent as interview_agent_module
 from flow44.ai.agents.interview.agent import InterviewAgent
 from flow44.ai.agents.interview.models import InterviewAnswer, InterviewOption, InterviewQuestion, InterviewSession
+from flow44.db.chat import ChatRole
 from flow44.db.project_data_source import DataSourceContext
 
 
@@ -28,7 +29,9 @@ def deps(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         pause=AsyncMock(),
         fetch=AsyncMock(return_value=[]),
         chat=AsyncMock(return_value=json.dumps({"questions": []})),
+        save=AsyncMock(),
     )
+    monkeypatch.setattr(interview_agent_module, "save_message", deps.save)
     monkeypatch.setattr(interview_agent_module, "pause_turn", deps.pause)
     monkeypatch.setattr(interview_agent_module, "fetch_data_sources", deps.fetch)
     monkeypatch.setattr(interview_agent_module, "complete_chat", deps.chat)
@@ -123,12 +126,14 @@ class TestApplyAnswers:
 
         content = await agent.apply_answers(InterviewSession(content="build a dashboard", questions=questions), answers)
 
-        assert content == (
-            "build a dashboard\n\nClarifications from the user:\n"
+        clarifications = (
+            "Clarifications from the user:\n"
             "- Who is this for?: Me (Personal use), My team\n"
             "- What look?: no preference given — pick a sensible default\n"
             "- Which colours?: no preference given — pick a sensible default"
         )
+        assert content == f"build a dashboard\n\n{clarifications}"
+        deps.save.assert_awaited_once_with("proj-1", ChatRole.user, clarifications)
         deps.emit.assert_awaited_once_with(
             {
                 "type": "interview_answered",
@@ -137,7 +142,10 @@ class TestApplyAnswers:
             }
         )
 
-    async def test_skip_leaves_the_request_untouched(self, agent: InterviewAgent) -> None:
+    async def test_skip_leaves_the_request_and_history_untouched(
+        self, agent: InterviewAgent, deps: SimpleNamespace
+    ) -> None:
         session = InterviewSession(content="build a dashboard", questions=[_question()])
 
         assert await agent.apply_answers(session, []) == "build a dashboard"
+        deps.save.assert_not_awaited()

@@ -16,6 +16,7 @@ from flow44.ai.core.messages import Message
 from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
+from flow44.db.chat import ChatRole, save_message
 from flow44.db.paused_turn import pause_turn
 from flow44.db.project_data_source import DataSourceContext
 from flow44.sandbox.main import PnpmSandbox
@@ -95,7 +96,9 @@ class InterviewAgent(BaseAgent):
 
         if not answers:
             return session.content
-        return f"{session.content}\n\n{_format_clarifications(session.questions, answers)}"
+        clarifications = _format_clarifications(session.questions, answers)
+        await save_message(self.project_id, ChatRole.user, clarifications)
+        return f"{session.content}\n\n{clarifications}"
 
     @track(name="generate-interview")  # type: ignore[untyped-decorator]
     async def _generate_questions(
