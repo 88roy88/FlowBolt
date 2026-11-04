@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import logging
+import time
 import traceback as traceback_module
 from collections.abc import Callable
 from datetime import datetime
@@ -11,11 +12,17 @@ import opik
 from litellm.integrations.opik.opik import OpikLogger
 from litellm.integrations.opik.opik_payload_builder import extractors
 from opik import Span, get_global_client, opik_context
+from opik.rest_api.errors import NotFoundError
 from opik.types import ErrorInfoDict
 
 from flow44.config import settings
+from flow44.services.logging import _project_name as _log_project_name
 
 logger = logging.getLogger(__name__)
+
+_MAX_TAG_LENGTH = 100
+_THREAD_WAIT_ATTEMPTS = 15
+_THREAD_WAIT_SECONDS = 2.0
 
 
 class RunCancelled(Exception):
@@ -106,14 +113,45 @@ class FailureAwareOpikLogger(OpikLogger):
             logger.exception("FailureAwareOpikLogger failed to log failure event")
 
 
+def _project_name_tags() -> list[str]:
+    project_name = _log_project_name.get()
+    return [f"project_name:{project_name}"[:_MAX_TAG_LENGTH]] if project_name else []
+
+
 def setup_trace(project_id: str, user_id: str, model: str | None, tags: list[str]) -> str | None:
     trace_data = opik_context.get_current_trace_data()
     opik_context.update_current_trace(
         thread_id=project_id,
-        metadata={"model": model or "default", "user_id": user_id},
-        tags=[*tags, f"project:{project_id}"],
+        metadata={"model": model or "default", "user_id": user_id, "project_name": _log_project_name.get()},
+        tags=[*tags, f"project:{project_id}", *_project_name_tags()],
     )
     return trace_data.id if trace_data else None
+
+
+def _tag_thread(thread_id: str, tags: list[str]) -> None:
+    client = get_global_client().rest_client.traces
+    for _ in range(_THREAD_WAIT_ATTEMPTS):
+        try:
+            thread = client.get_trace_thread(
+                thread_id=thread_id, project_name=settings.OPIK_PROJECT_NAME, truncate=True
+            )
+            if thread.thread_model_id:
+                client.update_thread(thread.thread_model_id, tags=tags)
+            return
+        except NotFoundError:
+            # A new thread only exists once Opik has stored its first finished trace.
+            time.sleep(_THREAD_WAIT_SECONDS)
+        except Exception:
+            logger.exception("Failed to tag Opik thread %s", thread_id)
+            return
+    logger.warning("Opik thread %s never appeared, leaving it untagged", thread_id)
+
+
+def tag_thread(thread_id: str) -> None:
+    """Trace tags don't reach the thread, which has its own tags. Call this once a run has finished."""
+    tags = _project_name_tags()
+    if tags and settings.OPIK_API_KEY:
+        asyncio.get_running_loop().run_in_executor(None, _tag_thread, thread_id, tags)
 
 
 def set_trace_input(input_data: dict[str, Any]) -> None:

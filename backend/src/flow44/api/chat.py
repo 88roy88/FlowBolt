@@ -17,6 +17,7 @@ from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.core.opik_utils import tag_thread
 from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.selected_elements_context import format_selected_elements, parse_selected_elements
 from flow44.ai.state import BuildState
@@ -132,6 +133,7 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         await _cancel_task(run_task)
         await versioning.commit_turn(project_id)
         await clear_heartbeat(project_id, only_beat=beat.at)
+        tag_thread(project_id)
 
 
 async def _claim_run(project_id: str) -> datetime:

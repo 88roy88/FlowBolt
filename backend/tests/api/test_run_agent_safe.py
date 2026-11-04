@@ -121,3 +121,19 @@ async def test_start_agent_runs_under_the_supervisor(monkeypatch: pytest.MonkeyP
     await asyncio.wait_for(started.wait(), timeout=1)
     await asyncio.wait_for(task, timeout=1)
     assert set() == chat._RUNNING
+
+
+@pytest.mark.parametrize("error", [None, RuntimeError("boom")])
+async def test_tags_the_opik_thread_after_every_run(monkeypatch: pytest.MonkeyPatch, error: Exception | None) -> None:
+    _patch_boundary(monkeypatch)
+    _patch_heartbeat(monkeypatch)
+    tagged: list[str] = []
+    monkeypatch.setattr(chat, "tag_thread", tagged.append)
+
+    async def agent() -> None:
+        if error:
+            raise error
+
+    await chat._run_agent_safe(PROJECT_ID, agent(), CLAIMED_AT)
+
+    assert tagged == [PROJECT_ID]
