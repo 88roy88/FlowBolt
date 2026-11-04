@@ -30,4 +30,4 @@ class InterviewSession(BaseModel):
 
 
 class InterviewQuestionsPayload(BaseModel):
-    questions: list[InterviewQuestion] = Field(default_factory=list)
+    questions: list[InterviewQuestion]

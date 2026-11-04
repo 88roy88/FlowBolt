@@ -13,15 +13,22 @@ from flow44.ai.agents.interview.models import (
 )
 from flow44.ai.agents.interview.prompts import render_interview
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import record_span_error
+from flow44.ai.core.opik_utils import add_trace_tags, record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.db.chat import ChatRole, save_message
 from flow44.db.paused_turn import pause_turn
 from flow44.db.project_data_source import DataSourceContext
 from flow44.sandbox.main import PnpmSandbox
+from flow44.services.logging import log_bi_event
 
 logger = logging.getLogger(__name__)
+
+
+def _outcome(questions: list[InterviewQuestion] | None) -> str:
+    if questions is None:
+        return "failed"
+    return "asked" if questions else "none"
 
 
 def _describe_values(question: InterviewQuestion, values: list[str]) -> str:
@@ -66,25 +73,34 @@ class InterviewAgent(BaseAgent):
             )
         await self.emit({"type": "phase", "phase": "interviewing"})
         questions = await self._generate_questions(content, contexts)
+        outcome = _outcome(questions)
+        log_bi_event("interview_generated", outcome=outcome, question_count=len(questions or []))
+        add_trace_tags([f"interview:{outcome}"])
 
         session = InterviewSession(
             content=content,
             data_source_ids=ids,
             data_source_contexts=contexts,
-            questions=questions,
+            questions=questions or [],
             model=self.model,
         )
-        if not questions:
+        if not session.questions:
             return session
 
         await pause_turn(self.project_id, "awaiting_interview", session.model_dump_json())
         await self.emit({"type": "phase", "phase": "awaiting_interview"})
-        await self.emit({"type": "interview_questions", "questions": [q.model_dump() for q in questions]})
+        await self.emit({"type": "interview_questions", "questions": [q.model_dump() for q in session.questions]})
         return session
 
     @track(name="interview-agent-answers", ignore_arguments=["session"])  # type: ignore[untyped-decorator]
     async def apply_answers(self, session: InterviewSession, answers: list[InterviewAnswer]) -> str:
         self._setup_trace(["interview-agent", "answers"])
+        log_bi_event(
+            "interview_responded",
+            action="submit" if answers else "skip",
+            question_count=len(session.questions),
+            answered_count=sum(1 for a in answers if a.values),
+        )
 
         await self.emit(
             {
@@ -103,7 +119,7 @@ class InterviewAgent(BaseAgent):
     @track(name="generate-interview")  # type: ignore[untyped-decorator]
     async def _generate_questions(
         self, content: str, data_source_contexts: list[DataSourceContext]
-    ) -> list[InterviewQuestion]:
+    ) -> list[InterviewQuestion] | None:
         raw = await complete_chat(
             [Message.user(content)],
             render_interview(data_source_contexts=data_source_contexts or None),
@@ -115,4 +131,4 @@ class InterviewAgent(BaseAgent):
         except ValidationError as exc:
             logger.exception("[interview] Invalid questions payload")
             record_span_error(exc)
-            return []
+            return None

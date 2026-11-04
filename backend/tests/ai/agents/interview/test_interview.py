@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -30,7 +30,11 @@ def deps(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         fetch=AsyncMock(return_value=[]),
         chat=AsyncMock(return_value=json.dumps({"questions": []})),
         save=AsyncMock(),
+        bi=MagicMock(),
+        tags=MagicMock(),
     )
+    monkeypatch.setattr(interview_agent_module, "log_bi_event", deps.bi)
+    monkeypatch.setattr(interview_agent_module, "add_trace_tags", deps.tags)
     monkeypatch.setattr(interview_agent_module, "save_message", deps.save)
     monkeypatch.setattr(interview_agent_module, "pause_turn", deps.pause)
     monkeypatch.setattr(interview_agent_module, "fetch_data_sources", deps.fetch)
@@ -65,6 +69,8 @@ class TestAsk:
             {"type": "phase", "phase": "awaiting_interview"},
             {"type": "interview_questions", "questions": [_question().model_dump()]},
         ]
+        deps.bi.assert_called_once_with("interview_generated", outcome="asked", question_count=1)
+        deps.tags.assert_called_once_with(["interview:asked"])
 
     async def test_no_questions_returns_without_pausing(self, agent: InterviewAgent, deps: SimpleNamespace) -> None:
         session = await agent.ask("build a red button")
@@ -72,6 +78,7 @@ class TestAsk:
         assert session.questions == []
         deps.pause.assert_not_awaited()
         assert _events(deps) == [{"type": "phase", "phase": "interviewing"}]
+        deps.bi.assert_called_once_with("interview_generated", outcome="none", question_count=0)
 
     async def test_data_sources_reach_the_prompt_and_the_session(
         self, agent: InterviewAgent, deps: SimpleNamespace
@@ -104,16 +111,24 @@ class TestAsk:
         deps.pause.assert_not_awaited()
 
     @pytest.mark.parametrize(
-        "payload",
-        [{"questions": None}, {"questions": [{**_question().model_dump(), "options": [{"label": "Me"}]}]}],
-        ids=["null", "single-option"],
+        "raw",
+        [
+            json.dumps({"questions": None}),
+            json.dumps({"questions": [{**_question().model_dump(), "options": [{"label": "Me"}]}]}),
+            "{}",
+            "not json",
+        ],
+        ids=["null", "single-option", "empty-object", "unparseable"],
     )
-    async def test_invalid_payload_asks_nothing(
-        self, agent: InterviewAgent, deps: SimpleNamespace, payload: object
+    async def test_invalid_payload_asks_nothing_and_reports_failure(
+        self, agent: InterviewAgent, deps: SimpleNamespace, raw: str
     ) -> None:
-        deps.chat.return_value = json.dumps(payload)
+        deps.chat.return_value = raw
 
         assert (await agent.ask("build something")).questions == []
+        deps.pause.assert_not_awaited()
+        deps.bi.assert_called_once_with("interview_generated", outcome="failed", question_count=0)
+        deps.tags.assert_called_once_with(["interview:failed"])
 
 
 class TestApplyAnswers:
@@ -141,6 +156,7 @@ class TestApplyAnswers:
                 "answers": [a.model_dump() for a in answers],
             }
         )
+        deps.bi.assert_called_once_with("interview_responded", action="submit", question_count=3, answered_count=1)
 
     async def test_skip_leaves_the_request_and_history_untouched(
         self, agent: InterviewAgent, deps: SimpleNamespace
@@ -149,3 +165,4 @@ class TestApplyAnswers:
 
         assert await agent.apply_answers(session, []) == "build a dashboard"
         deps.save.assert_not_awaited()
+        deps.bi.assert_called_once_with("interview_responded", action="skip", question_count=1, answered_count=0)
