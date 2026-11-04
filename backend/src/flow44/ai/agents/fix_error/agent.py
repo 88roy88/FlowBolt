@@ -2,15 +2,13 @@ import logging
 from pathlib import PurePosixPath
 from typing import Any
 
-from opik import track
-
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.fix_error.file_edits import EditApplyError
 from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import record_span_error
+from flow44.ai.core.opik_utils import record_span_error, track
 from flow44.ai.core.provider import stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
@@ -70,7 +68,7 @@ class FixErrorAgent(ChatAgent):
 
         return "retry"
 
-    @track(name="fix-error-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="fix-error-agent-run")
     async def run(
         self,
         error_message: str,

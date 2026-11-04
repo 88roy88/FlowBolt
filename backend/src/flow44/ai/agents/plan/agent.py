@@ -2,8 +2,6 @@ import asyncio
 import json
 import logging
 
-from opik import track
-
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
@@ -15,7 +13,7 @@ from flow44.ai.agents.plan.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import record_span_error
+from flow44.ai.core.opik_utils import record_span_error, track
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
@@ -55,7 +53,7 @@ class PlanAgent(BaseAgent):
 
         return flow
 
-    @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
+    @track(name="plan-agent-run")
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
@@ -179,7 +177,7 @@ class PlanAgent(BaseAgent):
 
     # -- Rebuild --
 
-    @track(name="plan-agent-rebuild", ignore_arguments=["state"])  # type: ignore[untyped-decorator]
+    @track(name="plan-agent-rebuild", ignore_arguments=["state"])
     async def rebuild_with_feedback(self, state: BuildState, feedback: str) -> None:
         """Rebuild the user overview incorporating feedback, then persist."""
         self._state = state
@@ -214,7 +212,7 @@ class PlanAgent(BaseAgent):
 
     # -- Design --
 
-    @track(name="design-architecture")  # type: ignore[untyped-decorator]
+    @track(name="design-architecture")
     async def _design_architecture(self) -> ArchitectureDesign:
         prompt = render_architecture(data_source_contexts=self._state.data_source_contexts or None)
         try:
@@ -232,7 +230,7 @@ class PlanAgent(BaseAgent):
             await self.emit({"type": "design_progress", "stream": "architecture", "content": "failed"})
             return ArchitectureDesign()
 
-    @track(name="design-ux")  # type: ignore[untyped-decorator]
+    @track(name="design-ux")
     async def _design_ux(self) -> UXDesign:
         try:
             raw = await complete_chat(
@@ -249,7 +247,7 @@ class PlanAgent(BaseAgent):
             await self.emit({"type": "design_progress", "stream": "ux", "content": "failed"})
             return UXDesign()
 
-    @track(name="build-user-plan-overview")  # type: ignore[untyped-decorator]
+    @track(name="build-user-plan-overview")
     async def _build_user_plan_overview(self) -> UserPlanOverview:
         plan_input = json.dumps(
             {
