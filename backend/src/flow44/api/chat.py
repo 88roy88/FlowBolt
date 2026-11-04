@@ -178,9 +178,8 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime, roll
         else:
             await versioning.commit_turn(project_id)
         await clear_heartbeat(project_id, only_beat=beat.at)
-        if aborted:
-            # Last, so clients reload a released, trimmed project.
-            await emit_transient(project_id, {"type": "turn_aborted"})
+        # Last, so clients reload a released, trimmed project or start a queued message.
+        await emit_transient(project_id, {"type": "turn_aborted" if aborted else "run_released"})
 
 
 async def _claim_run(project_id: str) -> datetime:

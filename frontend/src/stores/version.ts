@@ -6,6 +6,7 @@ import { useChatStore } from './chat';
 import { useFilesStore } from './files';
 import { useErrorStore } from './errors';
 import { getTimestamp, isReplaying } from './chatHandlers';
+import { canFlushQueue } from './chatAgentState';
 
 type Attempt =
   | { op: 'preview'; commit_sha: string }
@@ -171,7 +172,12 @@ function handleVersionRestored(msg: { commit_sha: string }) {
 function handleTurnAborted() {
   const projectId = useSessionStore.getState().projectId;
   // Replaying the trimmed events drops the aborted AI output and brings back a pending plan.
-  if (projectId) void useChatStore.getState().loadHistory(projectId);
+  if (projectId) void useChatStore.getState().reloadAfterAbort(projectId);
+}
+
+function handleRunReleased() {
+  const chat = useChatStore.getState();
+  if (canFlushQueue(chat)) chat.sendQueued(chat.queuedMessages[0].id);
 }
 
 function handleVersionError(msg: { message: string; code: string; files?: string[] }) {
@@ -192,6 +198,7 @@ const versionRoutes: { [M in WSMessage as M['type']]?: (msg: M) => void } = {
   workspace_dirty: (msg) => useVersionStore.setState({ dirtyFiles: msg.files }),
   workspace_reset: refreshEditorFiles,
   turn_aborted: handleTurnAborted,
+  run_released: handleRunReleased,
   error: () => settle(false),
   phase: () => { if (pending?.op === 'send') settle(true); },
 };
