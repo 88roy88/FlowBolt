@@ -17,6 +17,24 @@ class ContextWindowExceeded(Exception):
     pass
 
 
+def supports_vision(model: str | None) -> bool:
+    model = model or settings.AI_MODEL
+    # litellm doesn't know every Claude id (Bedrock profiles, new releases), but they all take images.
+    if "claude" in model.lower():
+        return True
+    try:
+        return bool(litellm.supports_vision(model))
+    except Exception:
+        return False
+
+
+def supports_pdf_input(model: str | None) -> bool:
+    try:
+        return bool(litellm.utils.supports_pdf_input(model or settings.AI_MODEL))
+    except Exception:
+        return False
+
+
 # TODO: when will messages be dicts?
 def _to_dicts(messages: list[dict[str, Any] | Message]) -> list[dict[str, Any]]:
     return [m.to_dict() if isinstance(m, Message) else m for m in messages]

@@ -18,6 +18,8 @@ _MISSING_OBJECT_CODES = {"NoSuchKey", "NoSuchBucket", "404"}
 _DELETE_BATCH_LIMIT = 1000
 _DELETION_TAG = {"Key": "pending-deletion", "Value": "true"}
 _DELETION_TAG_QUERY = f"{_DELETION_TAG['Key']}={_DELETION_TAG['Value']}"
+# S3's minimum size for every multipart part except the last.
+_MULTIPART_PART_SIZE = 8 * 1024 * 1024
 
 
 def _content_type(path: str) -> str:
@@ -85,20 +87,23 @@ class S3Storage:
     async def setup(self) -> AsyncIterator[None]:
         async with self._session.client("s3", **self._client_kwargs()) as client:
             self._client = client
-            await self._ensure_bucket(settings.S3_BUCKET_NAME)
+            await self._ensure_bucket(settings.S3_BUCKET_NAME, published=True)
+            await self._ensure_bucket(settings.S3_UPLOADS_BUCKET_NAME, published=False)
             logger.info("S3 bucket setup complete.")
             try:
                 yield
             finally:
                 self._client = None
 
-    async def _ensure_bucket(self, bucket_name: str) -> None:
+    async def _ensure_bucket(self, bucket_name: str, *, published: bool) -> None:
         try:
             await self.client.create_bucket(Bucket=bucket_name)
             logger.info("Bucket '%s' created successfully.", bucket_name)
         except ClientError as e:
             if e.response["Error"]["Code"] not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
                 raise
+        if not published:
+            return
         await self.client.put_bucket_policy(Bucket=bucket_name, Policy=_public_read_policy(bucket_name))
         await self.client.put_bucket_lifecycle_configuration(
             Bucket=bucket_name, LifecycleConfiguration=_delete_tagged_files_rule()
@@ -176,6 +181,53 @@ class S3Storage:
                 )
         except ClientError:
             logger.warning("Failed to delete S3 objects under %s", self._prefix(project_id))
+
+    async def upload_stream(self, key: str, chunks: AsyncIterator[bytes], content_type: str) -> int:
+        bucket = settings.S3_UPLOADS_BUCKET_NAME
+        created = await self.client.create_multipart_upload(Bucket=bucket, Key=key, ContentType=content_type)
+        upload_id = created["UploadId"]
+        parts: list[dict[str, Any]] = []
+        size = 0
+        try:
+            async for body in _rechunk(chunks, _MULTIPART_PART_SIZE):
+                size += len(body)
+                part_number = len(parts) + 1
+                response = await self.client.upload_part(
+                    Bucket=bucket, Key=key, UploadId=upload_id, PartNumber=part_number, Body=body
+                )
+                parts.append({"PartNumber": part_number, "ETag": response["ETag"]})
+            await self.client.complete_multipart_upload(
+                Bucket=bucket, Key=key, UploadId=upload_id, MultipartUpload={"Parts": parts}
+            )
+        except BaseException:
+            with contextlib.suppress(ClientError):
+                await self.client.abort_multipart_upload(Bucket=bucket, Key=key, UploadId=upload_id)
+            raise
+        return size
+
+    async def read_upload(self, key: str) -> bytes | None:
+        try:
+            response = await self.client.get_object(Bucket=settings.S3_UPLOADS_BUCKET_NAME, Key=key)
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] in _MISSING_OBJECT_CODES:
+                return None
+            raise
+        body: bytes = await response["Body"].read()
+        return body
+
+
+async def _rechunk(chunks: AsyncIterator[bytes], size: int) -> AsyncIterator[bytes]:
+    # Always yields at least once: a multipart upload needs a part, even an empty one.
+    buffer = bytearray()
+    yielded = False
+    async for chunk in chunks:
+        buffer += chunk
+        while len(buffer) >= size:
+            yield bytes(buffer[:size])
+            del buffer[:size]
+            yielded = True
+    if buffer or not yielded:
+        yield bytes(buffer)
 
 
 s3_storage = S3Storage()

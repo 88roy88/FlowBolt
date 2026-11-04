@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from flow44.ai.core.messages import ContentBlock
 from flow44.ai.file_safety import FileSafetyError
 from flow44.ai.state import BuildState
 
@@ -23,6 +24,7 @@ class ExecutionState(BaseModel):
     root_span_id: str | None = None  # The `run()` @track span — parent for top-level step spans
     observation_id: str | None = None
     llm_metadata_fn: Any = None  # Function to generate metadata
+    attachment_blocks: list[ContentBlock] = Field(default_factory=list)
 
     # Validation results
     typecheck_errors: str = ""

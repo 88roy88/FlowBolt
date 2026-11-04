@@ -15,6 +15,7 @@ class BuildState(BaseModel):
     project_id: str
     model: str | None = None
     user_content: str = ""
+    attachment_ids: list[str] = Field(default_factory=list)
     data_source_ids: list[str] = Field(default_factory=list)
     data_source_contexts: list[DataSourceContext] = Field(default_factory=list)
     generated_data_source_files: dict[str, str] = Field(default_factory=dict)

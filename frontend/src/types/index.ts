@@ -6,8 +6,17 @@ export interface Message {
   timestamp: number;
   dataSources?: { id: number; name: string }[];
   selectedElements?: SelectedElement[];
+  attachments?: ChatAttachment[];
   agentCard?: AgentCard;
   version?: string; // commit_sha
+}
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  content_type: string;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface SelectedElement {
@@ -137,6 +146,7 @@ export interface AIModel {
   id: string;
   name: string;
   provider: string;
+  supports_vision?: boolean;
 }
 
 export interface DataSourceSearchResult {
@@ -247,7 +257,7 @@ export type WSMessage = { _ts?: string } & (
 
   | { type: 'followup_step'; tool: string; args: Record<string, string>; status: string; result_preview?: string; iteration: number }
   | { type: 'file_diffs'; diffs: FileDiff[] }
-  | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; selected_elements?: Omit<SelectedElement, 'id'>[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
+  | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; selected_elements?: Omit<SelectedElement, 'id'>[]; attachments?: ChatAttachment[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
   | { type: 'plan_accepted'; overview: PlanOverview }
   | { type: 'version_committed'; commit_sha: string; author?: VersionAuthor; diffs?: FileDiff[] }
   | { type: 'version_preview_active'; commit_sha: string; is_latest: boolean }

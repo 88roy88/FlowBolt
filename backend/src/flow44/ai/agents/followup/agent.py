@@ -11,7 +11,8 @@ from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.agents.followup.prompts import render_followup
-from flow44.ai.core.messages import Message
+from flow44.ai.attachments import load_history_attachments
+from flow44.ai.core.messages import ContentBlock, Message
 from flow44.ai.core.react_flow import ReActFlow, looks_like_leaked_tool_call
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
@@ -26,12 +27,18 @@ MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
 
 
-def _trim_start(history: list[ChatMessage]) -> int:
+def _history_size(m: ChatMessage, attachments: list[ContentBlock]) -> int:
+    if m.raw_message:
+        return len(json.dumps(m.raw_message))
+    return len(m.content) + sum(len(b.model_dump_json()) for b in attachments)
+
+
+def _trim_start(history: list[ChatMessage], attachments: dict[str, list[ContentBlock]]) -> int:
     run_starts = [i for i, m in enumerate(history) if m.role == ChatRole.user]
     if not run_starts:
         return 0
     budget = settings.AI_HISTORY_CHAR_BUDGET
-    sizes = [len(json.dumps(m.raw_message)) if m.raw_message else len(m.content) for m in history]
+    sizes = [_history_size(m, attachments.get(m.id, [])) for m in history]
     suffix_sizes = list(accumulate(reversed(sizes)))[::-1]
     if suffix_sizes[0] <= budget:
         return 0
@@ -190,7 +197,7 @@ class FollowUpAgent(ChatAgent):
             self._build_context(),
             get_messages(self.project_id),
         )
-        messages = self._history_to_messages(history)
+        messages = self._history_to_messages(history, await load_history_attachments(self.project_id, history))
 
         system_prompt = render_followup(
             project_summary=context["summary"],
@@ -240,12 +247,15 @@ class FollowUpAgent(ChatAgent):
         for path, content in files.items():
             await self._write_file_and_emit_diff(self._diffs, path, content)
 
-    def _history_to_messages(self, history: list[ChatMessage]) -> list[dict[str, Any] | Message]:
+    def _history_to_messages(
+        self, history: list[ChatMessage], attachments: dict[str, list[ContentBlock]] | None = None
+    ) -> list[dict[str, Any] | Message]:
         messages: list[dict[str, Any] | Message] = []
+        attachments = attachments or {}
 
-        for m in history[_trim_start(history) :]:
+        for m in history[_trim_start(history, attachments) :]:
             if m.role == ChatRole.user:
-                messages.append(Message.user(m.content))
+                messages.append(Message.user_with_attachments(m.content, attachments.get(m.id, [])))
             elif m.raw_message is not None:
                 messages.append(m.raw_message)
             elif m.role == ChatRole.assistant and m.content.strip() and not looks_like_leaked_tool_call(m.content):

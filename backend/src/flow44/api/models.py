@@ -10,6 +10,7 @@ import aioboto3
 import httpx
 from fastapi import APIRouter
 
+from flow44.ai.core.provider import supports_vision
 from flow44.config import settings
 
 logger = logging.getLogger(__name__)
@@ -175,16 +176,17 @@ def _get_openrouter_models() -> list[dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 
-async def _refresh_models() -> list[dict[str, str]]:
+async def _refresh_models() -> list[dict[str, Any]]:
     """Fetch models from all providers and update the cache."""
-    all_models: list[dict[str, str]] = []
+    discovered: list[dict[str, str]] = []
 
     # If using Bedrock, fetch Bedrock models; otherwise fetch from AI_BASE_URL
     if settings.AI_MODEL.startswith("bedrock"):
-        all_models.extend(await _fetch_bedrock_models())
+        discovered.extend(await _fetch_bedrock_models())
     else:
-        all_models.extend(_fetch_models_from_base_url())
+        discovered.extend(_fetch_models_from_base_url())
 
+    all_models = [{**m, "supports_vision": supports_vision(m["id"])} for m in discovered]
     _cache["models"] = all_models
     _cache["ts"] = time.monotonic()
     return all_models
@@ -196,10 +198,10 @@ async def _refresh_models() -> list[dict[str, str]]:
 
 
 @router.get("/api/models")
-async def list_models() -> list[dict[str, str]]:
+async def list_models() -> list[dict[str, Any]]:
     """Return the list of available AI models (cached for 60 s)."""
     if _cache_valid():
-        return cast(list[dict[str, str]], _cache["models"])
+        return cast(list[dict[str, Any]], _cache["models"])
     return await _refresh_models()
 
 

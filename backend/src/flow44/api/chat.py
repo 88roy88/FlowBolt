@@ -6,7 +6,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from typing import Any
@@ -17,6 +17,7 @@ from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.attachments import MAX_ATTACHMENTS_PER_MESSAGE, unsupported_reason
 from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.selected_elements_context import format_selected_elements, parse_selected_elements
 from flow44.ai.state import BuildState
@@ -26,6 +27,7 @@ from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_mes
 from flow44.db.events import emit_event, get_events, get_latest_event, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
 from flow44.db.pending_plan import delete_pending_plan, get_pending_plan
+from flow44.db.uploads import Upload, get_uploads
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
@@ -54,6 +56,10 @@ class AgentAlreadyRunning(Exception):
     pass
 
 
+class AttachmentsRejected(Exception):
+    pass
+
+
 class _RunBudgetExceeded(Exception):
     """The run outlived AGENT_RUN_TIMEOUT (distinct from a TimeoutError the agent raises)."""
 
@@ -70,6 +76,7 @@ class _UserTurn:
     prompt: str
     event: dict[str, Any]
     context: str = ""
+    attachment_ids: list[str] = field(default_factory=list)
 
     @property
     def model_content(self) -> str:
@@ -163,14 +170,30 @@ async def _start_turn(
 
 
 async def _save_user_turn(project_id: str, turn: _UserTurn) -> None:
-    await save_message(project_id, ChatRole.user, turn.model_content)
+    await save_message(project_id, ChatRole.user, turn.model_content, attachment_ids=turn.attachment_ids or None)
     log_bi_event(
         "prompt_submitted",
         prompt_length=len(turn.prompt),
         prompt_sequence_number=await count_user_messages(project_id),
         selected_element_count=len(turn.event.get("selected_elements", [])),
+        attachment_count=len(turn.attachment_ids),
     )
     await emit_event(project_id, turn.event, notify=False)
+
+
+async def _resolve_attachments(project_id: str, raw_ids: Any, model: str | None) -> list[Upload]:
+    if not raw_ids:
+        return []
+    if not isinstance(raw_ids, list) or not all(isinstance(i, str) for i in raw_ids):
+        raise AttachmentsRejected("Invalid attachments.")
+    if len(raw_ids) > MAX_ATTACHMENTS_PER_MESSAGE:
+        raise AttachmentsRejected(f"Attach at most {MAX_ATTACHMENTS_PER_MESSAGE} files per message.")
+    uploads = await get_uploads(project_id, raw_ids)
+    if len(uploads) != len(raw_ids):
+        raise AttachmentsRejected("An attachment couldn't be found. Remove it and try again.")
+    if reason := unsupported_reason(uploads, model):
+        raise AttachmentsRejected(reason)
+    return uploads
 
 
 @http_router.get("/{project_id}/history")
@@ -227,12 +250,18 @@ async def chat_ws(  # noqa: C901, PLR0915
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
                     elements = parse_selected_elements(data.get("selectedElements"))
+                    attachments = await _resolve_attachments(project.id, data.get("attachmentIds"), selected_model)
 
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
                     turn = _UserTurn(prompt=user_content, event=user_event)
                     if elements:
                         user_event["selected_elements"] = [el.model_dump() for el in elements]
                         turn.context = format_selected_elements(elements)
+                    if attachments:
+                        user_event["attachments"] = [
+                            u.model_dump(include={"id", "name", "content_type", "width", "height"}) for u in attachments
+                        ]
+                        turn.attachment_ids = [u.id for u in attachments]
                     if ds_ids:
                         ds_names: list[str] = []
                         for ds_id in ds_ids:
@@ -254,12 +283,12 @@ async def chat_ws(  # noqa: C901, PLR0915
                         data_source_authorization=data_source_authorization,
                     )
                     source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
+                    run = partial(agent.run, turn.model_content, data_source_ids=source_ids)
+                    if agent_cls is PlanAgent:
+                        # FollowUpAgent reads attachments from the saved history instead.
+                        run = partial(run, attachment_ids=turn.attachment_ids)
                     # Claim first: a refused turn must not leave the message behind.
-                    await _start_turn(
-                        project.id,
-                        partial(agent.run, turn.model_content, data_source_ids=source_ids),
-                        prepare=partial(_save_user_turn, project.id, turn),
-                    )
+                    await _start_turn(project.id, run, prepare=partial(_save_user_turn, project.id, turn))
 
                 elif msg_type == "plan_response":
                     action = data.get("action")
@@ -274,11 +303,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
+                        execute_model = selected_model or state.model
+                        # The plan can be accepted with a different model than the one that made it.
+                        await _resolve_attachments(project.id, state.attachment_ids, execute_model)
                         execute_agent = ExecuteAgent(
                             project_id=project.id,
                             sandbox=sandbox,
                             state=state,
-                            model=selected_model or state.model,
+                            model=execute_model,
                             user_id=user_id,
                         )
                         # before the delete: a refusal must not lose the plan
@@ -339,6 +371,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                     await versioning.handle_action(project.id, msg_type, data)
             except AgentAlreadyRunning:
                 await websocket.send_json(_AGENT_BUSY)
+            except AttachmentsRejected as exc:
+                await websocket.send_json({"type": "error", "message": str(exc)})
             except versioning.WorkspaceLocked as exc:
                 await websocket.send_json(exc.payload)
             except (GitError, versioning.UnknownVersionError):

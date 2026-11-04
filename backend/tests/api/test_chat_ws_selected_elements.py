@@ -53,6 +53,7 @@ def _send_message(payload: dict[str, Any]) -> dict[str, Any]:
     assert save_message.await_args is not None
     assert emit_event.await_args is not None
     captured["saved_content"] = save_message.await_args.args[2]
+    captured["saved_kwargs"] = save_message.await_args.kwargs
     captured["event"] = emit_event.await_args.args[1]
     captured["prompt_length"] = log_bi_event.call_args.kwargs["prompt_length"]
     captured["element_count"] = log_bi_event.call_args.kwargs["selected_element_count"]

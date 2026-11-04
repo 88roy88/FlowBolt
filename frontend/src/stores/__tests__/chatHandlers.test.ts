@@ -87,6 +87,7 @@ const INITIAL_STATE: ChatState = {
   selectedModel: null,
   selectedDataSources: [],
   selectedElements: [],
+  pendingAttachments: [],
   historyLoaded: true,
   setDraft: vi.fn() as unknown as ChatState['setDraft'],
   sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
@@ -105,6 +106,8 @@ const INITIAL_STATE: ChatState = {
   addSelectedElement: vi.fn() as unknown as ChatState['addSelectedElement'],
   removeSelectedElement: vi.fn() as unknown as ChatState['removeSelectedElement'],
   clearSelectedElements: vi.fn() as unknown as ChatState['clearSelectedElements'],
+  addAttachments: vi.fn() as unknown as ChatState['addAttachments'],
+  removeAttachment: vi.fn() as unknown as ChatState['removeAttachment'],
   loadModels: vi.fn() as unknown as ChatState['loadModels'],
 };
 
