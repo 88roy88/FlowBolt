@@ -15,6 +15,9 @@ from flow44.sandbox.pty import BasePTY
 logger = logging.getLogger(__name__)
 
 
+BACKGROUND_PIDFILE_SUFFIX = ".pid"
+
+
 def workspace_path(project_id: str) -> str:
     return os.path.join(settings.WORKSPACE_BASE_DIR, project_id)
 
@@ -93,10 +96,29 @@ class BaseSandbox(ABC):
         except ProcessLookupError:
             pass
 
+    def _register_background(self, name: str, proc: asyncio.subprocess.Process, log_file: IO[bytes]) -> None:
+        """Track a spawned background process and record its PID on disk.
+
+        The pidfile lets a later backend run kill processes this one left behind
+        (see SandboxManager.reconcile_workspaces) without touching anything else.
+        """
+        self._bg_processes[name] = proc
+        self._bg_log_files[name] = log_file
+        try:
+            with open(self.get_background_pid_path(name), "w", encoding="utf-8") as f:
+                f.write(str(proc.pid))
+        except OSError:
+            logger.warning("Failed to write pidfile for '%s'", name, exc_info=True)
+        logger.debug("Background process '%s' started (pid %s)", name, proc.pid)
+
     async def stop_background_process(self, name: str) -> None:
         proc = self._bg_processes.pop(name, None)
         if proc is not None:
             await self._kill_process_tree(proc)
+        try:
+            os.remove(self.get_background_pid_path(name))
+        except OSError:
+            pass
         log_file = self._bg_log_files.pop(name, None)
         if log_file is not None:
             try:
@@ -125,8 +147,17 @@ class BaseSandbox(ABC):
         """Terminate a process by PID."""
         ...
 
+    @classmethod
+    @abstractmethod
+    def get_pid_cmdline(cls, pid: int) -> str | None:
+        """Return the full command line of a running process, or None if unavailable."""
+        ...
+
     def get_background_log_path(self, name: str) -> str:
         return os.path.join(self.workspace_dir, f".{name}.log")
+
+    def get_background_pid_path(self, name: str) -> str:
+        return os.path.join(self.workspace_dir, f".{name}{BACKGROUND_PIDFILE_SUFFIX}")
 
     # -- PTY --
 

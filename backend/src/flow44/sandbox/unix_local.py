@@ -68,9 +68,7 @@ class UnixSandbox(BaseSandbox):
             start_new_session=True,
         )
 
-        self._bg_processes[name] = proc
-        self._bg_log_files[name] = log_file
-        logger.debug("Background process '%s' started (pid %s)", name, proc.pid)
+        self._register_background(name, proc, log_file)
 
     @classmethod
     def find_pids_in_port_range(cls, port_start: int, port_end: int) -> list[tuple[int, int]]:
@@ -121,6 +119,28 @@ class UnixSandbox(BaseSandbox):
                 os.kill(pid, signal.SIGTERM)
             except (ProcessLookupError, PermissionError):
                 pass
+
+    @classmethod
+    def get_pid_cmdline(cls, pid: int) -> str | None:
+        """Read the command line from /proc (Linux), falling back to ps (macOS)."""
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                return f.read().replace(b"\0", b" ").decode(errors="replace").strip() or None
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return None
+        try:
+            result = subprocess.run(  # noqa: PLW1510
+                ["ps", "-ww", "-o", "command=", "-p", str(pid)],  # noqa: S607
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return result.stdout.strip() or None
+        except Exception:
+            logger.debug("Failed to read cmdline of pid %d", pid, exc_info=True)
+            return None
 
     def create_pty(self) -> UnixPTY:
         master_fd, slave_fd = os.openpty()

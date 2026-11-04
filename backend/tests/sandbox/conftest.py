@@ -26,6 +26,10 @@ class DummySandbox(PnpmMixin, SearchMixin, FileSystemMixin, BaseSandbox):
     def kill_pid(cls, pid: int) -> None:
         raise NotImplementedError
 
+    @classmethod
+    def get_pid_cmdline(cls, pid: int) -> str | None:
+        raise NotImplementedError
+
 
 @pytest.fixture
 def sandbox(tmp_path):  # type: ignore[type-arg]

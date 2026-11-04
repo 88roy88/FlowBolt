@@ -170,9 +170,7 @@ class NamespacedSandbox(UnixSandbox):
             start_new_session=True,
         )
 
-        self._bg_processes[name] = proc
-        self._bg_log_files[name] = log_file
-        logger.debug("Background process '%s' started (pid %s)", name, proc.pid)
+        self._register_background(name, proc, log_file)
 
     def create_pty(self) -> UnixPTY:
         master_fd, slave_fd = os.openpty()

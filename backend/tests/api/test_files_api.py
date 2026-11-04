@@ -35,6 +35,10 @@ class APITestSandbox(FileSystemMixin, BaseSandbox):
     def kill_pid(cls, pid: int) -> None:
         raise NotImplementedError
 
+    @classmethod
+    def get_pid_cmdline(cls, pid: int) -> str | None:
+        raise NotImplementedError
+
 
 def _override_sandbox(workspace_dir: Path) -> APITestSandbox:
     info = SandboxInfo(project_id=PROJECT_ID, workspace_dir=str(workspace_dir), port=0)

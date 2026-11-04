@@ -1,15 +1,24 @@
 import asyncio
+import glob
 import logging
 import os
 import shutil
 import socket
 
 from flow44.config import settings
-from flow44.sandbox.base import SandboxInfo, workspace_path
+from flow44.sandbox.base import BACKGROUND_PIDFILE_SUFFIX, SandboxInfo, workspace_path
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.main import PnpmSandbox, PnpmSandboxNamespace, PnpmSandboxUnix, PnpmSandboxWindows
 
 logger = logging.getLogger(__name__)
+
+
+def _cmdline_references(cmdline: str | None, path: str) -> bool:
+    """Whether a process command line mentions `path` (or its resolved form)."""
+    if not cmdline:
+        return False
+    haystack = os.path.normcase(cmdline)
+    return any(os.path.normcase(p) in haystack for p in {path, os.path.abspath(path), os.path.realpath(path)})
 
 
 class SandboxError(Exception):
@@ -132,11 +141,44 @@ class SandboxManager:
         self._delete_orphan_workspaces(live_project_ids)
 
     def _kill_orphan_processes(self, port_start: int, port_end: int) -> None:
-        """Kill any processes occupying the sandbox port range from a previous run."""
+        """Kill sandbox processes left behind by a previous run.
+
+        Only processes provably started by this backend are killed: other software
+        commonly listens in the sandbox port range (e.g. Docker Desktop's port proxy),
+        and killing it can take down the whole host service.
+        """
         sandbox_cls = self._get_sandbox_class()
+        base = settings.WORKSPACE_BASE_DIR
+
+        # Pass 1: background processes recorded in pidfiles. The cmdline check guards
+        # against the PID having been reused by an unrelated process since.
+        for pidfile in glob.glob(os.path.join(glob.escape(base), "*", f".*{BACKGROUND_PIDFILE_SUFFIX}")):
+            workspace_dir = os.path.dirname(pidfile)
+            try:
+                with open(pidfile, encoding="utf-8") as f:
+                    pid = int(f.read().strip())
+            except (OSError, ValueError):
+                pid = None
+            if pid is not None and _cmdline_references(sandbox_cls.get_pid_cmdline(pid), workspace_dir):
+                logger.info("Killing orphan sandbox process pid %d (%s)", pid, pidfile)
+                sandbox_cls.kill_pid(pid)
+            try:
+                os.remove(pidfile)
+            except OSError:
+                pass
+
+        # Pass 2: listeners in the port range whose parent is gone (or that predate
+        # pidfiles). Kill only those running out of a workspace; leave the rest alone.
         for pid, port in sandbox_cls.find_pids_in_port_range(port_start, port_end):
-            logger.info("Killing orphan process pid %d (port %d)", pid, port)
-            sandbox_cls.kill_pid(pid)
+            if _cmdline_references(sandbox_cls.get_pid_cmdline(pid), base):
+                logger.info("Killing orphan sandbox process pid %d (port %d)", pid, port)
+                sandbox_cls.kill_pid(pid)
+            else:
+                logger.warning(
+                    "Port %d in the sandbox range is held by a non-sandbox process (pid %d); leaving it alone",
+                    port,
+                    pid,
+                )
 
     def _delete_orphan_workspaces(self, live_project_ids: set[str]) -> None:
         """Delete workspace directories for projects no longer in the database."""
