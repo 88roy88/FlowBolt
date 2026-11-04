@@ -19,6 +19,8 @@ interface FilesState {
   setActiveFile: (path: string) => void;
   updateFileContent: (path: string, content: string) => void;
   saveFile: (path: string) => Promise<void>;
+  /** Rewrites a file on disk without opening it, keeping its tab in sync if it's already open. */
+  editFile: (path: string, edit: (content: string) => string) => Promise<void>;
   createFile: (path: string, content?: string) => Promise<void>;
   uploadFiles: (basePath: string, files: File[]) => Promise<void>;
   renamePath: (oldPath: string, newPath: string) => Promise<void>;
@@ -239,6 +241,18 @@ export const useFilesStore = create<FilesState>((set, get) => ({
       await api.saveFileContent(projectId, normalizedPath, content).catch(reportWorkspaceLock);
       set((s) => ({ saveVersion: s.saveVersion + 1 }));
     }
+  },
+
+  async editFile(path: string, edit: (content: string) => string) {
+    const normalizedPath = normalizePath(path);
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+    const open = get().openFiles.get(normalizedPath);
+    const content = edit(open ?? await api.fetchFileContent(projectId, normalizedPath));
+    await api.saveFileContent(projectId, normalizedPath, content).catch(reportWorkspaceLock);
+    if (open !== undefined) get().updateFileContent(normalizedPath, content);
+    else queryClient.setQueryData(['file', projectId, normalizedPath], content);
+    set((s) => ({ saveVersion: s.saveVersion + 1 }));
   },
 
   async createFile(path: string, content = '') {
