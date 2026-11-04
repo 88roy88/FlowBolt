@@ -108,7 +108,7 @@ class ExecuteAgent(BaseAgent):
 
     # -- Flow Steps (sequential — use @track for automatic span lifecycle) --
 
-    @track(name="build-technical-plan")
+    @track(name="build-technical-plan", ignore_arguments=["state"], capture_output=False)
     async def _step_build_plan(self, state: ExecutionState) -> ExecutionState:
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
@@ -139,7 +139,7 @@ class ExecuteAgent(BaseAgent):
         )
         return state
 
-    @track(name="execute-plan")
+    @track(name="execute-plan", ignore_arguments=["state"], capture_output=False)
     async def _step_execute_tasks(self, state: ExecutionState) -> ExecutionState:
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
@@ -190,7 +190,7 @@ class ExecuteAgent(BaseAgent):
         state.all_errors = "\n\n".join(all_errors)
         return state
 
-    @track(name="fix-errors")
+    @track(name="fix-errors", ignore_arguments=["state"], capture_output=False)
     async def _step_fix_errors(self, state: ExecutionState) -> ExecutionState:
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
@@ -232,7 +232,7 @@ class ExecuteAgent(BaseAgent):
         opik_context.update_current_span(output={"files_fixed": [p for p, _ in generated]})
         return state
 
-    @track(name="generate-summary")
+    @track(name="generate-summary", ignore_arguments=["state"], capture_output=False)
     async def _step_summarize(self, state: ExecutionState) -> ExecutionState:
         if state.rejected_files:
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
