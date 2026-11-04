@@ -78,7 +78,7 @@ class _StepNamedSpanClient:
 class FailureAwareOpikLogger(OpikLogger):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self._opik_client = _StepNamedSpanClient(get_global_client())
+        self._opik_client = _StepNamedSpanClient(get_global_client())  # type: ignore[assignment]
 
     async def async_log_failure_event(
         self,
