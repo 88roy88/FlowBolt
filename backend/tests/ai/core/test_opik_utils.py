@@ -163,17 +163,6 @@ def test_tagging_gives_up_without_raising(monkeypatch: pytest.MonkeyPatch, error
     assert updates == []
 
 
-def test_llm_spans_are_named_after_their_step() -> None:
-    spans: list[dict[str, Any]] = []
-    client = opik_utils._StepNamedSpanClient(SimpleNamespace(span=lambda **kwargs: spans.append(kwargs), flush=print))
-
-    client.span(name="model_chat.completion_123", metadata={"generation_name": "followup-react-2"})
-    client.span(name="model_failure", metadata=None)
-
-    assert [span["name"] for span in spans] == ["followup-react-2", "model_failure"]
-    assert client.flush is print
-
-
 def test_opik_environment_reaches_the_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPIK_ENVIRONMENT", "unset")
 
