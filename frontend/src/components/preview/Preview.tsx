@@ -7,9 +7,12 @@ import { usePublishStore } from '../../stores/publish';
 import { PUBLISH_ROLES } from '../../types';
 import { RefreshCw, ExternalLink, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
+import { AppTitle } from './AppTitle';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
+import { TOOLBAR_SOURCE } from '../../hooks/usePreviewToolbarBridge';
 import { logger } from '../../services/logger';
+import { formatPreviewRoute } from '../../utils/previewRoute';
 
 type PreviewLoadTrigger = 'manual_refresh' | 'auto_on_code_change';
 
@@ -22,6 +25,11 @@ export function Preview() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [route, setRoute] = useState('/');
+  const [appTitle, setAppTitle] = useState<string | null>(null);
+
+  const routeLabel = formatPreviewRoute(route);
+  const isHome = routeLabel === '/';
 
   const isPublished = !!currentProject?.published_url;
   const liveUrl = currentProject?.published_url
@@ -35,9 +43,26 @@ export function Preview() {
       return;
     }
     setLoading(true);
+    setRoute('/');
+    setAppTitle(null);
     credentialsStore.ensureCookie();
     setPreviewUrl(`/api/preview/${projectId}/proxy/`);
   }, [projectId]);
+
+  // Only the iframe's page counts: tabs opened from the preview report theirs here too.
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      const data = event.data;
+      if (event.origin !== window.location.origin) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      if (data?.source !== TOOLBAR_SOURCE) return;
+      if (data.type === 'route-changed' && typeof data.route === 'string') setRoute(data.route);
+      if (data.type === 'title-changed' && typeof data.title === 'string') setAppTitle(data.title);
+    }
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
 
   const clearConsole = useConsoleStore((s) => s.clear);
 
@@ -93,27 +118,43 @@ export function Preview() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-border shrink-0">
-        <Button variant="outline" size="sm" onClick={handleRefresh} title={t('preview.refreshPreview')}>
-          <RefreshCw size={14} className="text-primary/70" />
-          {t('preview.refresh')}
-        </Button>
-        {previewUrl && (
-          <Button variant="outline" size="sm" onClick={() => { credentialsStore.ensureCookie(); window.open(previewUrl, '_blank'); }} title={t('preview.openInNewTab')}>
-            <ExternalLink size={14} className="text-primary/70" />
-            {t('preview.open')}
+      <div className="grid grid-cols-[1fr_minmax(0,24rem)_1fr] items-center gap-2 px-3 py-1.5 bg-surface border-b border-border shrink-0">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="rounded-full" onClick={handleRefresh} title={t('preview.refreshPreview')}>
+            <RefreshCw size={14} className={`text-primary/70 ${loading ? 'animate-spin' : ''}`} />
+            {t('preview.refresh')}
           </Button>
-        )}
-        <span className="text-xs text-muted-foreground truncate flex-1">
-          {previewUrl ?? t('preview.loading')}
-        </span>
+          {previewUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => { credentialsStore.ensureCookie(); window.open(`${previewUrl}${route.slice(1)}`, '_blank'); }}
+              title={t('preview.openInNewTab')}
+            >
+              <ExternalLink size={14} className="text-primary/70" />
+              {t('preview.open')}
+            </Button>
+          )}
+        </div>
+
+        {/* Route bar */}
+        <div className="flex items-center justify-center gap-2 min-w-0 h-7 px-3 rounded-full bg-muted/70 border border-border/60 text-xs">
+          <AppTitle title={appTitle} onChange={setAppTitle} />
+          {!isHome && (
+            <span dir="ltr" className="min-w-0 truncate text-muted-foreground" title={routeLabel} data-testid="preview-path">
+              {routeLabel}
+            </span>
+          )}
+        </div>
 
         {/* Publish Actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-end gap-1.5">
           {isPublished && liveUrl ? (
             <Button
               variant="outline"
               size="sm"
+              className="rounded-full"
               onClick={() => window.open(liveUrl, '_blank')}
               title={t('preview.viewPublishedApp')}
             >
@@ -125,6 +166,7 @@ export function Preview() {
             <Button
               variant="default"
               size="sm"
+              className="rounded-full"
               disabled={!projectId}
               onClick={handlePublish}
               title={isPublished ? t('preview.republish') : t('preview.publish')}

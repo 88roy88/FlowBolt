@@ -117,6 +117,8 @@
     "code": "Code",
     "loading": "Loading preview...",
     "error": "Failed to load preview",
+    "renameApp": "Rename app",
+    "renameAppFailed": "Couldn't rename the app",
     "refresh": "Refresh",
     "refreshPreview": "Refresh preview",
     "open": "Open",
