@@ -9,7 +9,7 @@ from typing import Any
 import litellm
 import pytest
 
-from flow44.ai.core.provider import ContextWindowExceeded, _handle_litellm_errors, stream_chat
+from flow44.ai.core.provider import ContextWindowExceeded, _handle_litellm_errors, stream_chat, supports_vision
 from flow44.config import settings
 
 _MESSAGES = [{"role": "user", "content": "go"}]
@@ -48,3 +48,15 @@ async def test_unprefixed_context_length_error_becomes_context_window_exceeded()
     with pytest.raises(ContextWindowExceeded):
         async with _handle_litellm_errors("m"):
             raise error
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        ("anthropic/claude-3-5-sonnet-20241022", True),
+        ("bedrock/us.anthropic.Claude-unreleased-v1:0", True),
+        ("minimax/minimax-m2.7", False),
+    ],
+)
+def test_supports_vision_trusts_claude_ids_and_asks_litellm_otherwise(model: str, expected: bool) -> None:
+    assert supports_vision(model) is expected

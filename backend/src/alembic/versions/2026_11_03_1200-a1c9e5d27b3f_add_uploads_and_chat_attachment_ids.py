@@ -38,12 +38,22 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
     )
     op.create_index(op.f('ix_uploads_project_id'), 'uploads', ['project_id'], unique=False)
+    live_asset = sa.text("kind = 'asset' AND deleted_at IS NULL")
+    op.create_index(
+        'uq_uploads_live_asset_name',
+        'uploads',
+        ['project_id', 'name'],
+        unique=True,
+        postgresql_where=live_asset,
+        sqlite_where=live_asset,
+    )
     op.add_column('chat_messages', sa.Column('attachment_ids', sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     op.drop_column('chat_messages', 'attachment_ids')
+    op.drop_index('uq_uploads_live_asset_name', table_name='uploads')
     op.drop_index(op.f('ix_uploads_project_id'), table_name='uploads')
     op.drop_table('uploads')
     sa.Enum(name='uploadkind').drop(op.get_bind(), checkfirst=True)

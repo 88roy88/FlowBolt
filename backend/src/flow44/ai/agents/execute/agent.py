@@ -15,6 +15,7 @@ from flow44.ai.agents.execute.prompts import (
     render_feedback,
     render_merge,
 )
+from flow44.ai.attachments import load_attachment_blocks
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
 from flow44.ai.core.opik_utils import create_span, error_info, record_span_error
@@ -89,6 +90,7 @@ class ExecuteAgent(BaseAgent):
             trace_id=self._trace_id,
             root_span_id=current_span.id if current_span else None,
             llm_metadata_fn=self._llm_metadata,
+            attachment_blocks=await load_attachment_blocks(self.project_id, self._build_state.attachment_ids),
         )
 
         final_state = await self._flow.run(exec_state, start="build_plan")
@@ -374,10 +376,14 @@ class ExecuteAgent(BaseAgent):
                 data_source_contexts=state.build_state.data_source_contexts or None,
             )
 
+            instruction = "Generate the code."
+            if state.attachment_blocks:
+                instruction = "Generate the code. The attached files came with the user's request; match them."
+
             generated: list[tuple[str, str]] = []
             parser = ActionParser(on_file_action=lambda p, c: generated.append((p, c)))
             async for chunk in stream_chat(
-                [Message.user("Generate the code.")],
+                [Message.user_with_attachments(instruction, state.attachment_blocks)],
                 prompt,
                 model=state.model,
                 metadata=state.llm_metadata_fn(f"execute_task_{task.id}", parent_span_id=span.id),

@@ -18,8 +18,12 @@ class ContextWindowExceeded(Exception):
 
 
 def supports_vision(model: str | None) -> bool:
+    model = model or settings.AI_MODEL
+    # litellm doesn't know every Claude id (Bedrock profiles, new releases), but they all take images.
+    if "claude" in model.lower():
+        return True
     try:
-        return bool(litellm.supports_vision(model or settings.AI_MODEL))
+        return bool(litellm.supports_vision(model))
     except Exception:
         return False
 

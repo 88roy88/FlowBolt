@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
+from flow44.ai.state import BuildState
 from flow44.db.uploads import Upload, UploadKind
 from flow44.main import app
 
@@ -72,3 +73,14 @@ def test_an_unknown_attachment_is_refused() -> None:
 
     assert reply["type"] == "error"
     assert "couldn't be found" in reply["message"]
+
+
+def test_accepting_a_plan_with_a_model_without_vision_is_refused() -> None:
+    state = BuildState(project_id=PROJECT_ID, attachment_ids=[SHOT.id])
+    payload = {"type": "plan_response", "action": "accept", "model": "text-only"}
+
+    with patch("flow44.api.chat.get_pending_plan", AsyncMock(return_value=state.model_dump_json())):
+        reply = _refused(payload, [SHOT], vision=False)
+
+    assert reply["type"] == "error"
+    assert "can't read images" in reply["message"]

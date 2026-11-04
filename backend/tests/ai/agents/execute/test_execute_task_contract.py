@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -13,6 +14,7 @@ from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
 from flow44.ai.agents.execute.models import Task, WorkPlan
 from flow44.ai.agents.plan.models import ArchitectureDesign, UXDesign
+from flow44.ai.core.messages import ImageContent
 from flow44.ai.file_safety import FileSafetyError
 from flow44.ai.state import BuildState
 
@@ -287,3 +289,63 @@ async def test_step_summarize_drops_files_not_actually_written(monkeypatch: pyte
     file_overview = summary_events[0]["summary"]["file_overview"]
     assert "src/App.tsx" in file_overview
     assert "src/main.tsx" not in file_overview
+
+
+def _recording_stream(seen: list[Any]) -> Any:
+    async def _fake_stream(messages: list[Any], *_args: Any, **_kwargs: Any) -> AsyncIterator[str]:
+        seen.extend(messages)
+        yield _ARTIFACT
+
+    return _fake_stream
+
+
+async def test_execute_task_sends_the_attachments_to_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[Any] = []
+    monkeypatch.setattr(execute_agent, "stream_chat", _recording_stream(seen))
+    task = Task(id="t1", title="A", description="", files=["src/components/Foo.tsx"])
+    state = _make_state(task, _RecordingSandbox())
+    image = ImageContent.from_data_uri("data:image/png;base64,AAAA")
+    state.attachment_blocks = [image]
+
+    await ExecuteAgent.__new__(ExecuteAgent)._execute_task(task, state)
+
+    assert seen[0].content[0] == image
+    assert "attached files" in seen[0].content[-1].text
+
+
+async def test_execute_task_without_attachments_sends_plain_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[Any] = []
+    monkeypatch.setattr(execute_agent, "stream_chat", _recording_stream(seen))
+    task = Task(id="t1", title="A", description="", files=["src/components/Foo.tsx"])
+
+    await ExecuteAgent.__new__(ExecuteAgent)._execute_task(task, _make_state(task, _RecordingSandbox()))
+
+    assert seen[0].content == "Generate the code."
+
+
+async def test_run_loads_the_plan_attachments(monkeypatch: pytest.MonkeyPatch) -> None:
+    image = ImageContent.from_data_uri("data:image/png;base64,AAAA")
+    load = AsyncMock(return_value=[image])
+    monkeypatch.setattr(execute_agent, "load_attachment_blocks", load)
+
+    class _Stop(Exception):
+        pass
+
+    flow = MagicMock()
+    flow.run = AsyncMock(side_effect=_Stop)
+    agent = ExecuteAgent.__new__(ExecuteAgent)
+    agent.project_id = "p"
+    agent.sandbox = None
+    agent.model = None
+    agent._trace_id = None
+    agent._build_state = BuildState(project_id="p", attachment_ids=["u1"])
+    agent._flow = flow
+    agent._setup_trace = MagicMock()
+    agent._set_trace_input = MagicMock()
+    agent.emit = AsyncMock()
+
+    with pytest.raises(_Stop):
+        await agent.run()
+
+    load.assert_awaited_once_with("p", ["u1"])
+    assert flow.run.await_args.args[0].attachment_blocks == [image]

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from sqlalchemy import Column, ForeignKey, String
+from sqlalchemy import Column, ForeignKey, Index, String, text
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -13,8 +13,21 @@ class UploadKind(StrEnum):
     asset = "asset"
 
 
+_LIVE_ASSET = text("kind = 'asset' AND deleted_at IS NULL")
+
+
 class Upload(SQLModel, table=True):
     __tablename__ = "uploads"
+    __table_args__ = (
+        Index(
+            "uq_uploads_live_asset_name",
+            "project_id",
+            "name",
+            unique=True,
+            postgresql_where=_LIVE_ASSET,
+            sqlite_where=_LIVE_ASSET,
+        ),
+    )
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     project_id: str = Field(

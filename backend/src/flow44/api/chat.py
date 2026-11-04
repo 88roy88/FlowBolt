@@ -303,11 +303,14 @@ async def chat_ws(  # noqa: C901, PLR0915
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
+                        execute_model = selected_model or state.model
+                        # The plan can be accepted with a different model than the one that made it.
+                        await _resolve_attachments(project.id, state.attachment_ids, execute_model)
                         execute_agent = ExecuteAgent(
                             project_id=project.id,
                             sandbox=sandbox,
                             state=state,
-                            model=selected_model or state.model,
+                            model=execute_model,
                             user_id=user_id,
                         )
                         # before the delete: a refusal must not lose the plan
