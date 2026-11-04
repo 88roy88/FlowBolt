@@ -14,6 +14,7 @@ import {
   AGENT_PHASE,
   getTransientReset,
   isAwaitingPlanApproval,
+  isAwaitingUserInput,
   isHistoryRunComplete,
 } from './chatAgentState';
 
@@ -105,7 +106,7 @@ function handleText(msg: { content: string }, set: SetState) {
 }
 
 function handleError(msg: { message: string }, set: SetState, get: GetState, cleanup: () => void) {
-  const reset = get().agentPhase === AGENT_PHASE.awaiting_interview ? { isStreaming: false } : getTransientReset();
+  const reset = isAwaitingUserInput(get()) ? { isStreaming: false } : getTransientReset();
   set({ ...reset, agentAlive: false, error: msg.message });
   endTurn(cleanup, true);
 }

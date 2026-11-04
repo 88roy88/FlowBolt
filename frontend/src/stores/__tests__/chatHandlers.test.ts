@@ -338,6 +338,17 @@ describe('createSendMessageHandler — interview flow', () => {
       error: 'refused',
     });
   });
+
+  it('an error while awaiting plan approval keeps the plan and phase', () => {
+    handler(msg({ type: 'plan_overview', overview: MOCK_PLAN_OVERVIEW }));
+    handler(msg({ type: 'error', message: 'refused' }));
+
+    expect(store.state()).toMatchObject({
+      planOverview: MOCK_PLAN_OVERVIEW,
+      agentPhase: 'awaiting_approval',
+      error: 'refused',
+    });
+  });
 });
 
 describe('createSendMessageHandler — followup flow', () => {

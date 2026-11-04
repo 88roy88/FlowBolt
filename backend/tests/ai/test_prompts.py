@@ -84,6 +84,7 @@ class TestPromptRendering:
                     data_source_id="123",
                     data_source_name="Sales Data",
                     sanitized_name="SalesData",
+                    data_source_summary="Quarterly sales export",
                     data_schema="Revenue by region",
                     relevant_fields="date, amount",
                     params_info={"parameters": [{"name": "from_date", "display_name": "From date"}]},
@@ -91,6 +92,7 @@ class TestPromptRendering:
             ]
         )
         assert "Revenue by region" in result
+        assert "Quarterly sales export" in result
         assert result.index('Everything under "Data Source" above') > result.index("Data Source: Sales Data")
 
     def test_summary(self) -> None:

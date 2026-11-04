@@ -22,15 +22,12 @@ class AgentRouter:
     async def handle_message(
         self, content: str, data_source_ids: list[str] | None, *, model: str | None, interview: bool
     ) -> None:
-        agent = await self._agent(model)
-        if not (interview and isinstance(agent, PlanAgent)):
-            await agent.run(content, data_source_ids)
+        if interview and await is_new_project(self._project_id):
+            session = await self._interviewer(model).ask(content, data_source_ids)
+            if not session.questions:
+                await self._continue(await self._agent(model), content, session)
             return
-
-        session = await self._interviewer(model).ask(content, data_source_ids)
-        if session.questions:
-            return
-        await self._continue(agent, content, session)
+        await (await self._agent(model)).run(content, data_source_ids)
 
     async def resume_interview(
         self, session: InterviewSession, answers: list[InterviewAnswer], *, model: str | None
