@@ -1,9 +1,7 @@
 import asyncio
-import functools
 import logging
 import time
 import traceback as traceback_module
-from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -23,40 +21,6 @@ logger = logging.getLogger(__name__)
 _MAX_TAG_LENGTH = 100
 _THREAD_WAIT_ATTEMPTS = 15
 _THREAD_WAIT_SECONDS = 2.0
-
-
-class RunCancelled(Exception):
-    pass
-
-
-def track(**options: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """opik.track for coroutines that also closes the span when the task is cancelled.
-
-    opik.track only handles Exception, so a CancelledError would leave the span and trace open.
-    The exception swap stays inside the decorator, so callers still see a real CancelledError
-    and their `except Exception` recovery paths can't swallow the cancellation.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        async def cancellable(*args: Any, **kwargs: Any) -> Any:
-            try:
-                return await func(*args, **kwargs)
-            except asyncio.CancelledError as exc:
-                raise RunCancelled("Cancelled") from exc
-
-        tracked = opik.track(**options)(cancellable)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            try:
-                return await tracked(*args, **kwargs)
-            except RunCancelled as exc:
-                raise asyncio.CancelledError from exc
-
-        return wrapper
-
-    return decorator
 
 
 class _StepNamedSpanClient:
@@ -199,7 +163,7 @@ def record_span_error(exc: Exception) -> None:
         opik_context.update_current_span(error_info=error_info(exc))
 
 
-def error_info(exc: BaseException) -> ErrorInfoDict:
+def error_info(exc: Exception) -> ErrorInfoDict:
     info: ErrorInfoDict = {
         "exception_type": type(exc).__name__,
         "traceback": "".join(traceback_module.format_exception(exc)),

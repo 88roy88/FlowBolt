@@ -4,6 +4,7 @@ import uuid
 from itertools import accumulate
 from typing import Any
 
+from opik import track
 from pydantic import BaseModel
 
 from flow44.ai.agents._chat_agent import ChatAgent
@@ -11,7 +12,6 @@ from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, 
 from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.agents.followup.prompts import render_followup
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import track
 from flow44.ai.core.react_flow import ReActFlow, looks_like_leaked_tool_call
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
 from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
@@ -161,7 +161,7 @@ class FollowUpAgent(ChatAgent):
 
         return ToolExecutor([grep, glob, read_file, write_file, edit_file])
 
-    @track(name="followup-agent-run")
+    @track(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
         self._setup_trace(["follow-up-agent"])
 

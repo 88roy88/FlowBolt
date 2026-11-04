@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Any
 
-from opik import opik_context
+from opik import opik_context, track
 
 from flow44.ai.agents._base import BaseAgent
 from flow44.ai.agents.execute.execution_state import ExecutionState
@@ -17,7 +17,7 @@ from flow44.ai.agents.execute.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import create_span, error_info, record_span_error, track, update_span
+from flow44.ai.core.opik_utils import create_span, error_info, record_span_error, update_span
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
@@ -72,7 +72,7 @@ class ExecuteAgent(BaseAgent):
 
         return "fix_errors"
 
-    @track(name="execute-agent-run")
+    @track(name="execute-agent-run")  # type: ignore[untyped-decorator]
     async def run(self) -> None:
         self._setup_trace(["execute-agent"])
         self._set_trace_input({"action": "plan_approved"})
@@ -108,7 +108,7 @@ class ExecuteAgent(BaseAgent):
 
     # -- Flow Steps (sequential — use @track for automatic span lifecycle) --
 
-    @track(name="build-technical-plan", ignore_arguments=["state"], capture_output=False)
+    @track(name="build-technical-plan", ignore_arguments=["state"], capture_output=False)  # type: ignore[untyped-decorator]
     async def _step_build_plan(self, state: ExecutionState) -> ExecutionState:
         await state.emit_fn({"type": "phase", "phase": "planning"})
 
@@ -139,7 +139,7 @@ class ExecuteAgent(BaseAgent):
         )
         return state
 
-    @track(name="execute-plan", ignore_arguments=["state"], capture_output=False)
+    @track(name="execute-plan", ignore_arguments=["state"], capture_output=False)  # type: ignore[untyped-decorator]
     async def _step_execute_tasks(self, state: ExecutionState) -> ExecutionState:
         if state.build_state.work_plan is None:
             raise RuntimeError("No work plan available")
@@ -190,7 +190,7 @@ class ExecuteAgent(BaseAgent):
         state.all_errors = "\n\n".join(all_errors)
         return state
 
-    @track(name="fix-errors", ignore_arguments=["state"], capture_output=False)
+    @track(name="fix-errors", ignore_arguments=["state"], capture_output=False)  # type: ignore[untyped-decorator]
     async def _step_fix_errors(self, state: ExecutionState) -> ExecutionState:
         await state.emit_fn({"type": "phase", "phase": "fixing"})
         state.fix_attempts += 1
@@ -232,7 +232,7 @@ class ExecuteAgent(BaseAgent):
         opik_context.update_current_span(output={"files_fixed": [p for p, _ in generated]})
         return state
 
-    @track(name="generate-summary", ignore_arguments=["state"], capture_output=False)
+    @track(name="generate-summary", ignore_arguments=["state"], capture_output=False)  # type: ignore[untyped-decorator]
     async def _step_summarize(self, state: ExecutionState) -> ExecutionState:
         if state.rejected_files:
             await state.emit_fn({"type": "error", "message": format_rejection_feedback(state.rejected_files)})
@@ -409,9 +409,6 @@ class ExecuteAgent(BaseAgent):
             task.status = "completed"
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "completed"})
             span.end(output={"files_written": paths, "rejected_files": [str(r) for r in rejections]})
-        except asyncio.CancelledError as exc:
-            span.end(error_info=error_info(exc))
-            raise
         except Exception as exc:
             logger.exception("[execute] Task %s failed", task.id)
             task.status = "failed"
@@ -419,13 +416,13 @@ class ExecuteAgent(BaseAgent):
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
             span.end(error_info=error_info(exc))
 
-    @track(name="typecheck", ignore_arguments=["state"])
+    @track(name="typecheck", ignore_arguments=["state"])  # type: ignore[untyped-decorator]
     async def _typecheck(self, state: ExecutionState) -> str:
         result = await state.sandbox_ref.run_build_command("npx tsc --noEmit")
         update_span(metadata={"success": result.success})
         return str(result.errors)
 
-    @track(name="build", ignore_arguments=["state"])
+    @track(name="build", ignore_arguments=["state"])  # type: ignore[untyped-decorator]
     async def _build(self, state: ExecutionState) -> str:
         result = await state.sandbox_ref.run_build_command("pnpm build")
         update_span(metadata={"success": result.success})
