@@ -139,10 +139,10 @@ export function Preview() {
         </div>
 
         {/* Route bar */}
-        <div className="flex items-center justify-center gap-2 min-w-0 h-7 px-3 rounded-full bg-muted/70 border border-border/60 text-xs">
+        <div className="justify-self-center flex items-center justify-center gap-2 w-fit min-w-[min(16rem,100%)] max-w-full h-7 px-3 rounded-full bg-muted/70 border border-border/60 text-xs">
           <AppTitle title={appTitle} onChange={setAppTitle} />
           {!isHome && (
-            <span dir="ltr" className="min-w-0 truncate text-muted-foreground" title={routeLabel} data-testid="preview-path">
+            <span dir="ltr" className="min-w-[4rem] shrink-[100000] truncate text-muted-foreground" title={routeLabel} data-testid="preview-path">
               {routeLabel}
             </span>
           )}
