@@ -2,6 +2,7 @@ import contextlib
 import functools
 import os
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import psycopg
 import pytest
@@ -24,6 +25,7 @@ from flow44.api.deps import (  # noqa: E402
 )
 from flow44.auth.permissions import get_owner_permissions  # noqa: E402
 from flow44.db.database import build_db_url, init_db, reset  # noqa: E402
+from flow44.integrations.directory.client import directory_client  # noqa: E402
 from flow44.main import app  # noqa: E402
 
 
@@ -57,6 +59,12 @@ def authenticated_user():
     app.dependency_overrides.pop(validate_token, None)
     app.dependency_overrides.pop(validate_ws_token, None)
     app.dependency_overrides.pop(get_user_permissions, None)
+
+
+@pytest.fixture(autouse=True)
+def no_directory_groups(monkeypatch):
+    # No directory service runs in tests, and a refused connection takes ~3s to fail on Windows.
+    monkeypatch.setattr(directory_client, "get_user_group_ids", AsyncMock(return_value=set()))
 
 
 @pytest.fixture(scope="session")
