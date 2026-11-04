@@ -44,6 +44,7 @@ export interface ChatState {
   loadHistory: (projectId: string) => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
+  setError: (message: string) => void;
   setStreaming: (streaming: boolean) => void;
   setSelectedModel: (model: string) => void;
   addDataSource: (pkg: { id: number; name: string }) => void;
@@ -327,6 +328,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearError() {
     set({ error: null });
+  },
+
+  setError(message: string) {
+    set({ error: message });
   },
 
   setStreaming(streaming: boolean) {

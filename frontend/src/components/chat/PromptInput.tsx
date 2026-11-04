@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
 import { isAwaitingPlanApproval } from '../../stores/chatAgentState';
@@ -7,6 +7,8 @@ import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import { ArrowUp, CirclePlus, Loader2, SquareDashedMousePointer, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
+import { EnhanceRow } from './enhance/EnhanceRow';
+import { useEnhancePrompt } from './enhance/useEnhancePrompt';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
@@ -40,14 +42,40 @@ export function PromptInput() {
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }, [value]);
 
+  const applyToTextarea = useCallback((text: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(text.length, text.length);
+    el.scrollTop = 0;
+  }, []);
+
+  const enhance = useEnhancePrompt(projectId, value, setValue, applyToTextarea);
+
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || inputBlocked) return;
+    enhance.reset();
     if (projectId) sendMessage(trimmed);
     else if (startsProject) void startProjectFromPrompt(trimmed);
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    enhance.reset();
+    setValue(e.target.value);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      if (showEnhance && !enhance.isEnhancing) enhance.enhance();
+      return;
+    }
+    if (e.key === 'Escape' && enhance.canUndo) {
+      e.preventDefault();
+      enhance.undo();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -57,6 +85,7 @@ export function PromptInput() {
   const disabled = inputBlocked || (!projectId && !startsProject);
   const canSend = !!value.trim() && !disabled;
   const dsOpen = showDsSelector && !disabled;
+  const showEnhance = !!projectId && canSend;
 
   // Global keyboard shortcut: Cmd+K to focus chat
   useEffect(() => {
@@ -150,7 +179,7 @@ export function PromptInput() {
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -160,6 +189,15 @@ export function PromptInput() {
           data-testid="chat-input"
           className="w-full resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
         />
+
+        {showEnhance && (
+          <EnhanceRow
+            isEnhancing={enhance.isEnhancing}
+            canUndo={enhance.canUndo}
+            onEnhance={() => enhance.enhance()}
+            onUndo={enhance.undo}
+          />
+        )}
 
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}
