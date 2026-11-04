@@ -206,11 +206,11 @@ describe('version store wire contracts', () => {
   });
 
   it('reloads the trimmed history when the server confirms an abort', () => {
-    const loadHistory = vi.fn();
-    useChatStore.setState({ loadHistory });
+    const reloadAfterAbort = vi.fn();
+    useChatStore.setState({ reloadAfterAbort });
 
     handleVersionMessage(msg({ type: 'turn_aborted' }));
 
-    expect(loadHistory).toHaveBeenCalledWith('proj-1');
+    expect(reloadAfterAbort).toHaveBeenCalledWith('proj-1');
   });
 });

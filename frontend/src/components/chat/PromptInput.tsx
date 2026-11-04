@@ -6,6 +6,7 @@ import { useSessionStore } from '../../stores/session';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import { ArrowUp, CirclePlus, Loader2, Square, SquareDashedMousePointer, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
+import { QueuedMessages } from './QueuedMessages';
 import { ModelSelector } from './ModelSelector';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
@@ -17,6 +18,7 @@ export function PromptInput() {
   const [showDsSelector, setShowDsSelector] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const queueMessage = useChatStore((s) => s.queueMessage);
   const abortTurn = useChatStore((s) => s.abortTurn);
   const aborting = useChatStore((s) => s.aborting);
   const value = useChatStore((s) => s.draft);
@@ -31,7 +33,8 @@ export function PromptInput() {
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
-  const inputBlocked = lock !== null || awaitingPlan || isCreating;
+  // A running agent doesn't block the input: messages queue until the run ends
+  const inputBlocked = (lock !== null && lock !== 'run_active') || awaitingPlan || isCreating;
   // No project open: submitting starts a new one, if the user may create projects
   const startsProject = !projectId && canCreate;
 
@@ -45,7 +48,8 @@ export function PromptInput() {
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || inputBlocked) return;
-    if (projectId) sendMessage(trimmed);
+    if (projectId && agentBusy) queueMessage(trimmed);
+    else if (projectId) sendMessage(trimmed);
     else if (startsProject) void startProjectFromPrompt(trimmed);
   };
 
@@ -77,6 +81,7 @@ export function PromptInput() {
     if (isCreating) return t('chat.placeholder.creatingProject');
     if (!projectId && !startsProject) return t('chat.placeholder.selectProject');
     if (awaitingPlan) return t('chat.placeholder.reviewPlan');
+    if (lock === 'run_active') return t('chat.placeholder.queue');
     if (lock) return t(LOCK_MESSAGES[lock]);
     return t('chat.placeholder.default');
   };
@@ -111,6 +116,8 @@ export function PromptInput() {
           <span>{busyLabel}...</span>
         </div>
       ) : null}
+
+      <QueuedMessages />
 
       <div
         className={`flex flex-col gap-2 bg-surface rounded-2xl p-2.5 transition-all duration-200 ${
@@ -188,7 +195,7 @@ export function PromptInput() {
             <ModelSelector />
           </div>
 
-          {canStop ? (
+          {canStop && (
             <button
               onClick={abortTurn}
               disabled={aborting}
@@ -198,7 +205,8 @@ export function PromptInput() {
             >
               {aborting ? <Loader2 size={14} className="animate-spin" /> : <Square size={12} fill="currentColor" />}
             </button>
-          ) : (
+          )}
+          {(!canStop || canSend) && (
             <button
               onClick={handleSubmit}
               disabled={!canSend}
@@ -208,7 +216,7 @@ export function PromptInput() {
                   ? 'bg-primary text-text-on-accent cursor-pointer hover:scale-105 hover:shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_40%,transparent)] active:scale-95'
                   : 'bg-muted text-muted-foreground opacity-50 cursor-default'
               }`}
-              title={t('common.sendMessage')}
+              title={canStop ? t('chat.queue.add') : t('common.sendMessage')}
             >
               <ArrowUp size={16} strokeWidth={2.5} />
             </button>

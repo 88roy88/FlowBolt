@@ -143,6 +143,12 @@
   "chat": {
     "chat": "Chat",
     "stop": "Stop and discard changes",
+    "queue": {
+      "title": "Queued messages",
+      "add": "Queue message",
+      "send": "Send now",
+      "remove": "Remove from queue"
+    },
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -152,6 +158,7 @@
       "creatingProject": "Creating project...",
       "reviewPlan": "Review the plan above, then accept or modify",
       "working": "AI is working...",
+      "queue": "Type a message to queue it for when the AI finishes",
       "readOnly": "View-only access",
       "default": "What do you want to build? Click on + to add flow packages."
     },
