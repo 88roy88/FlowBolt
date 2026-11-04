@@ -67,11 +67,12 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
     ) -> str:
         working_messages: list[dict[str, Any]] = [m.to_dict() if isinstance(m, Message) else m for m in messages]
         tool_schemas = tools.get_schemas()
+        tool_names = [schema["function"]["name"] for schema in tool_schemas]
         last_content = ""
 
         for iteration in range(self.max_iterations):
             metadata = (
-                metadata_fn(f"react-{iteration}", extra_metadata={"available_tools": tool_schemas})
+                metadata_fn(f"react-{iteration}", extra_metadata={"available_tools": tool_names})
                 if metadata_fn
                 else None
             )

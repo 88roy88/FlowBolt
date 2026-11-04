@@ -82,3 +82,19 @@ async def test_tool_span_is_marked_as_failed_when_the_tool_errors(monkeypatch: p
 
     assert updates["error_info"]["exception_type"] == "ToolError"
     assert updates["error_info"]["message"] == "nope"
+
+
+async def test_llm_metadata_lists_tool_names_not_full_schemas(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_llm(monkeypatch, "done")
+    schema = {"type": "function", "function": {"name": "read_file", "parameters": {"type": "object"}}}
+    tools: Any = SimpleNamespace(get_schemas=lambda: [schema])
+    metadata: list[dict[str, Any]] = []
+
+    def metadata_fn(_: str, extra_metadata: dict[str, Any]) -> dict[str, Any]:
+        metadata.append(extra_metadata)
+        return {}
+
+    flow: ReActFlow[Any] = ReActFlow(max_iterations=1)
+    await flow.react_loop([{"role": "user", "content": "go"}], "sys", tools, metadata_fn=metadata_fn)
+
+    assert metadata == [{"available_tools": ["read_file"]}]
