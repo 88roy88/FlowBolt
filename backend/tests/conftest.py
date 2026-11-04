@@ -46,7 +46,6 @@ def tmp_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def no_opik_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Direct client calls ignore OPIK_TRACK_DISABLE, so they'd reach the real project.
     monkeypatch.setattr("flow44.ai.core.opik_utils.get_global_client", MagicMock())
 
 
