@@ -6,7 +6,12 @@ import pytest
 
 from flow44.integrations.flapi import models as flapi_models
 from flow44.logic import data_source as ds_logic
-from flow44.logic.models import DataSourceParamsInfo
+from flow44.logic.models import DataSourceParamsInfo, DataSourceResult
+
+
+@pytest.fixture(autouse=True)
+def _no_flapi_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ds_logic, "run_data_source", AsyncMock(return_value=DataSourceResult(data={})))
 
 
 def _metadata(*, queries: list[flapi_models.Query]) -> flapi_models.PackageMetadata:

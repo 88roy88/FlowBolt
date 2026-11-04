@@ -117,7 +117,7 @@ class SearchMixin(BaseSandbox, ABC):
         return "".join(lines)
 
     # TODO: take a look at the grep.py in code-validation-service for reference
-    async def grep(  # noqa: PLR0913
+    async def grep(  # noqa: PLR0913, PLR0917
         self,
         pattern: str,
         path: str = "/",
