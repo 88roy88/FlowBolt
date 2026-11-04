@@ -59,10 +59,26 @@ def track(**options: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     return decorator
 
 
+class _StepNamedSpanClient:
+    """Names LLM spans after their step, since LiteLLM names them after the model and a timestamp."""
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._client, name)
+
+    def span(self, **kwargs: Any) -> Any:
+        generation_name = (kwargs.get("metadata") or {}).get("generation_name")
+        if generation_name:
+            kwargs["name"] = generation_name
+        return self._client.span(**kwargs)
+
+
 class FailureAwareOpikLogger(OpikLogger):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self._opik_client = get_global_client()
+        self._opik_client = _StepNamedSpanClient(get_global_client())
 
     async def async_log_failure_event(
         self,

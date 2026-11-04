@@ -247,3 +247,14 @@ def test_tagging_gives_up_without_raising(monkeypatch: pytest.MonkeyPatch, error
     opik_utils._tag_thread("id-1", ["project_name:Sales"])
 
     assert updates == []
+
+
+def test_llm_spans_are_named_after_their_step() -> None:
+    spans: list[dict[str, Any]] = []
+    client = opik_utils._StepNamedSpanClient(SimpleNamespace(span=lambda **kwargs: spans.append(kwargs), flush=print))
+
+    client.span(name="model_chat.completion_123", metadata={"generation_name": "followup-react-2"})
+    client.span(name="model_failure", metadata=None)
+
+    assert [span["name"] for span in spans] == ["followup-react-2", "model_failure"]
+    assert client.flush is print
