@@ -173,6 +173,11 @@ def create_span(**kwargs: Any) -> Span:
     return get_global_client().span(**kwargs)
 
 
+def update_span(**fields: Any) -> None:
+    if opik_context.get_current_span_data() is not None:
+        opik_context.update_current_span(**fields)
+
+
 def record_span_error(exc: Exception) -> None:
     if opik_context.get_current_span_data() is not None:
         opik_context.update_current_span(error_info=error_info(exc))

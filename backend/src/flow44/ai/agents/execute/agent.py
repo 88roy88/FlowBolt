@@ -17,7 +17,7 @@ from flow44.ai.agents.execute.prompts import (
 )
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import create_span, error_info, record_span_error, track
+from flow44.ai.core.opik_utils import create_span, error_info, record_span_error, track, update_span
 from flow44.ai.core.provider import complete_chat, stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
@@ -419,10 +419,14 @@ class ExecuteAgent(BaseAgent):
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
             span.end(error_info=error_info(exc))
 
+    @track(name="typecheck", ignore_arguments=["state"])
     async def _typecheck(self, state: ExecutionState) -> str:
         result = await state.sandbox_ref.run_build_command("npx tsc --noEmit")
+        update_span(metadata={"success": result.success})
         return str(result.errors)
 
+    @track(name="build", ignore_arguments=["state"])
     async def _build(self, state: ExecutionState) -> str:
         result = await state.sandbox_ref.run_build_command("pnpm build")
+        update_span(metadata={"success": result.success})
         return str(result.errors)

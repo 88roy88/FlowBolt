@@ -8,11 +8,24 @@ from pydantic import BaseModel
 
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import add_trace_tags
+from flow44.ai.core.opik_utils import add_trace_tags, error_info, track, update_span
 from flow44.ai.core.provider import complete_chat_with_tools
-from flow44.ai.core.tools import ToolExecutor, truncate_tool_args
+from flow44.ai.core.tools import ToolError, ToolExecutor, ToolResult, truncate_tool_args
 
 logger = logging.getLogger(__name__)
+
+_MAX_TRACED_RESULT_LENGTH = 2000
+
+
+@track(name="tool-call", type="tool", capture_input=False, capture_output=False)
+async def _execute_tool(tools: ToolExecutor, tool_name: str, tool_use_id: str, args: dict[str, Any]) -> ToolResult:
+    update_span(name=tool_name, input=truncate_tool_args(args))
+    result = await tools.execute(tool_name, tool_use_id=tool_use_id, **args)
+    update_span(output={"result": str(result.value)[:_MAX_TRACED_RESULT_LENGTH]})
+    if result.is_error:
+        update_span(error_info=error_info(ToolError(str(result.value))))
+    return result
+
 
 StateT = TypeVar("StateT", bound=BaseModel)
 
@@ -146,7 +159,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                     }
                     await emit_fn({"type": "react_step", **step_data})
 
-                result = await tools.execute(tool_name, tool_use_id=tool_call.id, **args)
+                result = await _execute_tool(tools, tool_name, tool_call.id, args)
                 result_str = str(result.value) if not result.is_error else f"Error: {result.value}"
 
                 if emit_fn:
