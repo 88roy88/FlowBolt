@@ -11,3 +11,4 @@ export { FixProgressCard } from './FixProgressCard';
 export { DiffBlock } from './DiffBlock';
 export { FileRows, FilesChangedSection } from './FilesChangedSection';
 export { FollowUpProgress } from './FollowUpProgress';
+export { InterviewAnsweredCard } from './InterviewAnsweredCard';

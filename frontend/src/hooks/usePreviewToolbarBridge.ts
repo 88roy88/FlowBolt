@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSessionStore } from '../stores/session';
 import { useChatStore } from '../stores/chat';
-import { isAwaitingPlanApproval } from '../stores/chatAgentState';
+import { isAwaitingUserInput } from '../stores/chatAgentState';
 import { workspaceLocked } from '../stores/workspaceLock';
 import { WRITE_ROLES } from '../types';
 import { parseSelectedElement } from '../utils/selectedElement';
@@ -49,7 +49,7 @@ export function usePreviewToolbarBridge() {
         } else if (
           // Same gate as the chat input.
           workspaceLocked() !== null ||
-          isAwaitingPlanApproval(chat) ||
+          isAwaitingUserInput(chat) ||
           useSessionStore.getState().isCreating
         ) {
           send({ type: 'prompt-result', ok: false, reason: 'busy', count });
