@@ -34,7 +34,7 @@ def _enhance_env(*, project: MagicMock | None = None, is_new: bool = True) -> It
     complete = AsyncMock(return_value="  a fuller prompt  ")
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project),
-        patch("flow44.api.chat._is_new_project", new_callable=AsyncMock, return_value=is_new),
+        patch("flow44.api.chat.is_new_project", new_callable=AsyncMock, return_value=is_new),
         patch("flow44.ai.agents.enhance.agent.complete_chat", complete),
     ):
         yield complete

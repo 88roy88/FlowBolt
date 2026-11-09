@@ -14,6 +14,7 @@ import {
   AGENT_PHASE,
   getTransientReset,
   isAwaitingPlanApproval,
+  isAwaitingUserInput,
   isHistoryRunComplete,
 } from './chatAgentState';
 
@@ -104,8 +105,9 @@ function handleText(msg: { content: string }, set: SetState) {
   }));
 }
 
-function handleError(msg: { message: string }, set: SetState, cleanup: () => void) {
-  set({ ...getTransientReset(), agentAlive: false, error: msg.message });
+function handleError(msg: { message: string }, set: SetState, get: GetState, cleanup: () => void) {
+  const reset = isAwaitingUserInput(get()) ? { isStreaming: false } : getTransientReset();
+  set({ ...reset, agentAlive: false, error: msg.message });
   endTurn(cleanup, true);
 }
 
@@ -179,7 +181,7 @@ export function createFixErrorHandler(
         break;
 
       case 'error':
-        handleError(msg, set, cleanup);
+        handleError(msg, set, get, cleanup);
         break;
 
       case 'action_complete': {
@@ -238,6 +240,35 @@ export function createSendMessageHandler(
           notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
         }
         break;
+
+      case 'interview_questions':
+        set({
+          ...getTransientReset(),
+          interviewQuestions: msg.questions,
+          agentPhase: AGENT_PHASE.awaiting_interview,
+        });
+        if (!_replaying) {
+          notifyAgentNeedsAttention(useSessionStore.getState().currentProject?.name);
+        }
+        break;
+
+      case 'interview_answered': {
+        const answeredMsg: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: '',
+          timestamp: getTimestamp(),
+          agentCard: { type: 'interview_answered', questions: msg.questions, answers: msg.answers },
+        };
+        set((s) => ({
+          messages: [...s.messages, answeredMsg],
+          isStreaming: true,
+          agentAlive: true,
+          agentPhase: AGENT_PHASE.interviewing,
+          interviewQuestions: null,
+        }));
+        break;
+      }
 
       case 'plan_accepted': {
         const acceptedMsg: Message = {
@@ -303,7 +334,7 @@ export function createSendMessageHandler(
         break;
 
       case 'error':
-        handleError(msg, set, cleanup);
+        handleError(msg, set, get, cleanup);
         break;
 
       case 'action_complete':

@@ -16,6 +16,7 @@ import {
   ErrorFixRequestCard,
   FixProgressCard,
   FollowUpProgress,
+  InterviewAnsweredCard,
   UserEditCard,
 } from './cards';
 import { VersionControl } from './VersionControl';
@@ -57,6 +58,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
         filesChanged={card.filesChanged}
         diffs={card.diffs}
       />;
+    case 'interview_answered':
+      return <InterviewAnsweredCard questions={card.questions} answers={card.answers} />;
     default:
       return null;
   }
