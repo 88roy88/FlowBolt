@@ -1,5 +1,6 @@
 [run]
 source = src/flow44
+core = sysmon
 
 [report]
 show_missing = true

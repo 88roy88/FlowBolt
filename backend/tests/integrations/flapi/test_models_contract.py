@@ -30,9 +30,15 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(scope="module")
+def mock_api():
+    with httpx.Client(base_url=MOCK_BASE_URL, headers=AUTH) as client:
+        yield client
+
+
 @pytest.mark.parametrize("package_id", PACKAGE_IDS)
-def test_search_parses(package_id: int) -> None:
-    r = httpx.get(f"{MOCK_BASE_URL}/package/v1/search/{package_id}", headers=AUTH)
+def test_search_parses(mock_api: httpx.Client, package_id: int) -> None:
+    r = mock_api.get(f"/package/v1/search/{package_id}")
     r.raise_for_status()
     items = [PackageSearchResult.model_validate(x) for x in r.json()]
     assert items
@@ -40,15 +46,15 @@ def test_search_parses(package_id: int) -> None:
 
 
 @pytest.mark.parametrize("package_id", PACKAGE_IDS)
-def test_quick_params_info_parses(package_id: int) -> None:
-    r = httpx.get(f"{MOCK_BASE_URL}/package/v1/quick/{package_id}", headers=AUTH)
+def test_quick_params_info_parses(mock_api: httpx.Client, package_id: int) -> None:
+    r = mock_api.get(f"/package/v1/quick/{package_id}")
     r.raise_for_status()
     QuickParamsInfo.model_validate(r.json())
 
 
 @pytest.mark.parametrize("package_id", PACKAGE_IDS)
-def test_metadata_parses(package_id: int) -> None:
-    r = httpx.get(f"{MOCK_BASE_URL}/package/v2/{package_id}", headers=AUTH)
+def test_metadata_parses(mock_api: httpx.Client, package_id: int) -> None:
+    r = mock_api.get(f"/package/v2/{package_id}")
     r.raise_for_status()
     meta = PackageMetadata.model_validate(r.json())
     assert meta.id_ == package_id
