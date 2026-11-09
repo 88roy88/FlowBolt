@@ -225,6 +225,13 @@ async def get_project(project_id: str, user_id: UserDep) -> Project:
 ProjectDep = Annotated[Project, Depends(get_project)]
 
 
+async def get_optional_project(user_id: UserDep, project_id: str | None = None) -> Project | None:
+    return await get_project(project_id, user_id) if project_id else None
+
+
+OptionalProjectDep = Annotated[Project | None, Depends(get_optional_project)]
+
+
 async def get_user_permissions(project: ProjectDep, user_id: UserDep) -> set[Permission]:
     permissions = await resolve_project_permissions(project, user_id)
     if not permissions:

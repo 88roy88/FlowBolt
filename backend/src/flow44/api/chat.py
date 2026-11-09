@@ -20,15 +20,20 @@ from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.followup.agent import FollowUpAgent
 from flow44.ai.agents.plan.agent import PlanAgent
 from flow44.ai.core.provider import ContextWindowExceeded
-from flow44.ai.selected_elements_context import format_selected_elements, parse_selected_elements
+from flow44.ai.selected_elements_context import (
+    MAX_SELECTED_ELEMENTS,
+    SelectedElement,
+    format_selected_elements,
+    parse_selected_elements,
+)
 from flow44.ai.state import BuildState
 from flow44.api.deps import (
+    OptionalProjectDep,
     Permission,
     ProjectDep,
     TokenDep,
     WsProjectDep,
     WsUserDep,
-    require_permission,
     require_ws_permission,
 )
 from flow44.config import settings
@@ -199,28 +204,26 @@ class EnhanceRequest(BaseModel):
     content: str = Field(min_length=1, max_length=10_000)
     model: str | None = None
     data_source_names: list[str] = Field(default_factory=list, max_length=20)
+    selected_elements: list[SelectedElement] = Field(default_factory=list, max_length=MAX_SELECTED_ELEMENTS)
 
 
 class EnhanceResponse(BaseModel):
     enhanced: str
 
 
-@http_router.post("/{project_id}/enhance")
-async def enhance(
-    project: ProjectDep,
-    body: EnhanceRequest,
-    _perms: set[Permission] = require_permission(Permission.write),
-) -> EnhanceResponse:
+@http_router.post("/enhance")
+async def enhance(project: OptionalProjectDep, body: EnhanceRequest) -> EnhanceResponse:
     try:
         enhanced = await enhance_prompt(
             body.content,
-            is_new=await _is_new_project(project.id),
-            summary=project.summary,
+            is_new=project is None or await _is_new_project(project.id),
+            summary=project.summary if project else "",
             model=body.model,
             data_source_names=body.data_source_names,
+            context=format_selected_elements(body.selected_elements) if body.selected_elements else "",
         )
     except Exception:
-        logger.exception("[chat] Prompt enhancement failed for session %s", project.id)
+        logger.exception("[chat] Prompt enhancement failed")
         raise HTTPException(status_code=502, detail="Prompt enhancement failed") from None
 
     return EnhanceResponse(enhanced=enhanced)

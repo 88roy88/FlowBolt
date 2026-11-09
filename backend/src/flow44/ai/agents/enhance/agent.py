@@ -14,6 +14,7 @@ async def enhance_prompt(
     summary: str,
     model: str | None,
     data_source_names: list[str],
+    context: str = "",
 ) -> str:
     system_prompt = render_enhance(
         is_new_project=is_new,
@@ -21,7 +22,7 @@ async def enhance_prompt(
         data_source_names=data_source_names,
     )
     enhanced = await complete_chat(
-        [Message.user(content)],
+        [Message.user(f"{content}\n\n{context}" if context else content)],
         system_prompt,
         model=model,
         metadata=llm_metadata(None, "enhance_prompt"),
