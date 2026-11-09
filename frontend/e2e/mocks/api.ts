@@ -140,6 +140,9 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   const fileContents = { ...MOCK_FILE_CONTENTS };
   let projectsGetCount = 0;
 
+  // Unmocked, the dev proxy 401s the BI event and signs the user out
+  await page.route('**/api/bi/events', (route) => route.fulfill({ status: 204, body: '' }));
+
   // --- Projects ---
   await page.route('**/api/projects', async (route) => {
     if (route.request().method() === 'POST') {
@@ -370,7 +373,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: payload });
   });
 
-  await page.route(`**/api/chat/*/enhance`, async (route) => {
+  await page.route(/\/api\/chat\/enhance(\?|$)/, async (route) => {
     if (options.enhanceDelayMs) await new Promise((r) => setTimeout(r, options.enhanceDelayMs));
     return route.fulfill({ json: { enhanced: ENHANCED_PROMPT } });
   });

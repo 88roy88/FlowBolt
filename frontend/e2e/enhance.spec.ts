@@ -11,11 +11,6 @@ const isMock = !process.env.BACKEND_URL;
 
 const DRAFT = 'a todo app';
 
-// Unmocked, the dev proxy 401s the BI event and signs the user out
-test.beforeEach(async ({ page }) => {
-  await page.route('**/api/bi/events', (route) => route.fulfill({ status: 204, body: '' }));
-});
-
 async function openComposer(page: import('@playwright/test').Page) {
   await page.goto(`/#/project/${PROJECT_ID}`, { waitUntil: 'domcontentloaded' });
   const input = page.getByTestId('chat-input');
@@ -76,6 +71,24 @@ test.describe('Prompt enhancement', () => {
   });
 });
 
+test.describe('Prompt enhancement — home composer', () => {
+  test.skip(!isMock, 'mock-mode only');
+
+  test('rewrites the draft without creating a project', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const input = page.getByTestId('chat-input');
+    await input.fill(DRAFT);
+    const projectPosts: string[] = [];
+    page.on('request', (r) => {
+      if (r.method() === 'POST' && new URL(r.url()).pathname.startsWith('/api/projects')) projectPosts.push(r.url());
+    });
+    await page.getByTestId('enhance-button').click();
+
+    await expect(input).toHaveValue(ENHANCED_PROMPT);
+    expect(projectPosts).toEqual([]);
+  });
+});
+
 test.describe('Prompt enhancement — in flight', () => {
   test.skip(!isMock, 'mock-mode only');
   test.use({ mockOptions: { enhanceDelayMs: 3000 } });
@@ -83,13 +96,13 @@ test.describe('Prompt enhancement — in flight', () => {
   test('sending abandons the rewrite and submits the current draft', async ({ page }) => {
     const input = await openComposer(page);
     await input.fill(DRAFT);
+    const enhanced = page.waitForEvent('requestfailed', (r) => r.url().includes('/api/chat/enhance'));
     await page.getByTestId('enhance-button').click();
 
     await expect(page.getByText('Enhancing...')).toBeVisible();
     await page.getByTestId('send-button').click();
 
     await expect(input).toHaveValue('');
-    await page.waitForTimeout(3500);
-    await expect(input).toHaveValue('');
+    await enhanced;
   });
 });
