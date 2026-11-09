@@ -148,7 +148,7 @@
     "model": "מודל",
     "enhance": {
       "action": "שפר את הבקשה",
-      "actionTitle": "שפר את הבקשה (Ctrl+E)",
+      "actionTitle": "שפר את הבקשה (Ctrl/⌘+E)",
       "enhancing": "משפר...",
       "enhanced": "שופר",
       "undo": "בטל",

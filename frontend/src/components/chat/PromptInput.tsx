@@ -66,7 +66,7 @@ export function PromptInput() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+    if ((e.metaKey || e.ctrlKey) && e.code === 'KeyE') {
       e.preventDefault();
       if (showEnhance && !enhance.isEnhancing) enhance.enhance();
       return;
@@ -85,7 +85,7 @@ export function PromptInput() {
   const disabled = inputBlocked || (!projectId && !startsProject);
   const canSend = !!value.trim() && !disabled;
   const dsOpen = showDsSelector && !disabled;
-  const showEnhance = !!projectId && canSend;
+  const showEnhance = canSend && (!!projectId || startsProject);
 
   // Global keyboard shortcut: Cmd+K to focus chat
   useEffect(() => {

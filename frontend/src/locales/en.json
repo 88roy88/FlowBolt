@@ -148,7 +148,7 @@
     "model": "Model",
     "enhance": {
       "action": "Enhance prompt",
-      "actionTitle": "Enhance prompt (Ctrl+E)",
+      "actionTitle": "Enhance prompt (Ctrl/⌘+E)",
       "enhancing": "Enhancing...",
       "enhanced": "Enhanced",
       "undo": "Undo",

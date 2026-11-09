@@ -125,30 +125,26 @@ describe('enhancePrompt', () => {
       content: 'a todo app',
       model: 'some/model',
       dataSourceNames: ['Sales Postgres'],
+      selectedElements: [{ id: 'e1', tag: 'button', selector: '#go', text: 'Go', classes: 'btn', html: '<button>', components: ['App'] }],
     });
 
     expect(enhanced).toBe('a fuller prompt');
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/chat/p1/enhance');
+    expect(url).toBe('/api/chat/enhance?project_id=p1');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({
       content: 'a todo app',
       model: 'some/model',
       data_source_names: ['Sales Postgres'],
+      selected_elements: [{ tag: 'button', selector: '#go', text: 'Go', classes: 'btn', html: '<button>', components: ['App'] }],
     });
   });
 
-  it('passes the abort signal through to fetch', async () => {
+  it('omits project_id when there is no project', async () => {
     fetchMock.mockResolvedValue(response(200, '{"enhanced":"x"}'));
-    const controller = new AbortController();
 
-    await enhancePrompt(
-      'p1',
-      { content: 'a todo app', model: null, dataSourceNames: [] },
-      controller.signal
-    );
+    await enhancePrompt(null, { content: 'a todo app', model: null, dataSourceNames: [], selectedElements: [] });
 
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(init.signal).toBe(controller.signal);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/chat/enhance');
   });
 });

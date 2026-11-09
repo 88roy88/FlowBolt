@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { useChatStore } from '../../../stores/chat';
+import { useErrorStore } from '../../../stores/errors';
 import { enhancePrompt } from '../../../services/api';
 
 export function useEnhancePrompt(
@@ -15,7 +16,7 @@ export function useEnhancePrompt(
   const abortRef = useRef<AbortController | null>(null);
   const selectedModel = useChatStore((s) => s.selectedModel);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
-  const setError = useChatStore((s) => s.setError);
+  const selectedElements = useChatStore((s) => s.selectedElements);
 
   const apply = useCallback(
     (text: string) => {
@@ -30,11 +31,12 @@ export function useEnhancePrompt(
       const controller = new AbortController();
       abortRef.current = controller;
       return enhancePrompt(
-        projectId!,
+        projectId,
         {
           content: value.trim(),
           model: selectedModel,
           dataSourceNames: selectedDataSources.map((ds) => ds.name),
+          selectedElements,
         },
         controller.signal
       );
@@ -44,7 +46,8 @@ export function useEnhancePrompt(
       apply(enhanced);
     },
     onError: (err: Error) => {
-      if (err.name !== 'AbortError') setError(t('chat.enhance.failed'));
+      if (err.name === 'AbortError') return;
+      useErrorStore.getState().pushError({ source: 'connection', message: t('chat.enhance.failed') });
     },
   });
 
