@@ -161,10 +161,7 @@ class FollowUpAgent(ChatAgent):
 
         @tool
         async def delete_file(path: str) -> str:
-            """Delete a single file that is no longer needed. Directories cannot be deleted.
-
-            Remove or update every import of the file so the app still builds.
-            """
+            """Delete a single file that is no longer needed. Directories cannot be deleted."""
             try:
                 path = normalized_path_or_reject(path)
             except FileSafetyError as exc:
