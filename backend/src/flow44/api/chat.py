@@ -15,25 +15,18 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
-from flow44.ai.agents.followup.agent import FollowUpAgent
+from flow44.ai.agents.interview.models import InterviewAnswer, InterviewSession
 from flow44.ai.agents.plan.agent import PlanAgent
+from flow44.ai.agents.routing import AgentRouter
 from flow44.ai.core.provider import ContextWindowExceeded
 from flow44.ai.selected_elements_context import format_selected_elements, parse_selected_elements
 from flow44.ai.state import BuildState
 from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
 from flow44.config import settings
 from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
-from flow44.db.events import (
-    emit_event,
-    emit_transient,
-    get_events,
-    get_last_event_id,
-    get_latest_event,
-    subscribe,
-    unsubscribe,
-)
+from flow44.db.events import emit_event, emit_transient, get_events, get_last_event_id, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
-from flow44.db.pending_plan import delete_pending_plan, get_pending_plan, save_pending_plan
+from flow44.db.paused_turn import clear_paused_turn, get_paused_turn, pause_turn
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services import run_abort
@@ -45,11 +38,6 @@ logger = logging.getLogger(__name__)
 
 http_router = APIRouter(prefix="/api/chat", tags=["chat"])
 ws_router = APIRouter()
-
-
-async def _is_new_project(project_id: str) -> bool:
-    """A project is 'new' if no build has completed yet (no action_complete event)."""
-    return await get_latest_event(project_id, "action_complete") is None
 
 
 # Strong refs: asyncio holds tasks weakly, so a run could be GC'd mid-flight.
@@ -268,6 +256,15 @@ async def chat_ws(  # noqa: C901, PLR0915
         except Exception:
             logger.debug("Event forwarding stopped for session %s", project.id)
 
+    async def _paused_state(phase: str, missing: str) -> str | None:
+        turn = await get_paused_turn(project.id)
+        if turn is None or turn.phase != phase:
+            await websocket.send_json({"type": "error", "message": missing})
+            return None
+        return turn.state_json
+
+    router = AgentRouter(project.id, sandbox, user_id=user_id, data_source_authorization=data_source_authorization)
+
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
             raw = await websocket.receive_text()
@@ -279,6 +276,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                     user_content: str = data["content"]
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
+                    mode: str = data.get("mode", "build")
                     elements = parse_selected_elements(data.get("selectedElements"))
 
                     user_event: dict[str, Any] = {"type": "user_message", "content": user_content}
@@ -298,19 +296,17 @@ async def chat_ws(  # noqa: C901, PLR0915
                             {"id": dsid, "name": dsname} for dsid, dsname in zip(ds_ids, ds_names, strict=True)
                         ]
 
-                    agent_cls = PlanAgent if await _is_new_project(project.id) else FollowUpAgent
-                    agent = agent_cls(
-                        project_id=project.id,
-                        sandbox=sandbox,
-                        model=selected_model,
-                        user_id=user_id,
-                        data_source_authorization=data_source_authorization,
-                    )
                     source_ids = [str(dsid) for dsid in ds_ids] if ds_ids else None
                     # Claim first: a refused turn must not leave the message behind.
                     await _start_turn(
                         project.id,
-                        partial(agent.run, turn.model_content, data_source_ids=source_ids),
+                        partial(
+                            router.handle_message,
+                            turn.model_content,
+                            source_ids,
+                            model=selected_model,
+                            interview=mode == "interview",
+                        ),
                         prepare=partial(_save_user_turn, project.id, turn),
                     )
 
@@ -319,11 +315,9 @@ async def chat_ws(  # noqa: C901, PLR0915
                     feedback = data.get("feedback")
                     selected_model = data.get("model")
 
-                    state_json = await get_pending_plan(project.id)
+                    state_json = await _paused_state("awaiting_approval", "No pending plan found")
                     if state_json is None:
-                        await websocket.send_json({"type": "error", "message": "No pending plan found"})
                         continue
-
                     state = BuildState.model_validate_json(state_json)
 
                     if action == "accept":
@@ -338,8 +332,8 @@ async def chat_ws(  # noqa: C901, PLR0915
                         await _start_turn(
                             project.id,
                             execute_agent.run,
-                            prepare=partial(delete_pending_plan, project.id),
-                            on_abort=partial(save_pending_plan, project.id, state_json),
+                            prepare=partial(clear_paused_turn, project.id),
+                            on_abort=partial(pause_turn, project.id, "awaiting_approval", state_json),
                         )
 
                     elif action == "modify" and feedback:
@@ -350,6 +344,28 @@ async def chat_ws(  # noqa: C901, PLR0915
                             user_id=user_id,
                         )
                         await _start_turn(project.id, partial(plan_agent.rebuild_with_feedback, state, feedback))
+
+                elif msg_type == "interview_response":
+                    action = data.get("action")
+                    if action not in ("submit", "skip"):
+                        await websocket.send_json({"type": "error", "message": "Invalid interview action"})
+                        continue
+
+                    state_json = await _paused_state("awaiting_interview", "No pending interview found")
+                    if state_json is None:
+                        continue
+                    session = InterviewSession.model_validate_json(state_json)
+
+                    answers: list[InterviewAnswer] = []
+                    if action == "submit":
+                        answers = [InterviewAnswer.model_validate(a) for a in data.get("answers") or []]
+
+                    await _start_turn(
+                        project.id,
+                        partial(router.resume_interview, session, answers, model=session.model),
+                        prepare=partial(clear_paused_turn, project.id),
+                        on_abort=partial(pause_turn, project.id, "awaiting_interview", state_json),
+                    )
 
                 elif msg_type == "fix_error":
                     error_message = data.get("error_message", "")
