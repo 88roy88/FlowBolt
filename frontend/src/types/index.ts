@@ -243,7 +243,7 @@ export interface FileDiff {
 
 export interface FollowUpStep {
   id: string;
-  tool: 'grep' | 'glob' | 'read_file' | 'write_file' | 'edit_file';
+  tool: 'grep' | 'glob' | 'read_file' | 'write_file' | 'edit_file' | 'delete_file';
   args: Record<string, string>;
   status: 'running' | 'completed' | 'failed';
   resultPreview?: string;
