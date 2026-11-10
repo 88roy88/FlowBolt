@@ -1,5 +1,6 @@
 """Tests for UnixSandbox.exec() — real subprocess in tmp workspace."""
 
+import asyncio
 import os
 
 import pytest
@@ -57,3 +58,19 @@ class TestUnixSandboxExec:
         (tmp_path / "workspace" / "data.txt").write_text("hello from file")
         lines = await _collect(sandbox.exec("cat data.txt"))
         assert "hello from file" in "".join(lines)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(os.name != "nt", reason="WindowsLocalSandbox runs via cmd")
+async def test_windows_exited_background_process_is_not_running(tmp_path) -> None:  # type: ignore[type-arg]
+    from flow44.sandbox.windows_local import WindowsLocalSandbox  # noqa: PLC0415
+
+    sandbox = WindowsLocalSandbox(SandboxInfo(project_id="test", workspace_dir=str(tmp_path), port=0))
+    await sandbox._spawn_background("dev-server", "exit 1", os.environ.copy())
+    for _ in range(50):
+        if not sandbox.is_background_process_running("dev-server"):
+            break
+        await asyncio.sleep(0.1)
+    running = sandbox.is_background_process_running("dev-server")
+    await sandbox.stop_all_background_processes()
+    assert not running
