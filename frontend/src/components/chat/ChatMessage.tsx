@@ -2,9 +2,10 @@ import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
-import { FileText, TerminalSquare } from 'lucide-react';
-import type { Message } from '../../types';
+import { FileText, SquareDashedMousePointer, TerminalSquare } from 'lucide-react';
+import type { Message, SelectedElement } from '../../types';
 import { formatClock } from '../../utils/formatTime';
+import { elementLabel, elementTooltip } from '../../utils/selectedElement';
 import { Badge } from '../ui/badge';
 import {
   DataSourcesFetchedCard,
@@ -15,6 +16,7 @@ import {
   ErrorFixRequestCard,
   FixProgressCard,
   FollowUpProgress,
+  InterviewAnsweredCard,
   UserEditCard,
 } from './cards';
 import { VersionControl } from './VersionControl';
@@ -56,6 +58,8 @@ function AgentCardRenderer({ message }: { message: Message }) {
         filesChanged={card.filesChanged}
         diffs={card.diffs}
       />;
+    case 'interview_answered':
+      return <InterviewAnsweredCard questions={card.questions} answers={card.answers} />;
     default:
       return null;
   }
@@ -69,6 +73,19 @@ function DataSourceBadges({ dataSources }: { dataSources: { id: number; name: st
           <span className="text-muted-foreground font-semibold">Data</span>
           <span className="font-semibold">{ds.name}</span>
           <span className="text-muted-foreground">#{ds.id}</span>
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function SelectedElementBadges({ elements }: { elements: SelectedElement[] }) {
+  return (
+    <div className="flex flex-wrap gap-1 mb-1.5">
+      {elements.map((el) => (
+        <Badge key={el.id} variant="accent" className="gap-1 max-w-full" title={elementTooltip(el)}>
+          <SquareDashedMousePointer size={12} className="shrink-0" />
+          <span className="font-semibold truncate" dir="auto">{elementLabel(el)}</span>
         </Badge>
       ))}
     </div>
@@ -115,6 +132,9 @@ export const ChatMessage = memo(function ChatMessage({ message, isStreaming }: C
       >
         {isUser && message.dataSources && message.dataSources.length > 0 && (
           <DataSourceBadges dataSources={message.dataSources} />
+        )}
+        {isUser && message.selectedElements && message.selectedElements.length > 0 && (
+          <SelectedElementBadges elements={message.selectedElements} />
         )}
         {isUser ? (
           <p className="whitespace-pre-wrap break-words">{message.content}</p>

@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 
 from flow44.ai.agents import analyze_data_source as ads_module
-from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
+from flow44.ai.agents.analyze_data_source import (
+    fetch_and_analyze_data_source,
+    fetch_data_sources,
+    generate_data_source_files,
+)
 from flow44.db.project_data_source import DataSourceContext
 from flow44.logic import data_source as ds_logic
 from flow44.logic.models import (
@@ -118,6 +123,31 @@ class TestFetchAndAnalyze:
         assert ctx.can_run_without_input is False
         assert ctx.sample_data is None
         assert ctx.params_info["parameters"][0]["name"] == "person_id"
+
+
+class TestFetchDataSources:
+    async def test_emits_phase_and_returns_contexts_in_order(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        emit = AsyncMock()
+        fetch = AsyncMock(side_effect=lambda sid, *_a: DataSourceContext(data_source_id=sid))
+        monkeypatch.setattr(ads_module, "fetch_and_analyze_data_source", fetch)
+
+        contexts = await fetch_data_sources(["a", "b"], "hi", None, None, lambda _: {}, emit)
+
+        assert [c.data_source_id for c in contexts] == ["a", "b"]
+        emit.assert_awaited_once_with({"type": "phase", "phase": "fetching_data_sources"})
+
+    async def test_failure_reports_and_reraises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        emit = AsyncMock()
+        monkeypatch.setattr(ads_module, "fetch_and_analyze_data_source", AsyncMock(side_effect=RuntimeError("boom")))
+
+        with pytest.raises(RuntimeError):
+            await fetch_data_sources(["a"], "hi", None, None, lambda _: {}, emit)
+
+        assert [call.args[0] for call in emit.await_args_list] == [
+            {"type": "phase", "phase": "fetching_data_sources"},
+            {"type": "error", "message": "Build aborted: failed to fetch required data source data."},
+            {"type": "phase", "phase": "idle"},
+        ]
 
 
 class TestGenerateDataSourceFiles:

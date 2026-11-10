@@ -4,6 +4,7 @@ import type { AgentPhase } from '../../types';
 import { AGENT_PHASE } from '../../stores/chatAgentState';
 
 const PHASE_LABEL_KEYS: Partial<Record<AgentPhase, string>> = {
+  [AGENT_PHASE.interviewing]: 'chat.phase.interviewing',
   [AGENT_PHASE.designing]: 'chat.phase.designingApplication',
   [AGENT_PHASE.planning]: 'chat.phase.buildingWorkPlan',
   [AGENT_PHASE.awaiting_approval]: 'chat.phase.reviewPlanBelow',

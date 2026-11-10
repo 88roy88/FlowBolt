@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
+import type { Message, SelectedElement, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff, InterviewQuestion, InterviewAnswer, InterviewMode } from '../types';
 import { WRITE_ROLES } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
@@ -20,6 +20,8 @@ export interface ChatState {
   selectedModel: string | null;
   agentPhase: AgentPhase;
   planOverview: PlanOverview | null;
+  interviewQuestions: InterviewQuestion[] | null;
+  interviewMode: InterviewMode;
   executionTasks: ExecutionTask[];
   fixSteps: FixStep[];
   followUpSteps: FollowUpStep[];
@@ -27,6 +29,7 @@ export interface ChatState {
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
   selectedDataSources: { id: number; name: string }[];
+  selectedElements: SelectedElement[];
   /** True after the project has completed at least one AI action cycle. */
   buildCompleted: boolean;
   /** Server-reported agent activity from GET /api/iaagent/{id}/alive */
@@ -34,10 +37,12 @@ export interface ChatState {
   agentAlivePollId: number;
   draft: string;
   setDraft: (draft: string) => void;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, opts?: { keepDraft?: boolean }) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   rollbackTurn: (id: string) => void;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
+  respondToInterview: (action: 'submit' | 'skip', answers?: InterviewAnswer[]) => void;
+  setInterviewMode: (mode: InterviewMode) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
   loadHistory: (projectId: string) => Promise<void>;
@@ -48,8 +53,13 @@ export interface ChatState {
   addDataSource: (pkg: { id: number; name: string }) => void;
   removeDataSource: (id: number) => void;
   clearDataSources: () => void;
+  addSelectedElement: (element: SelectedElement) => boolean;
+  removeSelectedElement: (id: string) => void;
+  clearSelectedElements: () => void;
   loadModels: () => Promise<void>;
 }
+
+export const MAX_SELECTED_ELEMENTS = 5;
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -85,6 +95,7 @@ const RESET_STATE = {
   error: null,
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
+  interviewQuestions: null,
   executionTasks: [] as ExecutionTask[],
 };
 
@@ -99,6 +110,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedModel: null,
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
+  interviewQuestions: null,
+  interviewMode: 'interview',
   executionTasks: [],
   fixSteps: [],
   followUpSteps: [],
@@ -106,6 +119,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   designProgress: { architecture: null, ux: null },
   projectSummary: null,
   selectedDataSources: [],
+  selectedElements: [],
   buildCompleted: false,
   agentAlive: null,
   agentAlivePollId: 0,
@@ -161,12 +175,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  sendMessage(content: string) {
+  sendMessage(content: string, opts?: { keepDraft?: boolean }) {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
     void requestPermissionIfNeeded();
 
-    const { selectedDataSources, selectedModel } = get();
+    const { selectedDataSources, selectedElements, selectedModel } = get();
 
     const userMessage: Message = {
       id: generateId(),
@@ -174,13 +188,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content,
       timestamp: Date.now(),
       dataSources: selectedDataSources.length > 0 ? [...selectedDataSources] : undefined,
+      selectedElements: selectedElements.length > 0 ? [...selectedElements] : undefined,
     };
 
     set((state) => ({
       messages: [...state.messages, userMessage],
       isStreaming: true,
       agentAlive: true,
-      draft: '',
+      ...(!opts?.keepDraft && { draft: '' }),
       ...RESET_STATE,
       designProgress: { architecture: null, ux: null },
     }));
@@ -193,8 +208,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.send({
       type: 'message',
       content,
+      mode: get().interviewMode,
       ...(selectedModel && { model: selectedModel }),
       ...(selectedDataSources.length > 0 && { dataSourceIds: selectedDataSources.map((c) => c.id) }),
+      ...(selectedElements.length > 0 && { selectedElements: selectedElements.map(({ id: _id, ...e }) => e) }),
     });
 
     // Persist the model to the project so it's restored on next visit
@@ -203,12 +220,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updateProjectModel(currentProject.id, selectedModel).catch(() => {});
     }
 
-    set({ selectedDataSources: [] });
+    set({ selectedDataSources: [], selectedElements: [] });
     armTurn({
-      run: () => get().sendMessage(content),
+      run: () => get().sendMessage(content, opts),
       undo: () => {
         get().rollbackTurn(userMessage.id);
-        set({ draft: content });
+        set({ selectedElements, ...((!opts?.keepDraft || !get().draft) && { draft: content }) });
       },
     });
   },
@@ -239,6 +256,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     startAgentAlivePolling(projectId);
   },
 
+  respondToInterview(action: 'submit' | 'skip', answers?: InterviewAnswer[]) {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+
+    const socket = getChatSocket(projectId);
+    const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
+    attachHandler(projectId, socket, handler);
+    socket.send({ type: 'interview_response', action, answers });
+
+    set({ isStreaming: true, agentAlive: true });
+    startAgentAlivePolling(projectId);
+  },
+
+  setInterviewMode(mode: InterviewMode) {
+    set({ interviewMode: mode });
+  },
+
   addMessage(message: Message) {
     set((state) => ({ messages: [...state.messages, message] }));
   },
@@ -262,6 +296,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         buildCompleted: false,
         agentAlive: null,
         draft: '',
+        selectedElements: [],
         ...RESET_STATE,
       });
       useVersionStore.getState().reset();
@@ -309,6 +344,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       historyLoaded: false,
       buildCompleted: false,
       agentAlive: null,
+      interviewMode: 'interview',
+      selectedElements: [],
       ...RESET_STATE,
     });
     useVersionStore.getState().reset();
@@ -345,6 +382,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearDataSources() {
     set({ selectedDataSources: [] });
+  },
+
+  addSelectedElement(element: SelectedElement) {
+    if (get().selectedElements.length >= MAX_SELECTED_ELEMENTS) return false;
+    set((state) => ({ selectedElements: [...state.selectedElements, element] }));
+    return true;
+  },
+
+  removeSelectedElement(id: string) {
+    set((state) => ({ selectedElements: state.selectedElements.filter((e) => e.id !== id) }));
+  },
+
+  clearSelectedElements() {
+    set({ selectedElements: [] });
   },
 
   async loadModels() {

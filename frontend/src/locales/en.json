@@ -142,8 +142,6 @@
   },
   "chat": {
     "chat": "Chat",
-    "send": "send",
-    "newLine": "new line",
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -152,6 +150,7 @@
       "selectProject": "Select a project first",
       "creatingProject": "Creating project...",
       "reviewPlan": "Review the plan above, then accept or modify",
+      "reviewInterview": "Answer the questions above, or skip",
       "working": "AI is working...",
       "readOnly": "View-only access",
       "default": "What do you want to build? Click on + to add flow packages."
@@ -159,6 +158,7 @@
     "phase": {
       "analyzing": "Analyzing",
       "fetchingDataSources": "Fetching data sources",
+      "interviewing": "Preparing questions",
       "designing": "Designing",
       "planning": "Planning",
       "building": "Building",
@@ -179,7 +179,23 @@
       "changeSomething": "Change something",
       "sendFeedback": "Send feedback"
     },
+    "interview": {
+      "title": "A few quick questions before I build",
+      "other": "Something else",
+      "submit": "Continue",
+      "skip": "Skip",
+      "skipAll": "Skip all",
+      "next": "Next",
+      "back": "Back",
+      "progress": "Question {{current}} of {{total}}",
+      "selectHint": "Select all that apply",
+      "modePlan": "Plan",
+      "modeBuild": "Build",
+      "modePlanHint": "A few questions before building",
+      "modeBuildHint": "Skip the questions and plan right away"
+    },
     "design": {
+      "designing": "Designing...",
       "designComplete": "Design complete",
       "architecture": "Architecture",
       "uiux": "UI/UX"
@@ -188,6 +204,9 @@
       "removeDataSource": "Remove data source",
       "searchPlaceholder": "Search data sources (optional)",
       "usedInProject": "Used in this project"
+    },
+    "selectedElement": {
+      "remove": "Remove element"
     }
   },
   "sharing": {

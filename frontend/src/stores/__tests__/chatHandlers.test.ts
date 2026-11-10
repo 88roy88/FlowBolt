@@ -12,10 +12,11 @@ import {
   isAgentAlive,
   isAgentWorking,
   isAwaitingPlanApproval,
+  isAwaitingInterview,
   isHistoryRunComplete,
 } from '../chatAgentState';
 import type { ChatState } from '../chat';
-import type { WSMessage, PlanOverview, ProjectSummary } from '../../types';
+import type { WSMessage, PlanOverview, ProjectSummary, InterviewQuestion } from '../../types';
 import { notifyAgentNeedsAttention, notifyBuildComplete } from '../../utils/notifications';
 
 const filesMock = vi.hoisted(() => ({
@@ -73,6 +74,8 @@ const INITIAL_STATE: ChatState = {
   agentPhase: 'idle',
   designProgress: { architecture: null, ux: null },
   planOverview: null,
+  interviewQuestions: null,
+  interviewMode: 'interview',
   executionTasks: [],
   error: null,
   buildCompleted: false,
@@ -86,12 +89,15 @@ const INITIAL_STATE: ChatState = {
   models: [],
   selectedModel: null,
   selectedDataSources: [],
+  selectedElements: [],
   historyLoaded: true,
   setDraft: vi.fn() as unknown as ChatState['setDraft'],
   sendMessage: vi.fn() as unknown as ChatState['sendMessage'],
   sendFixError: vi.fn() as unknown as ChatState['sendFixError'],
   rollbackTurn: vi.fn() as unknown as ChatState['rollbackTurn'],
   respondToPlan: vi.fn() as unknown as ChatState['respondToPlan'],
+  respondToInterview: vi.fn() as unknown as ChatState['respondToInterview'],
+  setInterviewMode: vi.fn() as unknown as ChatState['setInterviewMode'],
   addMessage: vi.fn() as unknown as ChatState['addMessage'],
   loadHistory: vi.fn() as unknown as ChatState['loadHistory'],
   clearMessages: vi.fn() as unknown as ChatState['clearMessages'],
@@ -101,6 +107,9 @@ const INITIAL_STATE: ChatState = {
   addDataSource: vi.fn() as unknown as ChatState['addDataSource'],
   removeDataSource: vi.fn() as unknown as ChatState['removeDataSource'],
   clearDataSources: vi.fn() as unknown as ChatState['clearDataSources'],
+  addSelectedElement: vi.fn() as unknown as ChatState['addSelectedElement'],
+  removeSelectedElement: vi.fn() as unknown as ChatState['removeSelectedElement'],
+  clearSelectedElements: vi.fn() as unknown as ChatState['clearSelectedElements'],
   loadModels: vi.fn() as unknown as ChatState['loadModels'],
 };
 
@@ -248,10 +257,97 @@ describe('createSendMessageHandler — build flow', () => {
     expect(result.dataSources).toEqual([{ id: 1, name: 'Sales' }]);
   });
 
+  it('user_message with selected_elements attaches them with ids', () => {
+    const element = {
+      tag: 'button', selector: 'main > button.cta', text: 'Sign up', classes: 'cta', html: '<button>Sign up</button>', components: ['App'],
+    };
+    handler(msg({ type: 'user_message', content: 'Make this red', selected_elements: [element] }));
+
+    const result = store.state().messages[0];
+    expect(result.content).toBe('Make this red');
+    expect(result.selectedElements).toHaveLength(1);
+    expect(result.selectedElements![0]).toMatchObject(element);
+    expect(result.selectedElements![0].id).toEqual(expect.any(String));
+  });
+
   it('unknown event type does not crash', () => {
     expect(() => {
       handler(msg({ type: 'totally_unknown_event' }));
     }).not.toThrow();
+  });
+});
+
+describe('createSendMessageHandler — interview flow', () => {
+  let store: ReturnType<typeof createTestStore>;
+  let handler: (msg: WSMessage) => void;
+
+  const QUESTIONS: InterviewQuestion[] = [
+    {
+      id: 'q-1',
+      header: 'Audience',
+      question: 'Who is this for?',
+      options: [{ label: 'Me', description: 'Personal use' }],
+      multi_select: false,
+    },
+  ];
+
+  beforeEach(() => {
+    store = createTestStore();
+    setReplayMode(false);
+    handler = createSendMessageHandler(store.set, store.get, vi.fn() as unknown as () => void);
+  });
+
+  it.each([
+    { replay: false, notified: 1 },
+    { replay: true, notified: 0 },
+  ])('interview_questions shows the questions (replay: $replay)', ({ replay, notified }) => {
+    vi.mocked(notifyAgentNeedsAttention).mockClear();
+    setReplayMode(replay);
+    try {
+      handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
+    } finally {
+      setReplayMode(false);
+    }
+
+    expect(store.state()).toMatchObject({
+      agentPhase: 'awaiting_interview',
+      interviewQuestions: QUESTIONS,
+      isStreaming: false,
+    });
+    expect(notifyAgentNeedsAttention).toHaveBeenCalledTimes(notified);
+  });
+
+  it('interview_answered adds a historical card and resumes planning', () => {
+    const answers = [{ question_id: 'q-1', values: ['Me'] }];
+    handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
+    handler(msg({ type: 'interview_answered', questions: QUESTIONS, answers }));
+
+    expect(store.state()).toMatchObject({ interviewQuestions: null, agentPhase: 'interviewing' });
+    const card = store.state().messages.find((m) => m.agentCard?.type === 'interview_answered')?.agentCard;
+    expect(card).toEqual({ type: 'interview_answered', questions: QUESTIONS, answers });
+  });
+
+  it('an error while awaiting the interview keeps the questions and phase', () => {
+    handler(msg({ type: 'interview_questions', questions: QUESTIONS }));
+    handler(msg({ type: 'error', message: 'refused' }));
+
+    expect(store.state()).toMatchObject({
+      interviewQuestions: QUESTIONS,
+      agentPhase: 'awaiting_interview',
+      isStreaming: false,
+      error: 'refused',
+    });
+  });
+
+  it('an error while awaiting plan approval keeps the plan and phase', () => {
+    handler(msg({ type: 'plan_overview', overview: MOCK_PLAN_OVERVIEW }));
+    handler(msg({ type: 'error', message: 'refused' }));
+
+    expect(store.state()).toMatchObject({
+      planOverview: MOCK_PLAN_OVERVIEW,
+      agentPhase: 'awaiting_approval',
+      error: 'refused',
+    });
   });
 });
 
@@ -424,6 +520,15 @@ describe('chatAgentState helpers', () => {
     expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: MOCK_PLAN_OVERVIEW })).toBe(true);
     expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.awaiting_approval, planOverview: null })).toBe(false);
     expect(isAwaitingPlanApproval({ agentPhase: AGENT_PHASE.planning, planOverview: MOCK_PLAN_OVERVIEW })).toBe(false);
+  });
+
+  it('isAwaitingInterview requires phase and questions', () => {
+    expect(isAwaitingInterview({
+      agentPhase: AGENT_PHASE.awaiting_interview,
+      interviewQuestions: [{ id: 'q-1', header: 'A', question: 'Q?', options: [], multi_select: false }],
+    })).toBe(true);
+    expect(isAwaitingInterview({ agentPhase: AGENT_PHASE.awaiting_interview, interviewQuestions: null })).toBe(false);
+    expect(isAwaitingInterview({ agentPhase: AGENT_PHASE.planning, interviewQuestions: [] })).toBe(false);
   });
 
   it('isAgentAlive uses poll when known and WS while unknown', () => {
