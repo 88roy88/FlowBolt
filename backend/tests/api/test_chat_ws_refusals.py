@@ -37,7 +37,7 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
     writes = {
         "save_message": AsyncMock(),
         "emit_event": AsyncMock(),
-        "delete_pending_plan": AsyncMock(),
+        "clear_paused_turn": AsyncMock(),
     }
     with (
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock, return_value=project),
@@ -45,10 +45,9 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
         patch("flow44.api.chat.sandbox_manager") as mgr,
         patch("flow44.api.chat.versioning.broadcast_current_version", new_callable=AsyncMock),
         patch("flow44.api.chat.versioning.begin_turn", claim),
-        patch("flow44.api.chat._is_new_project", new_callable=AsyncMock, return_value=True),
         patch("flow44.api.chat.save_message", writes["save_message"]),
         patch("flow44.api.chat.emit_event", writes["emit_event"]),
-        patch("flow44.api.chat.delete_pending_plan", writes["delete_pending_plan"]),
+        patch("flow44.api.chat.clear_paused_turn", writes["clear_paused_turn"]),
     ):
         sandbox = MagicMock()
         sandbox.project_id = PROJECT_ID
@@ -103,17 +102,18 @@ def test_message_refused_as_busy_saves_nothing() -> None:
     assert "already running" in reply["message"]
 
 
-def test_refused_plan_accept_keeps_the_pending_plan() -> None:
+def test_refused_plan_accept_keeps_the_paused_turn() -> None:
     state = MagicMock()
     state.model = "claude-opus-5"
+    turn = MagicMock(phase="awaiting_approval", state_json="{}")
     with (
-        patch("flow44.api.chat.get_pending_plan", new_callable=AsyncMock, return_value="{}"),
+        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=turn),
         patch("flow44.api.chat.BuildState") as build_state,
     ):
         build_state.model_validate_json.return_value = state
         reply, writes = _send({"type": "plan_response", "action": "accept"}, _locked("previewing"))
 
-    writes["delete_pending_plan"].assert_not_awaited()
+    writes["clear_paused_turn"].assert_not_awaited()
     assert reply == PREVIEWING
 
 
@@ -147,35 +147,47 @@ def test_version_op_refusal_reaches_the_client() -> None:
     }
 
 
-def test_aborted_plan_accept_restores_the_pending_plan() -> None:
+@pytest.mark.parametrize(
+    ("payload", "phase"),
+    [
+        ({"type": "plan_response", "action": "accept"}, "awaiting_approval"),
+        ({"type": "interview_response", "action": "skip"}, "awaiting_interview"),
+    ],
+)
+def test_aborted_resume_pauses_the_turn_again(payload: dict[str, Any], phase: str) -> None:
     state_json = '{"plan": "build a todo app"}'
     state = MagicMock()
     state.model = "claude-opus-5"
 
-    async def hang() -> None:
+    async def hang(*_args: Any, **_kwargs: Any) -> None:
         await emit_transient(PROJECT_ID, {"type": "agent_started"})
         await asyncio.sleep(30)
 
+    turn = MagicMock(phase=phase, state_json=state_json)
     with (
         _connected(AsyncMock(return_value=CLAIMED_AT)) as writes,
-        patch("flow44.api.chat.get_pending_plan", new_callable=AsyncMock, return_value=state_json),
+        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=turn),
         patch("flow44.api.chat.BuildState") as build_state,
+        patch("flow44.api.chat.InterviewSession") as interview_session,
         patch("flow44.api.chat.ExecuteAgent") as execute_agent,
+        patch("flow44.api.chat.AgentRouter") as router,
         patch("flow44.api.chat.get_last_event_id", new_callable=AsyncMock, return_value=7),
         patch("flow44.api.chat.versioning.discard_agent_response", new_callable=AsyncMock) as discard,
-        patch("flow44.api.chat.save_pending_plan", new_callable=AsyncMock) as save_pending_plan,
+        patch("flow44.api.chat.pause_turn", new_callable=AsyncMock) as pause_turn,
         patch("flow44.api.chat.clear_heartbeat", new_callable=AsyncMock),
         # The LISTEN/NOTIFY hop has its own test; here the abort wakes the run directly.
         patch.object(run_abort, "request_abort", AsyncMock(side_effect=run_abort._wake)),
     ):
         build_state.model_validate_json.return_value = state
+        interview_session.model_validate_json.return_value = state
         execute_agent.return_value.run = hang
+        router.return_value.resume_interview = hang
         with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
-            ws.send_json({"type": "plan_response", "action": "accept"})
+            ws.send_json(payload)
             assert ws.receive_json() == {"type": "agent_started"}
             ws.send_json({"type": "abort"})
             assert ws.receive_json() == {"type": "turn_aborted"}
 
-    writes["delete_pending_plan"].assert_awaited_once_with(PROJECT_ID)
+    writes["clear_paused_turn"].assert_awaited_once_with(PROJECT_ID)
     discard.assert_awaited_once_with(PROJECT_ID, 7, ANY)
-    save_pending_plan.assert_awaited_once_with(PROJECT_ID, state_json)
+    pause_turn.assert_awaited_once_with(PROJECT_ID, phase, state_json)

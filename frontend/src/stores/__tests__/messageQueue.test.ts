@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useChatStore } from '../chat';
 import { handleVersionMessage, useVersionStore } from '../version';
 import { AGENT_PHASE } from '../chatAgentState';
-import type { PlanOverview, SelectedElement, WSMessage } from '../../types';
+import type { InterviewQuestion, PlanOverview, SelectedElement, WSMessage } from '../../types';
 
 vi.mock('../session', () => ({
   useSessionStore: {
@@ -78,6 +78,7 @@ describe('message queue', () => {
       selectedDataSources: [],
       selectedElements: [],
       planOverview: null,
+      interviewQuestions: null,
       agentPhase: AGENT_PHASE.idle,
     });
   });
@@ -165,6 +166,15 @@ describe('message queue', () => {
     useChatStore.setState({ agentPhase: AGENT_PHASE.idle, planOverview: null });
     deliver({ type: 'run_released' });
     expect(sentPrompts()).toEqual(['next']);
+  });
+
+  it('waits while an interview needs answers', () => {
+    useChatStore.getState().queueMessage('next');
+    useChatStore.setState({ agentPhase: AGENT_PHASE.awaiting_interview, interviewQuestions: [] as InterviewQuestion[] });
+
+    deliver({ type: 'run_released' });
+    expect(sentPrompts()).toEqual([]);
+    expect(queuedContents()).toEqual(['next']);
   });
 
   it('holds the queue when Stop arrives too late to abort the turn', () => {

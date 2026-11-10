@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +83,28 @@ async def fetch_and_analyze_data_source(
         integration_notes=analysis.get("integration_notes", ""),
         param_ux_hints=analysis.get("param_ux_hints", ""),
     )
+
+
+async def fetch_data_sources(
+    data_source_ids: list[str],
+    user_content: str,
+    authorization: str | None,
+    model: str | None,
+    llm_metadata_fn: Callable[[str], dict[str, Any]],
+    emit: Callable[[dict[str, Any]], Awaitable[None]],
+) -> list[DataSourceContext]:
+    await emit({"type": "phase", "phase": "fetching_data_sources"})
+    try:
+        return await asyncio.gather(
+            *[
+                fetch_and_analyze_data_source(sid, user_content, authorization, model, llm_metadata_fn)
+                for sid in data_source_ids
+            ]
+        )
+    except Exception:
+        await emit({"type": "error", "message": "Build aborted: failed to fetch required data source data."})
+        await emit({"type": "phase", "phase": "idle"})
+        raise
 
 
 def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:

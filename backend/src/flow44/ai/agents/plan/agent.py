@@ -5,7 +5,7 @@ import logging
 from opik import track
 
 from flow44.ai.agents._base import BaseAgent
-from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
+from flow44.ai.agents.analyze_data_source import fetch_data_sources, generate_data_source_files
 from flow44.ai.agents.plan.models import ArchitectureDesign, UserPlanOverview, UXDesign
 from flow44.ai.agents.plan.plan_state import PlanState
 from flow44.ai.agents.plan.prompts import (
@@ -19,7 +19,8 @@ from flow44.ai.core.opik_utils import record_span_error
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.ai.state import BuildState
-from flow44.db.pending_plan import save_pending_plan
+from flow44.db.paused_turn import pause_turn
+from flow44.db.project_data_source import DataSourceContext
 from flow44.sandbox.main import PnpmSandbox
 from flow44.services.logging.helpers import bi_logger
 
@@ -56,9 +57,15 @@ class PlanAgent(BaseAgent):
         return flow
 
     @track(name="plan-agent-run")  # type: ignore[untyped-decorator]
-    async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:
+    async def run(
+        self,
+        content: str,
+        data_source_ids: list[str] | None = None,
+        data_source_contexts: list[DataSourceContext] | None = None,
+    ) -> None:
         self._state.user_content = content
         self._state.data_source_ids = data_source_ids or []
+        self._state.data_source_contexts = data_source_contexts or []
         self._setup_trace(["plan-agent"])
 
         # Initialize plan state for Flow
@@ -83,29 +90,15 @@ class PlanAgent(BaseAgent):
 
     async def _step_fetch_data_sources(self, state: PlanState) -> PlanState:
         """Step: Fetch and analyze data sources."""
-        await state.emit_fn({"type": "phase", "phase": "fetching_data_sources"})
-
-        try:
-            results = await asyncio.gather(
-                *[
-                    fetch_and_analyze_data_source(
-                        sid,
-                        self._state.user_content,
-                        self._data_source_authorization,
-                        self.model,
-                        self._llm_metadata,
-                    )
-                    for sid in state.build_state.data_source_ids
-                ]
+        if not state.build_state.data_source_contexts:
+            state.build_state.data_source_contexts = await fetch_data_sources(
+                state.build_state.data_source_ids,
+                self._state.user_content,
+                self._data_source_authorization,
+                self.model,
+                self._llm_metadata,
+                state.emit_fn,
             )
-        except Exception:
-            await state.emit_fn(
-                {"type": "error", "message": "Build aborted: failed to fetch required data source data."}
-            )
-            await state.emit_fn({"type": "phase", "phase": "idle"})
-            raise
-
-        state.build_state.data_source_contexts = [ctx for ctx in results if ctx is not None]
 
         # Generate deterministic hook + type files and write to sandbox
         for ctx in state.build_state.data_source_contexts:
@@ -170,8 +163,7 @@ class PlanAgent(BaseAgent):
 
     async def _step_persist(self, state: PlanState) -> PlanState:
         """Step: Persist to DB and emit plan for approval."""
-        state.build_state.phase = "awaiting_approval"
-        await save_pending_plan(state.project_id, state.build_state.model_dump_json())
+        await pause_turn(state.project_id, "awaiting_approval", state.build_state.model_dump_json())
         await state.emit_fn({"type": "phase", "phase": "awaiting_approval"})
         await state.emit_fn({"type": "plan_overview", "overview": state.build_state.user_plan_overview.model_dump()})
 
@@ -205,8 +197,7 @@ class PlanAgent(BaseAgent):
         )
         self._state.user_plan_overview = UserPlanOverview.model_validate(parse_json_response(raw))
 
-        self._state.phase = "awaiting_approval"
-        await save_pending_plan(self.project_id, self._state.model_dump_json())
+        await pause_turn(self.project_id, "awaiting_approval", self._state.model_dump_json())
         await self.emit({"type": "phase", "phase": "awaiting_approval"})
         await self.emit({"type": "plan_overview", "overview": self._state.user_plan_overview.model_dump()})
 

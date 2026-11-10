@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, SelectedElement, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff } from '../types';
+import type { Message, SelectedElement, Action, WSMessage, AIModel, AgentPhase, PlanOverview, ExecutionTask, ProjectSummary, FixStep, FollowUpStep, FileDiff, InterviewQuestion, InterviewAnswer, InterviewMode } from '../types';
 import { WRITE_ROLES } from '../types';
 import { getChatSocket } from '../services/websocket';
 import { useSessionStore } from './session';
@@ -28,6 +28,8 @@ export interface ChatState {
   selectedModel: string | null;
   agentPhase: AgentPhase;
   planOverview: PlanOverview | null;
+  interviewQuestions: InterviewQuestion[] | null;
+  interviewMode: InterviewMode;
   executionTasks: ExecutionTask[];
   fixSteps: FixStep[];
   followUpSteps: FollowUpStep[];
@@ -56,6 +58,8 @@ export interface ChatState {
   abortTurn: () => void;
   reloadAfterAbort: (projectId: string) => Promise<void>;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
+  respondToInterview: (action: 'submit' | 'skip', answers?: InterviewAnswer[]) => void;
+  setInterviewMode: (mode: InterviewMode) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
   loadHistory: (projectId: string) => Promise<void>;
@@ -126,6 +130,7 @@ const RESET_STATE = {
   error: null,
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
+  interviewQuestions: null,
   executionTasks: [] as ExecutionTask[],
   aborting: false,
 };
@@ -169,6 +174,7 @@ function sendTurn(
   socket.send({
     type: 'message',
     content,
+    mode: get().interviewMode,
     ...(selectedModel && { model: selectedModel }),
     ...(dataSources.length > 0 && { dataSourceIds: dataSources.map((c) => c.id) }),
     ...(selectedElements.length > 0 && { selectedElements: selectedElements.map(({ id: _id, ...e }) => e) }),
@@ -194,6 +200,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedModel: null,
   agentPhase: AGENT_PHASE.idle,
   planOverview: null,
+  interviewQuestions: null,
+  interviewMode: 'interview',
   executionTasks: [],
   fixSteps: [],
   followUpSteps: [],
@@ -361,6 +369,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     startAgentAlivePolling(projectId);
   },
 
+  respondToInterview(action: 'submit' | 'skip', answers?: InterviewAnswer[]) {
+    const projectId = useSessionStore.getState().projectId;
+    if (!projectId) return;
+
+    const socket = getChatSocket(projectId);
+    const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
+    attachHandler(projectId, socket, handler);
+    socket.send({ type: 'interview_response', action, answers });
+
+    set({ isStreaming: true, agentAlive: true });
+    startAgentAlivePolling(projectId);
+  },
+
+  setInterviewMode(mode: InterviewMode) {
+    set({ interviewMode: mode });
+  },
+
   addMessage(message: Message) {
     set((state) => ({ messages: [...state.messages, message] }));
   },
@@ -433,6 +458,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       historyLoaded: false,
       buildCompleted: false,
       agentAlive: null,
+      interviewMode: 'interview',
       selectedElements: [],
       queuedMessages: [],
       queueHeld: false,

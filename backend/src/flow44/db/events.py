@@ -69,7 +69,8 @@ async def emit_event(project_id: str, event: dict[str, Any], *, notify: bool = T
     event.setdefault("_ts", datetime.now(UTC).isoformat())
 
     async with database.async_session() as session:
-        row = AgentEvent(project_id=project_id, event_type=event.get("type", "unknown"), payload=event)
+        # TODO: mypy 2.4 sees created_at as required since it has no Python default; fix the model and drop the ignore
+        row = AgentEvent(project_id=project_id, event_type=event.get("type", "unknown"), payload=event)  # type: ignore[call-arg]
         session.add(row)
         await session.commit()
 

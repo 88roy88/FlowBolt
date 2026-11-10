@@ -11,6 +11,7 @@ import { UnsavedEditsRow } from '../version/UnsavedEditsRow';
 import { PromptInput } from './PromptInput';
 import { ChatSkeleton } from './ChatSkeleton';
 import { WorkPlanView } from './WorkPlanView';
+import { InterviewCard } from './InterviewCard';
 import { TaskProgress } from './TaskProgress';
 import { PhaseIndicator } from './PhaseIndicator';
 import { DesignProgress } from './DesignProgress';
@@ -42,12 +43,12 @@ export function ChatPanel() {
   const { t, i18n } = useTranslation();
   const {
     messages, currentAssistantMessage, actions, error, clearError,
-    agentPhase, planOverview, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
+    agentPhase, planOverview, interviewQuestions, executionTasks, designProgress, fixSteps, followUpSteps, fileDiffs,
   } = useChatStore(useShallow((s) => ({
     messages: s.messages, currentAssistantMessage: s.currentAssistantMessage, actions: s.actions,
     error: s.error, clearError: s.clearError, agentPhase: s.agentPhase, planOverview: s.planOverview,
-    executionTasks: s.executionTasks, designProgress: s.designProgress, fixSteps: s.fixSteps,
-    followUpSteps: s.followUpSteps, fileDiffs: s.fileDiffs,
+    interviewQuestions: s.interviewQuestions, executionTasks: s.executionTasks, designProgress: s.designProgress,
+    fixSteps: s.fixSteps, followUpSteps: s.followUpSteps, fileDiffs: s.fileDiffs,
   })));
   const agentActive = useChatStore(isAgentAlive);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
@@ -97,12 +98,14 @@ export function ChatPanel() {
 
   const showDesignProgress = agentPhase === 'designing';
   const showOverview = agentPhase === 'awaiting_approval' && planOverview;
+  const showInterview = agentPhase === 'awaiting_interview' && interviewQuestions;
   const showTaskProgress = (agentPhase === 'executing' || agentPhase === 'complete') && executionTasks.length > 0;
   const showFixProgress = fixSteps.length > 0 && agentActive;
   const showFollowUpProgress = followUpSteps.length > 0 && agentActive;
-  const showStreamingMessage = agentActive && currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress;
-  const showPhaseIndicator = agentPhase === 'planning' || (agentPhase === 'exploring' && followUpSteps.length === 0);
-  const showTypingDots = agentActive && !currentAssistantMessage && !showDesignProgress && !showOverview && !showTaskProgress && !showFixProgress && !showFollowUpProgress && !showPhaseIndicator;
+  const showAgentCard = showDesignProgress || showOverview || showInterview || showTaskProgress || showFixProgress || showFollowUpProgress;
+  const showStreamingMessage = agentActive && currentAssistantMessage && !showAgentCard;
+  const showPhaseIndicator = agentPhase === 'planning' || agentPhase === 'interviewing' || (agentPhase === 'exploring' && followUpSteps.length === 0);
+  const showTypingDots = agentActive && !currentAssistantMessage && !showAgentCard && !showPhaseIndicator;
 
   const dayGroups = groupMessagesByDay(messages);
 
@@ -124,6 +127,7 @@ export function ChatPanel() {
         {showPhaseIndicator && <PhaseIndicator phase={agentPhase} />}
         {showDesignProgress && <DesignProgress designProgress={designProgress} />}
         {showOverview && planOverview && <WorkPlanView overview={planOverview} />}
+        {showInterview && interviewQuestions && <InterviewCard questions={interviewQuestions} />}
         {showTaskProgress && <TaskProgress tasks={executionTasks} />}
         {showFixProgress && <FixProgressCard steps={fixSteps} content={currentAssistantMessage} diffs={fileDiffs} isLive />}
         {showFollowUpProgress && (

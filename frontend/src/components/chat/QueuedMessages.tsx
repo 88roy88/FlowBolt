@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ArrowUp, X } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
-import { isAwaitingPlanApproval } from '../../stores/chatAgentState';
+import { isAwaitingUserInput } from '../../stores/chatAgentState';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
 
 export function QueuedMessages() {
@@ -9,13 +9,13 @@ export function QueuedMessages() {
   const queuedMessages = useChatStore((s) => s.queuedMessages);
   const removeQueued = useChatStore((s) => s.removeQueued);
   const sendQueued = useChatStore((s) => s.sendQueued);
-  const awaitingPlan = useChatStore(isAwaitingPlanApproval);
+  const awaitingInput = useChatStore(isAwaitingUserInput);
   const { lock } = useWorkspaceLock();
 
   if (queuedMessages.length === 0) return null;
 
   // Normally the queue sends itself; this restarts it after a failure or a missed run_released.
-  const canSendNow = lock === null && !awaitingPlan;
+  const canSendNow = lock === null && !awaitingInput;
 
   return (
     <ul className="flex flex-col gap-1 mb-2" aria-label={t('chat.queue.title')} data-testid="queued-messages">
