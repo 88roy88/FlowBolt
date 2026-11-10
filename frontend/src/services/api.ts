@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
+import type { AssignableRole, SelectedElement, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
 import type { LogEvent } from './logger';
 
 const BASE = '/api';
@@ -181,6 +181,32 @@ export async function fetchChatHistory(projectId: string): Promise<{ id: string;
 
 export async function fetchAgentEvents(projectId: string): Promise<Record<string, unknown>[]> {
   return request(`/chat/${projectId}/events`);
+}
+
+export type EnhancePromptRequest = {
+  content: string;
+  model: string | null;
+  dataSourceNames: string[];
+  selectedElements: SelectedElement[];
+};
+
+export async function enhancePrompt(
+  projectId: string | null,
+  req: EnhancePromptRequest,
+  signal?: AbortSignal
+): Promise<string> {
+  const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+  const data = await request<{ enhanced: string }>(`/chat/enhance${query}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      content: req.content,
+      model: req.model,
+      data_source_names: req.dataSourceNames,
+      selected_elements: req.selectedElements.map(({ id: _id, ...e }) => e),
+    }),
+    signal,
+  });
+  return data.enhanced;
 }
 
 export type AgentAliveResponse = {

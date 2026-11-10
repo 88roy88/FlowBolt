@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+
+import pytest
+
 from flow44.ai.file_safety import FileSafetyError
-from flow44.ai.helpers import format_agent_feedback, parse_json_response
+from flow44.ai.helpers import format_agent_feedback, format_summary, parse_json_response
 
 
 class TestParseJsonResponse:
@@ -96,6 +100,19 @@ class TestParseJsonResponse:
         """Handle code blocks with multiple ``` markers."""
         result = parse_json_response('```json\n{"key": "value"}\n```\n```')
         assert result == {"key": "value"}
+
+
+class TestFormatSummary:
+    def test_valid_json(self) -> None:
+        raw = json.dumps({"summary": "A todo app", "tech_stack": ["React"], "features": ["Add todos"]})
+        result = format_summary(raw)
+        assert "A todo app" in result
+        assert "Tech stack: React" in result
+        assert "Features: Add todos" in result
+
+    @pytest.mark.parametrize(("raw", "expected"), [("", ""), ("not json", "(no project summary available)")])
+    def test_empty_and_malformed(self, raw: str, expected: str) -> None:
+        assert format_summary(raw) == expected
 
 
 class TestFormatAgentFeedback:

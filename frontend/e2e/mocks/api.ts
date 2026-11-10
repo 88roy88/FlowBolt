@@ -124,7 +124,11 @@ export interface MockAPIOptions {
   failProjectsOnce?: boolean;
   /** Flags returned by GET /api/projects/me. Defaults to an admin. */
   userStatus?: { is_admin: boolean; is_platform_user: boolean };
+  /** Hold the enhance response open, so the pending state is observable. */
+  enhanceDelayMs?: number;
 }
+
+export const ENHANCED_PROMPT = 'A todo app for a solo professional, with a single list view.';
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -135,6 +139,9 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   const fileTree = cloneTree(MOCK_FILE_TREE);
   const fileContents = { ...MOCK_FILE_CONTENTS };
   let projectsGetCount = 0;
+
+  // Unmocked, the dev proxy 401s the BI event and signs the user out
+  await page.route('**/api/bi/events', (route) => route.fulfill({ status: 204, body: '' }));
 
   // --- Projects ---
   await page.route('**/api/projects', async (route) => {
@@ -165,11 +172,6 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
       return route.fulfill({ json: { user_id: 'test-user', ...status } });
     }
 
-    // Skip sub-routes like /name, /model, /members
-    if (url.includes('/name') || url.includes('/model') || url.includes('/members')) {
-      return route.fulfill({ status: 200, json: {} });
-    }
-
     if (route.request().method() === 'DELETE') {
       // Extract project ID from URL and remove from list
       const parts = url.split('/');
@@ -180,6 +182,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     }
     const requestedId = new URL(url).pathname.split('/').pop();
     return route.fulfill({ json: projects.find((p) => p.id === requestedId) ?? projects[0] ?? MOCK_PROJECT });
+  });
+
+  // `*` stops at `/`, so sub-routes need their own pattern or they escape to the dev-server proxy.
+  await page.route('**/api/projects/*/**', async (route) => {
+    return route.fulfill({ json: {} });
   });
 
   // --- Files ---
@@ -364,6 +371,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   await page.route(`**/api/chat/*/events`, async (route) => {
     const payload = options.seedEvents ?? (options.seedChatHistory ? CHAT_SEED_EVENTS : []);
     return route.fulfill({ json: payload });
+  });
+
+  await page.route(/\/api\/chat\/enhance(\?|$)/, async (route) => {
+    if (options.enhanceDelayMs) await new Promise((r) => setTimeout(r, options.enhanceDelayMs));
+    return route.fulfill({ json: { enhanced: ENHANCED_PROMPT } });
   });
 
   // --- Models ---

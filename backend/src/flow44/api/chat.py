@@ -11,17 +11,32 @@ from datetime import datetime
 from functools import partial
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel, Field
 
+from flow44.ai.agents.enhance.agent import enhance_prompt
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
 from flow44.ai.agents.interview.models import InterviewAnswer, InterviewSession
 from flow44.ai.agents.plan.agent import PlanAgent
-from flow44.ai.agents.routing import AgentRouter
+from flow44.ai.agents.routing import AgentRouter, is_new_project
 from flow44.ai.core.provider import ContextWindowExceeded
-from flow44.ai.selected_elements_context import format_selected_elements, parse_selected_elements
+from flow44.ai.selected_elements_context import (
+    MAX_SELECTED_ELEMENTS,
+    SelectedElement,
+    format_selected_elements,
+    parse_selected_elements,
+)
 from flow44.ai.state import BuildState
-from flow44.api.deps import Permission, ProjectDep, TokenDep, WsProjectDep, WsUserDep, require_ws_permission
+from flow44.api.deps import (
+    OptionalProjectDep,
+    Permission,
+    ProjectDep,
+    TokenDep,
+    WsProjectDep,
+    WsUserDep,
+    require_ws_permission,
+)
 from flow44.config import settings
 from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
 from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
@@ -179,6 +194,35 @@ async def chat_history(project: ProjectDep) -> list[dict[str, Any]]:
 async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
     events = await get_events(project.id)
     return [{**evt.payload, "_ts": evt.created_at} for evt in events]
+
+
+class EnhanceRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=10_000)
+    model: str | None = None
+    data_source_names: list[str] = Field(default_factory=list, max_length=20)
+    selected_elements: list[SelectedElement] = Field(default_factory=list, max_length=MAX_SELECTED_ELEMENTS)
+
+
+class EnhanceResponse(BaseModel):
+    enhanced: str
+
+
+@http_router.post("/enhance")
+async def enhance(project: OptionalProjectDep, body: EnhanceRequest) -> EnhanceResponse:
+    try:
+        enhanced = await enhance_prompt(
+            body.content,
+            is_new=project is None or await is_new_project(project.id),
+            summary=project.summary if project else "",
+            model=body.model,
+            data_source_names=body.data_source_names,
+            context=format_selected_elements(body.selected_elements) if body.selected_elements else "",
+        )
+    except Exception:
+        logger.exception("[chat] Prompt enhancement failed")
+        raise HTTPException(status_code=502, detail="Prompt enhancement failed") from None
+
+    return EnhanceResponse(enhanced=enhanced)
 
 
 @ws_router.websocket("/ws/chat/{project_id}")
