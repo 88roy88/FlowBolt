@@ -1,8 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import { ArrowUp, X } from 'lucide-react';
+import { ArrowUp, Package, SquareDashedMousePointer, X } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { isAwaitingUserInput } from '../../stores/chatAgentState';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
+import { elementLabel } from '../../utils/selectedElement';
+
+function AttachmentCount({ icon: Icon, names }: { icon: typeof Package; names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <span className="flex items-center gap-0.5 shrink-0 text-xs text-muted-foreground" title={names.join(', ')}>
+      <Icon size={13} />
+      {names.length}
+    </span>
+  );
+}
 
 export function QueuedMessages() {
   const { t } = useTranslation();
@@ -22,6 +33,8 @@ export function QueuedMessages() {
       {queuedMessages.map((m) => (
         <li key={m.id} className="flex items-center gap-1 ps-3 pe-1 py-1 rounded-lg bg-muted/50 text-sm">
           <span className="flex-1 min-w-0 truncate" dir="auto" title={m.content}>{m.content}</span>
+          <AttachmentCount icon={SquareDashedMousePointer} names={m.selectedElements.map(elementLabel)} />
+          <AttachmentCount icon={Package} names={m.dataSources.map((ds) => ds.name)} />
           {canSendNow && (
             <button
               onClick={() => sendQueued(m.id)}

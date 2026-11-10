@@ -62,7 +62,7 @@ export interface ChatState {
   setInterviewMode: (mode: InterviewMode) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
-  loadHistory: (projectId: string) => Promise<void>;
+  loadHistory: (projectId: string, opts?: { keepInput?: boolean }) => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
@@ -135,7 +135,6 @@ const RESET_STATE = {
   aborting: false,
 };
 
-/** Starts a user turn and returns its message id. */
 function sendTurn(
   projectId: string,
   content: string,
@@ -341,8 +340,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reloadAfterAbort(projectId: string) {
     const { draft, queuedMessages, selectedDataSources, selectedElements } = get();
     const dataSources = [...queuedMessages.flatMap((m) => m.dataSources), ...selectedDataSources];
-    // loadHistory clears the input before its first await, so this lands after that reset.
-    const reloaded = get().loadHistory(projectId);
     set({
       draft: [...queuedMessages.map((m) => m.content), draft].filter(Boolean).join('\n\n'),
       selectedDataSources: dataSources.filter((c, i) => dataSources.findIndex((o) => o.id === c.id) === i),
@@ -350,7 +347,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       queuedMessages: [],
       queueHeld: false,
     });
-    return reloaded;
+    return get().loadHistory(projectId, { keepInput: true });
   },
 
   respondToPlan(action: 'accept' | 'modify', feedback?: string) {
@@ -390,7 +387,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({ messages: [...state.messages, message] }));
   },
 
-  async loadHistory(projectId: string) {
+  async loadHistory(projectId: string, opts?: { keepInput?: boolean }) {
     // Detach any existing handlers from the previous session
     if (activeProjectId && activeProjectId !== projectId) {
       stopAgentAlivePolling();
@@ -409,8 +406,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         historyLoaded: false,
         buildCompleted: false,
         agentAlive: null,
-        draft: '',
-        selectedElements: [],
+        ...(!opts?.keepInput && { draft: '', selectedElements: [] }),
         ...RESET_STATE,
       });
       useVersionStore.getState().reset();
