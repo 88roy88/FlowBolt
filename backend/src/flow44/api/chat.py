@@ -176,11 +176,6 @@ async def _save_user_turn(project_id: str, turn: _UserTurn) -> None:
     await emit_event(project_id, turn.event, notify=False)
 
 
-@http_router.get("/limits")
-async def chat_limits() -> dict[str, int]:
-    return {"max_message_chars": settings.CHAT_MESSAGE_MAX_CHARS}
-
-
 @http_router.get("/{project_id}/history")
 async def chat_history(project: ProjectDep) -> list[dict[str, Any]]:
     messages = await get_messages(project.id)

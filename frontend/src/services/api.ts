@@ -201,8 +201,12 @@ export async function fetchDefaultModel(): Promise<string> {
   return data.model;
 }
 
-export async function fetchChatLimits(): Promise<{ max_message_chars: number }> {
-  return request<{ max_message_chars: number }>('/chat/limits');
+export interface ClientConfig {
+  chat_message_max_chars: number;
+}
+
+export async function fetchClientConfig(): Promise<ClientConfig> {
+  return request<ClientConfig>('/config');
 }
 
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchResult[]> {

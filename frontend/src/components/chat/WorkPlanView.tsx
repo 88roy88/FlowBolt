@@ -7,7 +7,7 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { CardWrapper } from './cards/CardWrapper';
 import { MessageLengthHint } from './MessageLengthHint';
-import { isOverLimit, useMaxMessageChars } from '../../hooks/useMaxMessageChars';
+import { isOverLimit, useClientConfig } from '../../hooks/useClientConfig';
 
 interface WorkPlanViewProps {
   overview: PlanOverview;
@@ -18,7 +18,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
   const [modifyMode, setModifyMode] = useState(false);
   const [feedback, setFeedback] = useState('');
   const respondToPlan = useChatStore((s) => s.respondToPlan);
-  const maxChars = useMaxMessageChars();
+  const maxChars = useClientConfig()?.chat_message_max_chars ?? null;
   const feedbackLength = feedback.trim().length;
   const tooLong = isOverLimit(feedbackLength, maxChars);
 

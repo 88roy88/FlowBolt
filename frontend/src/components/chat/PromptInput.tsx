@@ -9,7 +9,7 @@ import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
 import { MessageLengthHint } from './MessageLengthHint';
-import { isOverLimit, useMaxMessageChars } from '../../hooks/useMaxMessageChars';
+import { isOverLimit, useClientConfig } from '../../hooks/useClientConfig';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
@@ -44,7 +44,7 @@ export function PromptInput() {
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
-  const maxChars = useMaxMessageChars();
+  const maxChars = useClientConfig()?.chat_message_max_chars ?? null;
   const length = value.trim().length;
   const tooLong = isOverLimit(length, maxChars);
   const inputBlocked = lock !== null || awaitingPlan || awaitingInterview || isCreating;

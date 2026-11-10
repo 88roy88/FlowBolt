@@ -27,10 +27,6 @@ MAX_READ_LINES = 1000
 
 
 def _trim_start(history: list[ChatMessage]) -> int:
-    """Index of the oldest run to keep: drop whole runs, oldest first, until the rest fits the budget.
-
-    The latest run is always kept, even when it alone is over budget.
-    """
     run_starts = [i for i, m in enumerate(history) if m.role == ChatRole.user]
     if not run_starts:
         return 0
