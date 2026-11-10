@@ -4,11 +4,26 @@ from pathlib import Path
 import pytest
 
 from flow44.config import settings
-from flow44.services.versioning.git import Git, GitError
+from flow44.services.versioning.git import Git, GitError, _split_file_diffs
 
 from .conftest import VersionChain, git_out, outer_repo, requires_git
 
 pytestmark = requires_git
+
+
+def test_split_file_diffs_flags_new_and_deleted_files() -> None:
+    show_output = (
+        "diff --git a/old.txt b/old.txt\ndeleted file mode 100644\nindex 26af6a8..0000000\n"
+        "--- a/old.txt\n+++ /dev/null\n@@ -1 +0,0 @@\n-zero\n"
+        "diff --git a/kept.txt b/kept.txt\nindex 2fa992c..5ea2ed4 100644\n"
+        "--- a/kept.txt\n+++ b/kept.txt\n@@ -1 +1 @@\n-keep\n+changed\n"
+        "diff --git a/new.txt b/new.txt\nnew file mode 100644\nindex 0000000..3e75765\n"
+        "--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+new\n"
+    )
+
+    flags = {d.path: (d.is_new, d.is_deleted) for d in _split_file_diffs(show_output)}
+
+    assert flags == {"old.txt": (False, True), "kept.txt": (False, False), "new.txt": (True, False)}
 
 
 async def test_changed_files_include_dirty_and_untracked_but_not_ignored(repo: Git, workspace: Path) -> None:
@@ -92,6 +107,7 @@ async def test_commit_diffs_lists_binary_files_and_both_sides_of_a_rename(repo: 
     diffs = {d.path: d for d in await repo.commit_diffs(sha, max_chars=10_000)}
 
     assert {path: d.is_new for path, d in diffs.items()} == {"a.txt": False, "b.txt": True, "pixel.png": True}
+    assert {path: d.is_deleted for path, d in diffs.items()} == {"a.txt": True, "b.txt": False, "pixel.png": False}
     assert diffs["pixel.png"].diff == ""
     assert "+zero" in diffs["b.txt"].diff
 

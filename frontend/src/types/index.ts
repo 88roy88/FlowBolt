@@ -239,6 +239,7 @@ export interface FileDiff {
   path: string;
   diff: string;
   is_new?: boolean;
+  is_deleted?: boolean;
 }
 
 export interface FollowUpStep {

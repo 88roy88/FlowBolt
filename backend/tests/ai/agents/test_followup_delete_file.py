@@ -44,6 +44,7 @@ async def test_delete_file_removes_file_and_records_full_removal_diff() -> None:
     assert sandbox.deleted == ["src/components/Old.tsx"]
     [diff] = agent._diffs.combined_diffs()
     assert diff.path == "src/components/Old.tsx"
+    assert diff.is_deleted is True
     assert "-export const Old = 1;" in diff.diff
 
 
