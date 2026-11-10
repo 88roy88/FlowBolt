@@ -30,7 +30,7 @@ class _PopenWrapper:
 
     @property
     def returncode(self) -> int | None:
-        return self._proc.returncode
+        return self._proc.poll()
 
     def kill(self) -> None:
         subprocess.run(["taskkill", "/PID", str(self._proc.pid), "/T", "/F"], check=False)  # noqa: S607
@@ -70,7 +70,8 @@ class WindowsLocalSandbox(BaseSandbox):
             stdout=log_file,
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
-            env=env,
+            # pnpm 11 auto-installs before scripts, colliding with the scaffold's install (EPERM on Windows)
+            env={**env, "pnpm_config_verify_deps_before_run": "warn"},
             encoding="utf-8",
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]  # Windows-only
         )
