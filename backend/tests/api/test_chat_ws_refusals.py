@@ -99,6 +99,36 @@ def test_message_refused_as_busy_saves_nothing() -> None:
     assert "already running" in reply["message"]
 
 
+def test_message_over_the_length_limit_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("flow44.api.chat.settings.CHAT_MESSAGE_MAX_CHARS", 10)
+    claim = AsyncMock(return_value=CLAIMED_AT)
+    reply, writes = _send({"type": "message", "content": "x" * 11}, claim)
+
+    claim.assert_not_awaited()
+    writes["save_message"].assert_not_awaited()
+    assert reply["type"] == "error"
+    assert "too long" in reply["message"]
+
+
+def test_plan_feedback_over_the_length_limit_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("flow44.api.chat.settings.CHAT_MESSAGE_MAX_CHARS", 10)
+    claim = AsyncMock(return_value=CLAIMED_AT)
+    reply, _ = _send({"type": "plan_response", "action": "modify", "feedback": "x" * 11}, claim)
+
+    claim.assert_not_awaited()
+    assert reply["type"] == "error"
+    assert "too long" in reply["message"]
+
+
+def test_limits_endpoint_reports_the_message_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("flow44.api.chat.settings.CHAT_MESSAGE_MAX_CHARS", 1234)
+    with patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="user-a"):
+        res = client.get("/api/chat/limits", headers={"cookie": "flow44_token=t"})
+
+    assert res.status_code == 200
+    assert res.json() == {"max_message_chars": 1234}
+
+
 def test_refused_plan_accept_keeps_the_paused_turn() -> None:
     state = MagicMock()
     state.model = "claude-opus-5"

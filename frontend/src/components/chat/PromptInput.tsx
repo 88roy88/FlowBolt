@@ -8,6 +8,8 @@ import { ArrowUp, CirclePlus, Loader2, SquareDashedMousePointer, X } from 'lucid
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
+import { MessageLengthHint } from './MessageLengthHint';
+import { isOverLimit, useMaxMessageChars } from '../../hooks/useMaxMessageChars';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
@@ -42,6 +44,9 @@ export function PromptInput() {
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
+  const maxChars = useMaxMessageChars();
+  const length = value.trim().length;
+  const tooLong = isOverLimit(length, maxChars);
   const inputBlocked = lock !== null || awaitingPlan || awaitingInterview || isCreating;
   // No project open: submitting starts a new one, if the user may create projects
   const startsProject = !projectId && canCreate;
@@ -55,7 +60,7 @@ export function PromptInput() {
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || inputBlocked) return;
+    if (!trimmed || inputBlocked || tooLong) return;
     if (projectId) sendMessage(trimmed);
     else if (startsProject) void startProjectFromPrompt(trimmed);
   };
@@ -68,7 +73,7 @@ export function PromptInput() {
   };
 
   const disabled = inputBlocked || (!projectId && !startsProject);
-  const canSend = !!value.trim() && !disabled;
+  const canSend = length > 0 && !disabled && !tooLong;
   const dsOpen = showDsSelector && !disabled;
 
   // Global keyboard shortcut: Cmd+K to focus chat
@@ -167,6 +172,8 @@ export function PromptInput() {
           data-testid="chat-input"
           className="w-full resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
         />
+
+        <MessageLengthHint length={length} max={maxChars} />
 
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}

@@ -6,6 +6,8 @@ import { useChatStore } from '../../stores/chat';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { CardWrapper } from './cards/CardWrapper';
+import { MessageLengthHint } from './MessageLengthHint';
+import { isOverLimit, useMaxMessageChars } from '../../hooks/useMaxMessageChars';
 
 interface WorkPlanViewProps {
   overview: PlanOverview;
@@ -16,8 +18,12 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
   const [modifyMode, setModifyMode] = useState(false);
   const [feedback, setFeedback] = useState('');
   const respondToPlan = useChatStore((s) => s.respondToPlan);
+  const maxChars = useMaxMessageChars();
+  const feedbackLength = feedback.trim().length;
+  const tooLong = isOverLimit(feedbackLength, maxChars);
 
   const handleModify = () => {
+    if (modifyMode && tooLong) return;
     if (modifyMode && feedback.trim()) {
       respondToPlan('modify', feedback.trim());
       setModifyMode(false);
@@ -87,6 +93,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
             autoFocus
             className="bg-background"
           />
+          <MessageLengthHint length={feedbackLength} max={maxChars} />
         </div>
       )}
 
@@ -96,7 +103,7 @@ export function WorkPlanView({ overview }: WorkPlanViewProps) {
           <Check size={14} />
           {t('chat.plan.looksGood')}
         </Button>
-        <Button variant="warning" onClick={handleModify} className="grow h-auto min-h-8 whitespace-normal text-center hover:-translate-y-0.5 transition-transform duration-150">
+        <Button variant="warning" onClick={handleModify} disabled={modifyMode && tooLong} className="grow h-auto min-h-8 whitespace-normal text-center hover:-translate-y-0.5 transition-transform duration-150">
           <Pencil size={14} />
           {modifyMode ? t('chat.plan.sendFeedback') : t('chat.plan.changeSomething')}
         </Button>

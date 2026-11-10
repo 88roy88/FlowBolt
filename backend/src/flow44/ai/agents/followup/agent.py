@@ -27,6 +27,10 @@ MAX_READ_LINES = 1000
 
 
 def _trim_start(history: list[ChatMessage]) -> int:
+    """Index of the oldest run to keep: drop whole runs, oldest first, until the rest fits the budget.
+
+    The latest run is always kept, even when it alone is over budget.
+    """
     run_starts = [i for i, m in enumerate(history) if m.role == ChatRole.user]
     if not run_starts:
         return 0
@@ -35,8 +39,7 @@ def _trim_start(history: list[ChatMessage]) -> int:
     suffix_sizes = list(accumulate(reversed(sizes)))[::-1]
     if suffix_sizes[0] <= budget:
         return 0
-    oldest_protected = run_starts[-settings.AI_HISTORY_MIN_RUNS :][0]
-    return next(i for i in run_starts if suffix_sizes[i] <= budget or i >= oldest_protected)
+    return next((i for i in run_starts if suffix_sizes[i] <= budget), run_starts[-1])
 
 
 def _format_file_safety_error(exc: FileSafetyError) -> str:
