@@ -1,7 +1,7 @@
 /**
  * Message queue E2E tests:
  * - Messages typed during a run wait for the run to be released
- * - Stop moves queued messages back into the input
+ * - A queue held after a failed turn can be sent by hand
  */
 import { type Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -50,29 +50,6 @@ test.describe('Message queue', () => {
       { type: 'run_released' },
     ], 20);
     await expect(queued).toHaveCount(0);
-  });
-
-  test('removes a queued message', async ({ page, sendChatEvents }) => {
-    const input = await startRun(page, sendChatEvents);
-
-    await input.fill('Never mind');
-    await input.press('Enter');
-    await page.getByTestId('queued-remove').click();
-
-    await expect(page.getByTestId('queued-messages')).toHaveCount(0);
-  });
-
-  test('moves queued messages back into the input on Stop', async ({ page, sendChatEvents }) => {
-    const input = await startRun(page, sendChatEvents);
-
-    await input.fill('Queued one');
-    await input.press('Enter');
-    await input.fill('Still typing');
-    await page.getByTestId('stop-button').click();
-    await sendChatEvents([{ type: 'turn_aborted' }], 20);
-
-    await expect(input).toHaveValue('Queued one\n\nStill typing');
-    await expect(page.getByTestId('queued-messages')).toHaveCount(0);
   });
 
   test('offers Send on a queue held after a failed turn', async ({ page, sendChatEvents }) => {

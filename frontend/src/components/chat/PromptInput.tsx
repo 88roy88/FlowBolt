@@ -46,7 +46,6 @@ export function PromptInput() {
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
-  // A running agent doesn't block the input: messages queue until the run ends
   const inputBlocked = (lock !== null && lock !== 'run_active') || awaitingPlan || awaitingInterview || isCreating;
   // No project open: submitting starts a new one, if the user may create projects
   const startsProject = !projectId && canCreate;
