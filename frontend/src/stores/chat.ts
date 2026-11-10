@@ -135,6 +135,13 @@ const RESET_STATE = {
   aborting: false,
 };
 
+function rememberProjectModel(model: string | null) {
+  const currentProject = useSessionStore.getState().currentProject;
+  if (currentProject && model) {
+    updateProjectModel(currentProject.id, model).catch(() => {});
+  }
+}
+
 function sendTurn(
   projectId: string,
   content: string,
@@ -179,11 +186,7 @@ function sendTurn(
     ...(selectedElements.length > 0 && { selectedElements: selectedElements.map(({ id: _id, ...e }) => e) }),
   });
 
-  // Persist the model to the project so it's restored on next visit
-  const currentProject = useSessionStore.getState().currentProject;
-  if (currentProject && selectedModel) {
-    updateProjectModel(currentProject.id, selectedModel).catch(() => {});
-  }
+  rememberProjectModel(selectedModel);
 
   return userMessage.id;
 }
@@ -256,10 +259,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       model: selectedModel || undefined,
     });
 
-    const currentProject = useSessionStore.getState().currentProject;
-    if (currentProject && selectedModel) {
-      updateProjectModel(currentProject.id, selectedModel).catch(() => {});
-    }
+    rememberProjectModel(selectedModel);
 
     armTurn({
       run: () => get().sendFixError(errorMessage, errorFile, errorLine, errorStack),
