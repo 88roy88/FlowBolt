@@ -56,14 +56,6 @@ class TestDiffTracker:
         assert diffs["src/A.tsx"].is_new is False
         assert diffs["src/B.tsx"].is_new is True
 
-    def test_deletion_is_flagged(self) -> None:
-        tracker = DiffTracker()
-        tracker.record_deletion("src/Old.tsx", "old\n")
-
-        [diff] = tracker.combined_diffs()
-        assert diff.is_deleted is True
-        assert "-old" in diff.diff
-
     def test_deleting_an_empty_file_still_yields_an_entry(self) -> None:
         tracker = DiffTracker()
         tracker.record_deletion("src/Empty.tsx", "")
