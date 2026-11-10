@@ -149,7 +149,6 @@ function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetSt
   if (msg.error_fix_request) {
     userMsg.agentCard = { type: 'error_fix_request', ...msg.error_fix_request };
   }
-  // A new turn supersedes the previous turn's error (live sends clear it too; replay needs this).
   set((s) => ({ messages: [...s.messages, userMsg], error: null }));
 }
 
