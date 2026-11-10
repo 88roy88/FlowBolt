@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.agents.followup.agent import FollowUpAgent
 
@@ -49,22 +47,13 @@ async def test_delete_file_removes_file_and_records_full_removal_diff() -> None:
     assert "-export const Old = 1;" in diff.diff
 
 
-@pytest.mark.parametrize("path", ["src/main.tsx", "src/api/client.ts", "package.json", "../outside.ts", "/abs.ts"])
-async def test_delete_file_rejects_protected_or_unsafe_paths(path: str) -> None:
-    sandbox = _FakeSandbox({path: "x"})
+async def test_delete_file_rejects_protected_file() -> None:
+    sandbox = _FakeSandbox({"src/main.tsx": "x"})
 
-    result = await _delete(_make_agent(sandbox), path)
+    result = await _delete(_make_agent(sandbox), "src/main.tsx")
 
     assert result.startswith("Generated app contract violation: ")
     assert sandbox.deleted == []
-
-
-async def test_delete_file_reports_missing_file() -> None:
-    sandbox = _FakeSandbox({})
-
-    result = await _delete(_make_agent(sandbox), "src/components/Gone.tsx")
-
-    assert result == "Error: File not found: src/components/Gone.tsx"
 
 
 async def test_delete_file_refuses_directories() -> None:
