@@ -10,6 +10,7 @@ import { DirectorySearch } from './DirectorySearch';
 import { cn } from '@/lib/utils';
 import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
+import { isPlainClick, projectHref } from '../../utils/links';
 
 // Rows whose id is in `hits` sort first; ties preserve order under a stable sort.
 function rankHit(hits: Set<string>, a: string, b: string): number {
@@ -339,14 +340,14 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 className={cn(APPS_GRID, 'items-center px-2 py-1.5 rounded-md hover:bg-muted/30 group')}
               >
                 {/* The hashchange listener in App selects the project; admins' project list includes every project. */}
-                <button
-                  type="button"
-                  onClick={() => { window.location.hash = `#/project/${a.project_id}`; onClose(); }}
-                  className="min-w-0 text-[13px] truncate text-start hover:underline"
+                <a
+                  href={projectHref(a.project_id)}
+                  onClick={(e) => { if (isPlainClick(e)) onClose(); }}
+                  className="min-w-0 text-[13px] text-inherit truncate text-start hover:underline"
                   title={`${t('admin.openProject', 'Open project')} (${a.project_id})`}
                 >
                   {a.name}
-                </button>
+                </a>
                 <span className="text-muted-foreground text-xs text-left truncate" title={a.owner_id}>
                   {a.owner_id}
                 </span>

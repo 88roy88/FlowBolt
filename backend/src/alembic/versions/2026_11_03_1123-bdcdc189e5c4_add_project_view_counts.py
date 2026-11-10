@@ -1,7 +1,7 @@
 """add project view counts
 
 Revision ID: bdcdc189e5c4
-Revises: 7f3e2a9c1b4d
+Revises: b9a5594e700d
 Create Date: 2026-11-03 11:23:08.649802
 
 """
@@ -14,7 +14,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = 'bdcdc189e5c4'
-down_revision: Union[str, Sequence[str], None] = '7f3e2a9c1b4d'
+down_revision: Union[str, Sequence[str], None] = 'b9a5594e700d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
