@@ -50,7 +50,6 @@ class DiffTracker:
         diffs = []
         for path, original in self._originals.items():
             diff_str = compute_diff(original.content, self._finals[path], path)
-            # A file created and deleted in the same run never existed, so it gets no entry.
             is_deleted = path in self._deleted and not original.is_new
             if diff_str or is_deleted:
                 diffs.append(FileDiff(path=path, diff=diff_str, is_new=original.is_new, is_deleted=is_deleted))
