@@ -33,6 +33,9 @@ class _RecordingSandbox:
     async def write_file(self, path: str, content: str) -> None:
         self.written.append((path, content))
 
+    async def read_file(self, path: str) -> str:
+        raise FileNotFoundError(path)
+
 
 async def _noop_emit(_event: dict[str, Any]) -> None:
     return None

@@ -35,6 +35,13 @@ logger = logging.getLogger(__name__)
 
 MAX_FIX_ATTEMPTS = 10
 
+APP_ENTRY_PATH = "src/App.tsx"
+APP_NOT_UPDATED_ERROR = (
+    f"## Integration Errors\n{APP_ENTRY_PATH} was not updated, so the preview still shows the template app "
+    "and none of the generated components are rendered. "
+    f"Rewrite {APP_ENTRY_PATH} to import and render the generated components according to the architecture."
+)
+
 
 class ExecuteAgent(BaseAgent):
     def __init__(
@@ -185,6 +192,8 @@ class ExecuteAgent(BaseAgent):
             all_errors.append("## TypeScript Errors\n" + state.typecheck_errors)
         if state.build_errors:
             all_errors.append("## Build Errors\n" + state.build_errors)
+        if APP_ENTRY_PATH not in state.build_state.completed_files:
+            all_errors.append(APP_NOT_UPDATED_ERROR)
 
         state.all_errors = "\n\n".join(all_errors)
         return state
@@ -200,7 +209,7 @@ class ExecuteAgent(BaseAgent):
             input={"errors": state.all_errors, "fix_attempt": state.fix_attempts},
         )
 
-        prompt = render_feedback(files=state.build_state.completed_files)
+        prompt = render_feedback(files=await self._files_for_fix(state))
         messages: list[dict[str, Any] | Message] = [
             Message.user(format_agent_feedback(state.all_errors, state.rejected_files))
         ]
@@ -414,6 +423,15 @@ class ExecuteAgent(BaseAgent):
             task.error = str(exc)
             await state.emit_fn({"type": "task_update", "taskId": task.id, "status": "failed"})
             span.end(error_info=error_info(exc))
+
+    async def _files_for_fix(self, state: ExecutionState) -> dict[str, str]:
+        files = dict(state.build_state.completed_files)
+        if APP_ENTRY_PATH not in files:
+            try:
+                files[APP_ENTRY_PATH] = await state.sandbox_ref.read_file(APP_ENTRY_PATH)
+            except OSError:
+                logger.exception("[execute] Could not read %s for the fix prompt", APP_ENTRY_PATH)
+        return files
 
     async def _typecheck(self, state: ExecutionState) -> str:
         result = await state.sandbox_ref.run_build_command("npx tsc --noEmit")
