@@ -149,7 +149,12 @@ function handleUserMessage(msg: WSMessage & { type: 'user_message' }, set: SetSt
   if (msg.error_fix_request) {
     userMsg.agentCard = { type: 'error_fix_request', ...msg.error_fix_request };
   }
-  set((s) => ({ messages: [...s.messages, userMsg], error: null }));
+  set((s) => ({
+    messages: [...s.messages, userMsg],
+    ...getTransientReset(),
+    error: null,
+    planOverview: null,
+  }));
 }
 
 export function createFixErrorHandler(
