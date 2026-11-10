@@ -447,6 +447,24 @@ describe('createSendMessageHandler — replay mode', () => {
     expect(filesMock.loadFileTree).not.toHaveBeenCalled();
   });
 
+  it('a failed turn followed by a later turn leaves no error banner', () => {
+    handler(msg({ type: 'user_message', content: 'Build it' }));
+    handler(msg({ type: 'phase', phase: 'idle' }));
+    handler(msg({ type: 'error', message: 'AI processing failed' }));
+    handler(msg({ type: 'user_message', content: 'Try again' }));
+    handler(msg({ type: 'text', content: 'Done!' }));
+    handler(msg({ type: 'action_complete' }));
+
+    expect(store.state().error).toBeNull();
+  });
+
+  it('a failed last turn still shows its error', () => {
+    handler(msg({ type: 'user_message', content: 'Build it' }));
+    handler(msg({ type: 'error', message: 'AI processing failed' }));
+
+    expect(store.state().error).toBe('AI processing failed');
+  });
+
   it('live turns keep their side effects once replay ends', () => {
     setReplayMode(false);
     handler(msg({ type: 'file', path: 'src/App.tsx', content: 'new content' }));
