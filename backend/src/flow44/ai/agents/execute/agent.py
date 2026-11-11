@@ -101,7 +101,6 @@ class ExecuteAgent(BaseAgent):
             }
         )
 
-        final_state.build_state.phase = "idle"
         final_state.build_state.work_plan = None
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})

@@ -24,6 +24,3 @@ class BuildState(BaseModel):
     work_plan: WorkPlan | None = None
     completed_files: dict[str, str] = Field(default_factory=dict)
     task_files: dict[str, list[str]] = Field(default_factory=dict)
-
-    # Flow control
-    phase: str = "idle"

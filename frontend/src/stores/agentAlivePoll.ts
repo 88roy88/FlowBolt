@@ -4,7 +4,7 @@ import {
   ACTIVE_AGENT_PHASES,
   getTransientReset,
   isAgentWorking,
-  isAwaitingPlanApproval,
+  isAwaitingUserInput,
   isKnownAgentPhase,
 } from './chatAgentState';
 import { useChatStore } from './chat';
@@ -14,7 +14,7 @@ const POLL_MS = 10000;
 
 export function handleChatConnectionLost(): void {
   const state = useChatStore.getState();
-  if (isAgentWorking(state) && !isAwaitingPlanApproval(state)) {
+  if (isAgentWorking(state) && !isAwaitingUserInput(state)) {
     useChatStore.setState({ ...getTransientReset(), agentAlive: false });
   }
 }
@@ -32,7 +32,7 @@ function hasBusyUi(state: ReturnType<typeof useChatStore.getState>): boolean {
 function reconcileAlive(alive: boolean, phase: string | null): void {
   const state = useChatStore.getState();
   const working = isAgentWorking(state);
-  const awaiting = isAwaitingPlanApproval(state);
+  const awaiting = isAwaitingUserInput(state);
   const busyUi = hasBusyUi(state);
 
   if (state.error) {
