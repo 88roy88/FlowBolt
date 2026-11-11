@@ -20,9 +20,9 @@ from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
 from flow44.sandbox.main import PnpmSandbox
+from flow44.services.logging import log_bi_event
 from flow44.services.logging.helpers import bi_logger
 
-MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
 
 
@@ -199,7 +199,9 @@ class FollowUpAgent(ChatAgent):
             existing_data_source_contexts=existing_data_source_contexts or None,
         )
 
-        react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
+        react_flow: ReActFlow[BaseModel] = ReActFlow(
+            name="followup", max_iterations=settings.AI_FOLLOWUP_MAX_ITERATIONS
+        )
         answer = await react_flow.react_loop(
             messages=messages,
             system_prompt=system_prompt,
@@ -209,6 +211,9 @@ class FollowUpAgent(ChatAgent):
             emit_fn=self._emit_react_step,
         )
 
+        if react_flow.hit_max_iterations:
+            log_bi_event("agent_max_iterations_reached", agent="followup", max_iterations=react_flow.max_iterations)
+
         if answer:
             await self.emit({"type": "text", "content": answer})
 
@@ -216,7 +221,13 @@ class FollowUpAgent(ChatAgent):
 
         await self._emit_file_diffs_summary(self._diffs)
 
-        self._set_trace_output({"answer": answer or "", "steps": len(self._steps)})
+        self._set_trace_output(
+            {
+                "answer": answer or "",
+                "steps": len(self._steps),
+                "hit_max_iterations": react_flow.hit_max_iterations,
+            }
+        )
 
         # TODO: do we need both events?
         await self.emit({"type": "phase", "phase": "complete"})

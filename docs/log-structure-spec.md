@@ -119,6 +119,14 @@ Trigger: the user rates a response.
 | `rating_value` | enum: `up`, `down` | Yes | The rating the user gave. |
 | `rating_comment_provided` | boolean | Yes | Whether the user also left a comment. |
 
+#### `agent_max_iterations_reached`
+Trigger: an agent uses all its LLM turns for one prompt before it finishes. The agent then stops and tells the user what is left to do.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `agent` | enum: `followup` | Yes | Agent that reached the limit. |
+| `max_iterations` | integer | Yes | Turn limit in effect for the run. Set by `AIB_AI_FOLLOWUP_MAX_ITERATIONS`. |
+
 ### 4.3 Code Events
 
 #### `code_generated`
