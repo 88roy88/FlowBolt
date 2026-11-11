@@ -2,7 +2,9 @@
  * Home page navigation E2E tests:
  * - Which page the app opens on (admins vs. everyone else)
  * - Getting back to the home page (Back button, logo)
+ * - Middle clicking a project or the logo to open it in a new tab
  */
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { MOCK_PROJECT, PROJECT_ID } from './mocks/data';
 
@@ -27,7 +29,7 @@ test.describe('Startup as admin', () => {
     await page.goto('/');
 
     // Projects are loaded, but none is opened
-    const rail = page.getByRole('button', { name: 'ET', exact: true });
+    const rail = page.getByRole('link', { name: 'ET', exact: true });
     const row = page.getByTestId(`project-item-${MOCK_PROJECT.id}`);
     await expect(rail.or(row).first()).toBeVisible({ timeout: 10_000 });
     await expectHomePage(page);
@@ -63,9 +65,9 @@ test.describe('Returning home', () => {
 
   test('Back from a project returns to the home page', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('button', { name: 'ET', exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: 'ET', exact: true })).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole('button', { name: 'ET', exact: true }).click();
+    await page.getByRole('link', { name: 'ET', exact: true }).click();
     await expectProjectView(page);
     await expect(page).toHaveURL(PROJECT_URL);
 
@@ -78,7 +80,39 @@ test.describe('Returning home', () => {
     await expectProjectView(page);
 
     await page.getByRole('button', { name: 'Expand sidebar' }).click();
-    await page.getByRole('button', { name: 'BuildApp' }).click();
+    await page.getByRole('link', { name: 'BuildApp' }).click();
     await expectHomePage(page);
+  });
+});
+
+test.describe('Middle click opens a new tab', () => {
+  test.use({ mockOptions: { seedChatHistory: true } });
+
+  /** Middle clicks `target` and checks the new tab opened `url`. The new tab has no API mocks, so only its URL is checked. */
+  async function expectMiddleClickOpens(page: Page, target: Locator, url: string) {
+    const [newTab] = await Promise.all([page.context().waitForEvent('page'), target.click({ button: 'middle' })]);
+    await expect(newTab).toHaveURL(url);
+    await newTab.close();
+  }
+
+  test('on a project in the icon rail', async ({ page, baseURL }) => {
+    await page.goto('/');
+    await expectMiddleClickOpens(page, page.getByRole('link', { name: 'ET', exact: true }), `${baseURL}/#/project/${PROJECT_ID}`);
+    await expectHomePage(page);
+  });
+
+  test('on a project in the sidebar', async ({ page, baseURL }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Expand sidebar' }).click();
+    await expectMiddleClickOpens(page, page.getByTestId(`project-item-${PROJECT_ID}`), `${baseURL}/#/project/${PROJECT_ID}`);
+    await expectHomePage(page);
+  });
+
+  test('on the logo', async ({ page, baseURL }) => {
+    await page.goto(`/#/project/${PROJECT_ID}`);
+    await expectProjectView(page);
+    await page.getByRole('button', { name: 'Expand sidebar' }).click();
+    await expectMiddleClickOpens(page, page.getByRole('link', { name: 'BuildApp' }), `${baseURL}/`);
+    await expect(page).toHaveURL(PROJECT_URL);
   });
 });
