@@ -47,6 +47,13 @@ _AGENT_BUSY = {"type": "error", "message": "An agent is already running for this
 _VERSION_FAILED = {"type": "version_error", "message": "Version operation failed", "code": "failed"}
 
 
+def _message_too_long(text: str | None) -> dict[str, Any] | None:
+    limit = settings.CHAT_MESSAGE_MAX_CHARS
+    if text is None or len(text) <= limit:
+        return None
+    return {"type": "error", "message": f"Message is too long ({len(text):,} characters, max {limit:,})"}
+
+
 class AgentAlreadyRunning(Exception):
     pass
 
@@ -274,6 +281,9 @@ async def chat_ws(  # noqa: C901, PLR0915
             try:
                 if msg_type == "message":
                     user_content: str = data["content"]
+                    if error := _message_too_long(user_content):
+                        await websocket.send_json(error)
+                        continue
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
                     mode: str = data.get("mode", "build")
@@ -314,6 +324,9 @@ async def chat_ws(  # noqa: C901, PLR0915
                     action = data.get("action")
                     feedback = data.get("feedback")
                     selected_model = data.get("model")
+                    if error := _message_too_long(feedback):
+                        await websocket.send_json(error)
+                        continue
 
                     state_json = await _paused_state("awaiting_approval", "No pending plan found")
                     if state_json is None:

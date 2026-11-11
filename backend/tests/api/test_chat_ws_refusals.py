@@ -102,6 +102,24 @@ def test_message_refused_as_busy_saves_nothing() -> None:
     assert "already running" in reply["message"]
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"type": "message", "content": "x" * 11},
+        {"type": "plan_response", "action": "modify", "feedback": "x" * 11},
+    ],
+)
+def test_text_over_the_length_limit_is_refused(payload: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("flow44.api.chat.settings.CHAT_MESSAGE_MAX_CHARS", 10)
+    claim = AsyncMock(return_value=CLAIMED_AT)
+    reply, writes = _send(payload, claim)
+
+    claim.assert_not_awaited()
+    writes["save_message"].assert_not_awaited()
+    assert reply["type"] == "error"
+    assert "too long" in reply["message"]
+
+
 def test_refused_plan_accept_keeps_the_paused_turn() -> None:
     state = MagicMock()
     state.model = "claude-opus-5"

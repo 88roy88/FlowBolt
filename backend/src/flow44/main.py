@@ -12,6 +12,7 @@ from flow44.api import (
     admin,
     bi_events,
     chat,
+    client_config,
     data_source_api,
     directory,
     errors,
@@ -119,6 +120,7 @@ auth_routes.include_router(export.router)
 auth_routes.include_router(publish.router)
 auth_routes.include_router(data_source_api.router)
 auth_routes.include_router(chat.http_router)
+auth_routes.include_router(client_config.router)
 auth_routes.include_router(iaagent.router)
 auth_routes.include_router(members.router)
 auth_routes.include_router(directory.router)
