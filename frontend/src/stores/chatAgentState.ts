@@ -42,6 +42,7 @@ export const TRANSIENT_RESET: Partial<ChatState> = {
   currentAssistantMessage: '',
   actions: [],
   followUpSteps: [],
+  followUpStepLimitReached: false,
   fileDiffs: [],
   fixSteps: [],
   executionTasks: [],

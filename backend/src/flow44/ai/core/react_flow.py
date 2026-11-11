@@ -19,6 +19,11 @@ StateT = TypeVar("StateT", bound=BaseModel)
 MALFORMED_TOOL_CALL_CORRECTION = (
     "Your last tool call was malformed text. Call the tool through the tool-calling interface."
 )
+MAX_ITERATIONS_WRAP_UP = (
+    "You have reached the step limit for this turn and cannot call any more tools. "
+    "Tell the user briefly what you changed so far and what is still left to do, "
+    'and that they can reply "continue" to keep going.'
+)
 LEAKED_TOOL_CALL_MARKERS = (
     "<invoke name=",
     "｜DSML｜",
@@ -42,6 +47,8 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
     ) -> None:
         super().__init__(name)
         self.max_iterations = max_iterations
+        self.hit_max_iterations = False
+        self.wrap_up_failed = False
 
     async def react_loop(  # noqa: C901
         self,
@@ -55,6 +62,8 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         working_messages: list[dict[str, Any]] = [m.to_dict() if isinstance(m, Message) else m for m in messages]
         tool_schemas = tools.get_schemas()
         last_content = ""
+        self.hit_max_iterations = False
+        self.wrap_up_failed = False
 
         for iteration in range(self.max_iterations):
             metadata = (
@@ -173,4 +182,39 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
                 )
 
         logger.warning("[%s] Hit max iterations (%d)", self.name, self.max_iterations)
-        return last_content
+        self.hit_max_iterations = True
+        add_trace_tags(["max_iterations"])
+        return await self._wrap_up(working_messages, system_prompt, tool_schemas, model, metadata_fn)
+
+    async def _wrap_up(
+        self,
+        working_messages: list[dict[str, Any]],
+        system_prompt: str,
+        tool_schemas: list[dict[str, Any]],
+        model: str | None,
+        metadata_fn: Any,
+    ) -> str:
+        """One last tool-less call so the user hears what was done and what is left."""
+        working_messages.append(Message.user(MAX_ITERATIONS_WRAP_UP).to_dict())
+        metadata = (
+            metadata_fn("react-wrap-up", extra_metadata={"available_tools": tool_schemas}) if metadata_fn else None
+        )
+        try:
+            response = await complete_chat_with_tools(
+                messages=working_messages,  # type: ignore[arg-type]
+                system_prompt=system_prompt,
+                tools=tool_schemas,
+                model=model,
+                metadata=metadata,
+                tool_choice="none",
+            )
+        except Exception:
+            logger.exception("[react_loop:%s] Wrap-up call failed", self.name)
+            self.wrap_up_failed = True
+            return ""
+
+        content: str = response.choices[0].message.content or ""
+        if not content.strip() or looks_like_leaked_tool_call(content):
+            self.wrap_up_failed = True
+            return ""
+        return content

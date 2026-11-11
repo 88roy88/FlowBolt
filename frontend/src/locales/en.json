@@ -143,6 +143,7 @@
   "chat": {
     "chat": "Chat",
     "scrollToBottom": "Scroll to bottom",
+    "stepLimitReached": "I reached the step limit before finishing. Reply \"continue\" and I'll pick up where I left off.",
     "today": "Today",
     "yesterday": "Yesterday",
     "messageTooLong": "Message is too long ({{length}} / {{max}} characters)",
