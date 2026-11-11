@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pencil } from 'lucide-react';
+import { fetchFileContent, saveFileContent } from '../../services/api';
 import { useChatStore } from '../../stores/chat';
 import { useErrorStore } from '../../stores/errors';
 import { useFilesStore } from '../../stores/files';
@@ -8,6 +9,7 @@ import { useSessionStore } from '../../stores/session';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import { withAppTitle } from '../../utils/appTitle';
 
+const INDEX_HTML_PATH = '/index.html';
 const MAX_TITLE_LENGTH = 120;
 
 interface AppTitleProps {
@@ -19,6 +21,7 @@ interface AppTitleProps {
 /** The app's title; clicking it renames the app in its index.html. */
 export function AppTitle({ title, onChange }: AppTitleProps) {
   const { t } = useTranslation();
+  const projectId = useSessionStore((s) => s.projectId);
   const projectName = useSessionStore((s) => s.currentProject?.name);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
   const { lock } = useWorkspaceLock();
@@ -33,11 +36,14 @@ export function AppTitle({ title, onChange }: AppTitleProps) {
     const cancelled = cancelledRef.current;
     cancelledRef.current = false;
     setDraft(null);
-    if (cancelled || !next || title === null || next === title) return;
+    if (cancelled || !next || !projectId || title === null || next === title) return;
 
     onChange(next);
     try {
-      await useFilesStore.getState().editFile('index.html', (html) => withAppTitle(html, next));
+      const html = await fetchFileContent(projectId, INDEX_HTML_PATH);
+      await saveFileContent(projectId, INDEX_HTML_PATH, withAppTitle(html, next));
+      useFilesStore.setState((s) => ({ saveVersion: s.saveVersion + 1 }));
+      void useFilesStore.getState().refreshOpenFiles();
     } catch {
       onChange(title);
       useErrorStore.getState().pushError({ source: 'connection', message: t('preview.renameAppFailed') });
