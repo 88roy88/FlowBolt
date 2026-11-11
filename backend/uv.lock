@@ -594,7 +594,7 @@ requires-dist = [
     { name = "greenlet", specifier = ">=3.3.2" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
-    { name = "litellm", specifier = ">=1.55.10" },
+    { name = "litellm", specifier = ">=1.94.0" },
     { name = "opik", specifier = ">=2.1.32" },
     { name = "pydantic-settings", specifier = ">=2.7.1" },
     { name = "pyjwt", specifier = ">=2.12.1" },

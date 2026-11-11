@@ -223,7 +223,7 @@ class FollowUpAgent(ChatAgent):
         await self.emit({"type": "action_complete"})
 
     async def _fetch_analyze_and_write(self, sid: str, user_content: str) -> DataSourceContext:
-        ctx = await fetch_and_analyze_data_source(
+        ctx: DataSourceContext = await fetch_and_analyze_data_source(
             sid,
             user_content,
             self._data_source_authorization,

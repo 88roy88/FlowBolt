@@ -6,17 +6,19 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
+from opik import track
 
 from flow44.ai.agents.plan.prompts import render_data_source_analysis
 from flow44.ai.codegen.data_source_module import generate_data_source_module
 from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.messages import Message
+from flow44.ai.core.opik_utils import update_span
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.db.project_data_source import DataSourceContext
 from flow44.integrations.enrichment import fetch_data_source_summary
 from flow44.logic import data_source as ds_logic
-from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema
+from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, DataSourceUsage
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,30 @@ _env = Environment(  # noqa: S701
 )
 
 
+@track(name="fetch-data-source", ignore_arguments=["authorization"], capture_output=False)  # type: ignore[untyped-decorator]
+async def _fetch_data_source(data_source_id: str, authorization: str | None) -> tuple[str, DataSourceUsage, str]:
+    ds_name, usage, data_source_summary = await asyncio.gather(
+        ds_logic.get_display_name(data_source_id, authorization=authorization),
+        ds_logic.get_usage(data_source_id, authorization=authorization),
+        fetch_data_source_summary(data_source_id),
+    )
+    update_span(
+        output={
+            "data_source_name": ds_name,
+            "query_count": len(usage.queries),
+            "has_sample": usage.sample is not None,
+            "can_run_without_input": usage.can_run,
+            "has_summary": bool(data_source_summary),
+        }
+    )
+    return ds_name, usage, data_source_summary
+
+
+@track(  # type: ignore[untyped-decorator]
+    name="data-source",
+    ignore_arguments=["user_content", "authorization", "llm_metadata_fn"],
+    capture_output=False,
+)
 async def fetch_and_analyze_data_source(
     data_source_id: str,
     user_content: str,
@@ -34,11 +60,7 @@ async def fetch_and_analyze_data_source(
     model: str | None,
     llm_metadata_fn: Callable[[str], dict[str, Any]],
 ) -> DataSourceContext:
-    ds_name, usage, data_source_summary = await asyncio.gather(
-        ds_logic.get_display_name(data_source_id, authorization=authorization),
-        ds_logic.get_usage(data_source_id, authorization=authorization),
-        fetch_data_source_summary(data_source_id),
-    )
+    ds_name, usage, data_source_summary = await _fetch_data_source(data_source_id, authorization)
     sanitized = sanitize_to_pascal_case(ds_name) or f"DataSource{data_source_id}"
     prompt = render_data_source_analysis(
         user_content=user_content,
@@ -95,12 +117,13 @@ async def fetch_data_sources(
 ) -> list[DataSourceContext]:
     await emit({"type": "phase", "phase": "fetching_data_sources"})
     try:
-        return await asyncio.gather(
+        contexts: list[DataSourceContext] = await asyncio.gather(
             *[
                 fetch_and_analyze_data_source(sid, user_content, authorization, model, llm_metadata_fn)
                 for sid in data_source_ids
             ]
         )
+        return contexts
     except Exception:
         await emit({"type": "error", "message": "Build aborted: failed to fetch required data source data."})
         await emit({"type": "phase", "phase": "idle"})

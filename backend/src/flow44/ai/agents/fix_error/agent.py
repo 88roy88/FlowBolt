@@ -10,7 +10,7 @@ from flow44.ai.agents.fix_error.fix_error_state import FixErrorState
 from flow44.ai.agents.fix_error.prompts import render_feedback, render_fix_error_direct
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import record_span_error
+from flow44.ai.core.opik_utils import record_span_error, update_span
 from flow44.ai.core.provider import stream_chat
 from flow44.ai.file_safety import (
     FileSafetyError,
@@ -403,6 +403,8 @@ class FixErrorAgent(ChatAgent):
 
         return str(PurePosixPath("src", *parts))
 
+    @track(name="build")  # type: ignore[untyped-decorator]
     async def _build(self) -> str:
         result = await self.sandbox.run_build_command("pnpm build")
+        update_span(metadata={"success": result.success})
         return result.errors

@@ -11,8 +11,11 @@ from opik import Span, get_global_client, opik_context
 from opik.types import ErrorInfoDict
 
 from flow44.config import settings
+from flow44.services.logging import _project_name as _log_project_name
 
 logger = logging.getLogger(__name__)
+
+_MAX_TAG_LENGTH = 100
 
 
 class FailureAwareOpikLogger(OpikLogger):
@@ -71,10 +74,14 @@ class FailureAwareOpikLogger(OpikLogger):
 
 def setup_trace(project_id: str, user_id: str, model: str | None, tags: list[str]) -> str | None:
     trace_data = opik_context.get_current_trace_data()
+    identity_tags = [f"project:{project_id}", f"user:{user_id}"]
+    project_name = _log_project_name.get()
+    if project_name:
+        identity_tags.append(f"project_name:{project_name}")
     opik_context.update_current_trace(
         thread_id=project_id,
-        metadata={"model": model or "default", "user_id": user_id},
-        tags=[*tags, f"project:{project_id}"],
+        metadata={"model": model or "default", "user_id": user_id, "project_name": project_name},
+        tags=[*tags, *(tag[:_MAX_TAG_LENGTH] for tag in identity_tags)],
     )
     return trace_data.id if trace_data else None
 
@@ -96,6 +103,11 @@ def add_trace_tags(tags: list[str]) -> None:
 
 def create_span(**kwargs: Any) -> Span:
     return get_global_client().span(**kwargs)
+
+
+def update_span(**fields: Any) -> None:
+    if opik_context.get_current_span_data() is not None:
+        opik_context.update_current_span(**fields)
 
 
 def record_span_error(exc: Exception) -> None:
