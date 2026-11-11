@@ -41,4 +41,7 @@ class BaseAgent:
         parent_span_id: str | None = None,
         extra_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return llm_metadata(self._trace_id, generation_name, parent_span_id, extra_metadata)
+        return {
+            **llm_metadata(self._trace_id, generation_name, parent_span_id, extra_metadata),
+            "prompt_cache_key": self.project_id,
+        }
