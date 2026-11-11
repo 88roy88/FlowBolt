@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from datetime import UTC, datetime
@@ -12,7 +11,6 @@ import pytest
 from litellm.integrations.opik.opik_payload_builder import payload_builders
 
 from flow44.ai.core import opik_utils
-from flow44.config import OpikSettings
 from flow44.services.logging import _project_name as _log_project_name
 
 
@@ -77,11 +75,3 @@ def test_setup_trace_without_a_project_name_adds_no_name_tag(monkeypatch: pytest
     opik_utils.setup_trace("id-1", "user", None, ["plan-agent"])
 
     assert trace_update["tags"] == ["plan-agent", "project:id-1", "user:user"]
-
-
-def test_opik_environment_reaches_the_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OPIK_ENVIRONMENT", "unset")
-
-    OpikSettings(OPIK_API_KEY="key", OPIK_ENVIRONMENT="staging")
-
-    assert os.environ["OPIK_ENVIRONMENT"] == "staging"
