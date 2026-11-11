@@ -9,6 +9,8 @@ import { DataSourceSelector } from './DataSourceSelector';
 import { QueuedMessages } from './QueuedMessages';
 import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
+import { MessageLengthHint } from './MessageLengthHint';
+import { useClientConfig } from '../../hooks/useClientConfig';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
@@ -46,6 +48,9 @@ export function PromptInput() {
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
+  const maxChars = useClientConfig()?.chat_message_max_chars ?? null;
+  const length = value.trim().length;
+  const tooLong = maxChars !== null && length > maxChars;
   const inputBlocked = (lock !== null && lock !== 'run_active') || awaitingPlan || awaitingInterview || isCreating;
   // No project open: submitting starts a new one, if the user may create projects
   const startsProject = !projectId && canCreate;
@@ -59,7 +64,7 @@ export function PromptInput() {
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || inputBlocked) return;
+    if (!trimmed || inputBlocked || tooLong) return;
     if (projectId && agentBusy) queueMessage(trimmed);
     else if (projectId) sendMessage(trimmed);
     else if (startsProject) void startProjectFromPrompt(trimmed);
@@ -74,7 +79,7 @@ export function PromptInput() {
 
   const disabled = inputBlocked || (!projectId && !startsProject);
   const canStop = agentBusy && !awaitingPlan && !awaitingInterview && !!projectId;
-  const canSend = !!value.trim() && !disabled;
+  const canSend = length > 0 && !disabled && !tooLong;
   const dsOpen = showDsSelector && !disabled;
 
   // Global keyboard shortcut: Cmd+K to focus chat
@@ -177,6 +182,8 @@ export function PromptInput() {
           className="w-full resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
         />
 
+        <MessageLengthHint length={length} max={maxChars} />
+
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}
           {(projectId || startsProject) && (
@@ -213,7 +220,7 @@ export function PromptInput() {
               {aborting ? <Loader2 size={14} className="animate-spin" /> : <Square size={12} fill="currentColor" />}
             </button>
           )}
-          {(!canStop || canSend) && (
+          {(!canStop || length > 0) && (
             <button
               onClick={handleSubmit}
               disabled={!canSend}
