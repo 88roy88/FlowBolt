@@ -1,15 +1,29 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChatStore } from '../../stores/chat';
-import { isAwaitingPlanApproval } from '../../stores/chatAgentState';
+import { isAwaitingPlanApproval, isAwaitingInterview } from '../../stores/chatAgentState';
 import { useSessionStore } from '../../stores/session';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import { ArrowUp, CirclePlus, Loader2, SquareDashedMousePointer, X } from 'lucide-react';
 import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
+import { ModeSelector } from './ModeSelector';
+import { MessageLengthHint } from './MessageLengthHint';
+import { useClientConfig } from '../../hooks/useClientConfig';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
+import type { AgentPhase } from '../../types';
+
+const PHASE_LABEL_KEYS: Partial<Record<AgentPhase, string>> = {
+  fetching_data_sources: 'chat.phase.fetchingDataSources',
+  interviewing: 'chat.phase.interviewing',
+  designing: 'chat.phase.designing',
+  planning: 'chat.phase.planning',
+  executing: 'chat.phase.building',
+  fixing: 'chat.phase.fixing',
+  exploring: 'chat.phase.exploring',
+};
 
 export function PromptInput() {
   const { t } = useTranslation();
@@ -21,6 +35,7 @@ export function PromptInput() {
   const setValue = useChatStore((s) => s.setDraft);
   const agentPhase = useChatStore((s) => s.agentPhase);
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
+  const awaitingInterview = useChatStore(isAwaitingInterview);
   const selectedDataSources = useChatStore((s) => s.selectedDataSources);
   const removeDataSource = useChatStore((s) => s.removeDataSource);
   const selectedElements = useChatStore((s) => s.selectedElements);
@@ -29,7 +44,10 @@ export function PromptInput() {
   const isCreating = useSessionStore((s) => s.isCreating);
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
-  const inputBlocked = lock !== null || awaitingPlan || isCreating;
+  const maxChars = useClientConfig()?.chat_message_max_chars ?? null;
+  const length = value.trim().length;
+  const tooLong = maxChars !== null && length > maxChars;
+  const inputBlocked = lock !== null || awaitingPlan || awaitingInterview || isCreating;
   // No project open: submitting starts a new one, if the user may create projects
   const startsProject = !projectId && canCreate;
 
@@ -42,7 +60,7 @@ export function PromptInput() {
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || inputBlocked) return;
+    if (!trimmed || inputBlocked || tooLong) return;
     if (projectId) sendMessage(trimmed);
     else if (startsProject) void startProjectFromPrompt(trimmed);
   };
@@ -55,7 +73,7 @@ export function PromptInput() {
   };
 
   const disabled = inputBlocked || (!projectId && !startsProject);
-  const canSend = !!value.trim() && !disabled;
+  const canSend = length > 0 && !disabled && !tooLong;
   const dsOpen = showDsSelector && !disabled;
 
   // Global keyboard shortcut: Cmd+K to focus chat
@@ -74,19 +92,13 @@ export function PromptInput() {
     if (isCreating) return t('chat.placeholder.creatingProject');
     if (!projectId && !startsProject) return t('chat.placeholder.selectProject');
     if (awaitingPlan) return t('chat.placeholder.reviewPlan');
+    if (awaitingInterview) return t('chat.placeholder.reviewInterview');
     if (lock) return t(LOCK_MESSAGES[lock]);
     return t('chat.placeholder.default');
   };
   const placeholder = placeholderText();
 
-  const busyLabel =
-    agentPhase === 'fetching_data_sources' ? t('chat.phase.fetchingDataSources') :
-    agentPhase === 'designing' ? t('chat.phase.designing') :
-    agentPhase === 'planning' ? t('chat.phase.planning') :
-    agentPhase === 'executing' ? t('chat.phase.building') :
-    agentPhase === 'fixing' ? t('chat.phase.fixing') :
-    agentPhase === 'exploring' ? t('chat.phase.exploring') :
-    t('chat.phase.thinking');
+  const busyLabel = t(PHASE_LABEL_KEYS[agentPhase] ?? 'chat.phase.thinking');
 
   return (
     <div className="px-4 pt-2 pb-4 shrink-0">
@@ -161,6 +173,8 @@ export function PromptInput() {
           className="w-full resize-none text-[15px] leading-normal max-h-[200px] px-1.5 pt-1.5 bg-transparent disabled:opacity-50"
         />
 
+        <MessageLengthHint length={length} max={maxChars} />
+
         <div className="flex items-center gap-2">
           {/* Data source selector toggle */}
           {(projectId || startsProject) && (
@@ -182,6 +196,7 @@ export function PromptInput() {
           )}
 
           <div className="flex items-center gap-1 ms-auto min-w-0">
+            <ModeSelector />
             <ModelSelector />
           </div>
 

@@ -66,7 +66,7 @@ class AIModelSettings(BuildAppSettings):
     AI_REQUEST_TIMEOUT: int = 300
     AI_STREAM_TIMEOUT: int = 600
     AI_HISTORY_CHAR_BUDGET: int = 600_000
-    AI_HISTORY_MIN_RUNS: int = 5
+    CHAT_MESSAGE_MAX_CHARS: int = 100_000
 
     # if ai_model starts with bedrock/ set base_url and api_key to None
     # (using pydantic v2's model_validator to allow dynamic defaults based on other fields)

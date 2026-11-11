@@ -43,7 +43,7 @@ test.describe('Delete project', () => {
     await page.goto(`/#/project/${PROJECT_ID}`);
 
     // Wait for project to load
-    await expect(page.getByRole('button', { name: 'ET', exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: 'ET', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // Expand sidebar
     const expandBtn = page.getByRole('button', { name: 'Expand sidebar' });

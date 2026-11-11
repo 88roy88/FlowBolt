@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException
@@ -18,6 +19,26 @@ from flow44.sandbox.pty import BasePTY
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _send_scrollback(websocket: WebSocket, pty: BasePTY, project_id: str) -> None:
+    scrollback = pty.get_scrollback()
+    if not scrollback:
+        return
+    try:
+        text = scrollback.decode("utf-8", errors="replace")
+        await websocket.send_text(json.dumps({"type": "scrollback", "data": text}))
+    except Exception:
+        logger.debug("Failed to send scrollback for session %s", project_id)
+
+
+def _handle_control(pty: BasePTY, text: str) -> None:
+    try:
+        msg = json.loads(text)
+        if msg["type"] == "resize":
+            pty.resize(msg["rows"], msg["cols"])
+    except Exception:
+        logger.debug("Ignoring invalid terminal control message", exc_info=True)
 
 
 @router.websocket("/ws/terminal/{project_id}")
@@ -41,13 +62,7 @@ async def terminal_ws(  # noqa: C901
         await websocket.close(code=1011, reason="Failed to create terminal")
         return
 
-    # Replay scrollback so the client sees recent terminal history.
-    scrollback = pty.get_scrollback()
-    if scrollback:
-        try:
-            await websocket.send_bytes(scrollback)
-        except Exception:
-            logger.debug("Failed to send scrollback for session %s", project.id)
+    await _send_scrollback(websocket, pty, project.id)
 
     stop_event = asyncio.Event()
 
@@ -67,8 +82,13 @@ async def terminal_ws(  # noqa: C901
 
     try:
         while True:
-            data = await websocket.receive_bytes()
-            pty.write(data)
+            message = await websocket.receive()
+            if message["type"] == "websocket.disconnect":
+                raise WebSocketDisconnect(message.get("code", 1000))
+            if message.get("bytes") is not None:
+                pty.write(message["bytes"])
+            elif message.get("text") is not None:
+                _handle_control(pty, message["text"])
     except WebSocketDisconnect:
         logger.info("Terminal WebSocket disconnected for session %s", project.id)
     except Exception:

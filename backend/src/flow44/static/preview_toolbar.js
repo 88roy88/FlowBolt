@@ -67,7 +67,7 @@
 
   var host = window.parent !== window ? window.parent : window.opener;
   var state = {
-    status: 'pending', // 'pending' | 'connected' | 'readonly' | 'disconnected'
+    status: 'pending', // 'pending' | 'connected' | 'unbuilt' | 'readonly' | 'disconnected'
     count: 0,
     picking: false,
     collapsed: readCollapsed(),
@@ -148,7 +148,7 @@
     if (data.type === 'ready') {
       clearTimeout(helloTimer);
       var count = data.count || 0;
-      var status = data.canWrite ? 'connected' : 'readonly';
+      var status = data.canWrite ? 'connected' : data.unbuilt ? 'unbuilt' : 'readonly';
       if (count === state.count && status === state.status) return;
       state.count = count;
       state.status = status;
@@ -647,7 +647,7 @@
     ui.textContent = '';
     renderPrompt();
     if (state.prompt) positionBox();
-    if (state.status === 'pending') return;
+    if (state.status === 'pending' || state.status === 'unbuilt') return;
 
     if (state.toast) {
       var toast = document.createElement('div');
