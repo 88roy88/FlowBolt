@@ -104,6 +104,12 @@ async def get_latest_event(project_id: str, event_type: str) -> AgentEvent | Non
         return result.scalars().first()
 
 
+async def get_last_event_id(project_id: str) -> int:
+    async with database.async_session() as session:
+        result = await session.execute(select(func.max(AgentEvent.id)).where(AgentEvent.project_id == project_id))
+        return result.scalar_one_or_none() or 0
+
+
 async def clear_events(project_id: str) -> None:
     async with database.async_session() as session:
         await session.execute(delete(AgentEvent).where(col(AgentEvent.project_id) == project_id))

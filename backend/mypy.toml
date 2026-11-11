@@ -59,6 +59,8 @@ warn_untyped_fields = true
 ###### MISSING IMPORTS  #####
 [[tool.mypy.overrides]]
 module = [
+    "asyncpg",
+    "asyncpg.*",
     "winpty",
     "winpty.*",
 ]

@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+from flow44.db.events import emit_transient
 from flow44.main import app
+from flow44.services import run_abort
 from flow44.services.versioning.service import WorkspaceLocked
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -160,3 +163,49 @@ def test_version_op_refusal_reaches_the_client() -> None:
         "message": "Can't edit while the AI is working",
         "files": [],
     }
+
+
+@pytest.mark.parametrize(
+    ("payload", "phase"),
+    [
+        ({"type": "plan_response", "action": "accept"}, "awaiting_approval"),
+        ({"type": "interview_response", "action": "skip"}, "awaiting_interview"),
+    ],
+)
+def test_aborted_resume_pauses_the_turn_again(payload: dict[str, Any], phase: str) -> None:
+    state_json = '{"plan": "build a todo app"}'
+    state = MagicMock()
+    state.model = "claude-opus-5"
+
+    async def hang(*_args: Any, **_kwargs: Any) -> None:
+        await emit_transient(PROJECT_ID, {"type": "agent_started"})
+        await asyncio.sleep(30)
+
+    turn = MagicMock(phase=phase, state_json=state_json)
+    with (
+        _connected(AsyncMock(return_value=CLAIMED_AT)) as writes,
+        patch("flow44.api.chat.get_paused_turn", new_callable=AsyncMock, return_value=turn),
+        patch("flow44.api.chat.BuildState") as build_state,
+        patch("flow44.api.chat.InterviewSession") as interview_session,
+        patch("flow44.api.chat.ExecuteAgent") as execute_agent,
+        patch("flow44.api.chat.AgentRouter") as router,
+        patch("flow44.api.chat.get_last_event_id", new_callable=AsyncMock, return_value=7),
+        patch("flow44.api.chat.versioning.discard_agent_response", new_callable=AsyncMock) as discard,
+        patch("flow44.api.chat.pause_turn", new_callable=AsyncMock) as pause_turn,
+        patch("flow44.api.chat.clear_heartbeat", new_callable=AsyncMock),
+        # The LISTEN/NOTIFY hop has its own test; here the abort wakes the run directly.
+        patch.object(run_abort, "request_abort", AsyncMock(side_effect=run_abort._wake)),
+    ):
+        build_state.model_validate_json.return_value = state
+        interview_session.model_validate_json.return_value = state
+        execute_agent.return_value.run = hang
+        router.return_value.resume_interview = hang
+        with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
+            ws.send_json(payload)
+            assert ws.receive_json() == {"type": "agent_started"}
+            ws.send_json({"type": "abort"})
+            assert ws.receive_json() == {"type": "turn_aborted"}
+
+    writes["clear_paused_turn"].assert_awaited_once_with(PROJECT_ID)
+    discard.assert_awaited_once_with(PROJECT_ID, 7, ANY)
+    pause_turn.assert_awaited_once_with(PROJECT_ID, phase, state_json)
