@@ -61,12 +61,24 @@ def test_history_over_budget_is_cut_at_a_run_start_and_fits(monkeypatch: pytest.
             assert m["tool_call_id"] in seen_call_ids
 
 
-def test_last_runs_are_kept_even_when_they_exceed_the_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_only_the_last_run_is_kept_when_it_alone_exceeds_the_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "AI_HISTORY_CHAR_BUDGET", 10)
     messages = _convert(_history(30))
 
-    assert _user_requests(messages) == [f"request {n}" for n in range(25, 30)]
-    assert len(messages) == 20
+    assert _user_requests(messages) == ["request 29"]
+    assert len(messages) == 4
+
+
+def test_recent_runs_are_dropped_when_they_do_not_fit(monkeypatch: pytest.MonkeyPatch) -> None:
+    history = _history(30)
+    last_two = history[-8:]
+    monkeypatch.setattr(
+        settings,
+        "AI_HISTORY_CHAR_BUDGET",
+        sum(len(json.dumps(m.raw_message)) if m.raw_message else len(m.content) for m in last_two),
+    )
+
+    assert _user_requests(_convert(history)) == ["request 28", "request 29"]
 
 
 def test_leaked_tool_call_text_is_skipped() -> None:
