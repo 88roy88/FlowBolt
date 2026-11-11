@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchClientConfig, type ClientConfig } from '../services/api';
+import { fetchClientConfig } from '../services/api';
 
-export function useClientConfig(): ClientConfig | null {
-  const { data } = useQuery({ queryKey: ['client-config'], queryFn: fetchClientConfig, staleTime: Infinity });
-  return data ?? null;
+export function useClientConfig() {
+  return useQuery({ queryKey: ['client-config'], queryFn: fetchClientConfig, staleTime: Infinity }).data;
 }
