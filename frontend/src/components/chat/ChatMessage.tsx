@@ -57,6 +57,7 @@ function AgentCardRenderer({ message }: { message: Message }) {
         answer={card.answer}
         filesChanged={card.filesChanged}
         diffs={card.diffs}
+        stepLimitReached={card.stepLimitReached}
       />;
     case 'interview_answered':
       return <InterviewAnsweredCard questions={card.questions} answers={card.answers} />;

@@ -212,6 +212,8 @@ class FollowUpAgent(ChatAgent):
 
         if react_flow.hit_max_iterations:
             log_bi_event("agent_max_iterations_reached", agent="followup", max_iterations=react_flow.max_iterations)
+            if react_flow.wrap_up_failed:
+                await self.emit({"type": "step_limit_reached"})
 
         if answer:
             await self.emit({"type": "text", "content": answer})

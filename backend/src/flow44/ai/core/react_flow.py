@@ -24,9 +24,6 @@ MAX_ITERATIONS_WRAP_UP = (
     "Tell the user briefly what you changed so far and what is still left to do, "
     'and that they can reply "continue" to keep going.'
 )
-MAX_ITERATIONS_FALLBACK = (
-    'I reached the step limit for this turn before finishing. Reply "continue" and I\'ll pick up where I left off.'
-)
 LEAKED_TOOL_CALL_MARKERS = (
     "<invoke name=",
     "｜DSML｜",
@@ -51,6 +48,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         super().__init__(name)
         self.max_iterations = max_iterations
         self.hit_max_iterations = False
+        self.wrap_up_failed = False
 
     async def react_loop(  # noqa: C901
         self,
@@ -65,6 +63,7 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         tool_schemas = tools.get_schemas()
         last_content = ""
         self.hit_max_iterations = False
+        self.wrap_up_failed = False
 
         for iteration in range(self.max_iterations):
             metadata = (
@@ -211,9 +210,11 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
             )
         except Exception:
             logger.exception("[react_loop:%s] Wrap-up call failed", self.name)
-            return MAX_ITERATIONS_FALLBACK
+            self.wrap_up_failed = True
+            return ""
 
         content: str = response.choices[0].message.content or ""
         if not content.strip() or looks_like_leaked_tool_call(content):
-            return MAX_ITERATIONS_FALLBACK
+            self.wrap_up_failed = True
+            return ""
         return content

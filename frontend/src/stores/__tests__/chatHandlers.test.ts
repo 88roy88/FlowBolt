@@ -77,6 +77,7 @@ const INITIAL_STATE: ChatState = {
   interviewQuestions: null,
   interviewMode: 'interview',
   executionTasks: [],
+  followUpStepLimitReached: false,
   error: null,
   buildCompleted: false,
   agentAlive: null,
@@ -389,6 +390,17 @@ describe('createSendMessageHandler — followup flow', () => {
     const card = found!.agentCard as { type: 'followup_progress'; steps: unknown[]; answer?: string };
     expect(card.steps).toHaveLength(1);
     expect(card.answer).toBe('I found the issue.');
+  });
+
+  it('step_limit_reached marks the followup card and does not leak into the next turn', () => {
+    handler(msg({ type: 'followup_step', tool: 'read_file', args: {}, status: 'running', iteration: 1 }));
+    handler(msg({ type: 'followup_step', tool: 'read_file', args: {}, status: 'completed', iteration: 1 }));
+    handler(msg({ type: 'step_limit_reached' }));
+    handler(msg({ type: 'action_complete' }));
+
+    const card = store.state().messages.find(m => m.agentCard?.type === 'followup_progress')!.agentCard;
+    expect(card).toMatchObject({ stepLimitReached: true });
+    expect(store.state().followUpStepLimitReached).toBe(false);
   });
 });
 
