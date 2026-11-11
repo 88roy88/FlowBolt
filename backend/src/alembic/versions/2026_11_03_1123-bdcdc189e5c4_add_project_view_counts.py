@@ -26,6 +26,7 @@ def upgrade() -> None:
     sa.Column('project_id', sa.String(), nullable=False),
     sa.Column('production_views', sa.Integer(), nullable=False),
     sa.Column('preview_views', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('project_id')
     )

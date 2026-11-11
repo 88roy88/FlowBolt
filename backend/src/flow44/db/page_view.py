@@ -1,6 +1,7 @@
+from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Column, ForeignKey, String
+from sqlalchemy import Column, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Field, SQLModel, col, select
 
@@ -18,6 +19,10 @@ class ProjectViewCount(SQLModel, table=True):
     project_id: str = Field(sa_column=Column(String, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True))
     production_views: int = Field(default=0)
     preview_views: int = Field(default=0)
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
 
 
 async def increment_page_views(project_id: str, source: PageViewSource) -> None:
