@@ -84,6 +84,7 @@ async def test_tool_span_is_marked_as_failed_when_the_tool_errors(monkeypatch: p
     assert updates["error_info"]["message"] == "nope"
 
 
+# Names keep each LLM span in Opik small; full schemas would add a couple of KB to every call.
 async def test_llm_metadata_lists_tool_names_not_full_schemas(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_llm(monkeypatch, "done")
     schema = {"type": "function", "function": {"name": "read_file", "parameters": {"type": "object"}}}
