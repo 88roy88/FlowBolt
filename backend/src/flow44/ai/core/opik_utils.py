@@ -74,8 +74,8 @@ class FailureAwareOpikLogger(OpikLogger):
 
 def setup_trace(project_id: str, user_id: str, model: str | None, tags: list[str]) -> str | None:
     trace_data = opik_context.get_current_trace_data()
-    project_name = _log_project_name.get()
     identity_tags = [f"project:{project_id}", f"user:{user_id}"]
+    project_name = _log_project_name.get()
     if project_name:
         identity_tags.append(f"project_name:{project_name}")
     opik_context.update_current_trace(
