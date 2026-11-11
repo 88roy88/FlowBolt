@@ -145,6 +145,7 @@
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
+    "messageTooLong": "Message is too long ({{length}} / {{max}} characters)",
     "model": "Model",
     "placeholder": {
       "selectProject": "Select a project first",

@@ -21,20 +21,12 @@ export type AuthConfig = {
 function readConfig(): AuthConfig {
   const providerUrl = (import.meta.env.VITE_AUTH_PROVIDER_URL as string | undefined)?.trim() ?? '';
 
-  const derivedOrigin = (() => {
-    try {
-      return providerUrl ? new URL(providerUrl).origin : '';
-    } catch {
-      return '';
-    }
-  })();
-
   const explicitOrigin = (import.meta.env.VITE_AUTH_POST_MESSAGE_TARGET as string | undefined)?.trim();
 
   return {
     storageKey: (import.meta.env.VITE_AUTH_STORAGE_KEY as string | undefined)?.trim() || 'Auth',
     providerUrl,
-    postMessageTarget: explicitOrigin || derivedOrigin || '*',
+    postMessageTarget: explicitOrigin || '*',
     pollIntervalMs: envInt(import.meta.env.VITE_AUTH_POLL_INTERVAL_MS as string | undefined, 500),
     popupTimeoutMs: envInt(import.meta.env.VITE_AUTH_POPUP_TIMEOUT_MS as string | undefined, 300_000),
     useIframe: envBool(import.meta.env.VITE_AUTH_USE_IFRAME as string | undefined, false),
