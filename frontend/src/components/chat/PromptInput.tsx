@@ -9,7 +9,7 @@ import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
 import { MessageLengthHint } from './MessageLengthHint';
-import { isOverLimit, useClientConfig } from '../../hooks/useClientConfig';
+import { useClientConfig } from '../../hooks/useClientConfig';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
@@ -46,7 +46,7 @@ export function PromptInput() {
   const { lock, agentBusy } = useWorkspaceLock();
   const maxChars = useClientConfig()?.chat_message_max_chars ?? null;
   const length = value.trim().length;
-  const tooLong = isOverLimit(length, maxChars);
+  const tooLong = maxChars !== null && length > maxChars;
   const inputBlocked = lock !== null || awaitingPlan || awaitingInterview || isCreating;
   // No project open: submitting starts a new one, if the user may create projects
   const startsProject = !projectId && canCreate;
