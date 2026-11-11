@@ -239,6 +239,9 @@
     "colUrl": "כתובת",
     "colCreated": "נוצר",
     "colPublished": "פורסם",
+    "colLiveViews": "צפיות באתר",
+    "colPreviewViews": "צפיות בתצוגה מקדימה",
+    "colPreviewViewsHint": "רק תצוגות מקדימות שנפתחו בטאב משלהן, למשל מקישור. התצוגה המקדימה בתוך הבונה לא נספרת.",
     "openProject": "פתח פרויקט",
     "searchApps": "חיפוש לפי פרויקט, בעלים או כתובת",
     "noMatches": "אין אפליקציות תואמות"

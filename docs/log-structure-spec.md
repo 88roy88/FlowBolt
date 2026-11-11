@@ -257,4 +257,13 @@ Trigger: a user shares the link to a published app.
 |---|---|---|---|
 | `share_method` | enum: `link_copy`, `email`, `other` | No | Method used to share the link. |
 
+### 4.7 App View Events
+
+#### `page_viewed`
+Trigger: the backend serves a page load of a generated app: a published app at `/shared/<handle>/` (including inside an iframe), or a preview opened in its own tab. The builder's preview iframe does not count. A reload counts again; navigation inside the app does not. Published apps are served without sign-in: for their views `user_id` is present only when the viewer's browser sends the builder's sign-in cookie, and absent otherwise (for example on the first load from a link on another site).
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `view_source` | enum: `production`, `preview` | Yes | Whether the published app or the preview was viewed. |
+
 ---

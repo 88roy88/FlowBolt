@@ -239,6 +239,9 @@
     "colUrl": "URL",
     "colCreated": "Created",
     "colPublished": "Published",
+    "colLiveViews": "Live views",
+    "colPreviewViews": "Preview views",
+    "colPreviewViewsHint": "Only previews opened in their own tab, e.g. from a link. The builder's preview pane isn't counted.",
     "openProject": "Open project",
     "searchApps": "Search by project, owner or URL",
     "noMatches": "No matching apps"
