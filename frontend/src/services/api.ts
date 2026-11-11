@@ -201,6 +201,14 @@ export async function fetchDefaultModel(): Promise<string> {
   return data.model;
 }
 
+export interface ClientConfig {
+  chat_message_max_chars: number;
+}
+
+export async function fetchClientConfig(): Promise<ClientConfig> {
+  return request<ClientConfig>('/config');
+}
+
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchResult[]> {
   // Backend strips the Bearer prefix before forwarding to FLAPI, so the shared helper is safe here.
   return request<DataSourceSearchResult[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);

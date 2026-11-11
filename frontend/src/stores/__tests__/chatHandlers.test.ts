@@ -447,6 +447,42 @@ describe('createSendMessageHandler — replay mode', () => {
     expect(filesMock.loadFileTree).not.toHaveBeenCalled();
   });
 
+  it('a failed turn followed by a later turn leaves no error banner', () => {
+    handler(msg({ type: 'user_message', content: 'Build it' }));
+    handler(msg({ type: 'phase', phase: 'idle' }));
+    handler(msg({ type: 'error', message: 'AI processing failed' }));
+    handler(msg({ type: 'user_message', content: 'Try again' }));
+    handler(msg({ type: 'text', content: 'Done!' }));
+    handler(msg({ type: 'action_complete' }));
+
+    expect(store.state().error).toBeNull();
+  });
+
+  it('a turn with no ending event does not leak into the next turn', () => {
+    handler(msg({ type: 'user_message', content: 'First' }));
+    handler(msg({ type: 'phase', phase: 'exploring' }));
+    handler(msg({ type: 'followup_step', tool: 'read_file', status: 'running', iteration: 1 }));
+    handler(msg({ type: 'text', content: 'Partial answer from a crashed run' }));
+    handler(msg({ type: 'user_message', content: 'Second' }));
+    handler(msg({ type: 'phase', phase: 'exploring' }));
+    handler(msg({ type: 'followup_step', tool: 'edit_file', status: 'running', iteration: 1 }));
+    handler(msg({ type: 'text', content: 'Done' }));
+    handler(msg({ type: 'action_complete' }));
+
+    const last = store.state().messages.at(-1)!;
+    expect(last.content).toBe('Done');
+    expect(last.agentCard).toMatchObject({ type: 'followup_progress' });
+    const steps = (last.agentCard as { steps: { tool: string }[] }).steps;
+    expect(steps.map((s) => s.tool)).toEqual(['edit_file']);
+  });
+
+  it('a failed last turn still shows its error', () => {
+    handler(msg({ type: 'user_message', content: 'Build it' }));
+    handler(msg({ type: 'error', message: 'AI processing failed' }));
+
+    expect(store.state().error).toBe('AI processing failed');
+  });
+
   it('live turns keep their side effects once replay ends', () => {
     setReplayMode(false);
     handler(msg({ type: 'file', path: 'src/App.tsx', content: 'new content' }));
