@@ -134,6 +134,7 @@ export type QuickParamDefinition = Static<typeof QuickParamDefinitionSchema>;
 // Run Result types
 export const RunResultSchema = Type.Object({
   results: Type.Record(Type.String(), Type.Unknown()),
+  traceId: Type.Optional(Type.String()),
 });
 
 export type RunResult = Static<typeof RunResultSchema>;

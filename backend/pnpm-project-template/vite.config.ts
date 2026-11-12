@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     base: env.VITE_BASE ?? '/api/preview/{{PROJECT_ID}}/proxy/',
     define: {
+      'import.meta.env.VITE_PROJECT_ID': JSON.stringify('{{PROJECT_ID}}'),
+      'import.meta.env.VITE_APP_MODE': JSON.stringify(mode === 'production' ? 'published' : 'preview'),
       'import.meta.env.VITE_AUTH_PROVIDER_URL': JSON.stringify('{{AUTH_PROVIDER_URL}}'),
       'import.meta.env.VITE_AUTH_STORAGE_KEY': JSON.stringify('{{AUTH_STORAGE_KEY}}'),
       'import.meta.env.VITE_AUTH_USE_IFRAME': JSON.stringify('{{AUTH_USE_IFRAME}}'),

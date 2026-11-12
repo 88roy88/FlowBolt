@@ -130,6 +130,7 @@ class QuickParams(RootModel[dict[CubeId, dict[str, QuickParamValue]]]):
 
 class DataSourceRunResult(BaseModel):
     results: dict[QueryDisplayName, Any]
+    trace_id: str | None = Field(default=None, alias="traceId")
 
 
 # -- Quick params info: GET /package/v1/quick/{id} -----------------------

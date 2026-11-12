@@ -86,6 +86,7 @@ class DataSourceParams(RootModel[dict[str, ParamValue]]):
 
 class DataSourceResult(BaseModel):
     data: dict[QueryDisplayName, Any]
+    trace_id: str | None = None
 
 
 class DataSourceFieldSchema(BaseModel):
