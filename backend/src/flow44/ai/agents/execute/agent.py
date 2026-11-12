@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 MAX_FIX_ATTEMPTS = 10
 
+APP_ENTRY_PATH = "src/App.tsx"
+
 
 class ExecuteAgent(BaseAgent):
     def __init__(
@@ -166,10 +168,14 @@ class ExecuteAgent(BaseAgent):
             raise
 
         failed_tasks = [t.title for t in state.build_state.work_plan.tasks if t.status == "failed"]
+        app_tsx_updated = APP_ENTRY_PATH in state.build_state.completed_files
+        if not app_tsx_updated:
+            logger.error("[execute] %s was not generated, so the preview still shows the template app", APP_ENTRY_PATH)
         opik_context.update_current_span(
             output={
                 "files_written": list(state.build_state.completed_files.keys()),
                 "failed_tasks": failed_tasks,
+                "app_tsx_updated": app_tsx_updated,
             }
         )
         return state
