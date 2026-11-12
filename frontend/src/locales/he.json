@@ -44,6 +44,10 @@
     "untitledProject": "ללא שם",
     "createProjectError": "יצירת הפרויקט נכשלה. אנא נסה שוב."
   },
+  "topbar": {
+    "home": "דף הבית",
+    "projects": "פרויקטים"
+  },
   "settings": {
     "title": "הגדרות",
     "layout": "פריסה",
@@ -51,6 +55,11 @@
     "layoutClassicDesc": "צ'אט + לשוניות",
     "layoutFlexible": "גמיש",
     "layoutFlexibleDesc": "פאנלים עצמאיים",
+    "navigation": "ניווט בין פרויקטים",
+    "navSidebar": "סרגל צד",
+    "navSidebarDesc": "רשימת פרויקטים בצד",
+    "navTopbar": "סרגל עליון",
+    "navTopbarDesc": "בורר בסרגל העליון",
     "theme": "ערכת נושא",
     "themeDark": "כהה",
     "themeLight": "בהיר",

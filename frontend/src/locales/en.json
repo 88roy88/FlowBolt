@@ -44,6 +44,10 @@
     "untitledProject": "Untitled",
     "createProjectError": "Failed to create project. Please try again."
   },
+  "topbar": {
+    "home": "Home",
+    "projects": "Projects"
+  },
   "settings": {
     "title": "Settings",
     "layout": "Layout",
@@ -51,6 +55,11 @@
     "layoutClassicDesc": "Chat + tabbed panels",
     "layoutFlexible": "Flexible",
     "layoutFlexibleDesc": "Independent panels",
+    "navigation": "Project navigation",
+    "navSidebar": "Sidebar",
+    "navSidebarDesc": "Project list on the side",
+    "navTopbar": "Top bar",
+    "navTopbarDesc": "Switcher in the top bar",
     "theme": "Theme",
     "themeDark": "Dark",
     "themeLight": "Light",
