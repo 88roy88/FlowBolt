@@ -24,7 +24,14 @@ def _split_file_diffs(show_output: str) -> list[FileDiff]:
         header, _, modes = meta.partition("\n")
         path = header.removeprefix("a/").partition(" b/")[0]
         diff = f"--- {body}" if marker else ""
-        diffs.append(FileDiff(path=path, diff=diff, is_new="new file mode " in modes))
+        diffs.append(
+            FileDiff(
+                path=path,
+                diff=diff,
+                is_new="new file mode " in modes,
+                is_deleted="deleted file mode " in modes,
+            )
+        )
     return diffs
 
 

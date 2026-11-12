@@ -232,7 +232,9 @@ async def test_save_version_keeps_file_names_of_oversized_diffs(
 
     await versioning.save_version(project_id)
 
-    assert (await get_versions(project_id))[-1].payload["diffs"] == [{"path": "a.txt", "diff": "", "is_new": False}]
+    assert (await get_versions(project_id))[-1].payload["diffs"] == [
+        {"path": "a.txt", "diff": "", "is_new": False, "is_deleted": False}
+    ]
     assert [m.content for m in await get_messages(project_id)] == ["[I edited these files myself: a.txt]"]
 
 

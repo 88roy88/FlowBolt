@@ -41,6 +41,8 @@ class BiLogger:
             if diff.is_new:
                 file_type = diff.path.split(".")[-1] if "." in diff.path else ""
                 log_bi_event("file_created", file_path=diff.path, file_type=file_type, created_by="model")
+            elif diff.is_deleted:
+                log_bi_event("file_deleted", file_path=diff.path, deleted_by="model")
 
 
 bi_logger = BiLogger()
