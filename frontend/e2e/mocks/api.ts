@@ -366,6 +366,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: payload });
   });
 
+  // --- Client config (feature flags) ---
+  await page.route('**/api/config', async (route) => {
+    return route.fulfill({ json: { chat_message_max_chars: 20000, features: ['model_selector'] } });
+  });
+
   // --- Models ---
   await page.route('**/api/models', async (route) => {
     return route.fulfill({ json: MOCK_MODELS });

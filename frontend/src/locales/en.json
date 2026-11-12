@@ -244,7 +244,16 @@
     "colPreviewViewsHint": "Only previews opened in their own tab, e.g. from a link. The builder's preview pane isn't counted.",
     "openProject": "Open project",
     "searchApps": "Search by project, owner or URL",
-    "noMatches": "No matching apps"
+    "noMatches": "No matching apps",
+    "flagsTab": "Flags",
+    "flagEveryone": "Everyone",
+    "flagAdmins": "Admins",
+    "flagAddTarget": "Add user or group",
+    "flagDoneAdding": "Done",
+    "flagAdd": "Add",
+    "flagTargetsInactive": "On for everyone, so this list doesn't matter until Everyone is turned off.",
+    "noFlags": "No feature flags are defined",
+    "flagsLoadFailed": "Failed to load feature flags"
   },
   "version": {
     "currentVersion": "Current version",

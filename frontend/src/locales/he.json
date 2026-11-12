@@ -244,7 +244,16 @@
     "colPreviewViewsHint": "רק תצוגות מקדימות שנפתחו בטאב משלהן, למשל מקישור. התצוגה המקדימה בתוך הבונה לא נספרת.",
     "openProject": "פתח פרויקט",
     "searchApps": "חיפוש לפי פרויקט, בעלים או כתובת",
-    "noMatches": "אין אפליקציות תואמות"
+    "noMatches": "אין אפליקציות תואמות",
+    "flagsTab": "דגלים",
+    "flagEveryone": "כולם",
+    "flagAdmins": "מנהלים",
+    "flagAddTarget": "הוסף משתמש או קבוצה",
+    "flagDoneAdding": "סיום",
+    "flagAdd": "הוסף",
+    "flagTargetsInactive": "פעיל לכולם, לכן הרשימה הזו לא משפיעה עד שמכבים את \"כולם\".",
+    "noFlags": "לא הוגדרו דגלי פיצ'רים",
+    "flagsLoadFailed": "טעינת דגלי הפיצ'רים נכשלה"
   },
   "version": {
     "currentVersion": "גרסה נוכחית",

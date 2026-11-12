@@ -9,7 +9,7 @@ import { DataSourceSelector } from './DataSourceSelector';
 import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
 import { MessageLengthHint } from './MessageLengthHint';
-import { useClientConfig } from '../../hooks/useClientConfig';
+import { useClientConfig, useFeatureFlag } from '../../hooks/useClientConfig';
 import { Badge } from '../ui/badge';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { elementLabel, elementTooltip } from '../../utils/selectedElement';
@@ -45,6 +45,7 @@ export function PromptInput() {
   const canCreate = useSessionStore((s) => !!(s.userStatus?.is_platform_user || s.userStatus?.is_admin));
   const { lock, agentBusy } = useWorkspaceLock();
   const maxChars = useClientConfig()?.chat_message_max_chars ?? null;
+  const showModelSelector = useFeatureFlag('model_selector');
   const length = value.trim().length;
   const tooLong = maxChars !== null && length > maxChars;
   const inputBlocked = lock !== null || awaitingPlan || awaitingInterview || isCreating;
@@ -197,7 +198,7 @@ export function PromptInput() {
 
           <div className="flex items-center gap-1 ms-auto min-w-0">
             <ModeSelector />
-            <ModelSelector />
+            {showModelSelector && <ModelSelector />}
           </div>
 
           <button
