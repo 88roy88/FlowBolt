@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 
 from flow44.api import data_source_api
@@ -23,6 +24,7 @@ class TestDataSourceAPI:
             await data_source_api.run_data_source(
                 data_source_id="42",
                 authorization="Bearer test",
+                background_tasks=BackgroundTasks(),
                 params=None,
             )
         assert exc.value.status_code == 401
@@ -38,11 +40,67 @@ class TestDataSourceAPI:
         res = await data_source_api.run_data_source(
             data_source_id="42",
             authorization="Bearer test",
+            background_tasks=BackgroundTasks(),
             params=None,
         )
         assert isinstance(res, JSONResponse)
         assert res.status_code == 502
         assert json.loads(res.body) == upstream_body
+
+    async def test_run_logs_project_and_app_source(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def _fake_run(*_a, **_kw):
+            return {"data": {}}
+
+        async def _fake_get_project(project_id: str):
+            return SimpleNamespace(id=project_id, name="My App")
+
+        events: list[tuple[str, dict]] = []
+        monkeypatch.setattr(ds_logic, "run_data_source", _fake_run)
+        monkeypatch.setattr(data_source_api, "get_project", _fake_get_project)
+        monkeypatch.setattr(data_source_api, "log_bi_event", lambda event, **kw: events.append((event, kw)))
+
+        background_tasks = BackgroundTasks()
+        await data_source_api.run_data_source(
+            data_source_id="42",
+            authorization="Bearer test",
+            background_tasks=background_tasks,
+            params=None,
+            app_project_id="p1",
+            app_mode="published",
+        )
+        await background_tasks()
+
+        assert data_source_api._log_project_id.get() == "p1"
+        assert data_source_api._log_project_name.get() == "My App"
+        [(event, props)] = events
+        assert event == "flapi_call_made"
+        assert props["app_source"] == "published"
+
+    async def test_run_ignores_unknown_app_mode_and_missing_project(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def _fake_run(*_a, **_kw):
+            return {"data": {}}
+
+        async def _no_project(_project_id: str):
+            return None
+
+        events: list[tuple[str, dict]] = []
+        monkeypatch.setattr(ds_logic, "run_data_source", _fake_run)
+        monkeypatch.setattr(data_source_api, "get_project", _no_project)
+        monkeypatch.setattr(data_source_api, "log_bi_event", lambda event, **kw: events.append((event, kw)))
+
+        background_tasks = BackgroundTasks()
+        await data_source_api.run_data_source(
+            data_source_id="42",
+            authorization="Bearer test",
+            background_tasks=background_tasks,
+            params=None,
+            app_project_id="missing",
+            app_mode="bogus",
+        )
+        await background_tasks()
+
+        [(_, props)] = events
+        assert "app_source" not in props
 
     async def test_search_maps_500_to_502(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_search(*_a, **_kw):
