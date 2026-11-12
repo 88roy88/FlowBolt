@@ -45,6 +45,34 @@ export function SettingsModal({ layoutMode, onLayoutChange, navMode, onNavChange
 
         {/* Content */}
         <div className="px-5 py-4 space-y-5">
+          {/* Project navigation */}
+          <div className="space-y-2.5">
+            <label className="text-[13px] font-medium text-foreground">{t('settings.navigation')}</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { mode: 'sidebar', Icon: PanelLeft, label: t('settings.navSidebar'), desc: t('settings.navSidebarDesc') },
+                { mode: 'topbar', Icon: PanelTop, label: t('settings.navTopbar'), desc: t('settings.navTopbarDesc') },
+              ] as const).map(({ mode, Icon, label, desc }) => (
+                <button
+                  key={mode}
+                  onClick={() => onNavChange(mode)}
+                  data-testid={`nav-mode-${mode}`}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all duration-150 ${
+                    navMode === mode
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border hover:border-primary/30 hover:bg-muted/30 text-muted-foreground'
+                  }`}
+                >
+                  <Icon size={24} />
+                  <div className="text-center">
+                    <div className="text-[13px] font-medium">{label}</div>
+                    <div className="text-[11px] opacity-70">{desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Layout mode */}
           <div className="space-y-2.5">
             <label className="text-[13px] font-medium text-foreground">{t('settings.layout')}</label>
@@ -77,34 +105,6 @@ export function SettingsModal({ layoutMode, onLayoutChange, navMode, onNavChange
                   <div className="text-[11px] opacity-70">{t('settings.layoutFlexibleDesc')}</div>
                 </div>
               </button>
-            </div>
-          </div>
-
-          {/* Project navigation */}
-          <div className="space-y-2.5">
-            <label className="text-[13px] font-medium text-foreground">{t('settings.navigation')}</label>
-            <div className="grid grid-cols-2 gap-2">
-              {([
-                { mode: 'sidebar', Icon: PanelLeft, label: t('settings.navSidebar'), desc: t('settings.navSidebarDesc') },
-                { mode: 'topbar', Icon: PanelTop, label: t('settings.navTopbar'), desc: t('settings.navTopbarDesc') },
-              ] as const).map(({ mode, Icon, label, desc }) => (
-                <button
-                  key={mode}
-                  onClick={() => onNavChange(mode)}
-                  data-testid={`nav-mode-${mode}`}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all duration-150 ${
-                    navMode === mode
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border hover:border-primary/30 hover:bg-muted/30 text-muted-foreground'
-                  }`}
-                >
-                  <Icon size={24} />
-                  <div className="text-center">
-                    <div className="text-[13px] font-medium">{label}</div>
-                    <div className="text-[11px] opacity-70">{desc}</div>
-                  </div>
-                </button>
-              ))}
             </div>
           </div>
 
