@@ -125,6 +125,11 @@ export const QuickParamDefinitionSchema = Type.Object({
     Type.Object({
       DisplayName: Type.Union([Type.String(), Type.Null()]),
       Description: Type.Union([Type.String(), Type.Null()]),
+      RequiredType: Type.Optional(
+        Type.Object({
+          IsRequired: Type.Boolean(),
+        }),
+      ),
     }),
   ),
 });

@@ -96,6 +96,14 @@ def _to_data_source(result: flapi_models.PackageSearchResult) -> DataSource:
     )
 
 
+def _resolve_is_required(p: flapi_models.QuickParamDefinition) -> bool:
+    """quickParameterInfo.RequiredType.IsRequired takes precedence over the regular IsRequired."""
+    info = p.quick_parameter_info
+    if info and info.required_type and info.required_type.is_required is not None:
+        return info.required_type.is_required
+    return p.is_required
+
+
 def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
     parameters: list[ParamDefinition] = []
     require_any = False
@@ -121,7 +129,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
                         else None
                     ),
                     type=_FLAPI_PARAM_TYPE.get(p.type_, "string"),
-                    is_required=p.is_required,
+                    is_required=_resolve_is_required(p),
                     is_single_value=p.is_single_value,
                     is_require_any=p.is_require_any,
                     options=options,
