@@ -101,7 +101,7 @@ def _resolve_is_required(p: flapi_models.QuickParamDefinition) -> bool:
     info = p.quick_parameter_info
     if info and info.required_type and info.required_type.is_required is not None:
         return info.required_type.is_required
-    return p.raw_is_required
+    return p.is_required
 
 
 def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:

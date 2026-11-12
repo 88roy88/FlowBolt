@@ -152,8 +152,7 @@ class QuickParamDefinition(PascalCaseBaseModel):
     type_: ParamType = Field(alias="Type")
     # ontology_type: OntologyType
     is_single_value: bool
-    # Don't read this directly; use logic.data_source._resolve_is_required.
-    raw_is_required: bool = Field(alias="IsRequired")
+    is_required: bool
     is_require_any: bool = False
     value: QuickParamValue | None = None
     quick_parameter_info: QuickParameterInfo | None = Field(default=None, alias="quickParameterInfo")
