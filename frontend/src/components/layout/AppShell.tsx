@@ -22,20 +22,12 @@ import { isPlainClick, projectHref } from '../../utils/links';
 import { openProject } from '../../utils/openProject';
 import { ProjectAvatar } from './ProjectAvatar';
 import { TopBar } from './TopBar';
+import { NavModeContext, loadNavMode, type NavMode } from './navMode';
 import { getProjectHasMessages, setProjectHasMessages } from '../../utils/projectHasMessagesCache';
 
 const SIDEBAR_WIDTH = 280;
 const RAIL_WIDTH = 56;
 type LayoutMode = 'classic' | 'flexible';
-export type NavMode = 'sidebar' | 'topbar';
-
-function loadNavMode(): NavMode {
-  try {
-    if (localStorage.getItem('nav-mode') === 'topbar') return 'topbar';
-  } catch {}
-  return 'sidebar';
-}
-
 function loadLayoutMode(): LayoutMode {
   try {
     const v = localStorage.getItem('layout-mode');
@@ -190,7 +182,12 @@ export function AppShell() {
       {/* Main content */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {navMode === 'topbar' && (
-          <TopBar onOpenSettings={() => setShowSettings(true)} onOpenAdmin={() => setShowAdminPanel(true)} />
+          <TopBar
+            showProjectActions={!!currentProject && !isNewProject}
+            showPanelTabs={layoutMode === 'classic'}
+            onOpenSettings={() => setShowSettings(true)}
+            onOpenAdmin={() => setShowAdminPanel(true)}
+          />
         )}
         <GlobalProgress />
         <PreviewVersionBanner />
@@ -234,7 +231,9 @@ export function AppShell() {
           </div>
         ) : (
           <>
-            {layoutMode === 'classic' ? <ClassicLayout /> : <FlexibleLayout />}
+            <NavModeContext.Provider value={navMode}>
+              {layoutMode === 'classic' ? <ClassicLayout /> : <FlexibleLayout />}
+            </NavModeContext.Provider>
             {!isNewProject && !isEmptyState && <BottomDrawer />}
           </>
         )}

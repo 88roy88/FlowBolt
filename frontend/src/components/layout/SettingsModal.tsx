@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, LayoutPanelLeft, Columns3, Moon, Sun, Bell, Languages, PanelLeft, PanelTop } from 'lucide-react';
 import { Button } from '../ui/button';
 import { isNotifyEnabled, setNotifyEnabled, requestPermissionIfNeeded } from '../../utils/notifications';
-import type { NavMode } from './AppShell';
+import type { NavMode } from './navMode';
 
 export type LayoutMode = 'classic' | 'flexible';
 

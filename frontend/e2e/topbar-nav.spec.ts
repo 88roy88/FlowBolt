@@ -45,6 +45,27 @@ test.describe('Topbar navigation', () => {
     await expect(row).toHaveCount(0, { timeout: 5_000 });
   });
 
+  test.describe('with a workspace', () => {
+    test.use({ mockOptions: { seedChatHistory: true } });
+
+    test('moves panel tabs, share and publish into the topbar', async ({ page }) => {
+      await page.goto(`/#/project/${PROJECT_ID}`);
+      const topbar = page.getByTestId('topbar');
+      const tabs = page.getByTestId('topbar-panel-tabs');
+      await expect(tabs).toBeVisible({ timeout: 10_000 });
+
+      // Only one Publish button: the one in the topbar
+      await expect(page.getByRole('button', { name: /^publish$/i })).toHaveCount(1);
+      await expect(topbar.getByTestId('topbar-publish')).toBeVisible();
+
+      await tabs.getByRole('tab', { name: 'Code' }).click();
+      await expect(tabs.getByRole('tab', { name: 'Code' })).toHaveAttribute('aria-selected', 'true');
+
+      await topbar.getByTestId('topbar-publish').click();
+      await expect(page.getByRole('dialog').or(page.getByText(/publish your app|choose a url/i)).first()).toBeVisible();
+    });
+  });
+
   test('can switch back to the sidebar from settings', async ({ page }) => {
     await page.goto(`/#/project/${PROJECT_ID}`);
     await expect(page.getByTestId('topbar')).toBeVisible({ timeout: 10_000 });
