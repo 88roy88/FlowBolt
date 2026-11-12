@@ -71,10 +71,10 @@ async def test_enabled_for_admins_only(monkeypatch):
         assert await get_enabled_flags("alice") == set()
 
 
-async def test_user_target_matches_case_insensitively():
+async def test_user_target():
     state = FlagState(key="beta", targets=[_target("beta", FlagTargetType.user, "alice@corp")])
     with _with_states(state):
-        assert await get_enabled_flags("Alice@CORP") == {"beta"}
+        assert await get_enabled_flags("alice@corp") == {"beta"}
         assert await get_enabled_flags("bob@corp") == set()
 
 

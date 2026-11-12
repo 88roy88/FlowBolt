@@ -42,7 +42,6 @@ async def is_feature_enabled(user_id: str, flag: FeatureFlag) -> bool:
 
 async def _get_enabled_among(user_id: str, flags: dict[FeatureFlag, FlagSpec]) -> set[str]:
     states = await list_flag_states(flags.keys())
-    user_key = user_id.casefold()
     admin = is_admin(user_id)
 
     enabled: set[str] = set()
@@ -52,7 +51,7 @@ async def _get_enabled_among(user_id: str, flags: dict[FeatureFlag, FlagSpec]) -
         if (
             state.enabled_for_all
             or (state.enabled_for_admins and admin)
-            or any(t.target_type == FlagTargetType.user and t.target_id == user_key for t in state.targets)
+            or any(t.target_type == FlagTargetType.user and t.target_id == user_id for t in state.targets)
         ):
             enabled.add(key)
         elif groups := {t.target_id for t in state.targets if t.target_type == FlagTargetType.group}:
