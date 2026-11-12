@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from flow44.api import data_source_api
 from flow44.logic import data_source as ds_logic
+from flow44.logic.models import DataSourceResult
 
 
 class TestDataSourceAPI:
@@ -49,7 +50,7 @@ class TestDataSourceAPI:
 
     async def test_run_logs_project_and_app_source(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_run(*_a, **_kw):
-            return {"data": {}}
+            return DataSourceResult(data={}, trace_id="trace-1")
 
         async def _fake_get_project(project_id: str):
             return SimpleNamespace(id=project_id, name="My App")
@@ -75,10 +76,11 @@ class TestDataSourceAPI:
         [(event, props)] = events
         assert event == "flapi_call_made"
         assert props["app_source"] == "published"
+        assert props["flow_trace_id"] == "trace-1"
 
     async def test_run_ignores_unknown_app_mode_and_missing_project(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_run(*_a, **_kw):
-            return {"data": {}}
+            return DataSourceResult(data={})
 
         async def _no_project(_project_id: str):
             return None
@@ -101,6 +103,7 @@ class TestDataSourceAPI:
 
         [(_, props)] = events
         assert "app_source" not in props
+        assert "flow_trace_id" not in props
 
     async def test_search_maps_500_to_502(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _fake_search(*_a, **_kw):

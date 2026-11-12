@@ -135,7 +135,7 @@ def _to_params_info(info: flapi_models.QuickParamsInfo) -> DataSourceParamsInfo:
 
 
 def _to_result(raw: flapi_models.DataSourceRunResult) -> DataSourceResult:
-    return DataSourceResult(data=raw.results)
+    return DataSourceResult(data=raw.results, trace_id=raw.trace_id)
 
 
 # -- Public API ----------------------------------------------------------

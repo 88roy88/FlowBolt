@@ -198,6 +198,7 @@ Trigger: the running app calls flapi.
 | `endpoint` | string | Yes | flapi endpoint called. |
 | `duration_ms` | integer | Yes | Time from request to response. |
 | `app_source` | enum: `preview`, `published` | No | Whether the call came from the builder preview or a published app. Sent by the app itself, so absent for apps built from an older template. |
+| `flow_trace_id` | string | No | Trace ID returned by flapi next to the results. |
 | `status_code` | integer | Yes | HTTP status code of the response. |
 | `is_error` | boolean | Yes | True if the call failed, false if successful. |
 | `error_message` | string | No | Short, sanitized error text, present only when `is_error` is true. |

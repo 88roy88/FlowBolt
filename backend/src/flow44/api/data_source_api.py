@@ -133,6 +133,7 @@ async def run_data_source(
             duration_ms=int((time.monotonic() - start_time) * 1000),
             status_code=200,
             is_error=False,
+            **({"flow_trace_id": result.trace_id} if result.trace_id else {}),
         )
         return result
     except ds_logic.FlapiUpstreamError as err:
