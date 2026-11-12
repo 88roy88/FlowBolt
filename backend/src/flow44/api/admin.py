@@ -1,12 +1,11 @@
 import asyncio
 from datetime import datetime
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
-from flow44.api.deps import UserDep, is_admin
+from flow44.api.deps import AdminDep
 from flow44.config import settings
 from flow44.db.page_view import ProjectViewCount, list_page_view_counts
 from flow44.db.platform_user import (
@@ -21,6 +20,7 @@ from flow44.db.platform_user_group import (
 )
 from flow44.db.project import Project, list_published_projects
 from flow44.sandbox.base import workspace_path
+from flow44.sandbox.manager import sandbox_manager
 from flow44.services.maintenance.runner import ProjectMaintenanceResult, run_over_projects
 from flow44.services.maintenance.sandbox_file_permissions import fix_file_permissions
 from flow44.services.maintenance.template_sync import sync_protected_template_files
@@ -28,15 +28,6 @@ from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-
-async def require_admin(user_id: UserDep) -> str:
-    if not is_admin(user_id):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user_id
-
-
-AdminDep = Annotated[str, Depends(require_admin)]
 
 
 class InviteUserRequest(BaseModel):
@@ -197,3 +188,15 @@ async def sync_protected_files(user_id: AdminDep) -> list[ProjectMaintenanceResu
         return summary
 
     return await run_over_projects(sync_files)
+
+
+class ActiveSandboxesResponse(BaseModel):
+    count: int
+    project_ids: list[str]
+
+
+@router.get("/debug/sandboxes")
+async def debug_list_sandboxes(user_id: AdminDep) -> ActiveSandboxesResponse:
+    """Projects with a live sandbox on the pod that serves this request (one pod of several; docs/multi-pod.md)."""
+    active = sandbox_manager.active_project_ids()
+    return ActiveSandboxesResponse(count=len(active), project_ids=active)

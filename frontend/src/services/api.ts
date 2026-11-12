@@ -254,7 +254,7 @@ export async function checkBackendHealth(): Promise<boolean> {
 // --- User status & platform ---
 
 export async function fetchMe(): Promise<UserStatus> {
-  return request<UserStatus>('/projects/me');
+  return request<UserStatus>('/me');
 }
 
 // --- Project members ---

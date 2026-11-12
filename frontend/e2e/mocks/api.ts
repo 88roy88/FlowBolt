@@ -122,7 +122,7 @@ export interface MockAPIOptions {
   searchUnavailable?: boolean;
   /** Return 401 on the first GET /api/projects, then succeed — exercises the refresh-on-401 retry. */
   failProjectsOnce?: boolean;
-  /** Flags returned by GET /api/projects/me. Defaults to an admin. */
+  /** Flags returned by GET /api/me. Defaults to an admin. */
   userStatus?: { is_admin: boolean; is_platform_user: boolean };
 }
 
@@ -156,14 +156,14 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: { projects: [...projects], next_cursor: null } });
   });
 
+  // User status endpoint
+  await page.route('**/api/me', async (route) => {
+    const status = options.userStatus ?? { is_admin: true, is_platform_user: true };
+    return route.fulfill({ json: { user_id: 'test-user', ...status } });
+  });
+
   await page.route('**/api/projects/*', async (route) => {
     const url = route.request().url();
-
-    // User status endpoint
-    if (url.endsWith('/me')) {
-      const status = options.userStatus ?? { is_admin: true, is_platform_user: true };
-      return route.fulfill({ json: { user_id: 'test-user', ...status } });
-    }
 
     // Skip sub-routes like /name, /model, /members
     if (url.includes('/name') || url.includes('/model') || url.includes('/members')) {

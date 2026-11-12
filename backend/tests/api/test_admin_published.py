@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from flow44.api.admin import require_admin
+from flow44.api.deps import require_admin
 from flow44.db.page_view import ProjectViewCount
 from flow44.db.project import Project
 from flow44.main import app

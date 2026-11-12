@@ -1,11 +1,11 @@
 import logging
-from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 
 from flow44.api.deps import PermissionsDep, ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
+from flow44.api.static import PREVIEW_TOOLBAR_URL
 from flow44.auth.permissions import Permission, has_permission
 from flow44.db.locks import LockNamespace, advisory_lock
 from flow44.db.page_view import PageViewSource
@@ -18,8 +18,7 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 
 _proxy_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
 
-_TOOLBAR_FILE = Path(__file__).resolve().parent.parent / "static" / "preview_toolbar.js"
-_TOOLBAR_TAG = b'<script src="/api/preview/preview_toolbar.js" defer></script>'
+_TOOLBAR_TAG = f'<script src="{PREVIEW_TOOLBAR_URL}" defer></script>'.encode()
 
 
 def _inject_toolbar(html: bytes) -> bytes:
@@ -41,15 +40,6 @@ def _loading_page(title: str, message: str, detail: str, reload_ms: int) -> str:
         f'<div style="font-size:0.85rem;color:#999">{detail}</div>\n'
         f"<script>setTimeout(()=>location.reload(),{reload_ms})</script>\n"
         f"</body>\n</html>\n"
-    )
-
-
-@router.get("/preview_toolbar.js")
-async def preview_toolbar() -> FileResponse:
-    return FileResponse(
-        _TOOLBAR_FILE,
-        media_type="application/javascript; charset=utf-8",
-        headers={"Cache-Control": "no-cache"},
     )
 
 
