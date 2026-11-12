@@ -135,9 +135,14 @@ class DataSourceRunResult(BaseModel):
 # -- Quick params info: GET /package/v1/quick/{id} -----------------------
 
 
+class QuickRequiredType(PascalCaseBaseModel):
+    is_required: bool | None = None
+
+
 class QuickParameterInfo(PascalCaseBaseModel):
     display_name: str | None = None
     description: str | None = None
+    required_type: QuickRequiredType | None = None
 
 
 class QuickParamDefinition(PascalCaseBaseModel):
@@ -147,7 +152,8 @@ class QuickParamDefinition(PascalCaseBaseModel):
     type_: ParamType = Field(alias="Type")
     # ontology_type: OntologyType
     is_single_value: bool
-    is_required: bool
+    # Don't read this directly; use logic.data_source._resolve_is_required.
+    raw_is_required: bool = Field(alias="IsRequired")
     is_require_any: bool = False
     value: QuickParamValue | None = None
     quick_parameter_info: QuickParameterInfo | None = Field(default=None, alias="quickParameterInfo")
