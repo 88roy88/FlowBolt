@@ -17,6 +17,7 @@ from flow44.auth.permissions import (
     get_role_permissions,
     has_permission,
     highest_role,
+    is_admin,
 )
 from flow44.config import settings
 from flow44.db.platform_user import is_platform_user as db_is_platform_user
@@ -135,10 +136,6 @@ async def get_optional_user_id(token: TokenDep) -> str | None:
 
     _log_user_id.set(payload.unique_id)
     return payload.unique_id
-
-
-def is_admin(user_id: str) -> bool:
-    return user_id in settings.SYSTEM_ADMIN_IDS
 
 
 def resolve_role(project: Project, user_id: str, granted_role: Role | None) -> DisplayRole | None:

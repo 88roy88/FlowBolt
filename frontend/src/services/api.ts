@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, FeatureFlag, FlagTarget, FlagTargetType, UserStatus, AdUser, AdGroup } from '../types';
 import type { LogEvent } from './logger';
 
 const BASE = '/api';
@@ -203,6 +203,7 @@ export async function fetchDefaultModel(): Promise<string> {
 
 export interface ClientConfig {
   chat_message_max_chars: number;
+  features: string[];
 }
 
 export async function fetchClientConfig(): Promise<ClientConfig> {
@@ -364,6 +365,36 @@ export async function invitePlatformGroup(groupId: string, groupName: string, em
 
 export async function revokePlatformGroup(groupId: string): Promise<void> {
   await request(`/admin/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+}
+
+// --- Admin: feature flags ---
+
+export async function fetchFeatureFlags(): Promise<FeatureFlag[]> {
+  return request<FeatureFlag[]>('/admin/flags');
+}
+
+export async function updateFeatureFlag(
+  key: string,
+  changes: { enabled_for_all?: boolean; enabled_for_admins?: boolean },
+): Promise<void> {
+  await request(`/admin/flags/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify(changes) });
+}
+
+export async function addFlagTarget(
+  key: string,
+  target: { target_type: FlagTargetType; target_id: string; display_name: string; email?: string },
+): Promise<FlagTarget> {
+  return request<FlagTarget>(`/admin/flags/${encodeURIComponent(key)}/targets`, {
+    method: 'POST',
+    body: JSON.stringify(target),
+  });
+}
+
+export async function removeFlagTarget(key: string, targetType: FlagTargetType, targetId: string): Promise<void> {
+  await request(
+    `/admin/flags/${encodeURIComponent(key)}/targets/${targetType}/${encodeURIComponent(targetId)}`,
+    { method: 'DELETE' },
+  );
 }
 
 // --- Directory (users & groups) search ---
