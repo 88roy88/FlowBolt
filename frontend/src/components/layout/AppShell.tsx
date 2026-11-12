@@ -15,16 +15,26 @@ import { PromptInput } from '../chat/PromptInput';
 import { Settings, Shield } from 'lucide-react';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
-import { useFilesStore } from '../../stores/files';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { startProjectFromPrompt } from '../../utils/newProject';
 import { isPlainClick, projectHref } from '../../utils/links';
+import { openProject } from '../../utils/openProject';
+import { ProjectAvatar } from './ProjectAvatar';
+import { TopBar } from './TopBar';
 import { getProjectHasMessages, setProjectHasMessages } from '../../utils/projectHasMessagesCache';
 
 const SIDEBAR_WIDTH = 280;
 const RAIL_WIDTH = 56;
 type LayoutMode = 'classic' | 'flexible';
+export type NavMode = 'sidebar' | 'topbar';
+
+function loadNavMode(): NavMode {
+  try {
+    if (localStorage.getItem('nav-mode') === 'topbar') return 'topbar';
+  } catch {}
+  return 'sidebar';
+}
 
 function loadLayoutMode(): LayoutMode {
   try {
@@ -63,6 +73,12 @@ export function AppShell() {
     try { localStorage.setItem('layout-mode', mode); } catch {}
   };
 
+  const [navMode, setNavMode] = useState<NavMode>(loadNavMode);
+  const switchNav = (mode: NavMode) => {
+    setNavMode(mode);
+    try { localStorage.setItem('nav-mode', mode); } catch {}
+  };
+
   // Shared state
   const { lock } = useWorkspaceLock();
   const messages = useChatStore((s) => s.messages);
@@ -99,37 +115,6 @@ export function AppShell() {
   };
 
 
-  // Project colors + initials for icon rail
-  const PROJECT_COLORS = [
-    'bg-primary/20 text-primary',
-    'bg-success/20 text-success',
-    'bg-warning/20 text-warning',
-    'bg-project-purple/20 text-project-purple',
-    'bg-destructive/20 text-destructive',
-    'bg-project-teal/20 text-project-teal',
-    'bg-project-peach/20 text-project-peach',
-    'bg-project-sky/20 text-project-sky',
-  ];
-
-  function getColor(name: string) {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
-    return PROJECT_COLORS[Math.abs(h) % PROJECT_COLORS.length];
-  }
-
-  function getInitials(name: string) {
-    const w = name.trim().split(/\s+/);
-    return w.length >= 2 ? (w[0][0] + w[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
-  }
-
-  const handleRailSelect = (p: typeof projects[number]) => {
-    useSessionStore.getState().setCurrentProject(p);
-    window.location.hash = `#/project/${p.id}`;
-    useFilesStore.getState().reset();
-    useFilesStore.getState().loadFileTree();
-    useChatStore.getState().loadHistory(p.id);
-  };
-
   const IconRail = () => (
     <div className="flex flex-col items-center h-full py-2 gap-1">
       <button onClick={() => toggleSidebar(true)} title={t('sidebar.expandSidebar')} className="mb-1 shrink-0">
@@ -144,16 +129,14 @@ export function AppShell() {
             onClick={(e) => {
               if (!isPlainClick(e)) return;
               e.preventDefault();
-              handleRailSelect(p);
+              openProject(p, 'icon_rail');
             }}
-            className={`w-8 h-8 rounded-md text-xs font-bold flex items-center justify-center transition-all duration-150 shrink-0 ${
-              p.id === currentProject?.id
-                ? `${getColor(p.name)} ring-1 ring-primary/40`
-                : `${getColor(p.name)} opacity-50 hover:opacity-100`
+            className={`shrink-0 transition-all duration-150 ${
+              p.id === currentProject?.id ? 'ring-1 ring-primary/40 rounded-md' : 'opacity-50 hover:opacity-100'
             }`}
             title={p.name}
           >
-            {getInitials(p.name)}
+            <ProjectAvatar name={p.name} size="lg" />
           </a>
         ))}
       </div>
@@ -182,6 +165,7 @@ export function AppShell() {
 
   return (
     <div className="flex flex-row h-full w-full overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.03)' }}>
+      {navMode === 'sidebar' && (
       <div
         className="relative shrink-0 h-full bg-surface border-e border-border overflow-hidden transition-[width] duration-200 ease-out"
         style={{ width: sidebarExpanded ? SIDEBAR_WIDTH : RAIL_WIDTH }}
@@ -201,9 +185,13 @@ export function AppShell() {
           <Sidebar onCollapse={() => toggleSidebar(false)} onOpenSettings={() => setShowSettings(true)} onOpenAdmin={() => setShowAdminPanel(true)} />
         </div>
       </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {navMode === 'topbar' && (
+          <TopBar onOpenSettings={() => setShowSettings(true)} onOpenAdmin={() => setShowAdminPanel(true)} />
+        )}
         <GlobalProgress />
         <PreviewVersionBanner />
 
@@ -256,6 +244,8 @@ export function AppShell() {
         <SettingsModal
           layoutMode={layoutMode}
           onLayoutChange={switchLayout}
+          navMode={navMode}
+          onNavChange={switchNav}
           onClose={() => setShowSettings(false)}
         />
       )}
