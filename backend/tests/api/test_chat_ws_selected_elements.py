@@ -45,7 +45,7 @@ def _send_message(payload: dict[str, Any]) -> dict[str, Any]:
         patch("flow44.api.chat.log_bi_event") as log_bi_event,
     ):
         mgr.wake_sandbox = AsyncMock(return_value=MagicMock())
-        with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
+        with client.websocket_connect(f"/ws/projects/{PROJECT_ID}/chat", headers={"cookie": "flow44_token=t"}) as ws:
             ws.send_json(payload)
             assert done.wait(timeout=5), "turn was not started"
 

@@ -13,7 +13,7 @@ export function getChatSocket(projectId: string): ChatSocket {
   let stopReconnect: (() => void) | null = null;
 
   const { sendOrQueue, close } = createReconnectingSocket(
-    `${getWsBase()}/ws/chat/${projectId}`,
+    `${getWsBase()}/ws/projects/${projectId}/chat`,
     undefined,
     (data) => {
       try {

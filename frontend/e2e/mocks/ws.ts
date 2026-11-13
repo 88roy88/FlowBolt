@@ -51,10 +51,10 @@ export async function setupMockWS(page: Page, options: MockWSOptions = {}) {
         this.url = url.toString();
 
         // If this is NOT a URL we want to mock, use the real WebSocket
-        const isChatWs = this.url.includes(`/ws/chat/${projectId}`);
-        const isTerminalWs = this.url.includes(`/ws/terminal/${projectId}`);
-        const isErrorWs = this.url.includes(`/ws/errors/${projectId}`);
-        const isServerLogWs = this.url.includes(`/ws/server-log/${projectId}`);
+        const isChatWs = this.url.includes(`/ws/projects/${projectId}/chat`);
+        const isTerminalWs = this.url.includes(`/ws/projects/${projectId}/terminal`);
+        const isErrorWs = this.url.includes(`/ws/projects/${projectId}/errors`);
+        const isServerLogWs = this.url.includes(`/ws/projects/${projectId}/server-log`);
 
         if (!isChatWs && !isTerminalWs && !isErrorWs && !isServerLogWs) {
           // Fall through to real WebSocket for unknown URLs
@@ -133,10 +133,10 @@ export async function setupMockWS(page: Page, options: MockWSOptions = {}) {
         construct(_target, args) {
           const ws = new MockWebSocket(args[0], args[1]);
           const url = args[0].toString();
-          if (url.includes('/ws/chat/')) (window as any).__mockWebSockets.chat = ws;
-          if (url.includes('/ws/terminal/')) (window as any).__mockWebSockets.terminal = ws;
-          if (url.includes('/ws/errors/')) (window as any).__mockWebSockets.errors = ws;
-          if (url.includes('/ws/server-log/')) (window as any).__mockWebSockets.serverLog = ws;
+          if (/\/ws\/projects\/[^/]+\/chat(\?|$)/.test(url)) (window as any).__mockWebSockets.chat = ws;
+          if (/\/ws\/projects\/[^/]+\/terminal(\?|$)/.test(url)) (window as any).__mockWebSockets.terminal = ws;
+          if (/\/ws\/projects\/[^/]+\/errors(\?|$)/.test(url)) (window as any).__mockWebSockets.errors = ws;
+          if (/\/ws\/projects\/[^/]+\/server-log(\?|$)/.test(url)) (window as any).__mockWebSockets.serverLog = ws;
           return ws;
         },
       }),

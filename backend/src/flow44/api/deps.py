@@ -285,15 +285,6 @@ async def require_platform_user(user_id: UserDep) -> str:
 PlatformUserDep = Annotated[str, Depends(require_platform_user)]
 
 
-async def require_admin(user_id: UserDep) -> str:
-    if not is_admin(user_id):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user_id
-
-
-AdminDep = Annotated[str, Depends(require_admin)]
-
-
 # --- WebSocket variants ---
 
 

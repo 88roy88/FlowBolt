@@ -52,7 +52,7 @@ function trackFileSaveRequests(page: import('@playwright/test').Page) {
   page.on('request', (req) => {
     if (
       req.method() === 'PUT' &&
-      req.url().includes('/api/files/') &&
+      /\/api\/projects\/[^/]+\/files\//.test(req.url()) &&
       req.url().includes('/file/content')
     ) {
       putCount += 1;
@@ -66,7 +66,7 @@ function trackUploadRequests(page: import('@playwright/test').Page) {
   page.on('request', (req) => {
     if (
       req.method() === 'POST' &&
-      req.url().includes('/api/files/') &&
+      /\/api\/projects\/[^/]+\/files\//.test(req.url()) &&
       req.url().includes('/file/upload')
     ) {
       uploadCount += 1;
@@ -116,7 +116,7 @@ test.describe('Editor', () => {
     const typesContentReq = page.waitForRequest(
       (req) =>
         req.method() === 'GET' &&
-        req.url().includes('/api/files/') &&
+        /\/api\/projects\/[^/]+\/files\//.test(req.url()) &&
         req.url().includes('/file/content') &&
         decodeURIComponent(req.url()).includes('types.ts'),
       { timeout: 15_000 }
@@ -139,7 +139,7 @@ test.describe('Editor', () => {
     await srcRow.hover();
 
     const createReq = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      (req) => req.method() === 'POST' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file'),
       { timeout: 10_000 }
     );
     await srcRow.getByTitle('Create file').click();
@@ -160,7 +160,7 @@ test.describe('Editor', () => {
     await goToEditor(page);
 
     const uploadReq = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      (req) => req.method() === 'POST' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file/upload'),
       { timeout: 10_000 }
     );
 
@@ -179,7 +179,7 @@ test.describe('Editor', () => {
     await srcRow.hover();
 
     const createReq = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      (req) => req.method() === 'POST' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file'),
       { timeout: 10_000 }
     );
     await srcRow.getByTitle('Create file').click();
@@ -194,7 +194,7 @@ test.describe('Editor', () => {
     await assetsRow.hover();
 
     const uploadReq = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      (req) => req.method() === 'POST' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file/upload'),
       { timeout: 10_000 }
     );
     await assetsRow.getByTitle('Upload files').click();
@@ -210,7 +210,7 @@ test.describe('Editor', () => {
     const srcRow = fileTreeRowByName(page, 'src');
 
     const uploadReq = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      (req) => req.method() === 'POST' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file/upload'),
       { timeout: 10_000 }
     );
 
@@ -232,7 +232,7 @@ test.describe('Editor', () => {
     await goToEditor(page);
 
     const uploadReq = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      (req) => req.method() === 'POST' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file/upload'),
       { timeout: 10_000 }
     );
 
@@ -255,7 +255,7 @@ test.describe('Editor', () => {
     await goToEditor(page);
 
     const uploadReq = page.waitForRequest(
-      (req) => req.method() === 'POST' && req.url().includes('/api/files/') && req.url().includes('/file/upload'),
+      (req) => req.method() === 'POST' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file/upload'),
       { timeout: 10_000 }
     );
     await fileTreeContainer(page).getByRole('button', { name: 'Upload files' }).first().click();
@@ -271,7 +271,7 @@ test.describe('Editor', () => {
     await srcRow.hover();
 
     const renameReq = page.waitForRequest(
-      (req) => req.method() === 'PATCH' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      (req) => req.method() === 'PATCH' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file'),
       { timeout: 10_000 }
     );
     await srcRow.getByTitle('Rename').click();
@@ -293,7 +293,7 @@ test.describe('Editor', () => {
     await appFileRow.hover();
 
     const renameReq = page.waitForRequest(
-      (req) => req.method() === 'PATCH' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      (req) => req.method() === 'PATCH' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file'),
       { timeout: 10_000 }
     );
     await appFileRow.getByTitle('Rename').click();
@@ -315,7 +315,7 @@ test.describe('Editor', () => {
     await appFileRow.hover();
 
     const deleteReq = page.waitForRequest(
-      (req) => req.method() === 'DELETE' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      (req) => req.method() === 'DELETE' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file'),
       { timeout: 10_000 }
     );
     await appFileRow.getByTitle('Delete').click();
@@ -336,7 +336,7 @@ test.describe('Editor', () => {
     await srcRow.hover();
 
     const deleteReq = page.waitForRequest(
-      (req) => req.method() === 'DELETE' && req.url().includes('/api/files/') && req.url().includes('/file'),
+      (req) => req.method() === 'DELETE' && /\/api\/projects\/[^/]+\/files\//.test(req.url()) && req.url().includes('/file'),
       { timeout: 10_000 }
     );
     await srcRow.getByTitle('Delete').click();

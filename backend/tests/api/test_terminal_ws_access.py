@@ -36,7 +36,7 @@ def _terminal_env(mode: str, user_id: str, admin_ids: list[str]) -> Iterator[Mag
 
 def _connects() -> bool:
     try:
-        with client.websocket_connect("/ws/terminal/proj-123", headers={"cookie": "flow44_token=t"}) as ws:
+        with client.websocket_connect("/ws/projects/proj-123/terminal", headers={"cookie": "flow44_token=t"}) as ws:
             return ws.receive_json() == {"type": "scrollback", "data": "scrollback"}
     except WebSocketDisconnect:
         return False
@@ -60,7 +60,7 @@ def test_terminal_allowed(mode: str, admin_ids: list[str]) -> None:
 def test_text_frames_resize_and_binary_frames_write() -> None:
     with _terminal_env("namespaced", "user-a", admin_ids=[]) as sandbox:
         pty = sandbox.get_or_create_pty.return_value
-        with client.websocket_connect("/ws/terminal/proj-123", headers={"cookie": "flow44_token=t"}) as ws:
+        with client.websocket_connect("/ws/projects/proj-123/terminal", headers={"cookie": "flow44_token=t"}) as ws:
             ws.receive_json()
             ws.send_text('{"type": "resize", "cols": 120, "rows": 30}')
             ws.send_text("not json")

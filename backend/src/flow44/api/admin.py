@@ -1,11 +1,12 @@
 import asyncio
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
-from flow44.api.deps import AdminDep
+from flow44.api.deps import UserDep, is_admin
 from flow44.config import settings
 from flow44.db.page_view import ProjectViewCount, list_page_view_counts
 from flow44.db.platform_user import (
@@ -28,6 +29,15 @@ from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+async def require_admin(user_id: UserDep) -> str:
+    if not is_admin(user_id):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user_id
+
+
+AdminDep = Annotated[str, Depends(require_admin)]
 
 
 class InviteUserRequest(BaseModel):

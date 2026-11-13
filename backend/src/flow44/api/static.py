@@ -1,8 +1,3 @@
-"""Static assets the backend serves, such as scripts injected into previews.
-
-Kept out of /api/preview/{x}, which nginx pins to one pod per project (docs/multi-pod.md).
-"""
-
 from pathlib import Path
 
 from fastapi import APIRouter

@@ -54,7 +54,7 @@ def _connected(claim: AsyncMock) -> Iterator[dict[str, AsyncMock]]:
 
 def _send(payload: dict[str, Any], claim: AsyncMock) -> tuple[dict[str, Any], dict[str, AsyncMock]]:
     with _connected(claim) as writes:
-        with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
+        with client.websocket_connect(f"/ws/projects/{PROJECT_ID}/chat", headers={"cookie": "flow44_token=t"}) as ws:
             ws.send_json(payload)
             try:
                 reply = ws.receive_json()
@@ -139,7 +139,7 @@ def test_run_claim_released_when_a_side_effect_raises() -> None:
         patch("flow44.api.chat.clear_heartbeat", new_callable=AsyncMock) as clear_heartbeat,
     ):
         writes["save_message"].side_effect = RuntimeError("boom")
-        with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
+        with client.websocket_connect(f"/ws/projects/{PROJECT_ID}/chat", headers={"cookie": "flow44_token=t"}) as ws:
             ws.send_json({"type": "message", "content": "change the header"})
             try:
                 reply = ws.receive_json()

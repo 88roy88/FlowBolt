@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, patch
 
-from flow44.api.deps import has_platform_access, require_admin
+from flow44.api.admin import require_admin
+from flow44.api.deps import has_platform_access
 from flow44.db.platform_user_group import (
     add_platform_group,
     list_platform_groups,

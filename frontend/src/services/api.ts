@@ -56,45 +56,45 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export async function fetchFileTree(projectId: string): Promise<FileEntry[]> {
-  return request<FileEntry[]>(`/files/${projectId}/tree`);
+  return request<FileEntry[]>(`/projects/${projectId}/files/tree`);
 }
 
 export async function fetchFileContent(projectId: string, path: string): Promise<string> {
   const data = await request<{ path: string; content: string }>(
-    `/files/${projectId}/file/content?path=${encodeURIComponent(path)}`
+    `/projects/${projectId}/files/file/content?path=${encodeURIComponent(path)}`
   );
   return data.content;
 }
 
 export async function saveFileContent(projectId: string, path: string, content: string): Promise<void> {
-  await request(`/files/${projectId}/file/content`, {
+  await request(`/projects/${projectId}/files/file/content`, {
     method: 'PUT',
     body: JSON.stringify({ path, content }),
   });
 }
 
 export async function createFileEntry(projectId: string, path: string, content = ''): Promise<void> {
-  await request(`/files/${projectId}/file`, {
+  await request(`/projects/${projectId}/files/file`, {
     method: 'POST',
     body: JSON.stringify({ path, content }),
   });
 }
 
 export async function renameFileEntry(projectId: string, oldPath: string, newPath: string): Promise<void> {
-  await request(`/files/${projectId}/file`, {
+  await request(`/projects/${projectId}/files/file`, {
     method: 'PATCH',
     body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
   });
 }
 
 export async function deleteFileEntry(projectId: string, path: string): Promise<void> {
-  await request(`/files/${projectId}/file?path=${encodeURIComponent(path)}`, {
+  await request(`/projects/${projectId}/files/file?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',
   });
 }
 
 export async function uploadFileEntry(projectId: string, path: string, file: Blob): Promise<void> {
-  const res = await fetchWithAuth(`/files/${projectId}/file/upload?path=${encodeURIComponent(path)}`, {
+  const res = await fetchWithAuth(`/projects/${projectId}/files/file/upload?path=${encodeURIComponent(path)}`, {
     method: 'POST',
     headers: { 'Content-Type': file.type || 'application/octet-stream' },
     body: file,
@@ -112,7 +112,7 @@ export async function searchFiles(
   query: string,
   opts?: { caseSensitive?: boolean; wordMatch?: boolean; useRegex?: boolean; maxResults?: number; maxHitsPerFile?: number }
 ): Promise<SearchResult[]> {
-  const data = await request<{ query: string; results: SearchResult[] }>(`/files/${sessionId}/search`, {
+  const data = await request<{ query: string; results: SearchResult[] }>(`/projects/${sessionId}/files/search`, {
     method: 'POST',
     body: JSON.stringify({
       query,
@@ -176,11 +176,11 @@ export async function fetchPreviewPort(projectId: string): Promise<number> {
 }
 
 export async function fetchChatHistory(projectId: string): Promise<{ id: string; role: string; content: string; created_at: string }[]> {
-  return request(`/chat/${projectId}/history`);
+  return request(`/projects/${projectId}/chat/history`);
 }
 
 export async function fetchAgentEvents(projectId: string): Promise<Record<string, unknown>[]> {
-  return request(`/chat/${projectId}/events`);
+  return request(`/projects/${projectId}/chat/events`);
 }
 
 export type AgentAliveResponse = {
@@ -225,7 +225,7 @@ export function downloadSingleHtml(projectId: string): void {
 }
 
 export async function publishToS3(projectId: string, slug?: string): Promise<{ url: string; handle: string }> {
-  return request<{ url: string; handle: string }>(`/export/${projectId}/publish`, {
+  return request<{ url: string; handle: string }>(`/projects/${projectId}/export/publish`, {
     method: 'POST',
     body: JSON.stringify({ slug: slug ?? null }),
   });
@@ -237,7 +237,7 @@ export async function checkSlugAvailability(
   options?: RequestInit
 ): Promise<{ available: boolean }> {
   return request<{ available: boolean }>(
-    `/export/${projectId}/slug/check?slug=${encodeURIComponent(slug)}`,
+    `/projects/${projectId}/export/slug/check?slug=${encodeURIComponent(slug)}`,
     options
   );
 }

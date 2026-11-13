@@ -183,11 +183,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   });
 
   // --- Files ---
-  await page.route(`**/api/files/*/tree`, async (route) => {
+  await page.route(`**/api/projects/*/files/tree`, async (route) => {
     return route.fulfill({ json: fileTree });
   });
 
-  await page.route(`**/api/files/*/file/content**`, async (route) => {
+  await page.route(`**/api/projects/*/files/file/content**`, async (route) => {
     if (route.request().method() === 'PUT') {
       try {
         const body = route.request().postDataJSON() as { path?: string; content?: string };
@@ -205,7 +205,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: { path: pathParam || key, content } });
   });
 
-  await page.route(`**/api/files/*/file/upload**`, async (route) => {
+  await page.route(`**/api/projects/*/files/file/upload**`, async (route) => {
     const req = route.request();
     const method = req.method();
     const url = new URL(req.url());
@@ -308,7 +308,7 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ status: 405, body: 'Method Not Allowed' });
   });
 
-  await page.route(`**/api/files/*/search`, async (route) => {
+  await page.route(`**/api/projects/*/files/search`, async (route) => {
     if (route.request().method() !== 'POST') {
       return route.fulfill({ status: 405, body: 'Method Not Allowed' });
     }
@@ -357,11 +357,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   });
 
   // --- Chat ---
-  await page.route(`**/api/chat/*/history`, async (route) => {
+  await page.route(`**/api/projects/*/chat/history`, async (route) => {
     return route.fulfill({ json: [] });
   });
 
-  await page.route(`**/api/chat/*/events`, async (route) => {
+  await page.route(`**/api/projects/*/chat/events`, async (route) => {
     const payload = options.seedEvents ?? (options.seedChatHistory ? CHAT_SEED_EVENTS : []);
     return route.fulfill({ json: payload });
   });
@@ -388,22 +388,22 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
   });
 
   // --- Publish & slug check ---
-  await page.route('**/api/export/*/slug/check**', async (route) => {
+  await page.route('**/api/projects/*/export/slug/check**', async (route) => {
     const url = new URL(route.request().url());
     const slug = url.searchParams.get('slug') ?? '';
-    const projectId = url.pathname.split('/api/export/')[1]?.split('/slug/check')[0] ?? '';
+    const projectId = url.pathname.split('/api/projects/')[1]?.split('/export/slug/check')[0] ?? '';
     const taken = projects.some(
       (p) => p.published_url === slug && p.id !== projectId
     );
     return route.fulfill({ json: { available: !taken } });
   });
 
-  await page.route('**/api/export/*/publish', async (route) => {
+  await page.route('**/api/projects/*/export/publish', async (route) => {
     if (route.request().method() !== 'POST') {
       return route.fulfill({ status: 405, body: 'Method Not Allowed' });
     }
     const url = route.request().url();
-    const projectId = url.split('/api/export/')[1]?.split('/publish')[0] ?? '';
+    const projectId = url.split('/api/projects/')[1]?.split('/export/publish')[0] ?? '';
     let body: { slug?: string | null } = {};
     try { body = route.request().postDataJSON(); } catch { /* ignore */ }
     const slug = body.slug ?? undefined;

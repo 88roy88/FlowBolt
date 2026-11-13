@@ -16,21 +16,21 @@ client = TestClient(app)
 class TestSlugCheck:
     @pytest.mark.asyncio
     async def test_invalid_slug_returns_unavailable(self):
-        response = client.get("/api/export/proj-1/slug/check?slug=A!")
+        response = client.get("/api/projects/proj-1/export/slug/check?slug=A!")
         assert response.status_code == 200
         assert response.json() == {"available": False}
 
     @pytest.mark.asyncio
     async def test_taken_slug_returns_unavailable(self):
         with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=True)):
-            response = client.get("/api/export/proj-1/slug/check?slug=taken-slug")
+            response = client.get("/api/projects/proj-1/export/slug/check?slug=taken-slug")
             assert response.status_code == 200
             assert response.json() == {"available": False}
 
     @pytest.mark.asyncio
     async def test_free_slug_returns_available(self):
         with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=False)):
-            response = client.get("/api/export/proj-1/slug/check?slug=free-slug")
+            response = client.get("/api/projects/proj-1/export/slug/check?slug=free-slug")
             assert response.status_code == 200
             assert response.json() == {"available": True}
 
@@ -51,7 +51,7 @@ class TestPublish:
             patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=False)),
             patch("flow44.api.publish.publish_project", AsyncMock(return_value="my-cool-app")) as mock_publish,
         ):
-            response = client.post("/api/export/proj-1/publish", json={"slug": "my-cool-app"})
+            response = client.post("/api/projects/proj-1/export/publish", json={"slug": "my-cool-app"})
             assert response.status_code == 200
             assert response.json() == {"url": "/shared/my-cool-app", "handle": "my-cool-app"}
             mock_publish.assert_awaited_once_with("proj-1", "my-cool-app")
@@ -59,7 +59,7 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_without_slug(self):
         with patch("flow44.api.publish.publish_project", AsyncMock(return_value="proj-1")) as mock_publish:
-            response = client.post("/api/export/proj-1/publish", json={"slug": None})
+            response = client.post("/api/projects/proj-1/export/publish", json={"slug": None})
             assert response.status_code == 200
             assert response.json() == {"url": "/shared/proj-1", "handle": "proj-1"}
             mock_publish.assert_awaited_once_with("proj-1", None)
@@ -67,13 +67,13 @@ class TestPublish:
     @pytest.mark.asyncio
     async def test_publish_with_taken_slug_returns_409(self):
         with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=True)):
-            response = client.post("/api/export/proj-1/publish", json={"slug": "taken-slug"})
+            response = client.post("/api/projects/proj-1/export/publish", json={"slug": "taken-slug"})
             assert response.status_code == 409
             assert "already taken" in response.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_publish_with_invalid_slug_returns_400(self):
-        response = client.post("/api/export/proj-1/publish", json={"slug": "X!"})
+        response = client.post("/api/projects/proj-1/export/publish", json={"slug": "X!"})
         assert response.status_code == 400
         assert "Invalid slug" in response.json()["detail"]
 
@@ -86,7 +86,7 @@ class TestPublish:
                 AsyncMock(side_effect=IntegrityError(None, None, Exception("collision"))),
             ),
         ):
-            response = client.post("/api/export/proj-1/publish", json={"slug": "collision-slug"})
+            response = client.post("/api/projects/proj-1/export/publish", json={"slug": "collision-slug"})
             assert response.status_code == 409
             assert "just claimed" in response.json()["detail"]
 

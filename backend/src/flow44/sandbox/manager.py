@@ -3,13 +3,20 @@ import logging
 import os
 import shutil
 import socket
+import time
 
 from flow44.config import settings
+from flow44.db.events import emit_event
+from flow44.db.locks import LockNamespace, LockTimeout, advisory_lock
 from flow44.sandbox.base import SandboxInfo, workspace_path
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.main import PnpmSandbox, PnpmSandboxNamespace, PnpmSandboxUnix, PnpmSandboxWindows
+from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
+
+# Don't delete orphan workspaces that may not have finished initializing.
+_ORPHAN_MIN_AGE_SECONDS = 10 * 60
 
 
 class SandboxError(Exception):
@@ -23,6 +30,7 @@ class SandboxManager:
             range(settings.SANDBOX_PORT_RANGE_START, settings.SANDBOX_PORT_RANGE_END + 1)
         )
         self._lock = asyncio.Lock()
+        self._setup_tasks: dict[str, asyncio.Task[None]] = {}
 
     @staticmethod
     def _port_is_available(port: int) -> bool:
@@ -73,20 +81,42 @@ class SandboxManager:
         return sandbox
 
     async def wake_sandbox(self, project_id: str) -> PnpmSandbox:
-        """Wake a suspended sandbox: get it and start the dev server (non-blocking)."""
+        """Get the sandbox and start its dev server (non-blocking).
+
+        On a project's first wake, set up its workspace first (docs/multi-pod.md, "Workspaces are set up on first use").
+        """
         sandbox = await self.get_sandbox(project_id)
+        if project_id in self._setup_tasks:
+            return sandbox
+        if not await sandbox.is_scaffolded():
+            task = asyncio.create_task(self._set_up_workspace(sandbox))
+            self._setup_tasks[project_id] = task
+            task.add_done_callback(lambda _: self._setup_tasks.pop(project_id, None))
+            return sandbox
         await self.start_dev_server(sandbox)
         return sandbox
 
-    async def create_sandbox(self, project_id: str) -> PnpmSandbox:
-        """Create a brand-new sandbox: get, scaffold, and start the dev server."""
-        sandbox = await self.get_sandbox(project_id)
-        await sandbox.scaffold(settings.TEMPLATE_DIR)
-        await self.start_dev_server(sandbox)
-        return sandbox
+    async def _set_up_workspace(self, sandbox: PnpmSandbox) -> None:
+        project_id = sandbox.project_id
+        try:
+            # Lock because another pod may be setting up the same workspace.
+            async with advisory_lock(LockNamespace.workspace, project_id):
+                if not await sandbox.is_scaffolded():
+                    await sandbox.scaffold(settings.TEMPLATE_DIR)
+            await versioning.ensure_repo(project_id)
+            await self.start_dev_server(sandbox)
+        except LockTimeout:
+            logger.info("[sandbox] Workspace setup for %s is running elsewhere; retrying on next wake", project_id)
+        except Exception:
+            logger.exception("[sandbox] Workspace setup failed for project %s", project_id)
+            await emit_event(project_id, {"type": "error", "message": "Project setup failed"})
 
     async def suspend_sandbox(self, project_id: str) -> None:
         """Suspend a sandbox: kill processes and free port, but keep workspace on disk."""
+        setup = self._setup_tasks.pop(project_id, None)
+        if setup is not None:
+            setup.cancel()
+
         async with self._lock:
             sandbox = self._sandboxes.pop(project_id, None)
 
@@ -144,13 +174,14 @@ class SandboxManager:
         if not os.path.isdir(base):
             return
 
+        min_mtime = time.time() - _ORPHAN_MIN_AGE_SECONDS
         for name in os.listdir(base):
             if name.startswith("."):
                 continue
             workspace_dir = os.path.join(base, name)
             if not os.path.isdir(workspace_dir):
                 continue
-            if name not in live_project_ids:
+            if name not in live_project_ids and os.path.getmtime(workspace_dir) < min_mtime:
                 logger.info("Removing orphan workspace %s", name)
                 shutil.rmtree(workspace_dir, ignore_errors=True)
 

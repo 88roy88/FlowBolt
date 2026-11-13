@@ -10,8 +10,24 @@ map $uri $frame_options {
     ~^/preview/ "";
 }
 
+# Keep each project on one backend pod (docs/multi-pod.md).
+map $uri $project_key {
+    ~^/(?:api|ws)/projects/(?<project>[^/]+)  $project;
+    ~^/(?:api/)?preview/(?<project>[^/]+)     $project;
+    default                                   $request_id;
+}
+
+# Re-resolve the backend pod names every 5s, since a restarted pod gets a new IP.
+resolver ${NGINX_LOCAL_RESOLVERS} valid=5s ipv6=off;
+
+upstream backend {
+    zone backend 64k;
+    hash $project_key consistent;
+    ${BACKEND_SERVERS}
+}
+
 server {
-    listen 80;
+    listen 8080;
     server_name localhost;
     root /usr/share/nginx/html;
     index index.html;
@@ -27,6 +43,9 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
 
+    # Upstream servers are StatefulSet pods and don't skip dead pods automatically: fail fast to move to next pod.
+    proxy_connect_timeout 3s;
+
     # SPA — proxy to frontend container
     location / {
         try_files $uri $uri/ /index.html;
@@ -41,7 +60,7 @@ server {
 
     # API proxy
     location /api/ {
-        proxy_pass http://base-backend.base:8000;
+        proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
@@ -54,7 +73,6 @@ server {
         client_max_body_size 5M;
 
         # Timeout for long-running operations (model loading, processing)
-        proxy_connect_timeout 600s;
         proxy_send_timeout 600s;
         proxy_read_timeout 600s;
 
@@ -64,12 +82,14 @@ server {
         proxy_buffers 16 16k;
         proxy_busy_buffers_size 32k;
 
-        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        # Retry on another pod only if this one is unreachable: retrying an error response would start
+        # a second sandbox for the project on a different pod.
+        proxy_next_upstream error timeout;
     }
 
     # WebSocket proxy
     location /ws/ {
-        proxy_pass http://base-backend.base:8000;
+        proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
@@ -82,7 +102,7 @@ server {
 
     # Public share route — serves published apps by custom slug
     location /shared/ {
-        proxy_pass http://base-backend.base:8000;
+        proxy_pass http://backend;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -92,7 +112,7 @@ server {
 
     # Preview proxy — routes through backend which reverse-proxies to sandbox port
     location ~ ^/preview/(?<session_id>[a-zA-Z0-9_-]+)(?<preview_path>/.*)$ {
-        proxy_pass http://base-backend.base:8000/api/preview/$session_id/proxy$preview_path$is_args$args;
+        proxy_pass http://backend/api/preview/$session_id/proxy$preview_path$is_args$args;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_http_version 1.1;

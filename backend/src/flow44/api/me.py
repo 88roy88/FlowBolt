@@ -1,5 +1,3 @@
-"""The current user's identity and access flags."""
-
 from __future__ import annotations
 
 from typing import Any

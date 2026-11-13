@@ -45,7 +45,7 @@ def _send(messages: list[dict[str, Any]], phase: str = "awaiting_interview") -> 
         patch("flow44.api.chat._start_turn", new_callable=AsyncMock) as start_turn,
     ):
         mgr.wake_sandbox = AsyncMock(return_value=MagicMock(project_id="proj-123"))
-        with client.websocket_connect("/ws/chat/proj-123", headers={"cookie": "flow44_token=t"}) as ws:
+        with client.websocket_connect("/ws/projects/proj-123/chat", headers={"cookie": "flow44_token=t"}) as ws:
             for message in messages:
                 ws.send_json(message)
             reply = ws.receive_json()

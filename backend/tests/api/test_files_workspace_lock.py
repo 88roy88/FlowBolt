@@ -53,7 +53,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, setup_test_db: None) -
 
 def _mutate(method: str, path: str, kwargs: dict[str, Any], *, run_active: bool = False) -> Any:
     with patch("flow44.services.versioning.service.is_run_active", AsyncMock(return_value=run_active)):
-        return client.request(method.upper(), f"/api/files/{PROJECT_ID}{path}", **kwargs)
+        return client.request(method.upper(), f"/api/projects/{PROJECT_ID}/files{path}", **kwargs)
 
 
 @pytest.mark.parametrize(("method", "path", "kwargs"), MUTATIONS)
