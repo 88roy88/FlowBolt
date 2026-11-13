@@ -17,7 +17,7 @@ export function getServerLogSocket(projectId: string): ReadOnlySocket {
   function connect() {
     if (closed) return;
     credentialsStore.ensureCookie();
-    socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
+    socket = new WebSocket(`${getWsBase()}/ws/projects/${projectId}/server-log`);
     socket.binaryType = 'arraybuffer';
     history = '';
 

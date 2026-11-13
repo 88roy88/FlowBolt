@@ -35,7 +35,7 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
   function connect() {
     if (closed) return;
     credentialsStore.ensureCookie();
-    const ws = new WebSocket(`${getWsBase()}/ws/terminal/${projectId}`);
+    const ws = new WebSocket(`${getWsBase()}/ws/projects/${projectId}/terminal`);
     ws.binaryType = 'arraybuffer';
     socket = ws;
     history = '';

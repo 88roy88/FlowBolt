@@ -2,27 +2,24 @@
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
 
+from flow44.api.admin import AdminDep
 from flow44.api.deps import (
     Permission,
     PlatformUserDep,
     ProjectDep,
     UserDep,
-    can_use_terminal,
     get_project_role,
-    has_platform_access,
     is_admin,
     require_permission,
     resolve_role,
-    terminal_admin_only,
 )
 from flow44.auth.permissions import DisplayRole, ImplicitRole, get_admin_permissions, has_permission
 from flow44.db.project import (
@@ -38,7 +35,6 @@ from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
-from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
 
@@ -72,17 +68,6 @@ class ProjectResponse(BaseModel):
 
 def _serialize_project(project: Project, role: DisplayRole) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
-
-
-@router.get("/me")
-async def get_current_user(user_id: UserDep) -> dict[str, Any]:
-    return {
-        "user_id": user_id,
-        "is_admin": is_admin(user_id),
-        "is_platform_user": await has_platform_access(user_id),
-        "can_use_terminal": can_use_terminal(user_id),
-        "terminal_admin_only": terminal_admin_only(),
-    }
 
 
 def _encode_cursor(project: Project) -> str:
@@ -142,18 +127,7 @@ async def get_single_project(project: ProjectDep, user_id: UserDep) -> ProjectRe
 async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
     project = await create_project(body.name, user_id)
     log_bi_event("project_created", project_id=project.id, project_name=body.name)
-
-    async def _create() -> None:
-        from flow44.db.events import emit_event  # noqa: PLC0415
-
-        try:
-            await sandbox_manager.create_sandbox(project.id)
-            await versioning.ensure_repo(project.id)
-        except Exception:
-            logger.exception("[projects] Sandbox creation failed for project %s", project.id)
-            await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
-
-    asyncio.create_task(_create())
+    # The workspace is scaffolded by the pod that serves this project, on its first request (wake_sandbox).
     return _serialize_project(project, ImplicitRole.owner)
 
 
@@ -194,7 +168,7 @@ async def delete_existing_project(
 
 
 @router.post("/{project_id}/debug/reap", status_code=200)
-async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
+async def debug_reap_sandbox(project_id: str, _admin: AdminDep) -> dict[str, str]:
     """DEBUG: Force-evict a sandbox as if the idle reaper triggered."""
     if not sandbox_manager.has_active_sandbox(project_id):
         return {"status": "already_sleeping", "project_id": project_id}
@@ -202,10 +176,3 @@ async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
     await sandbox_manager.suspend_sandbox(project_id)
     idle_reaper.remove(project_id)
     return {"status": "reaped", "project_id": project_id}
-
-
-@router.get("/debug/sandboxes", status_code=200)
-async def debug_list_sandboxes() -> dict[str, Any]:
-    """DEBUG: Show active sandbox count and which projects have live sandboxes."""
-    active = sandbox_manager.active_project_ids()
-    return {"count": len(active), "project_ids": active}

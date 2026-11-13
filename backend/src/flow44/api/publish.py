@@ -10,7 +10,7 @@ from flow44.sandbox.operations import BuildError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/export/{project_id}", tags=["publish"])
+router = APIRouter(prefix="/api/projects/{project_id}/export", tags=["publish"])
 
 
 class PublishRequest(BaseModel):

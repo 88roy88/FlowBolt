@@ -54,7 +54,7 @@ def test_missing_cookie_rejected():
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock) as mock_get,
         patch("flow44.api.chat.sandbox_manager") as mock_mgr,
     ):
-        assert _handshake_rejected("/ws/chat/proj-123", None)
+        assert _handshake_rejected("/ws/projects/proj-123/chat", None)
         mock_get.assert_not_called()
         mock_mgr.get_sandbox.assert_not_called()
 
@@ -69,7 +69,7 @@ def test_wrong_owner_rejected():
         patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="other-user"),
         patch("flow44.api.chat.sandbox_manager") as mock_mgr,
     ):
-        assert _handshake_rejected("/ws/chat/proj-123", "any-token")
+        assert _handshake_rejected("/ws/projects/proj-123/chat", "any-token")
         mock_mgr.get_sandbox.assert_not_called()
 
 
@@ -80,7 +80,7 @@ def test_unknown_project_rejected():
         patch("flow44.api.deps.get_user_id", new_callable=AsyncMock, return_value="some-user"),
         patch("flow44.api.chat.sandbox_manager") as mock_mgr,
     ):
-        assert _handshake_rejected("/ws/chat/proj-ghost", "any-token")
+        assert _handshake_rejected("/ws/projects/proj-ghost/chat", "any-token")
         mock_mgr.get_sandbox.assert_not_called()
 
 
@@ -91,7 +91,7 @@ def test_sandbox_not_touched_before_auth():
         patch("flow44.api.deps.db_get_project", new_callable=AsyncMock) as mock_get,
         patch("flow44.api.chat.sandbox_manager", mock_mgr),
     ):
-        assert _handshake_rejected("/ws/chat/proj-123", None)
+        assert _handshake_rejected("/ws/projects/proj-123/chat", None)
         mock_get.assert_not_called()
         mock_mgr.get_sandbox.assert_not_called()
         mock_mgr.ensure_ready.assert_not_called()
@@ -113,7 +113,7 @@ def test_sandbox_not_found_after_auth_sends_error():
         mock_mgr.wake_sandbox = AsyncMock(side_effect=Exception("proj-123"))
 
         try:
-            with _websocket_connect("/ws/chat/proj-123", "valid-token") as ws:
+            with _websocket_connect("/ws/projects/proj-123/chat", "valid-token") as ws:
                 msg = ws.receive_json()
                 assert msg.get("type") == "error"
                 assert "sandbox" in msg.get("message", "").lower()

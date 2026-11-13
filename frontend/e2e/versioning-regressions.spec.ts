@@ -10,7 +10,7 @@ type VersionEvent = { type?: string; commit_sha?: string };
 const authHeaders = (token = E2E_AUTH_TOKEN) => ({ Authorization: `Bearer ${token}` });
 
 async function versionEvents(request: APIRequestContext, projectId: string): Promise<VersionEvent[]> {
-  const response = await request.get(`/api/chat/${projectId}/events`, {
+  const response = await request.get(`/api/projects/${projectId}/chat/events`, {
     headers: authHeaders(),
   });
   expect(response.ok()).toBe(true);
@@ -18,7 +18,7 @@ async function versionEvents(request: APIRequestContext, projectId: string): Pro
 }
 
 async function fileContent(request: APIRequestContext, projectId: string): Promise<string> {
-  const response = await request.get(`/api/files/${projectId}/file/content?path=${encodeURIComponent('/version.txt')}`, {
+  const response = await request.get(`/api/projects/${projectId}/files/file/content?path=${encodeURIComponent('/version.txt')}`, {
     headers: authHeaders(),
   });
   expect(response.ok()).toBe(true);
@@ -29,7 +29,7 @@ async function sendVersionAction(page: Page, projectId: string, action: Record<s
   await page.evaluate(
     ({ projectId: id, action: message, resultType: expected }) => new Promise<void>((resolve, reject) => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const socket = new WebSocket(`${protocol}//${window.location.host}/ws/chat/${id}`);
+      const socket = new WebSocket(`${protocol}//${window.location.host}/ws/projects/${id}/chat`);
       const timeout = window.setTimeout(() => {
         socket.close();
         reject(new Error(`Timed out waiting for ${expected}`));
@@ -61,7 +61,7 @@ async function expectViewerPreviewRejected(page: Page, projectId: string, commit
   const outcome = await page.evaluate(
     ({ projectId: id, commitSha: sha }) => new Promise<{ opened: boolean; closed: boolean; code: number | null }>((resolve) => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const socket = new WebSocket(`${protocol}//${window.location.host}/ws/chat/${id}`);
+      const socket = new WebSocket(`${protocol}//${window.location.host}/ws/projects/${id}/chat`);
       let opened = false;
       const timeout = window.setTimeout(() => {
         socket.close();
@@ -104,7 +104,7 @@ async function createSeededProject(request: APIRequestContext, page: Page): Prom
   const project = (await response.json()) as Project;
 
   await expect.poll(async () => {
-    const tree = await request.get(`/api/files/${project.id}/tree`, { headers: authHeaders() });
+    const tree = await request.get(`/api/projects/${project.id}/files/tree`, { headers: authHeaders() });
     return tree.status();
   }, { timeout: 30_000 }).toBe(200);
   await expect.poll(async () => (await versionEvents(request, project.id))
@@ -114,7 +114,7 @@ async function createSeededProject(request: APIRequestContext, page: Page): Prom
   await expect(page.getByPlaceholder(/what do you want to build/i)).toBeVisible({ timeout: 30_000 });
 
   for (const content of ['one', 'two']) {
-    const write = await request.put(`/api/files/${project.id}/file/content`, {
+    const write = await request.put(`/api/projects/${project.id}/files/file/content`, {
       headers: authHeaders(),
       data: { path: '/version.txt', content },
     });

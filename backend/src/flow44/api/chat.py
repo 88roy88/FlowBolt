@@ -35,7 +35,7 @@ from flow44.services.versioning.git import GitError
 
 logger = logging.getLogger(__name__)
 
-http_router = APIRouter(prefix="/api/chat", tags=["chat"])
+http_router = APIRouter(prefix="/api/projects/{project_id}/chat", tags=["chat"])
 ws_router = APIRouter()
 
 
@@ -176,19 +176,19 @@ async def _save_user_turn(project_id: str, turn: _UserTurn) -> None:
     await emit_event(project_id, turn.event, notify=False)
 
 
-@http_router.get("/{project_id}/history")
+@http_router.get("/history")
 async def chat_history(project: ProjectDep) -> list[dict[str, Any]]:
     messages = await get_messages(project.id)
     return [m.model_dump() for m in messages]
 
 
-@http_router.get("/{project_id}/events")
+@http_router.get("/events")
 async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
     events = await get_events(project.id)
     return [{**evt.payload, "_ts": evt.created_at} for evt in events]
 
 
-@ws_router.websocket("/ws/chat/{project_id}")
+@ws_router.websocket("/ws/projects/{project_id}/chat")
 async def chat_ws(  # noqa: C901, PLR0915
     websocket: WebSocket,
     project: WsProjectDep,

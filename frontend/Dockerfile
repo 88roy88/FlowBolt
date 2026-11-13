@@ -1,4 +1,5 @@
 ARG FRONTEND_BASE_IMAGE=node:24-slim
+# Must be >= 1.27.3 (docs/multi-pod.md, "Deployment requirements")
 ARG NGINX_IMAGE=nginx:alpine
 
 FROM ${FRONTEND_BASE_IMAGE} AS build
@@ -41,16 +42,17 @@ FROM ${NGINX_IMAGE}
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-RUN chown -R nginx:nginx /var/cache/nginx /var/run && \
-    chmod 777 /var/cache/nginx /var/run
+RUN chown -R nginx:nginx /var/cache/nginx /var/run /etc/nginx/conf.d && \
+    chmod 777 /var/cache/nginx /var/run /etc/nginx/conf.d
 
-COPY --chown=nginx:nginx nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chown=nginx:nginx nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --chown=nginx:nginx --chmod=755 nginx/16-backend-servers.envsh /docker-entrypoint.d/16-backend-servers.envsh
 COPY --chown=nginx:nginx --from=build /app/dist /usr/share/nginx/html
 
-RUN sed -i 's/listen 80;/listen 8080;/' /etc/nginx/conf.d/default.conf
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 USER nginx
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]

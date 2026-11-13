@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.websocket("/ws/errors/{project_id}")
+@router.websocket("/ws/projects/{project_id}/errors")
 async def errors_ws(websocket: WebSocket, project_id: str, sandbox: WsSandboxDep) -> None:  # noqa: C901, PLR0915
     """Watch ``.dev-server.log`` for error patterns and send structured events."""
     await websocket.accept()

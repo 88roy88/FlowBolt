@@ -35,7 +35,7 @@ async def test_export_zip(tmp_path):
     app.dependency_overrides[get_sandbox] = lambda: mock_sandbox
     app.dependency_overrides[get_project] = lambda: mock_project
     try:
-        response = client.get(f"/api/export/{project_id}/zip")
+        response = client.get(f"/api/projects/{project_id}/export/zip")
 
         assert response.status_code == 200
         assert response.headers["Content-Type"] == "application/zip"
@@ -64,7 +64,7 @@ async def test_export_zip_no_sandbox():
     app.dependency_overrides[get_sandbox] = _raise
     app.dependency_overrides[get_project] = lambda: mock_project
     try:
-        response = client.get(f"/api/export/{project_id}/zip")
+        response = client.get(f"/api/projects/{project_id}/export/zip")
         assert response.status_code == 404
         assert "No sandbox found" in response.json()["detail"]
     finally:
@@ -84,7 +84,7 @@ async def test_export_zip_missing_workspace(tmp_path):
     app.dependency_overrides[get_sandbox] = lambda: mock_sandbox
     app.dependency_overrides[get_project] = lambda: mock_project
     try:
-        response = client.get(f"/api/export/{project_id}/zip")
+        response = client.get(f"/api/projects/{project_id}/export/zip")
         assert response.status_code == 404
         assert response.json()["detail"] == "Workspace directory not found"
     finally:
@@ -104,7 +104,7 @@ async def test_export_html():
     app.dependency_overrides[get_project] = lambda: mock_project
     try:
         with patch("flow44.api.export.build_single_html", return_value=html_content):
-            response = client.get(f"/api/export/{project_id}/html")
+            response = client.get(f"/api/projects/{project_id}/export/html")
 
             assert response.status_code == 200
             assert response.headers["Content-Type"] == "text/html; charset=utf-8"
@@ -124,7 +124,7 @@ async def test_export_html_hebrew_name_does_not_crash():
     app.dependency_overrides[get_project] = lambda: mock_project
     try:
         with patch("flow44.api.export.build_single_html", return_value="<html></html>"):
-            response = client.get(f"/api/export/{project_id}/html")
+            response = client.get(f"/api/projects/{project_id}/export/html")
     finally:
         app.dependency_overrides.pop(get_project, None)
 
@@ -145,7 +145,7 @@ async def test_export_html_error():
     app.dependency_overrides[get_project] = lambda: mock_project
     try:
         with patch("flow44.api.export.build_single_html", side_effect=ValueError("No sandbox found")):
-            response = client.get(f"/api/export/{project_id}/html")
+            response = client.get(f"/api/projects/{project_id}/export/html")
             assert response.status_code == 404
             assert response.json()["detail"] == "No sandbox found"
     finally:

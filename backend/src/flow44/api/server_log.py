@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.websocket("/ws/server-log/{project_id}")
+@router.websocket("/ws/projects/{project_id}/server-log")
 async def server_log_ws(websocket: WebSocket, project_id: str, sandbox: WsSandboxDep) -> None:  # noqa: C901
     """Stream ``.dev-server.log`` to the client.
 

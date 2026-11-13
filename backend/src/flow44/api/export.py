@@ -17,7 +17,7 @@ from flow44.sandbox.operations import BuildError, build_single_html
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/export/{project_id}", tags=["export"])
+router = APIRouter(prefix="/api/projects/{project_id}/export", tags=["export"])
 
 EXCLUDED_DIRS = {"node_modules", ".git", "dist", ".cache"}
 

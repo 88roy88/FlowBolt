@@ -7,7 +7,7 @@ from flow44.api.deps import Permission, SandboxDep, require_permission, require_
 from flow44.sandbox.search_mixin import SearchToolError
 from flow44.services.logging import log_bi_event
 
-router = APIRouter(prefix="/api/files/{project_id}", tags=["files"])
+router = APIRouter(prefix="/api/projects/{project_id}/files", tags=["files"])
 
 
 class WriteFileRequest(BaseModel):

@@ -41,7 +41,7 @@ def _handle_control(pty: BasePTY, text: str) -> None:
         logger.debug("Ignoring invalid terminal control message", exc_info=True)
 
 
-@router.websocket("/ws/terminal/{project_id}")
+@router.websocket("/ws/projects/{project_id}/terminal")
 async def terminal_ws(  # noqa: C901
     websocket: WebSocket,
     user_id: WsUserDep,
