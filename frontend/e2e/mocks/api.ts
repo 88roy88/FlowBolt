@@ -142,6 +142,9 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
 
   // Unmocked, the dev proxy 401s the BI event and signs the user out
   await page.route('**/api/bi/events', (route) => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/api/config', (route) =>
+    route.fulfill({ json: { chat_message_max_chars: 100_000, enhance_max_chars: 10_000 } })
+  );
 
   // --- Projects ---
   await page.route('**/api/projects', async (route) => {

@@ -7,7 +7,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
@@ -39,11 +39,12 @@ from flow44.api.deps import (
 )
 from flow44.config import settings
 from flow44.db.chat import ChatRole, count_user_messages, get_messages, save_message
-from flow44.db.events import emit_event, get_events, subscribe, unsubscribe
+from flow44.db.events import emit_event, emit_transient, get_events, get_last_event_id, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat, touch_heartbeat
-from flow44.db.paused_turn import clear_paused_turn, get_paused_turn
+from flow44.db.paused_turn import clear_paused_turn, get_paused_turn, pause_turn
 from flow44.logic import data_source as ds_logic
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services import run_abort
 from flow44.services.logging import log_bi_event
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import GitError
@@ -61,12 +62,23 @@ _AGENT_BUSY = {"type": "error", "message": "An agent is already running for this
 _VERSION_FAILED = {"type": "version_error", "message": "Version operation failed", "code": "failed"}
 
 
+def _message_too_long(text: str | None) -> dict[str, Any] | None:
+    limit = settings.CHAT_MESSAGE_MAX_CHARS
+    if text is None or len(text) <= limit:
+        return None
+    return {"type": "error", "message": f"Message is too long ({len(text):,} characters, max {limit:,})"}
+
+
 class AgentAlreadyRunning(Exception):
     pass
 
 
 class _RunBudgetExceeded(Exception):
     """The run outlived AGENT_RUN_TIMEOUT (distinct from a TimeoutError the agent raises)."""
+
+
+class _RunAborted(Exception):
+    """The user asked to stop the run."""
 
 
 @dataclass
@@ -90,18 +102,29 @@ class _UserTurn:
 async def _heartbeat_until_done(project_id: str, run_task: asyncio.Task[Any], beat: _Beat) -> None:
     deadline = time.monotonic() + settings.AGENT_RUN_TIMEOUT
     beat_interval = settings.AGENT_RUN_STALE_TIMEOUT / 4
-    while time.monotonic() < deadline:
-        timeout = min(beat_interval, deadline - time.monotonic())
-        done, _ = await asyncio.wait({run_task}, timeout=timeout)
-        if run_task in done:
-            return
+    with run_abort.watch(project_id) as abort_requested:
+        abort_wait = asyncio.create_task(abort_requested.wait())
         try:
-            beat.at = await touch_heartbeat(project_id)
-        except Exception:
-            # A transient DB blip must not tear down a healthy run; the reaper covers a
-            # genuinely dead one if writes keep failing past the stale window.
-            logger.warning("[chat] Heartbeat write failed for session %s; continuing", project_id, exc_info=True)
-    raise _RunBudgetExceeded
+            while time.monotonic() < deadline:
+                timeout = min(beat_interval, deadline - time.monotonic())
+                done, _ = await asyncio.wait(
+                    {run_task, abort_wait}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
+                )
+                if run_task in done:
+                    return
+                if abort_wait in done:
+                    raise _RunAborted
+                try:
+                    beat.at = await touch_heartbeat(project_id)
+                except Exception:
+                    # A transient DB blip must not tear down a healthy run; the reaper covers a
+                    # genuinely dead one if writes keep failing past the stale window.
+                    logger.warning(
+                        "[chat] Heartbeat write failed for session %s; continuing", project_id, exc_info=True
+                    )
+            raise _RunBudgetExceeded
+        finally:
+            await _cancel_task(abort_wait)
 
 
 async def _cancel_task(task: asyncio.Task[Any]) -> None:
@@ -117,13 +140,28 @@ async def _report_run_failure(project_id: str, message: str) -> None:
     await emit_event(project_id, {"type": "error", "message": message})
 
 
-async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> None:
+Rollback = Callable[[], Awaitable[None]]
+
+
+async def _rollback_turn(
+    project_id: str, after_event_id: int, after_ts: str, on_abort: Callable[[], Awaitable[Any]] | None
+) -> None:
+    await versioning.discard_agent_response(project_id, after_event_id, after_ts)
+    if on_abort is not None:
+        await on_abort()
+
+
+async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime, rollback: Rollback | None = None) -> None:
     """Run the agent under a heartbeat + timeout, surfacing failures to the client."""
     run_task = asyncio.create_task(coro)
     beat = _Beat(at=claimed_at)
+    aborted = False
     try:
         await _heartbeat_until_done(project_id, run_task, beat)
         await run_task
+    except _RunAborted:
+        logger.info("[chat] Run aborted by the user for session %s", project_id)
+        aborted = True
     except _RunBudgetExceeded:
         logger.error(
             "[chat] Background agent timed out after %ss for session %s", settings.AGENT_RUN_TIMEOUT, project_id
@@ -141,8 +179,18 @@ async def _run_agent_safe(project_id: str, coro: Any, claimed_at: datetime) -> N
         await _report_run_failure(project_id, "AI processing failed")
     finally:
         await _cancel_task(run_task)
-        await versioning.commit_turn(project_id)
+        if aborted:
+            try:
+                if rollback is not None:
+                    await rollback()
+            except Exception:
+                logger.exception("[chat] Rolling back the aborted turn failed for session %s", project_id)
+        else:
+            await versioning.commit_turn(project_id)
         await clear_heartbeat(project_id, only_beat=beat.at)
+        if aborted:
+            # Last, so clients reload a released, trimmed project.
+            await emit_transient(project_id, {"type": "turn_aborted"})
 
 
 async def _claim_run(project_id: str) -> datetime:
@@ -152,8 +200,8 @@ async def _claim_run(project_id: str) -> datetime:
     return claimed_at
 
 
-def _start_agent(project_id: str, coro: Any, claimed_at: datetime) -> None:
-    task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at))
+def _start_agent(project_id: str, coro: Any, claimed_at: datetime, rollback: Rollback | None = None) -> None:
+    task = asyncio.create_task(_run_agent_safe(project_id, coro, claimed_at, rollback))
     _RUNNING.add(task)
     task.add_done_callback(_RUNNING.discard)
 
@@ -162,12 +210,16 @@ async def _start_turn(
     project_id: str,
     make_coro: Callable[[], Any],
     prepare: Callable[[], Awaitable[Any]] | None = None,
+    on_abort: Callable[[], Awaitable[Any]] | None = None,
 ) -> None:
     claimed_at = await _claim_run(project_id)
     try:
         if prepare is not None:
             await prepare()
-        _start_agent(project_id, make_coro(), claimed_at)
+        rollback = partial(
+            _rollback_turn, project_id, await get_last_event_id(project_id), datetime.now(UTC).isoformat(), on_abort
+        )
+        _start_agent(project_id, make_coro(), claimed_at, rollback)
     except Exception:
         await clear_heartbeat(project_id, only_beat=claimed_at)
         raise
@@ -197,7 +249,7 @@ async def chat_events(project: ProjectDep) -> list[dict[str, Any]]:
 
 
 class EnhanceRequest(BaseModel):
-    content: str = Field(min_length=1, max_length=10_000)
+    content: str = Field(min_length=1, max_length=settings.ENHANCE_MAX_CHARS)
     model: str | None = None
     data_source_names: list[str] = Field(default_factory=list, max_length=20)
     selected_elements: list[SelectedElement] = Field(default_factory=list, max_length=MAX_SELECTED_ELEMENTS)
@@ -273,6 +325,9 @@ async def chat_ws(  # noqa: C901, PLR0915
             try:
                 if msg_type == "message":
                     user_content: str = data["content"]
+                    if error := _message_too_long(user_content):
+                        await websocket.send_json(error)
+                        continue
                     selected_model: str | None = data.get("model")
                     ds_ids: list[int] = data.get("dataSourceIds") or []
                     mode: str = data.get("mode", "build")
@@ -313,6 +368,9 @@ async def chat_ws(  # noqa: C901, PLR0915
                     action = data.get("action")
                     feedback = data.get("feedback")
                     selected_model = data.get("model")
+                    if error := _message_too_long(feedback):
+                        await websocket.send_json(error)
+                        continue
 
                     state_json = await _paused_state("awaiting_approval", "No pending plan found")
                     if state_json is None:
@@ -332,6 +390,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                             project.id,
                             execute_agent.run,
                             prepare=partial(clear_paused_turn, project.id),
+                            on_abort=partial(pause_turn, project.id, "awaiting_approval", state_json),
                         )
 
                     elif action == "modify" and feedback:
@@ -362,6 +421,7 @@ async def chat_ws(  # noqa: C901, PLR0915
                         project.id,
                         partial(router.resume_interview, session, answers, model=session.model),
                         prepare=partial(clear_paused_turn, project.id),
+                        on_abort=partial(pause_turn, project.id, "awaiting_interview", state_json),
                     )
 
                 elif msg_type == "fix_error":
@@ -401,6 +461,9 @@ async def chat_ws(  # noqa: C901, PLR0915
                         ),
                         prepare=partial(_save_user_turn, project.id, _UserTurn(prompt=error_desc, event=fix_event)),
                     )
+
+                elif msg_type == "abort":
+                    await run_abort.request_abort(project.id)
 
                 else:
                     await versioning.handle_action(project.id, msg_type, data)

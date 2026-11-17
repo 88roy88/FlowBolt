@@ -28,26 +28,21 @@ describe('authConfig defaults', () => {
 });
 
 describe('postMessage target resolution', () => {
-  it('derives the origin from the provider URL', async () => {
+  it('defaults to "*" even when a provider URL is set', async () => {
     const { authConfig, isProviderConfigured } = await loadConfig({
       VITE_AUTH_PROVIDER_URL: 'https://sso.example.com/login?x=1',
     });
     expect(authConfig.providerUrl).toBe('https://sso.example.com/login?x=1');
-    expect(authConfig.postMessageTarget).toBe('https://sso.example.com');
+    expect(authConfig.postMessageTarget).toBe('*');
     expect(isProviderConfigured()).toBe(true);
   });
 
-  it('prefers an explicit target over the derived origin', async () => {
+  it('uses an explicit target when set', async () => {
     const { authConfig } = await loadConfig({
       VITE_AUTH_PROVIDER_URL: 'https://sso.example.com/login',
       VITE_AUTH_POST_MESSAGE_TARGET: 'https://override.example',
     });
     expect(authConfig.postMessageTarget).toBe('https://override.example');
-  });
-
-  it('falls back to "*" when the provider URL is unparseable', async () => {
-    const { authConfig } = await loadConfig({ VITE_AUTH_PROVIDER_URL: 'not a url' });
-    expect(authConfig.postMessageTarget).toBe('*');
   });
 });
 

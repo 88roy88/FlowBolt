@@ -1,7 +1,11 @@
 import { useSessionStore } from '../../stores/session';
 import { useFilesStore } from '../../stores/files';
+import type { MouseEvent } from 'react';
+import { appHref, isPlainClick } from '../../utils/links';
 
-function goHome() {
+function goHome(e: MouseEvent) {
+  if (!isPlainClick(e)) return;
+  e.preventDefault();
   if (!useSessionStore.getState().currentProject) return;
   useSessionStore.getState().goHome();
   useFilesStore.getState().reset();
@@ -40,12 +44,12 @@ export function FlowBrand({ size = 'md', className }: FlowBrandProps) {
   }[size];
 
   return (
-    <button type="button" onClick={goHome} className={`flex items-center ${config.gap} cursor-pointer ${className ?? ''}`}>
+    <a href={appHref()} onClick={goHome} className={`flex items-center ${config.gap} ${className ?? ''}`}>
       <FlowLogo size={config.icon} className="text-brand" />
       <span className={`font-bold tracking-tight ${config.text}`}>
         <span className="text-brand">Build</span>
         <span className="text-foreground">App</span>
       </span>
-    </button>
+    </a>
   );
 }

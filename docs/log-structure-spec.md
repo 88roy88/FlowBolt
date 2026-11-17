@@ -87,6 +87,14 @@ Trigger: the user sends an instruction to the model.
 | `version_id` | string | Yes | The version ID the prompt was sent in. |
 | `selected_element_count` | integer | Yes | Number of preview elements the user attached to the prompt, 0 when none. |
 
+#### `response_aborted`
+Trigger: the user presses Stop while the model is working, logged by the client once the outcome is known.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `outcome` | enum: `aborted`, `too_late` | Yes | `aborted` when the run was stopped and its changes discarded; `too_late` when the turn finished before the abort reached it. |
+| `elapsed_ms` | integer | Yes | Time from pressing Stop to the outcome. |
+
 
 #### `response_received` || Not yet implemented
 Trigger: the model returns a response to a prompt.
@@ -256,5 +264,14 @@ Trigger: a user shares the link to a published app.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `share_method` | enum: `link_copy`, `email`, `other` | No | Method used to share the link. |
+
+### 4.7 App View Events
+
+#### `page_viewed`
+Trigger: the backend serves a page load of a generated app: a published app at `/shared/<handle>/` (including inside an iframe), or a preview opened in its own tab. The builder's preview iframe does not count. A reload counts again; navigation inside the app does not. Published apps are served without sign-in: for their views `user_id` is present only when the viewer's browser sends the builder's sign-in cookie, and absent otherwise (for example on the first load from a link on another site).
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `view_source` | enum: `production`, `preview` | Yes | Whether the published app or the preview was viewed. |
 
 ---

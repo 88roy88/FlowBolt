@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from flow44.api import chat
+from flow44.services import run_abort
 
 PROJECT_ID = "test-project-run-agent-safe"
 CLAIMED_AT = datetime(2026, 1, 1, tzinfo=UTC)
@@ -121,3 +122,33 @@ async def test_start_agent_runs_under_the_supervisor(monkeypatch: pytest.MonkeyP
     await asyncio.wait_for(started.wait(), timeout=1)
     await asyncio.wait_for(task, timeout=1)
     assert set() == chat._RUNNING
+
+
+async def test_abort_cancels_and_rolls_back_instead_of_committing(monkeypatch: pytest.MonkeyPatch) -> None:
+    emit, clear, commit = _patch_boundary(monkeypatch)
+    transient = AsyncMock()
+    monkeypatch.setattr(chat, "emit_transient", transient)
+    rollback = AsyncMock()
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def hang() -> None:
+        started.set()
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    run = asyncio.create_task(chat._run_agent_safe(PROJECT_ID, hang(), CLAIMED_AT, rollback))
+    await asyncio.wait_for(started.wait(), timeout=1)
+    run_abort._wake(PROJECT_ID)
+    await asyncio.wait_for(run, timeout=1)
+
+    assert cancelled.is_set()
+    rollback.assert_awaited_once_with()
+    commit.assert_not_awaited()
+    emit.assert_not_awaited()
+    clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
+    transient.assert_awaited_once_with(PROJECT_ID, {"type": "turn_aborted"})
+    assert PROJECT_ID not in run_abort._watchers

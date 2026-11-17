@@ -13,6 +13,7 @@ import { reapProject } from '../../services/api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useDebouncedValue } from '../../hooks/useDebounce';
+import { isPlainClick, projectHref } from '../../utils/links';
 import { logger } from '../../services/logger';
 
 type SidebarProps = {
@@ -239,9 +240,8 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
           return (
             <div key={project.id}>
               <div
-                onClick={() => handleSelect(project)}
                 data-testid={`project-item-${project.id}`}
-                className={`group flex items-center gap-2.5 px-2 py-1.5 cursor-pointer mb-0.5 transition-colors duration-100 rounded-md ${isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
+                className={`group relative flex items-center gap-2.5 px-2 py-1.5 mb-0.5 transition-colors duration-100 rounded-md ${isActive ? 'bg-muted/60' : 'hover:bg-muted/30'
                   }`}
               >
                 <div className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${colorClass}`}>
@@ -257,18 +257,26 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
                       if (e.key === 'Escape') setRenamingId(null);
                     }}
                     onBlur={submitRename}
-                    onClick={(e) => e.stopPropagation()}
                     className="flex-1 text-[13px] bg-background border border-border rounded px-1.5 py-0.5"
                   />
                 ) : (
-                  <span className="flex-1 text-[13px] truncate">
+                  // The link's ::after covers the whole row, so the row clicks (and middle clicks) as a link
+                  <a
+                    href={projectHref(project.id)}
+                    onClick={(e) => {
+                      if (!isPlainClick(e)) return;
+                      e.preventDefault();
+                      handleSelect(project);
+                    }}
+                    className="flex-1 text-[13px] text-inherit truncate after:absolute after:inset-0 after:rounded-md"
+                  >
                     {project.name}
                     {project.role && (
                       <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                         {project.role}
                       </span>
                     )}
-                  </span>
+                  </a>
                 )}
                 <Button
                   variant="ghost"
@@ -282,7 +290,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
                     setMenuProjectId(project.id);
                   }}
                   style={{ anchorName: anchorName(project.id) } as CSSProperties}
-                  className="opacity-0 group-hover:opacity-40 hover:!opacity-100 shrink-0"
+                  className="relative opacity-0 group-hover:opacity-40 hover:!opacity-100 shrink-0"
                 >
                   <MoreHorizontal size={14} />
                 </Button>

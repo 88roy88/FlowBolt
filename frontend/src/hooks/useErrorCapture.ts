@@ -57,7 +57,7 @@ export function useErrorCapture() {
         column: d.column,
         stack: d.stack,
       });
-      logger.error('preview_error', {
+      logger.info('preview_error', {
         error_type: 'build',
         error_message: d.message,
       });
@@ -80,7 +80,7 @@ export function useErrorCapture() {
         const fromStack = parseStack(d.stack);
         const file = fromStack?.file ?? extractSourceFile(d.file);
         if (d.file && !file) return; // node_modules — skip
-        logger.error('preview_error', {
+        logger.info('preview_error', {
           error_type: 'runtime',
           error_message: msg,
         });
@@ -110,7 +110,7 @@ export function useErrorCapture() {
           if (errorMsg.includes('[vite] failed to connect to websocket')) return;
           // React error boundaries repeat the actual error — skip them
           if (errorMsg.includes('The above error occurred in')) return;
-          logger.error('preview_error', {
+          logger.info('preview_error', {
             error_type: 'console',
             error_message: errorMsg,
           });

@@ -142,9 +142,11 @@
   },
   "chat": {
     "chat": "Chat",
+    "stop": "Stop and discard changes",
     "scrollToBottom": "Scroll to bottom",
     "today": "Today",
     "yesterday": "Yesterday",
+    "messageTooLong": "Message is too long ({{length}} / {{max}} characters)",
     "model": "Model",
     "enhance": {
       "action": "Enhance prompt",
@@ -247,6 +249,9 @@
     "colUrl": "URL",
     "colCreated": "Created",
     "colPublished": "Published",
+    "colLiveViews": "Live views",
+    "colPreviewViews": "Preview views",
+    "colPreviewViewsHint": "Only previews opened in their own tab, e.g. from a link. The builder's preview pane isn't counted.",
     "openProject": "Open project",
     "searchApps": "Search by project, owner or URL",
     "noMatches": "No matching apps"

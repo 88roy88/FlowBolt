@@ -2,6 +2,7 @@ import type { ReadOnlySocket } from './types';
 import { credentialsStore } from '../../auth';
 import { getWsBase } from './reconnecting';
 
+const MAX_HISTORY_CHARS = 256 * 1024;
 const serverLogSockets = new Map<string, ReadOnlySocket>();
 
 export function getServerLogSocket(projectId: string): ReadOnlySocket {
@@ -9,6 +10,7 @@ export function getServerLogSocket(projectId: string): ReadOnlySocket {
   if (existing) return existing;
 
   const handlers: Array<(data: string) => void> = [];
+  let history = '';
   let socket: WebSocket | null = null;
   let closed = false;
 
@@ -17,11 +19,13 @@ export function getServerLogSocket(projectId: string): ReadOnlySocket {
     credentialsStore.ensureCookie();
     socket = new WebSocket(`${getWsBase()}/ws/server-log/${projectId}`);
     socket.binaryType = 'arraybuffer';
+    history = '';
 
     socket.addEventListener('message', (event) => {
       const text = event.data instanceof ArrayBuffer
         ? new TextDecoder().decode(event.data)
         : event.data as string;
+      history = (history + text).slice(-MAX_HISTORY_CHARS);
       handlers.forEach((h) => h(text));
     });
 
@@ -39,6 +43,7 @@ export function getServerLogSocket(projectId: string): ReadOnlySocket {
 
   const instance: ReadOnlySocket = {
     onData(handler: (data: string) => void) {
+      if (history) handler(history);
       handlers.push(handler);
       return () => {
         const idx = handlers.indexOf(handler);

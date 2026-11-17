@@ -36,12 +36,26 @@ export function Terminal() {
     const socket = getTerminalSocket(projectId);
     termRef.current = term;
 
+    // Skip xterm's automatic replies to the shell's status queries (e.g. terminal type) in replayed history.
+    let pendingReplays = 0;
     term.onData((data) => {
-      socket.send(data);
+      if (pendingReplays === 0) socket.send(data);
     });
 
-    const handler = (data: string) => {
-      term.write(data);
+    socket.resize(term.cols, term.rows);
+    term.onResize(({ cols, rows }) => {
+      socket.resize(cols, rows);
+    });
+
+    const handler = (data: string, replay: boolean) => {
+      if (!replay) {
+        term.write(data);
+        return;
+      }
+      pendingReplays++;
+      term.write(data, () => {
+        pendingReplays--;
+      });
     };
     const unsubscribe = socket.onData(handler);
 

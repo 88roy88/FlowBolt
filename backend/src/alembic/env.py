@@ -24,6 +24,7 @@ from sqlmodel import SQLModel
 import flow44.db.chat  # noqa
 import flow44.db.events  # noqa
 import flow44.db.heartbeat  # noqa
+import flow44.db.page_view  # noqa
 import flow44.db.paused_turn  # noqa
 import flow44.db.platform_user  # noqa
 import flow44.db.platform_user_group  # noqa

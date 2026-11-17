@@ -10,6 +10,7 @@ import { DirectorySearch } from './DirectorySearch';
 import { cn } from '@/lib/utils';
 import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
+import { isPlainClick, projectHref } from '../../utils/links';
 
 // Rows whose id is in `hits` sort first; ties preserve order under a stable sort.
 function rankHit(hits: Set<string>, a: string, b: string): number {
@@ -20,7 +21,8 @@ function rankHit(hits: Set<string>, a: string, b: string): number {
 
 type Tab = 'users' | 'published';
 
-type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at';
+type ViewsSortKey = 'production_views' | 'preview_views';
+type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at' | ViewsSortKey;
 type SortDir = 'asc' | 'desc';
 
 const INITIAL_SORT_DIR: Record<SortKey, SortDir> = {
@@ -29,9 +31,15 @@ const INITIAL_SORT_DIR: Record<SortKey, SortDir> = {
   project_url: 'asc',
   created_at: 'desc',
   published_at: 'desc',
+  production_views: 'desc',
+  preview_views: 'desc',
 };
 
-const APPS_GRID ='grid grid-cols-[1fr_130px_150px_80px_80px] gap-2';
+const APPS_GRID ='grid grid-cols-[1fr_130px_150px_80px_80px_80px_130px] gap-2';
+
+function isViewsSortKey(key: SortKey): key is ViewsSortKey {
+  return key === 'production_views' || key === 'preview_views';
+}
 
 /** Date only, with the full date + time of day on hover. */
 function Timestamp({ iso }: { iso: string }) {
@@ -45,7 +53,7 @@ function Timestamp({ iso }: { iso: string }) {
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>('users');
+  const [tab, setTab] = useState<Tab>('published');
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [groups, setGroups] = useState<PlatformGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,8 +106,11 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     const matchingApps = apps.filter((app) =>
       [app.name, app.owner_id, app.project_url].some((field) => field.toLowerCase().includes(query)));
 
+    const { key } = appsSort;
     return matchingApps.sort((a, b) => {
-      const order = a[appsSort.key].localeCompare(b[appsSort.key], undefined, { sensitivity: 'base' });
+      const order = isViewsSortKey(key)
+        ? a[key] - b[key]
+        : a[key].localeCompare(b[key], undefined, { sensitivity: 'base' });
       return appsSort.dir === 'asc' ? order : -order;
     });
   }, [apps, appsSearch, appsSort]);
@@ -108,14 +119,15 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
     : { key, dir: INITIAL_SORT_DIR[key] }));
 
-  const sortHeader = (key: SortKey, label: string) => {
+  const sortHeader = (key: SortKey, label: string, className?: string, title?: string) => {
     const active = appsSort.key === key;
     const SortIcon = appsSort.dir === 'asc' ? ArrowUp : ArrowDown;
     return (
       <button
         type="button"
         onClick={() => toggleSort(key)}
-        className={cn('flex items-center gap-0.5 text-start hover:text-foreground', active && 'text-foreground')}
+        title={title}
+        className={cn('flex items-center gap-0.5 text-start hover:text-foreground', active && 'text-foreground', className)}
       >
         {label}
         {active && <SortIcon size={11} className="shrink-0" />}
@@ -183,7 +195,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       <DialogContent
         className={cn(
           'max-h-[85vh] flex flex-col overflow-hidden',
-          tab === 'published' ? 'w-[760px] max-w-[760px]' : 'w-[440px]',
+          tab === 'published' ? 'w-[900px] max-w-[900px]' : 'w-[440px]',
         )}
       >
         <DialogClose onClose={onClose} />
@@ -193,8 +205,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
           {/* Tabs */}
           <div className="flex gap-4 mb-3 border-b border-border">
-            {tabButton('users', t('admin.usersTab', 'Platform Users'))}
             {tabButton('published', t('admin.publishedTab', 'Published Apps'))}
+            {tabButton('users', t('admin.usersTab', 'Platform Users'))}
           </div>
 
           {tab === 'users' && (
@@ -227,6 +239,13 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
               {sortHeader('project_url', t('admin.colUrl', 'URL'))}
               {sortHeader('created_at', t('admin.colCreated', 'Created'))}
               {sortHeader('published_at', t('admin.colPublished', 'Published'))}
+              {sortHeader('production_views', t('admin.colLiveViews', 'Live views'), 'justify-center')}
+              {sortHeader(
+                'preview_views',
+                t('admin.colPreviewViews', 'Preview views'),
+                'justify-center',
+                t('admin.colPreviewViewsHint', "Only previews opened in their own tab, e.g. from a link. The builder's preview pane isn't counted."),
+              )}
             </div>
           )}
         </div>
@@ -321,14 +340,14 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 className={cn(APPS_GRID, 'items-center px-2 py-1.5 rounded-md hover:bg-muted/30 group')}
               >
                 {/* The hashchange listener in App selects the project; admins' project list includes every project. */}
-                <button
-                  type="button"
-                  onClick={() => { window.location.hash = `#/project/${a.project_id}`; onClose(); }}
-                  className="min-w-0 text-[13px] truncate text-start hover:underline"
+                <a
+                  href={projectHref(a.project_id)}
+                  onClick={(e) => { if (isPlainClick(e)) onClose(); }}
+                  className="min-w-0 text-[13px] text-inherit truncate text-start hover:underline"
                   title={`${t('admin.openProject', 'Open project')} (${a.project_id})`}
                 >
                   {a.name}
-                </button>
+                </a>
                 <span className="text-muted-foreground text-xs text-left truncate" title={a.owner_id}>
                   {a.owner_id}
                 </span>
@@ -343,6 +362,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 </a>
                 <Timestamp iso={a.created_at} />
                 <Timestamp iso={a.published_at} />
+                <span className="text-muted-foreground text-xs tabular-nums text-center">{a.production_views}</span>
+                <span className="text-muted-foreground text-xs tabular-nums text-center">{a.preview_views}</span>
               </div>
             ))
           )}

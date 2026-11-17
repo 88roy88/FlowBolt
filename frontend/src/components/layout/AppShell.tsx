@@ -19,6 +19,7 @@ import { useFilesStore } from '../../stores/files';
 import { useWorkspaceLock } from '../../stores/workspaceLock';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { startProjectFromPrompt } from '../../utils/newProject';
+import { isPlainClick, projectHref } from '../../utils/links';
 import { getProjectHasMessages, setProjectHasMessages } from '../../utils/projectHasMessagesCache';
 
 const SIDEBAR_WIDTH = 280;
@@ -137,9 +138,14 @@ export function AppShell() {
       <div className="w-8 h-px bg-border shrink-0" />
       <div className="flex-1 flex flex-col items-center gap-1.5 px-1 py-1 overflow-y-auto overflow-x-visible">
         {projects.map((p) => (
-          <button
+          <a
             key={p.id}
-            onClick={() => handleRailSelect(p)}
+            href={projectHref(p.id)}
+            onClick={(e) => {
+              if (!isPlainClick(e)) return;
+              e.preventDefault();
+              handleRailSelect(p);
+            }}
             className={`w-8 h-8 rounded-md text-xs font-bold flex items-center justify-center transition-all duration-150 shrink-0 ${
               p.id === currentProject?.id
                 ? `${getColor(p.name)} ring-1 ring-primary/40`
@@ -148,7 +154,7 @@ export function AppShell() {
             title={p.name}
           >
             {getInitials(p.name)}
-          </button>
+          </a>
         ))}
       </div>
       <div className="w-8 h-px bg-border shrink-0" />
