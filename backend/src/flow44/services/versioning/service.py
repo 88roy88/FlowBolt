@@ -209,6 +209,15 @@ async def restore_version(project_id: str, commit_sha: str) -> None:
         await _emit_dirty_files(project_id, git)
 
 
+async def discard_agent_response(project_id: str, after_event_id: int, after_ts: str) -> None:
+    async with _locked_workspace(project_id, [_not_detached]) as git:
+        await git.discard_all()
+        await trim_events_after(project_id, after_event_id)
+        await trim_messages_after(project_id, after_ts)
+        await emit_transient(project_id, {"type": "workspace_reset"})
+        await _emit_dirty_files(project_id, git)
+
+
 async def handle_action(project_id: str, msg_type: str, data: dict[str, Any]) -> None:
     match msg_type:
         case "preview_version":

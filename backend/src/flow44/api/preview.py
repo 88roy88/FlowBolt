@@ -8,7 +8,9 @@ from fastapi.responses import FileResponse, Response
 from flow44.api.deps import PermissionsDep, ProjectDep, SandboxDep, WsProjectDep, WsSandboxDep
 from flow44.auth.permissions import Permission, has_permission
 from flow44.db.locks import LockNamespace, advisory_lock
+from flow44.db.page_view import PageViewSource
 from flow44.sandbox.manager import sandbox_manager
+from flow44.services.page_view_service import is_iframe, is_page_load, record_page_view
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +126,9 @@ async def proxy_to_sandbox(
     response_headers = dict(resp.headers)
     for h in ("content-encoding", "content-length", "transfer-encoding", "connection"):
         response_headers.pop(h, None)
+
+    if resp.status_code in (200, 304) and is_page_load(request) and not is_iframe(request):
+        await record_page_view(project, PageViewSource.preview)
 
     content = resp.content
     if (
