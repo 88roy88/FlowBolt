@@ -6,6 +6,7 @@ import { EditorPanel } from '../editor/EditorPanel';
 import { Preview } from '../preview/Preview';
 import { useChatStore } from '../../stores/chat';
 import { useTabPanelStore, type PanelTab } from '../../stores/tabPanel';
+import { useActionsInTopbar } from './navMode';
 
 
 const MAIN_SPLIT_MIN = 0.2;
@@ -18,6 +19,7 @@ export function ClassicLayout() {
   const [mainSplit, setMainSplit] = useState(0.4);
   const mainTopRef = useRef<HTMLDivElement>(null);
   const agentPhase = useChatStore((s) => s.agentPhase);
+  const tabsInTopbar = useActionsInTopbar();
 
   const messages = useChatStore((s) => s.messages);
   const historyLoaded = useChatStore((s) => s.historyLoaded);
@@ -56,6 +58,7 @@ export function ClassicLayout() {
       <Resizer direction="horizontal" onDrag={handleMainSplitResize} />
 
       <div style={{ flex: 1 - mainSplit, minWidth: 0 }} className="overflow-hidden flex flex-col">
+        {!tabsInTopbar && (
         <div className="flex items-center border-b border-border bg-surface shrink-0">
           {(['preview', 'code'] as PanelTab[]).map((tab) => (
             <button
@@ -71,6 +74,7 @@ export function ClassicLayout() {
             </button>
           ))}
         </div>
+        )}
         <div className="flex-1 overflow-hidden">
           {panelTab === 'preview' ? <Preview /> : <EditorPanel />}
         </div>

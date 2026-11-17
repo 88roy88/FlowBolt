@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
 import { logger } from '../../services/logger';
+import { useActionsInTopbar } from '../layout/navMode';
 
 type PreviewLoadTrigger = 'manual_refresh' | 'auto_on_code_change';
 
@@ -18,6 +19,7 @@ export function Preview() {
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const saveVersion = useFilesStore((s) => s.saveVersion);
+  const actionsInTopbar = useActionsInTopbar();
   
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -108,7 +110,8 @@ export function Preview() {
           {previewUrl ?? t('preview.loading')}
         </span>
 
-        {/* Publish Actions */}
+        {/* Publish Actions (in the topbar when topbar navigation is on) */}
+        {!actionsInTopbar && (
         <div className="flex items-center gap-1.5">
           {isPublished && liveUrl ? (
             <Button
@@ -134,6 +137,7 @@ export function Preview() {
             </Button>
           )}
         </div>
+        )}
       </div>
 
       {/* iframe */}

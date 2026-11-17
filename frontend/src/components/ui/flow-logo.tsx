@@ -31,6 +31,15 @@ export function FlowLogo({ size = 20, className }: FlowLogoProps) {
   );
 }
 
+/** Logo-only home link, for compact chrome like the topbar. */
+export function FlowHomeLink({ size = 18, title }: { size?: number; title?: string; }) {
+  return (
+    <a href={appHref()} onClick={goHome} title={title} aria-label={title} className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-muted/40 transition-colors">
+      <FlowLogo size={size} className="text-brand" />
+    </a>
+  );
+}
+
 interface FlowBrandProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
