@@ -11,6 +11,13 @@ import { AGENT_PHASE, TERMINAL_EVENT_TYPES } from './chatAgentState';
 import { startAgentAlivePolling, stopAgentAlivePolling } from './agentAlivePoll';
 import { logger } from '../services/logger';
 
+export interface QueuedMessage {
+  id: string;
+  content: string;
+  dataSources: { id: number; name: string }[];
+  selectedElements: SelectedElement[];
+}
+
 export interface ChatState {
   messages: Message[];
   isStreaming: boolean;
@@ -37,18 +44,25 @@ export interface ChatState {
   agentAlive: boolean | null;
   agentAlivePollId: number;
   aborting: boolean;
+  queuedMessages: QueuedMessage[];
+  /** Stops the queue from sending by itself: the user pressed Stop, even if the turn then finished anyway. */
+  queueHeld: boolean;
   draft: string;
   setDraft: (draft: string) => void;
   sendMessage: (content: string, opts?: { keepDraft?: boolean }) => void;
+  queueMessage: (content: string) => void;
+  removeQueued: (id: string) => void;
+  sendQueued: (id: string) => void;
   sendFixError: (errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) => void;
   rollbackTurn: (id: string) => void;
   abortTurn: () => void;
+  reloadAfterAbort: (projectId: string) => Promise<void>;
   respondToPlan: (action: 'accept' | 'modify', feedback?: string) => void;
   respondToInterview: (action: 'submit' | 'skip', answers?: InterviewAnswer[]) => void;
   setInterviewMode: (mode: InterviewMode) => void;
   addMessage: (message: Message) => void;
   historyLoaded: boolean;
-  loadHistory: (projectId: string) => Promise<void>;
+  loadHistory: (projectId: string, opts?: { keepInput?: boolean }) => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
   setStreaming: (streaming: boolean) => void;
@@ -121,6 +135,62 @@ const RESET_STATE = {
   aborting: false,
 };
 
+function rememberProjectModel(model: string | null) {
+  const currentProject = useSessionStore.getState().currentProject;
+  if (currentProject && model) {
+    updateProjectModel(currentProject.id, model).catch(() => {});
+  }
+}
+
+function sendTurn(
+  projectId: string,
+  content: string,
+  { dataSources, selectedElements }: Pick<QueuedMessage, 'dataSources' | 'selectedElements'>,
+  keepDraft?: boolean,
+): string {
+  const { setState: set, getState: get } = useChatStore;
+  void requestPermissionIfNeeded();
+
+  const { selectedModel } = get();
+
+  const userMessage: Message = {
+    id: generateId(),
+    role: 'user',
+    content,
+    timestamp: Date.now(),
+    dataSources: dataSources.length > 0 ? [...dataSources] : undefined,
+    selectedElements: selectedElements.length > 0 ? [...selectedElements] : undefined,
+  };
+
+  set((state) => ({
+    messages: [...state.messages, userMessage],
+    isStreaming: true,
+    agentAlive: true,
+    queueHeld: false,
+    ...(!keepDraft && { draft: '' }),
+    ...RESET_STATE,
+    designProgress: { architecture: null, ux: null },
+  }));
+
+  const socket = getChatSocket(projectId);
+  const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
+  attachHandler(projectId, socket, handler);
+  startAgentAlivePolling(projectId);
+
+  socket.send({
+    type: 'message',
+    content,
+    mode: get().interviewMode,
+    ...(selectedModel && { model: selectedModel }),
+    ...(dataSources.length > 0 && { dataSourceIds: dataSources.map((c) => c.id) }),
+    ...(selectedElements.length > 0 && { selectedElements: selectedElements.map(({ id: _id, ...e }) => e) }),
+  });
+
+  rememberProjectModel(selectedModel);
+
+  return userMessage.id;
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   historyLoaded: false,
@@ -146,6 +216,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   agentAlive: null,
   agentAlivePollId: 0,
   aborting: false,
+  queuedMessages: [],
+  queueHeld: false,
   draft: '',
 
   setDraft(draft: string) {
@@ -187,10 +259,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       model: selectedModel || undefined,
     });
 
-    const currentProject = useSessionStore.getState().currentProject;
-    if (currentProject && selectedModel) {
-      updateProjectModel(currentProject.id, selectedModel).catch(() => {});
-    }
+    rememberProjectModel(selectedModel);
 
     armTurn({
       run: () => get().sendFixError(errorMessage, errorFile, errorLine, errorStack),
@@ -201,54 +270,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage(content: string, opts?: { keepDraft?: boolean }) {
     const projectId = useSessionStore.getState().projectId;
     if (!projectId) return;
-    void requestPermissionIfNeeded();
 
-    const { selectedDataSources, selectedElements, selectedModel } = get();
-
-    const userMessage: Message = {
-      id: generateId(),
-      role: 'user',
-      content,
-      timestamp: Date.now(),
-      dataSources: selectedDataSources.length > 0 ? [...selectedDataSources] : undefined,
-      selectedElements: selectedElements.length > 0 ? [...selectedElements] : undefined,
-    };
-
-    set((state) => ({
-      messages: [...state.messages, userMessage],
-      isStreaming: true,
-      agentAlive: true,
-      ...(!opts?.keepDraft && { draft: '' }),
-      ...RESET_STATE,
-      designProgress: { architecture: null, ux: null },
-    }));
-
-    const socket = getChatSocket(projectId);
-    const handler = createSendMessageHandler(set, get, () => detachHandler(socket, handler));
-    attachHandler(projectId, socket, handler);
-    startAgentAlivePolling(projectId);
-
-    socket.send({
-      type: 'message',
-      content,
-      mode: get().interviewMode,
-      ...(selectedModel && { model: selectedModel }),
-      ...(selectedDataSources.length > 0 && { dataSourceIds: selectedDataSources.map((c) => c.id) }),
-      ...(selectedElements.length > 0 && { selectedElements: selectedElements.map(({ id: _id, ...e }) => e) }),
-    });
-
-    // Persist the model to the project so it's restored on next visit
-    const currentProject = useSessionStore.getState().currentProject;
-    if (currentProject && selectedModel) {
-      updateProjectModel(currentProject.id, selectedModel).catch(() => {});
-    }
+    const { selectedDataSources, selectedElements } = get();
+    const messageId = sendTurn(projectId, content, { dataSources: selectedDataSources, selectedElements }, opts?.keepDraft);
 
     set({ selectedDataSources: [], selectedElements: [] });
     armTurn({
       run: () => get().sendMessage(content, opts),
       undo: () => {
-        get().rollbackTurn(userMessage.id);
+        get().rollbackTurn(messageId);
         set({ selectedElements, ...((!opts?.keepDraft || !get().draft) && { draft: content }) });
+      },
+    });
+  },
+
+  queueMessage(content: string) {
+    set((state) => ({
+      queuedMessages: [...state.queuedMessages, {
+        id: generateId(),
+        content,
+        dataSources: state.selectedDataSources,
+        selectedElements: state.selectedElements,
+      }],
+      draft: '',
+      selectedDataSources: [],
+      selectedElements: [],
+    }));
+  },
+
+  removeQueued(id: string) {
+    set((state) => ({ queuedMessages: state.queuedMessages.filter((m) => m.id !== id) }));
+  },
+
+  sendQueued(id: string) {
+    const projectId = useSessionStore.getState().projectId;
+    const queued = get().queuedMessages.find((m) => m.id === id);
+    if (!projectId || !queued) return;
+
+    get().removeQueued(id);
+    const messageId = sendTurn(projectId, queued.content, queued, true);
+    armTurn({
+      run: () => get().sendQueued(id),
+      undo: () => {
+        get().rollbackTurn(messageId);
+        set((state) => ({ queuedMessages: [queued, ...state.queuedMessages] }));
       },
     });
   },
@@ -269,7 +334,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = getChatSocket(projectId);
     logAbortOutcome(socket, projectId);
     socket.send({ type: 'abort' });
-    set({ aborting: true });
+    set({ aborting: true, queueHeld: true });
+  },
+
+  reloadAfterAbort(projectId: string) {
+    const { draft, queuedMessages, selectedDataSources, selectedElements } = get();
+    const dataSources = [...queuedMessages.flatMap((m) => m.dataSources), ...selectedDataSources];
+    set({
+      draft: [...queuedMessages.map((m) => m.content), draft].filter(Boolean).join('\n\n'),
+      selectedDataSources: dataSources.filter((c, i) => dataSources.findIndex((o) => o.id === c.id) === i),
+      selectedElements: [...queuedMessages.flatMap((m) => m.selectedElements), ...selectedElements].slice(0, MAX_SELECTED_ELEMENTS),
+      queuedMessages: [],
+      queueHeld: false,
+    });
+    return get().loadHistory(projectId, { keepInput: true });
   },
 
   respondToPlan(action: 'accept' | 'modify', feedback?: string) {
@@ -309,13 +387,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({ messages: [...state.messages, message] }));
   },
 
-  async loadHistory(projectId: string) {
+  async loadHistory(projectId: string, opts?: { keepInput?: boolean }) {
     // Detach any existing handlers from the previous session
     if (activeProjectId && activeProjectId !== projectId) {
       stopAgentAlivePolling();
       const oldSocket = getChatSocket(activeProjectId);
       if (activeHandler) detachHandler(oldSocket, activeHandler);
       oldSocket.offMessage(handleVersionMessage);
+      set({ queuedMessages: [], queueHeld: false });
     }
 
     try {
@@ -327,8 +406,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         historyLoaded: false,
         buildCompleted: false,
         agentAlive: null,
-        draft: '',
-        selectedElements: [],
+        ...(!opts?.keepInput && { draft: '', selectedElements: [] }),
         ...RESET_STATE,
       });
       useVersionStore.getState().reset();
@@ -378,6 +456,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       agentAlive: null,
       interviewMode: 'interview',
       selectedElements: [],
+      queuedMessages: [],
+      queueHeld: false,
       ...RESET_STATE,
     });
     useVersionStore.getState().reset();
