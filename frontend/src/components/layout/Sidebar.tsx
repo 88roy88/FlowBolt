@@ -15,6 +15,7 @@ import { Input } from '../ui/input';
 import { useDebouncedValue } from '../../hooks/useDebounce';
 import { isPlainClick, projectHref } from '../../utils/links';
 import { logger } from '../../services/logger';
+import { getVisibleProjects } from '../../utils/visibleProjects';
 
 type SidebarProps = {
   onCollapse?: () => void;
@@ -152,7 +153,7 @@ export function Sidebar({ onCollapse, onOpenSettings, onOpenAdmin }: SidebarProp
   }, [searchTerm, searchProjects]);
 
   const isSearching = trimmedSearch !== '' && trimmedSearch !== projectSearch?.query && trimmedSearch !== failedSearch;
-  const visibleProjects = projectSearch?.results ?? projects;
+  const visibleProjects = getVisibleProjects(projects, projectSearch, currentProject);
   const hasMoreProjects = !isSearching && (projectSearch ? projectSearch.cursor : projectsCursor) !== null;
   const menuProject = visibleProjects.find((p) => p.id === menuProjectId);
 
