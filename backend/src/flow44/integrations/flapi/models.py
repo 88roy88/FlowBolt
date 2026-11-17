@@ -135,9 +135,14 @@ class DataSourceRunResult(BaseModel):
 # -- Quick params info: GET /package/v1/quick/{id} -----------------------
 
 
+class QuickRequiredType(PascalCaseBaseModel):
+    is_required: bool | None = None
+
+
 class QuickParameterInfo(PascalCaseBaseModel):
     display_name: str | None = None
     description: str | None = None
+    required_type: QuickRequiredType | None = None
 
 
 class QuickParamDefinition(PascalCaseBaseModel):

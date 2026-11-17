@@ -9,7 +9,12 @@ from typing import Any
 import litellm
 import pytest
 
-from flow44.ai.core.provider import ContextWindowExceeded, _handle_litellm_errors, stream_chat
+from flow44.ai.core.provider import (
+    ContextWindowExceeded,
+    _handle_litellm_errors,
+    _prompt_cache_kwargs,
+    stream_chat,
+)
 from flow44.config import settings
 
 _MESSAGES = [{"role": "user", "content": "go"}]
@@ -48,3 +53,11 @@ async def test_unprefixed_context_length_error_becomes_context_window_exceeded()
     with pytest.raises(ContextWindowExceeded):
         async with _handle_litellm_errors("m"):
             raise error
+
+
+@pytest.mark.parametrize(("enabled", "expected"), [(True, {"prompt_cache_key": "p1"}), (False, {})])
+def test_prompt_cache_key_follows_setting(
+    monkeypatch: pytest.MonkeyPatch, enabled: bool, expected: dict[str, Any]
+) -> None:
+    monkeypatch.setattr(settings, "AI_SEND_PROMPT_CACHE_KEY", enabled)
+    assert _prompt_cache_kwargs({"prompt_cache_key": "p1"}) == expected
