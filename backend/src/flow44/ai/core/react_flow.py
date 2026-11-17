@@ -22,7 +22,7 @@ MALFORMED_TOOL_CALL_CORRECTION = (
 MAX_ITERATIONS_WRAP_UP = (
     "You have reached the step limit for this turn and cannot call any more tools. "
     "Tell the user briefly what you changed so far and what is still left to do, "
-    'and that they can reply "continue" to keep going.'
+    "and ask them how they would like to proceed."
 )
 LEAKED_TOOL_CALL_MARKERS = (
     "<invoke name=",
@@ -184,9 +184,9 @@ class ReActFlow(Flow[StateT], Generic[StateT]):
         logger.warning("[%s] Hit max iterations (%d)", self.name, self.max_iterations)
         self.hit_max_iterations = True
         add_trace_tags(["max_iterations"])
-        return await self._wrap_up(working_messages, system_prompt, tool_schemas, model, metadata_fn)
+        return await self._react_wrap_up(working_messages, system_prompt, tool_schemas, model, metadata_fn)
 
-    async def _wrap_up(
+    async def _react_wrap_up(
         self,
         working_messages: list[dict[str, Any]],
         system_prompt: str,
