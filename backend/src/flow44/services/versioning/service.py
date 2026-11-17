@@ -9,7 +9,7 @@ from typing import Any
 
 from flow44.ai.agents.file_diffs import FileDiff
 from flow44.db.chat import ChatRole, save_message, trim_messages_after
-from flow44.db.events import AgentEvent, emit_event, emit_transient, get_versions, trim_events_after
+from flow44.db.events import AgentEvent, count_versions, emit_event, emit_transient, get_versions, trim_events_after
 from flow44.db.heartbeat import is_run_active, try_claim_run
 from flow44.db.locks import LockNamespace, LockTimeout, advisory_lock
 from flow44.services.logging import log_bi_event
@@ -18,7 +18,7 @@ from flow44.services.versioning.git import Git
 logger = logging.getLogger(__name__)
 
 _SCAFFOLD_MESSAGE = "Version 0 — blank scaffold"
-_TURN_MESSAGE = "Version"
+_TURN_MESSAGE = "AI changes"
 _USER_EDITS_MESSAGE = "Your edits"
 PLATFORM_UPDATE_MESSAGE = "Platform update"
 
@@ -109,8 +109,16 @@ def _find(versions: list[AgentEvent], commit_sha: str) -> AgentEvent | None:
     return next((v for v in versions if v.payload["commit_sha"] == commit_sha), None)
 
 
+def _version_number(versions: list[AgentEvent], commit_sha: str) -> int:
+    return next(i for i, v in enumerate(versions) if v.payload["commit_sha"] == commit_sha)
+
+
 def _newest_sha(versions: list[AgentEvent]) -> str | None:
     return versions[-1].payload["commit_sha"] if versions else None
+
+
+def _commit_message(number: int, message: str) -> str:
+    return f"Version {number} — {message}"
 
 
 # -- Telling clients --
@@ -160,19 +168,22 @@ def _edit_note(files: list[str]) -> str:
 
 async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, author: str = "user") -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
-        sha = await git.commit_all(message)
+        number = await count_versions(project_id)
+        sha = await git.commit_all(_commit_message(number, message))
         if sha:
             diffs = await git.commit_diffs(sha, max_chars=_MAX_DIFF_CHARS)
             if author == "user":
                 await save_message(project_id, ChatRole.user, _edit_note([d.path for d in diffs]))
-                log_bi_event("manual_edits_committed", version_id=sha, file_count=len(diffs))
+                log_bi_event("manual_edits_committed", version_id=sha, version_number=number, file_count=len(diffs))
             await _emit_committed(project_id, sha, author=author, diffs=diffs)
         await _emit_dirty_files(project_id, git)
 
 
 async def discard_edits(project_id: str) -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
+        file_count = len(await git.changed_files())
         await git.discard_all()
+        log_bi_event("manual_edits_discarded", file_count=file_count)
         await emit_transient(project_id, {"type": "workspace_reset"})
         await _emit_dirty_files(project_id, git)
 
@@ -182,6 +193,13 @@ async def preview_version(project_id: str, commit_sha: str) -> None:
         versions = await get_versions(project_id)
         if _find(versions, commit_sha) is None:
             raise UnknownVersionError(commit_sha)  # never hand raw client input to git
+        number = _version_number(versions, commit_sha)
+        log_bi_event(
+            "version_previewed",
+            version_id=commit_sha,
+            version_number=number,
+            versions_behind=len(versions) - 1 - number,
+        )
         if commit_sha == _newest_sha(versions):
             await git.checkout_latest()  # viewing the newest version is the same as not previewing at all
         else:
@@ -199,10 +217,18 @@ async def exit_preview(project_id: str) -> None:
 
 async def restore_version(project_id: str, commit_sha: str) -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_dirty]) as git:
-        target = _find(await get_versions(project_id), commit_sha)
+        versions = await get_versions(project_id)
+        target = _find(versions, commit_sha)
         if target is None or target.id is None:
             raise UnknownVersionError(commit_sha)
+        number = _version_number(versions, commit_sha)
         await git.restore_main(commit_sha)
+        log_bi_event(
+            "version_restored",
+            version_id=commit_sha,
+            version_number=number,
+            versions_discarded=len(versions) - 1 - number,
+        )
         await trim_events_after(project_id, target.id)
         await trim_messages_after(project_id, target.payload["_ts"])
         await emit_transient(project_id, {"type": "version_restored", "commit_sha": commit_sha})
@@ -241,7 +267,7 @@ async def commit_turn(project_id: str) -> str | None:
             if git.is_detached():
                 logger.warning("[versioning] refusing to commit while detached for %s", project_id)
                 return None
-            sha = await git.commit_all(_TURN_MESSAGE)
+            sha = await git.commit_all(_commit_message(await count_versions(project_id), _TURN_MESSAGE))
             if sha:
                 await _emit_committed(project_id, sha)
             await _emit_dirty_files(project_id, git)

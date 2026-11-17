@@ -126,6 +126,16 @@ async def get_versions(project_id: str) -> list[AgentEvent]:
         return list(result.scalars().all())
 
 
+async def count_versions(project_id: str) -> int:
+    async with database.async_session() as session:
+        result = await session.execute(
+            select(func.count())
+            .select_from(AgentEvent)
+            .where(AgentEvent.project_id == project_id, AgentEvent.event_type == "version_committed")
+        )
+        return result.scalar_one()
+
+
 async def trim_events_after(project_id: str, event_id: int) -> None:
     async with database.async_session() as session:
         await session.execute(
