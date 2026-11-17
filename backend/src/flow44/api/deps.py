@@ -128,6 +128,15 @@ async def get_user_id(token: TokenDep) -> str:
 UserDep = Annotated[str, Depends(get_user_id)]
 
 
+async def get_optional_user_id(token: TokenDep) -> str | None:
+    payload = decode_token(token) if token else None
+    if payload is None or not payload.unique_id:
+        return None
+
+    _log_user_id.set(payload.unique_id)
+    return payload.unique_id
+
+
 def is_admin(user_id: str) -> bool:
     return user_id in settings.SYSTEM_ADMIN_IDS
 

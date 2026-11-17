@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from flow44.api.admin import require_admin
+from flow44.db.page_view import ProjectViewCount
 from flow44.db.project import Project
 from flow44.main import app
 
@@ -36,10 +37,15 @@ class TestListPublishedApps:
             _published_project("proj-1", "my-app", "2026-01-02T00:00:00+00:00"),
             _published_project("proj-2", "proj-2", "2026-01-01T00:00:00+00:00"),
         ]
-        with patch("flow44.api.admin.list_published_projects", return_value=projects):
+        view_counts = {"proj-1": ProjectViewCount(project_id="proj-1", production_views=7, preview_views=3)}
+        with (
+            patch("flow44.api.admin.list_published_projects", return_value=projects),
+            patch("flow44.api.admin.list_page_view_counts", return_value=view_counts) as mock_counts,
+        ):
             response = client.get("/api/admin/published-apps")
 
         assert response.status_code == 200
+        mock_counts.assert_called_once_with(["proj-1", "proj-2"])
         assert response.json() == [
             {
                 "project_id": "proj-1",
@@ -49,6 +55,8 @@ class TestListPublishedApps:
                 "public_path": "/shared/my-app",
                 "created_at": "2025-12-01T00:00:00+00:00",
                 "published_at": "2026-01-02T00:00:00+00:00",
+                "production_views": 7,
+                "preview_views": 3,
             },
             {
                 "project_id": "proj-2",
@@ -58,11 +66,16 @@ class TestListPublishedApps:
                 "public_path": "/shared/proj-2",
                 "created_at": "2025-12-01T00:00:00+00:00",
                 "published_at": "2026-01-01T00:00:00+00:00",
+                "production_views": 0,
+                "preview_views": 0,
             },
         ]
 
     async def test_no_published_apps_returns_empty_list(self):
-        with patch("flow44.api.admin.list_published_projects", return_value=[]):
+        with (
+            patch("flow44.api.admin.list_published_projects", return_value=[]),
+            patch("flow44.api.admin.list_page_view_counts", return_value={}),
+        ):
             response = client.get("/api/admin/published-apps")
 
         assert response.status_code == 200
