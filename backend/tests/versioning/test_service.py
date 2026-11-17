@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 
@@ -7,8 +8,8 @@ from sqlalchemy import func, select
 
 from flow44.config import settings
 from flow44.db import database
-from flow44.db.chat import ChatMessage, ChatRole, get_messages
-from flow44.db.events import emit_event, get_versions, subscribe, unsubscribe
+from flow44.db.chat import ChatMessage, ChatRole, get_messages, save_message
+from flow44.db.events import emit_event, get_events, get_last_event_id, get_versions, subscribe, unsubscribe
 from flow44.db.heartbeat import clear_heartbeat
 from flow44.db.locks import LockNamespace
 from flow44.services.maintenance.template_sync import sync_protected_template_files
@@ -264,6 +265,32 @@ async def test_discard_removes_tracked_and_untracked_edits_and_broadcasts(
     assert not await dirty_chain.git.is_dirty()
     assert queue.get_nowait() == {"type": "workspace_reset"}
     assert queue.get_nowait() == {"type": "workspace_dirty", "files": []}
+
+
+async def test_discard_agent_response_reverts_the_ai_changes_and_keeps_the_user_message(
+    project_id: str, version_chain: VersionChain
+) -> None:
+    claimed_at = await versioning.begin_turn(project_id)
+    assert claimed_at is not None
+    await emit_event(project_id, {"type": "user_message", "content": "make it blue"})
+    await save_message(project_id, ChatRole.user, "make it blue")
+    after_event_id, after_ts = await get_last_event_id(project_id), datetime.now(UTC).isoformat()
+
+    original = (version_chain.workspace / "a.txt").read_text()
+    (version_chain.workspace / "a.txt").write_text("ai change")
+    (version_chain.workspace / "new.txt").write_text("ai file")
+    await emit_event(project_id, {"type": "text", "content": "Making it blue"})
+    await save_message(project_id, ChatRole.assistant, "Making it blue")
+    try:
+        await versioning.discard_agent_response(project_id, after_event_id, after_ts)
+    finally:
+        await clear_heartbeat(project_id, only_beat=claimed_at)
+
+    assert (version_chain.workspace / "a.txt").read_text() == original
+    assert not (version_chain.workspace / "new.txt").exists()
+    assert not await version_chain.git.is_dirty()
+    assert (await get_events(project_id))[-1].payload["type"] == "user_message"
+    assert [message.content for message in await get_messages(project_id)] == ["make it blue"]
 
 
 async def test_connect_broadcast_reports_unsaved_files(project_id: str, dirty_chain: VersionChain) -> None:

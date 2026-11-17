@@ -87,6 +87,14 @@ Trigger: the user sends an instruction to the model.
 | `version_id` | string | Yes | The version ID the prompt was sent in. |
 | `selected_element_count` | integer | Yes | Number of preview elements the user attached to the prompt, 0 when none. |
 
+#### `response_aborted`
+Trigger: the user presses Stop while the model is working, logged by the client once the outcome is known.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `outcome` | enum: `aborted`, `too_late` | Yes | `aborted` when the run was stopped and its changes discarded; `too_late` when the turn finished before the abort reached it. |
+| `elapsed_ms` | integer | Yes | Time from pressing Stop to the outcome. |
+
 
 #### `response_received` || Not yet implemented
 Trigger: the model returns a response to a prompt.

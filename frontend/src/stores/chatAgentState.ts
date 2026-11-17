@@ -47,6 +47,7 @@ export const TRANSIENT_RESET: Partial<ChatState> = {
   executionTasks: [],
   designProgress: { architecture: null, ux: null },
   interviewQuestions: null,
+  aborting: false,
 };
 
 export type AgentActivityState = Pick<ChatState, 'isStreaming' | 'agentPhase'>;
@@ -101,4 +102,16 @@ export function isAgentAlive(state: AgentAliveState): boolean {
 
 export function getTransientReset(): Partial<ChatState> {
   return { ...TRANSIENT_RESET };
+}
+
+export type QueueFlushState = AwaitingPlanState & AwaitingInterviewState & Pick<ChatState, 'queuedMessages' | 'queueHeld' | 'error'>;
+
+/** Whether a released run should start the next queued message by itself. */
+export function canFlushQueue(state: QueueFlushState): boolean {
+  return (
+    state.queuedMessages.length > 0 &&
+    !state.queueHeld &&
+    !state.error &&
+    !isAwaitingUserInput(state)
+  );
 }

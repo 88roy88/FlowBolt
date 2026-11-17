@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
 from flow44.api import chat
+from flow44.services import run_abort
 
 PROJECT_ID = "test-project-run-agent-safe"
 CLAIMED_AT = datetime(2026, 1, 1, tzinfo=UTC)
@@ -18,6 +19,7 @@ def _patch_boundary(monkeypatch: pytest.MonkeyPatch) -> tuple[AsyncMock, AsyncMo
     commit = AsyncMock(return_value=None)
     monkeypatch.setattr(chat.settings, "AGENT_RUN_TIMEOUT", 5)
     monkeypatch.setattr(chat, "emit_event", emit)
+    monkeypatch.setattr(chat, "emit_transient", AsyncMock())
     monkeypatch.setattr(chat, "clear_heartbeat", clear)
     monkeypatch.setattr(chat.versioning, "commit_turn", commit)
     return emit, clear, commit
@@ -55,6 +57,27 @@ async def test_failure_emits_error_and_commits_partial_work(monkeypatch: pytest.
     assert {"type": "error", "message": "AI processing failed"} in emitted
     clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
     commit.assert_awaited_once_with(PROJECT_ID)
+
+
+@pytest.mark.parametrize("outcome", ["success", "failure"])
+async def test_run_released_is_emitted_after_the_lock_clears(monkeypatch: pytest.MonkeyPatch, outcome: str) -> None:
+    _, clear, _ = _patch_boundary(monkeypatch)
+    order = Mock()
+    order.attach_mock(clear, "clear")
+    transient = AsyncMock()
+    order.attach_mock(transient, "transient")
+    monkeypatch.setattr(chat, "emit_transient", transient)
+
+    async def finish() -> None:
+        if outcome == "failure":
+            raise RuntimeError("agent blew up")
+
+    await chat._run_agent_safe(PROJECT_ID, finish(), CLAIMED_AT)
+
+    assert order.mock_calls == [
+        call.clear(PROJECT_ID, only_beat=CLAIMED_AT),
+        call.transient(PROJECT_ID, {"type": "run_released"}),
+    ]
 
 
 async def test_supervisor_timeout_cancels_commits_and_clears(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -121,3 +144,33 @@ async def test_start_agent_runs_under_the_supervisor(monkeypatch: pytest.MonkeyP
     await asyncio.wait_for(started.wait(), timeout=1)
     await asyncio.wait_for(task, timeout=1)
     assert set() == chat._RUNNING
+
+
+async def test_abort_cancels_and_rolls_back_instead_of_committing(monkeypatch: pytest.MonkeyPatch) -> None:
+    emit, clear, commit = _patch_boundary(monkeypatch)
+    transient = AsyncMock()
+    monkeypatch.setattr(chat, "emit_transient", transient)
+    rollback = AsyncMock()
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def hang() -> None:
+        started.set()
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    run = asyncio.create_task(chat._run_agent_safe(PROJECT_ID, hang(), CLAIMED_AT, rollback))
+    await asyncio.wait_for(started.wait(), timeout=1)
+    run_abort._wake(PROJECT_ID)
+    await asyncio.wait_for(run, timeout=1)
+
+    assert cancelled.is_set()
+    rollback.assert_awaited_once_with()
+    commit.assert_not_awaited()
+    emit.assert_not_awaited()
+    clear.assert_awaited_once_with(PROJECT_ID, only_beat=CLAIMED_AT)
+    transient.assert_awaited_once_with(PROJECT_ID, {"type": "turn_aborted"})
+    assert PROJECT_ID not in run_abort._watchers

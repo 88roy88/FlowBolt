@@ -204,4 +204,13 @@ describe('version store wire contracts', () => {
     handleVersionMessage(msg({ type: 'workspace_dirty', files: [] }));
     expect(useVersionStore.getState().dirtyFiles).toEqual([]);
   });
+
+  it('reloads the trimmed history when the server confirms an abort', () => {
+    const reloadAfterAbort = vi.fn();
+    useChatStore.setState({ reloadAfterAbort });
+
+    handleVersionMessage(msg({ type: 'turn_aborted' }));
+
+    expect(reloadAfterAbort).toHaveBeenCalledWith('proj-1');
+  });
 });
