@@ -284,7 +284,7 @@ Trigger: the backend serves a page load of a generated app: a published app at `
 
 ### 4.8 Version Events
 
-A version is one git commit. Its number is its position in the project's version list, starting at 0. After a restore, the next new versions reuse the numbers of the removed versions. The commit message of each version starts with its number, for example `Version 4 — AI changes`.
+A version is one git commit. Its number is its position in the project's version list, starting at 0. After a restore, the next new versions reuse the numbers of the removed versions.
 
 #### `version_previewed`
 Trigger: the user opens a version to look at it, without changing the project history. Opening the newest version also logs this event.

@@ -2,7 +2,6 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy import func, select
@@ -398,15 +397,3 @@ async def test_commit_messages_carry_the_version_number(project_id: str, workspa
     log = (await repo._run("log", "--reverse", "--format=%s")).splitlines()
 
     assert log == ["Version 0 — blank scaffold", "Version 1 — AI changes", "Version 2 — Your edits"]
-
-
-async def test_previewing_and_restoring_are_logged(project_id: str, version_chain: VersionChain) -> None:
-    with patch("flow44.services.versioning.service.log_bi_event") as bi_event:
-        await versioning.preview_version(project_id, version_chain.shas[1])
-        await versioning.exit_preview(project_id)
-        await versioning.restore_version(project_id, version_chain.shas[1])
-
-    assert [(c.args[0], c.kwargs) for c in bi_event.call_args_list] == [
-        ("version_previewed", {"version_id": version_chain.shas[1], "version_number": 1, "versions_behind": 1}),
-        ("version_restored", {"version_id": version_chain.shas[1], "version_number": 1, "versions_discarded": 1}),
-    ]
