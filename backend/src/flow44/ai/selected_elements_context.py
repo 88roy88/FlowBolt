@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
-_MAX_SELECTED_ELEMENTS = 5
+MAX_SELECTED_ELEMENTS = 5
 _MAX_COMPONENT_HIERARCHY_DEPTH = 4
 
 
@@ -58,7 +58,7 @@ def parse_selected_elements(raw: Any) -> list[SelectedElement]:
     if not isinstance(raw, list):
         return []
     elements: list[SelectedElement] = []
-    for item in raw[:_MAX_SELECTED_ELEMENTS]:
+    for item in raw[:MAX_SELECTED_ELEMENTS]:
         try:
             elements.append(SelectedElement.model_validate(item))
         except ValidationError:

@@ -9,4 +9,7 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 @router.get("")
 async def client_config() -> dict[str, int]:
-    return {"chat_message_max_chars": settings.CHAT_MESSAGE_MAX_CHARS}
+    return {
+        "chat_message_max_chars": settings.CHAT_MESSAGE_MAX_CHARS,
+        "enhance_max_chars": settings.ENHANCE_MAX_CHARS,
+    }

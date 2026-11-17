@@ -8,7 +8,7 @@ vi.mock('../../auth', () => ({
   },
 }));
 
-import { fetchProjects, searchAdUsers, searchAdGroups } from '../api';
+import { fetchProjects, searchAdUsers, searchAdGroups, enhancePrompt } from '../api';
 import { authSession } from '../../auth';
 
 function response(status: number, body = ''): Response {
@@ -114,5 +114,37 @@ describe('Directory search', () => {
   it('throws on a non-ok response', async () => {
     fetchMock.mockResolvedValue(response(502, 'Directory service unavailable'));
     await expect(searchAdUsers('dje')).rejects.toThrow(/API error 502/);
+  });
+});
+
+describe('enhancePrompt', () => {
+  it('posts the draft and returns the enhanced text', async () => {
+    fetchMock.mockResolvedValue(response(200, '{"enhanced":"a fuller prompt"}'));
+
+    const enhanced = await enhancePrompt('p1', {
+      content: 'a todo app',
+      model: 'some/model',
+      dataSourceNames: ['Sales Postgres'],
+      selectedElements: [{ id: 'e1', tag: 'button', selector: '#go', text: 'Go', classes: 'btn', html: '<button>', components: ['App'] }],
+    });
+
+    expect(enhanced).toBe('a fuller prompt');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/chat/enhance?project_id=p1');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      content: 'a todo app',
+      model: 'some/model',
+      data_source_names: ['Sales Postgres'],
+      selected_elements: [{ tag: 'button', selector: '#go', text: 'Go', classes: 'btn', html: '<button>', components: ['App'] }],
+    });
+  });
+
+  it('omits project_id when there is no project', async () => {
+    fetchMock.mockResolvedValue(response(200, '{"enhanced":"x"}'));
+
+    await enhancePrompt(null, { content: 'a todo app', model: null, dataSourceNames: [], selectedElements: [] });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/chat/enhance');
   });
 });

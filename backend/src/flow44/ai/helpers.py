@@ -9,6 +9,20 @@ from flow44.ai.file_safety import FileSafetyError
 logger = logging.getLogger(__name__)
 
 
+def format_summary(raw: str) -> str:
+    if not raw:
+        return ""
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, AttributeError):
+        return "(no project summary available)"
+    return (
+        f"{data.get('summary', '')}\n"
+        f"Tech stack: {', '.join(data.get('tech_stack', []))}\n"
+        f"Features: {', '.join(data.get('features', []))}\n"
+    )
+
+
 def format_agent_feedback(build_errors: str, rejected_files: list[FileSafetyError]) -> str:
     sections: list[str] = []
     if build_errors:
