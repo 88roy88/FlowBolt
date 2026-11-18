@@ -5,7 +5,7 @@ export function createErrorSocket(
   onError: (data: unknown) => void,
 ): { close(): void } {
   const { close } = createReconnectingSocket(
-    `${getWsBase()}/ws/projects/${projectId}/errors`,
+    `${getWsBase()}/ws/errors/${projectId}`,
     undefined,
     (data) => {
       try {

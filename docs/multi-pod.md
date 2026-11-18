@@ -15,7 +15,7 @@ Route ─► nginx (any replica) ─┬─ URL has a project ID ─► hash(proj
                               └─ no project ID ────────► hash(random key) ─► any pod
 ```
 
-> **Note — the rule for new routes:** anything that touches a sandbox or workspace **must** live under `/api/projects/{project_id}/…`, `/ws/projects/{project_id}/…` or `/api/preview/{project_id}/…`, or nginx can't send it to the project's pod. Nothing else may sit directly under those prefixes.
+> **Note — the rule for new routes:** nginx finds the project ID by prefix (the `$project_key` map): `/api/{projects,files,export,chat,preview}/{project_id}/…`, `/ws/{chat,terminal,server-log,errors}/{project_id}` and `/preview/{project_id}/…`. A new route that touches a sandbox or workspace **must** use one of these prefixes, or its prefix must be added to the map. Otherwise its requests spread across pods without any error.
 
 ### Workspaces are set up on first use
 
@@ -109,4 +109,4 @@ This is the setup from before multi-pod. Projects aren't pinned to a pod, so it'
 
 `docker compose up` runs one backend, with `BACKEND_INTERNAL_URL: http://backend:8000`.
 
-To try two, run two backend services named `backend-0` and `backend-1` (for example a compose override where both use `extends: { service: backend }`). Then set `BACKEND_STATEFULSET: backend` and `BACKEND_REPLICAS: 2` on `frontend`, in place of `BACKEND_INTERNAL_URL`, and leave `BACKEND_SERVICE` unset. Check the backend logs or `GET /api/admin/debug/sandboxes` (admin only) on each container to confirm that each project's sandbox runs on exactly one of them.
+To try two, run two backend services named `backend-0` and `backend-1` (for example a compose override where both use `extends: { service: backend }`). Then set `BACKEND_STATEFULSET: backend` and `BACKEND_REPLICAS: 2` on `frontend`, in place of `BACKEND_INTERNAL_URL`, and leave `BACKEND_SERVICE` unset. Check the backend logs or `GET /api/projects/debug/sandboxes` (admin only) directly on each container to confirm that each project's sandbox runs on exactly one of them.

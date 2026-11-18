@@ -19,7 +19,6 @@ from flow44.api import (
     export,
     files,
     iaagent,
-    me,
     members,
     models,
     preview,
@@ -27,7 +26,6 @@ from flow44.api import (
     publish,
     server_log,
     shared,
-    static,
     terminal,
 )
 from flow44.api.deps import validate_token, validate_ws_token
@@ -110,11 +108,9 @@ app.add_middleware(
 
 # Authenticated HTTP routes
 auth_routes = APIRouter(dependencies=[Depends(validate_token)])
-auth_routes.include_router(me.router)
 auth_routes.include_router(projects.router)
 auth_routes.include_router(files.router)
 auth_routes.include_router(preview.router)
-auth_routes.include_router(static.router)
 auth_routes.include_router(export.router)
 auth_routes.include_router(publish.router)
 auth_routes.include_router(data_source_api.router)

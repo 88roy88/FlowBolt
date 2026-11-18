@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
@@ -16,10 +16,13 @@ from flow44.api.deps import (
     PlatformUserDep,
     ProjectDep,
     UserDep,
+    can_use_terminal,
     get_project_role,
+    has_platform_access,
     is_admin,
     require_permission,
     resolve_role,
+    terminal_admin_only,
 )
 from flow44.auth.permissions import DisplayRole, ImplicitRole, get_admin_permissions, has_permission
 from flow44.db.project import (
@@ -68,6 +71,17 @@ class ProjectResponse(BaseModel):
 
 def _serialize_project(project: Project, role: DisplayRole) -> ProjectResponse:
     return ProjectResponse.model_validate(project.model_dump(exclude={"data_sources"}) | {"role": role})
+
+
+@router.get("/me")
+async def get_current_user(user_id: UserDep) -> dict[str, Any]:
+    return {
+        "user_id": user_id,
+        "is_admin": is_admin(user_id),
+        "is_platform_user": await has_platform_access(user_id),
+        "can_use_terminal": can_use_terminal(user_id),
+        "terminal_admin_only": terminal_admin_only(),
+    }
 
 
 def _encode_cursor(project: Project) -> str:
@@ -176,3 +190,10 @@ async def debug_reap_sandbox(project_id: str, _admin: AdminDep) -> dict[str, str
     await sandbox_manager.suspend_sandbox(project_id)
     idle_reaper.remove(project_id)
     return {"status": "reaped", "project_id": project_id}
+
+
+@router.get("/debug/sandboxes", status_code=200)
+async def debug_list_sandboxes(_admin: AdminDep) -> dict[str, Any]:
+    """DEBUG: Show active sandbox count and which projects have live sandboxes."""
+    active = sandbox_manager.active_project_ids()
+    return {"count": len(active), "project_ids": active}

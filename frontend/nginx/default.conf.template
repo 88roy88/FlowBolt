@@ -12,9 +12,10 @@ map $uri $frame_options {
 
 # Keep each project on one backend pod (docs/multi-pod.md).
 map $uri $project_key {
-    ~^/(?:api|ws)/projects/(?<project>[^/]+)  $project;
-    ~^/(?:api/)?preview/(?<project>[^/]+)     $project;
-    default                                   $request_id;
+    ~^/api/(?:projects|files|export|chat|preview)/(?<project>[^/]+)  $project;
+    ~^/ws/(?:chat|terminal|server-log|errors)/(?<project>[^/]+)      $project;
+    ~^/preview/(?<project>[^/]+)                                     $project;
+    default                                                          $request_id;
 }
 
 # Re-resolve the backend pod names every 5s, since a restarted pod gets a new IP.
