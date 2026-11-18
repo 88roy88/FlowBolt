@@ -141,7 +141,7 @@ async def get_single_project(project: ProjectDep, user_id: UserDep) -> ProjectRe
 async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
     project = await create_project(body.name, user_id)
     log_bi_event("project_created", project_id=project.id, project_name=body.name)
-    # The workspace is scaffolded by the pod that serves this project, on its first request (wake_sandbox).
+    # The workspace will be scaffolded by the pod that serves this project, on its first request (wake_sandbox).
     return _serialize_project(project, ImplicitRole.owner)
 
 
