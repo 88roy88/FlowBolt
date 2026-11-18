@@ -4,12 +4,12 @@ import json
 import logging
 from typing import Any, Generic, TypeVar
 
-from opik import track
+from opik import opik_context, track
 from pydantic import BaseModel
 
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import add_trace_tags, error_info, update_span
+from flow44.ai.core.opik_utils import add_trace_tags, error_info
 from flow44.ai.core.provider import complete_chat_with_tools
 from flow44.ai.core.tools import ToolError, ToolExecutor, ToolResult, truncate_tool_args
 
@@ -20,11 +20,11 @@ _MAX_TRACED_RESULT_LENGTH = 2000
 
 @track(name="tool-call", type="tool", capture_input=False, capture_output=False)  # type: ignore[untyped-decorator]
 async def _execute_tool(tools: ToolExecutor, tool_name: str, tool_use_id: str, args: dict[str, Any]) -> ToolResult:
-    update_span(name=tool_name, input=truncate_tool_args(args))
+    opik_context.update_current_span(name=tool_name, input=truncate_tool_args(args))
     result = await tools.execute(tool_name, tool_use_id=tool_use_id, **args)
-    update_span(output={"result": str(result.value)[:_MAX_TRACED_RESULT_LENGTH]})
+    opik_context.update_current_span(output={"result": str(result.value)[:_MAX_TRACED_RESULT_LENGTH]})
     if result.is_error:
-        update_span(error_info=error_info(ToolError(str(result.value))))
+        opik_context.update_current_span(error_info=error_info(ToolError(str(result.value))))
     return result
 
 

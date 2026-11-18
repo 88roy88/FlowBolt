@@ -6,13 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
-from opik import track
+from opik import opik_context, track
 
 from flow44.ai.agents.plan.prompts import render_data_source_analysis
 from flow44.ai.codegen.data_source_module import generate_data_source_module
 from flow44.ai.codegen.ts_types import sanitize_to_pascal_case
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import update_span
 from flow44.ai.core.provider import complete_chat
 from flow44.ai.helpers import parse_json_response
 from flow44.db.project_data_source import DataSourceContext
@@ -36,7 +35,7 @@ async def _fetch_data_source(data_source_id: str, authorization: str | None) -> 
         ds_logic.get_usage(data_source_id, authorization=authorization),
         fetch_data_source_summary(data_source_id),
     )
-    update_span(
+    opik_context.update_current_span(
         output={
             "data_source_name": ds_name,
             "query_count": len(usage.queries),

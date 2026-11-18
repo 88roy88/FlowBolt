@@ -51,7 +51,7 @@ async def test_persistent_leaks_return_nothing(monkeypatch: pytest.MonkeyPatch) 
 
 def _capture_span_updates(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     updates: dict[str, Any] = {}
-    monkeypatch.setattr(react_flow, "update_span", lambda **fields: updates.update(fields))
+    monkeypatch.setattr(react_flow.opik_context, "update_current_span", lambda **fields: updates.update(fields))
     return updates
 
 
