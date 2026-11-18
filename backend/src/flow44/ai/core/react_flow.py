@@ -9,9 +9,9 @@ from pydantic import BaseModel
 
 from flow44.ai.core.flow import Flow
 from flow44.ai.core.messages import Message
-from flow44.ai.core.opik_utils import add_trace_tags, error_info
+from flow44.ai.core.opik_utils import add_trace_tags
 from flow44.ai.core.provider import complete_chat_with_tools
-from flow44.ai.core.tools import ToolError, ToolExecutor, ToolResult, truncate_tool_args
+from flow44.ai.core.tools import ToolExecutor, ToolResult, truncate_tool_args
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,9 @@ async def _execute_tool(tools: ToolExecutor, tool_name: str, tool_use_id: str, a
     result = await tools.execute(tool_name, tool_use_id=tool_use_id, **args)
     opik_context.update_current_span(output={"result": str(result.value)[:_MAX_TRACED_RESULT_LENGTH]})
     if result.is_error:
-        opik_context.update_current_span(error_info=error_info(ToolError(str(result.value))))
+        opik_context.update_current_span(
+            error_info={"exception_type": "ToolError", "message": str(result.value), "traceback": ""}
+        )
     return result
 
 
