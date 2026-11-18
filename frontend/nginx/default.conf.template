@@ -18,7 +18,6 @@ map $uri $project_key {
     default                                                          $request_id;
 }
 
-# Re-resolve the backend pod names every 5s, since a restarted pod gets a new IP.
 resolver ${NGINX_LOCAL_RESOLVERS} valid=5s ipv6=off;
 
 upstream backend {
@@ -44,7 +43,6 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
 
-    # Upstream servers are StatefulSet pods and don't skip dead pods automatically: fail fast to move to next pod.
     proxy_connect_timeout 3s;
 
     # SPA — proxy to frontend container
@@ -83,8 +81,6 @@ server {
         proxy_buffers 16 16k;
         proxy_busy_buffers_size 32k;
 
-        # Retry on another pod only if this one is unreachable: retrying an error response would start
-        # a second sandbox for the project on a different pod.
         proxy_next_upstream error timeout;
     }
 
