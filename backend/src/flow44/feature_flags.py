@@ -23,8 +23,9 @@ FLAGS: dict[FeatureFlag, FlagSpec] = {
         "Show the model dropdown in the chat input. When off, chats use the project's model.",
     ),
     FeatureFlag.unsandboxed_preview: FlagSpec(
-        "Remove the sandbox from the builder's preview iframe. PDF embeds render, "
-        "but the previewed app can also navigate the whole builder page (top-level navigation).",
+        "Remove the sandbox attribute from the builder's preview iframe. "
+        "Allows rendering of <embed> for the PDF viewer, "
+        "but also lets the previewed app navigate the whole builder page (top-level navigation).",
     ),
 }
 
