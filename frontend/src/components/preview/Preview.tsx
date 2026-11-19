@@ -10,7 +10,7 @@ import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
 import { logger } from '../../services/logger';
-import { useFeatureFlag } from '../../hooks/useClientConfig';
+import { useFeatureFlagState } from '../../hooks/useClientConfig';
 
 const PREVIEW_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads';
 
@@ -23,7 +23,8 @@ export function Preview() {
   const saveVersion = useFilesStore((s) => s.saveVersion);
   // Chromium's PDF viewer can't load in a sandboxed frame, so PDF embeds are blank with the sandbox on.
   // Turning it off lets them render, but the previewed app can then navigate the whole builder page.
-  const unsandboxed = useFeatureFlag('unsandboxed_preview');
+  // The iframe waits for the flag, since a sandbox change only applies on navigation (it would load twice).
+  const { enabled: unsandboxed, ready: flagReady } = useFeatureFlagState('unsandboxed_preview');
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -145,18 +146,18 @@ export function Preview() {
       {/* iframe */}
       {previewUrl ? (
         <div className="relative flex-1">
-          <iframe
-            // A sandbox change only applies on navigation, so remount when the flag resolves.
-            key={String(unsandboxed)}
-            ref={iframeRef}
-            src={previewUrl}
-            onLoad={handleFrameLoad}
-            sandbox={unsandboxed ? undefined : PREVIEW_SANDBOX}
-            className="absolute inset-0 w-full h-full border-none"
-            style={{ background: 'var(--preview-bg)' }}
-            title={t('preview.title')}
-            data-testid="preview-iframe"
-          />
+          {flagReady && (
+            <iframe
+              ref={iframeRef}
+              src={previewUrl}
+              onLoad={handleFrameLoad}
+              sandbox={unsandboxed ? undefined : PREVIEW_SANDBOX}
+              className="absolute inset-0 w-full h-full border-none"
+              style={{ background: 'var(--preview-bg)' }}
+              title={t('preview.title')}
+              data-testid="preview-iframe"
+            />
+          )}
           <div
             className={`pointer-events-none absolute inset-0 flex items-center justify-center gap-2 text-muted-foreground text-sm bg-[var(--preview-bg)]/85 transition-opacity duration-200 ${loading ? 'opacity-100' : 'opacity-0'}`}
           >
