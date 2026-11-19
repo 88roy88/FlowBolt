@@ -8,6 +8,14 @@ from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import UserDep, is_admin
 from flow44.config import settings
+from flow44.db.feature_flag import (
+    FeatureFlagTarget,
+    FlagTargetType,
+    add_flag_target,
+    list_flag_states,
+    remove_flag_target,
+    update_flag,
+)
 from flow44.db.page_view import ProjectViewCount, list_page_view_counts
 from flow44.db.platform_user import (
     add_platform_user,
@@ -20,6 +28,7 @@ from flow44.db.platform_user_group import (
     remove_platform_group,
 )
 from flow44.db.project import Project, list_published_projects
+from flow44.feature_flags import FLAGS, FlagSpec, default_flag_state, resolve_flag_state
 from flow44.sandbox.base import workspace_path
 from flow44.services.maintenance.runner import ProjectMaintenanceResult, run_over_projects
 from flow44.services.maintenance.sandbox_file_permissions import fix_file_permissions
@@ -168,6 +177,112 @@ async def revoke_group(user_id: AdminDep, group_id: str) -> None:
     removed = await remove_platform_group(group_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Group not found")
+
+
+class FlagTargetResponse(BaseModel):
+    target_type: FlagTargetType
+    target_id: str
+    display_name: str
+    email: str
+    added_by: str
+    created_at: datetime | None
+
+
+class FeatureFlagResponse(BaseModel):
+    key: str
+    description: str
+    enabled_for_all: bool
+    enabled_for_admins: bool
+    targets: list[FlagTargetResponse]
+
+
+class UpdateFlagRequest(BaseModel):
+    enabled_for_all: bool | None = None
+    enabled_for_admins: bool | None = None
+
+
+class AddFlagTargetRequest(BaseModel):
+    target_type: FlagTargetType
+    target_id: str  # user UniqueID, or group DN
+    display_name: str = ""
+    email: str = ""
+
+
+def _target_response(t: FeatureFlagTarget) -> FlagTargetResponse:
+    return FlagTargetResponse(
+        target_type=FlagTargetType(t.target_type),
+        target_id=t.target_id,
+        display_name=t.display_name,
+        email=t.email,
+        added_by=t.added_by,
+        created_at=t.created_at,
+    )
+
+
+def _require_flag_spec(key: str) -> FlagSpec:
+    spec = next((spec for flag, spec in FLAGS.items() if flag == key), None)
+    if spec is None:
+        raise HTTPException(status_code=404, detail="Unknown feature flag")
+    return spec
+
+
+def _normalize_target_id(target_type: FlagTargetType, target_id: str) -> str:
+    # User ids are compared against the casefolded token UniqueID; group DNs are kept as the directory returns them.
+    return target_id.casefold() if target_type == FlagTargetType.user else target_id
+
+
+@router.get("/flags")
+async def list_flags(user_id: AdminDep) -> list[FeatureFlagResponse]:
+    states = await list_flag_states(FLAGS.keys())
+    responses = []
+    for key, spec in FLAGS.items():
+        state = resolve_flag_state(key, spec, states)
+        responses.append(
+            FeatureFlagResponse(
+                key=key,
+                description=spec.description,
+                enabled_for_all=state.enabled_for_all,
+                enabled_for_admins=state.enabled_for_admins,
+                targets=[_target_response(t) for t in state.targets],
+            )
+        )
+    return responses
+
+
+@router.put("/flags/{key}", status_code=204)
+async def update_flag_switches(user_id: AdminDep, key: str, body: UpdateFlagRequest) -> None:
+    await update_flag(
+        key,
+        updated_by=user_id,
+        initial=default_flag_state(key, _require_flag_spec(key)),
+        enabled_for_all=body.enabled_for_all,
+        enabled_for_admins=body.enabled_for_admins,
+    )
+
+
+@router.post("/flags/{key}/targets", status_code=201)
+async def add_target(user_id: AdminDep, key: str, body: AddFlagTargetRequest) -> FlagTargetResponse:
+    initial = default_flag_state(key, _require_flag_spec(key))
+    try:
+        target = await add_flag_target(
+            key,
+            body.target_type,
+            _normalize_target_id(body.target_type, body.target_id),
+            added_by=user_id,
+            initial=initial,
+            display_name=body.display_name,
+            email=body.email,
+        )
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Already on this flag") from exc
+    return _target_response(target)
+
+
+@router.delete("/flags/{key}/targets/{target_type}/{target_id:path}", status_code=204)
+async def remove_target(user_id: AdminDep, key: str, target_type: FlagTargetType, target_id: str) -> None:
+    _require_flag_spec(key)
+    if not await remove_flag_target(key, target_type, _normalize_target_id(target_type, target_id)):
+        raise HTTPException(status_code=404, detail="Target not found")
 
 
 @router.post("/maintenance/fix-file-permissions", tags=["maintenance"])

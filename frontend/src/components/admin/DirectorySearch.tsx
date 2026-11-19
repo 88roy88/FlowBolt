@@ -22,6 +22,8 @@ interface DirectorySearchProps {
   onExistingUsersMatched?: (userIds: string[]) => void;
   existingGroupIds?: Set<string>;
   onExistingGroupsMatched?: (groupIds: string[]) => void;
+  // Button text on each result; defaults to "Invite".
+  actionLabel?: string;
 }
 
 export function DirectorySearch({
@@ -31,8 +33,10 @@ export function DirectorySearch({
   onExistingUsersMatched,
   existingGroupIds,
   onExistingGroupsMatched,
+  actionLabel,
 }: DirectorySearchProps) {
   const { t } = useTranslation();
+  const inviteLabel = actionLabel ?? t('admin.searchInvite', 'Invite');
   const canUsers = !!onInviteUser;
   const canGroups = !!onInviteGroup;
 
@@ -197,7 +201,7 @@ export function DirectorySearch({
                   icon={<User size={14} className="shrink-0 text-muted-foreground" />}
                   title={u.displayName}
                   subtitle={u.mail || u.uniqueId}
-                  inviteLabel={t('admin.searchInvite', 'Invite')}
+                  inviteLabel={inviteLabel}
                   onInvite={() => onInviteUser?.(u)}
                   canInvite={!!u.uniqueId}
                 />
@@ -209,7 +213,7 @@ export function DirectorySearch({
                   icon={<Users size={14} className="shrink-0 text-muted-foreground" />}
                   title={g.displayName}
                   subtitle={g.mail}
-                  inviteLabel={t('admin.searchInvite', 'Invite')}
+                  inviteLabel={inviteLabel}
                   onInvite={() => onInviteGroup?.(g)}
                 />
               ))}

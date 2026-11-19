@@ -126,6 +126,25 @@ export interface PlatformGroup {
   created_at: string;
 }
 
+export type FlagTargetType = 'user' | 'group';
+
+export interface FlagTarget {
+  target_type: FlagTargetType;
+  target_id: string; // user UniqueID (lowercase) or group DN
+  display_name: string;
+  email: string;
+  added_by: string;
+  created_at: string;
+}
+
+export interface FeatureFlag {
+  key: string;
+  description: string;
+  enabled_for_all: boolean;
+  enabled_for_admins: boolean;
+  targets: FlagTarget[];
+}
+
 export interface UserStatus {
   user_id: string;
   is_admin: boolean;

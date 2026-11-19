@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { LoadingDots } from '../ui/loading-dots';
 import { DirectorySearch } from './DirectorySearch';
+import { FlagsTab } from './FlagsTab';
 import { cn } from '@/lib/utils';
 import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
@@ -19,7 +20,7 @@ function rankHit(hits: Set<string>, a: string, b: string): number {
   return aHit === bHit ? 0 : aHit ? -1 : 1;
 }
 
-type Tab = 'users' | 'published';
+type Tab = 'users' | 'published' | 'flags';
 
 type ViewsSortKey = 'production_views' | 'preview_views';
 type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at' | ViewsSortKey;
@@ -192,12 +193,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent
-        className={cn(
-          'max-h-[85vh] flex flex-col overflow-hidden',
-          tab === 'published' ? 'w-[900px] max-w-[900px]' : 'w-[440px]',
-        )}
-      >
+      <DialogContent className="w-[1100px] max-w-[95vw] h-[85vh] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogClose onClose={onClose} />
 
         <div className="shrink-0">
@@ -207,6 +203,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           <div className="flex gap-4 mb-3 border-b border-border">
             {tabButton('published', t('admin.publishedTab', 'Published Apps'))}
             {tabButton('users', t('admin.usersTab', 'Platform Users'))}
+            {tabButton('flags', t('admin.flagsTab', 'Flags'))}
           </div>
 
           {tab === 'users' && (
@@ -251,8 +248,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* min-h-0 lets this scroll within the dialog's max-height instead of overflowing. */}
-        <div className="border-t border-border mt-3 pt-3 flex-auto min-h-0 overflow-auto space-y-1">
-          {tab === 'users' ? (
+        <div className={cn('flex-auto min-h-0 overflow-auto space-y-1', tab !== 'flags' && 'border-t border-border mt-3 pt-3')}>
+          {tab === 'flags' ? (
+            <FlagsTab />
+          ) : tab === 'users' ? (
             loading ? (
               <p className="text-muted-foreground text-xs text-center py-4"><LoadingDots /></p>
             ) : isEmpty ? (
