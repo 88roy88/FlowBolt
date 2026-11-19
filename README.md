@@ -1,4 +1,4 @@
-# FlowBolt
+# BuildApp
 
 AI-powered web app builder. The backend is a FastAPI service; the frontend is a Vite/React app.
 
@@ -95,7 +95,7 @@ uv run --no-sync alembic revision --autogenerate -m "describe change"
 
 ## Tests & lint
 
-Backend tests need the Compose Postgres running. Before the first e2e run, install the browser: `pnpm exec playwright install chromium`.
+Backend tests need the Compose Postgres running. Before the first e2e run, install the browser: `cd frontend && pnpm exec playwright install chromium`.
 
 ```bash
 cd backend

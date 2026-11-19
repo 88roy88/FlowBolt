@@ -141,7 +141,7 @@ class OpikSettings(BuildAppSettings):
     # Opik (optional — set an API key to enable)
     OPIK_API_KEY: str | None = None
     OPIK_WORKSPACE: str | None = None
-    OPIK_PROJECT_NAME: str = "buildapp"
+    OPIK_PROJECT_NAME: str = "flow44"
     OPIK_URL_OVERRIDE: str | None = None
 
     def model_post_init(self, __context: Any) -> None:
