@@ -362,7 +362,7 @@ async def test_platform_update_commits_as_a_system_version(
     assert summary.startswith("updated 1")
     assert payload["author"] == "system"
     assert [d["path"] for d in payload["diffs"]] == ["src/api/client.ts"]
-    assert await version_chain.git._run("log", "-1", "--format=%s") == "Platform update"
+    assert await version_chain.git._run("log", "-1", "--format=%s") == "Version 4 — Platform update"
     assert client.read_text() == "platform v2\n"
     assert await get_messages(project_id) == []
 
@@ -383,3 +383,17 @@ async def test_template_sync_skips_a_workspace_that_is_not_on_this_pod(project_i
 
     assert summary == "workspace not present on this pod, skipped"
     assert not (tmp_path / "gone").exists()
+
+
+async def test_commit_messages_carry_the_version_number(project_id: str, workspace: Path) -> None:
+    (workspace / "a.txt").write_text("zero")
+    await versioning.ensure_repo(project_id)
+    repo = Git(project_id)
+    (workspace / "a.txt").write_text("one")
+    await versioning.commit_turn(project_id)
+    (workspace / "b.txt").write_text("two")
+    await versioning.save_version(project_id)
+
+    log = (await repo._run("log", "--reverse", "--format=%s")).splitlines()
+
+    assert log == ["Version 0 — blank scaffold", "Version 1 — AI changes", "Version 2 — Your edits"]

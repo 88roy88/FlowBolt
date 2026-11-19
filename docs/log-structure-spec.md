@@ -152,7 +152,15 @@ Trigger: the user saves their manual edits as a new version.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `version_id` | string | Yes | ID of the new version (the git commit SHA). |
+| `version_number` | integer | Yes | Number of the new version, as the user sees it (`v3` is 3). Version 0 is the blank scaffold. |
 | `file_count` | integer | Yes | Number of files changed in the version. |
+
+#### `manual_edits_discarded`
+Trigger: the user throws away their unsaved manual edits.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `file_count` | integer | Yes | Number of files that held unsaved edits. |
 
 #### `file_created`
 Trigger: a new file appears in the project, from the model or the user.
@@ -275,5 +283,27 @@ Trigger: the backend serves a page load of a generated app: a published app at `
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `view_source` | enum: `production`, `preview` | Yes | Whether the published app or the preview was viewed. |
+
+### 4.8 Version Events
+
+A version is one git commit. Its number is its position in the project's version list, starting at 0. After a restore, the next new versions reuse the numbers of the removed versions.
+
+#### `version_previewed`
+Trigger: the user opens a version to look at it, without changing the project history. Opening the newest version also logs this event.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `version_id` | string | Yes | ID of the version opened (the git commit SHA). |
+| `version_number` | integer | Yes | Number of the version opened. |
+| `versions_behind` | integer | Yes | Number of newer versions that exist, 0 for the newest version. |
+
+#### `version_restored`
+Trigger: the user restores the project to an earlier version. The newer versions and their chat messages are removed.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `version_id` | string | Yes | ID of the version restored to. |
+| `version_number` | integer | Yes | Number of the version restored to. |
+| `versions_discarded` | integer | Yes | Number of newer versions removed by the restore. |
 
 ---
