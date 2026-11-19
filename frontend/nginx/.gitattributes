@@ -1,0 +1,2 @@
+# Sourced by /bin/sh inside the nginx image; CRLF from a Windows checkout would break it.
+*.envsh text eol=lf

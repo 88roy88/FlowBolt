@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import logging
@@ -11,6 +10,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
 
+from flow44.api.admin import AdminDep
 from flow44.api.deps import (
     Permission,
     PlatformUserDep,
@@ -38,7 +38,6 @@ from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
-from flow44.services.versioning import service as versioning
 
 logger = logging.getLogger(__name__)
 
@@ -142,18 +141,7 @@ async def get_single_project(project: ProjectDep, user_id: UserDep) -> ProjectRe
 async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
     project = await create_project(body.name, user_id)
     log_bi_event("project_created", project_id=project.id, project_name=body.name)
-
-    async def _create() -> None:
-        from flow44.db.events import emit_event  # noqa: PLC0415
-
-        try:
-            await sandbox_manager.create_sandbox(project.id)
-            await versioning.ensure_repo(project.id)
-        except Exception:
-            logger.exception("[projects] Sandbox creation failed for project %s", project.id)
-            await emit_event(project.id, {"type": "error", "message": "Project setup failed"})
-
-    asyncio.create_task(_create())
+    # The workspace will be scaffolded by the pod that serves this project, on its first request (wake_sandbox).
     return _serialize_project(project, ImplicitRole.owner)
 
 
@@ -194,7 +182,7 @@ async def delete_existing_project(
 
 
 @router.post("/{project_id}/debug/reap", status_code=200)
-async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
+async def debug_reap_sandbox(project_id: str, _admin: AdminDep) -> dict[str, str]:
     """DEBUG: Force-evict a sandbox as if the idle reaper triggered."""
     if not sandbox_manager.has_active_sandbox(project_id):
         return {"status": "already_sleeping", "project_id": project_id}
@@ -205,7 +193,7 @@ async def debug_reap_sandbox(project_id: str) -> dict[str, str]:
 
 
 @router.get("/debug/sandboxes", status_code=200)
-async def debug_list_sandboxes() -> dict[str, Any]:
+async def debug_list_sandboxes(_admin: AdminDep) -> dict[str, Any]:
     """DEBUG: Show active sandbox count and which projects have live sandboxes."""
     active = sandbox_manager.active_project_ids()
     return {"count": len(active), "project_ids": active}
