@@ -30,13 +30,6 @@ cp backend/.env.example backend/.env
 
 Set `AIB_AI_API_KEY` to your [OpenRouter](https://openrouter.ai/keys) key; the default model is DeepSeek V4.1 Flash. The DB and S3 values already match Compose. `backend/.env.example` also shows other providers (vLLM, Ollama, Anthropic, Bedrock) and Opik tracing; every setting, with its default, is in `backend/src/flow44/config.py`.
 
-## Migrate
-
-```bash
-cd backend
-uv run --no-sync alembic upgrade head
-```
-
 ---
 
 ## Run (local dev)
@@ -45,6 +38,12 @@ Start Postgres, MinIO and the mocks:
 
 ```bash
 docker compose up -d postgres minio flapi-mock directory-mock
+```
+
+The first time, and after pulling new migrations, apply them:
+
+```bash
+cd backend && uv run --no-sync alembic upgrade head && cd ..
 ```
 
 Then run the backend and frontend in their own terminals:
