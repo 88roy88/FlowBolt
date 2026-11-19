@@ -17,7 +17,6 @@ export function useFeatureFlag(key: string): boolean {
   return useClientConfig()?.features.includes(key) ?? false;
 }
 
-// For flags that must be known before first render. A failed fetch settles as false.
 export function useFeatureFlagState(key: string): boolean | 'loading' {
   const { data, isPending } = useQuery(clientConfigQuery);
   if (isPending) return 'loading';
