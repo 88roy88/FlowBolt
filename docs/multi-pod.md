@@ -11,11 +11,9 @@ So **every request for a project must reach the same pod.** Database coordinatio
 The frontend nginx (`frontend/nginx/default.conf.template`) picks the backend pod from the URL:
 
 ```
-Route ─► nginx (any replica) ─┬─ URL has a project ID ─► hash(project_id) ─► always the same pod for that project
-                              └─ no project ID ────────► hash(random key) ─► any pod
+Route ─► nginx ─┬─ URL has a project ID ─► hash(project_id) ─► always the same pod for that project
+                └─ no project ID ────────► hash(random key) ─► any pod
 ```
-
-> **Note — the rule for new routes:** nginx finds the project ID by prefix (the `$project_key` map): `/api/{projects,files,export,chat,preview}/{project_id}/…`, `/ws/{chat,terminal,server-log,errors}/{project_id}` and `/preview/{project_id}/…`. A new route that touches a sandbox or workspace **must** use one of these prefixes, or its prefix must be added to the map. Otherwise its requests spread across pods without any error.
 
 ### Workspaces are set up on first use
 
@@ -92,7 +90,6 @@ This is the setup from before multi-pod. Projects aren't pinned to a pod, so it'
   spec:
     serviceName: base-backend-headless
     replicas: 2
-    # selector, pod template, workspace volume: as in the current Deployment
   ```
 
   Keep the existing `base-backend` Service for everything else.
