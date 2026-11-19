@@ -1,6 +1,6 @@
 # BuildApp
 
-AI-powered web app builder. The backend is a FastAPI service; the frontend is a Vite/React app.
+AI-powered web app builder. The backend is a FastAPI service; the frontend is a Vite/React app. How it works: [docs/architecture.md](docs/architecture.md).
 
 ---
 

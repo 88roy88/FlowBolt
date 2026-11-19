@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}</style>
+<title>BuildApp Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one reading column; each section is a numbered spec sheet (numbers = docs/architecture.md sections) with a wide schematic that scrolls on its own when narrow. */
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --band: #e3e8ef;
+  --ink: #18212f;
+  --muted: #5a6577;
+  --line: #b9c2cf;
+  --accent: #2f55d4;
+  --accent-soft: #e2e8fb;
+  --pause: #a86400;
+  --pause-soft: #fbf0dc;
+  --ok: #1d7a4c;
+  --ok-soft: #dcf1e6;
+  --fail: #b8322f;
+  --fail-soft: #f8e1e0;
+  --fix: #8a3fb8;
+  --mem: #f1ebf8;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151d; --surface: #182029; --band: #141b23; --ink: #e4e9f1; --muted: #98a3b5; --line: #3a4656;
+    --accent: #7d9bff; --accent-soft: #1f2a4a; --pause: #e6a447; --pause-soft: #3a2c14; --ok: #5cc994; --ok-soft: #15301f;
+    --fail: #f0807b; --fail-soft: #3b1c1b; --fix: #c792ef; --mem: #211b2c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151d; --surface: #182029; --band: #141b23; --ink: #e4e9f1; --muted: #98a3b5; --line: #3a4656;
+  --accent: #7d9bff; --accent-soft: #1f2a4a; --pause: #e6a447; --pause-soft: #3a2c14; --ok: #5cc994; --ok-soft: #15301f;
+  --fail: #f0807b; --fail-soft: #3b1c1b; --fix: #c792ef; --mem: #211b2c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 48px 72px; display: grid; gap: 72px; }
+header { display: grid; gap: 16px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.08; letter-spacing: -.02em; max-width: 18ch; }
+h2 { font-size: clamp(24px, 3vw, 32px); line-height: 1.15; letter-spacing: -.01em; }
+p { margin: 0; max-width: 68ch; }
+.lede { font-size: 18px; color: var(--muted); }
+code, .mono { font-family: var(--font-mono); font-size: .86em; }
+code { background: var(--band); padding: 1px 5px; border-radius: 4px; }
+nav ol { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+nav a {
+  display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--ink); text-decoration: none; font-size: 14px; background: var(--surface);
+}
+nav a span { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
+section { display: grid; gap: 20px; scroll-margin-top: 24px; }
+.head { display: grid; gap: 8px; }
+.num { font-family: var(--font-mono); font-size: 13px; color: var(--accent); letter-spacing: .04em; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 32px; }
+.notes p { font-size: 15px; min-width: 0; }
+.notes p strong { display: block; font-family: var(--font-display); font-weight: 500; font-size: 16px; margin-bottom: 2px; }
+.ref { display: block; font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.scroll { overflow-x: auto; padding: 20px; }
+.scroll svg { display: block; width: 100%; height: auto; min-width: 760px; }
+figcaption { border-top: 1px solid var(--line); padding: 12px 20px; font-size: 14px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1.5px solid; }
+.lg-pause { background: var(--pause-soft); border-color: var(--pause) !important; }
+.lg-fix { border-color: var(--fix) !important; }
+.lg-mem { background: var(--mem); border-color: var(--line) !important; }
+.lg-ok { background: var(--ok-soft); border-color: var(--ok) !important; }
+.lg-fail { background: var(--fail-soft); border-color: var(--fail) !important; }
+footer { border-top: 1px solid var(--line); padding-top: 24px; color: var(--muted); font-size: 14px; display: grid; gap: 6px; }
+
+svg text { font-family: var(--font-body); }
+.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.box.hl { stroke: var(--accent); fill: var(--accent-soft); }
+.box.pause { fill: var(--pause-soft); stroke: var(--pause); }
+.box.ok { fill: var(--ok-soft); stroke: var(--ok); }
+.box.fail { fill: var(--fail-soft); stroke: var(--fail); }
+.box.mem { fill: var(--mem); stroke: var(--line); stroke-dasharray: 4 4; }
+.box.proc { fill: none; stroke: var(--muted); stroke-dasharray: 7 5; }
+.box.group { fill: var(--band); stroke: var(--line); }
+.chip { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.lane { fill: var(--band); }
+.lane-sep { stroke: var(--line); stroke-width: 1; }
+.t { fill: var(--ink); font-size: 14px; font-weight: 600; }
+.t2 { fill: var(--ink); font-size: 12.5px; }
+.s { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.lab { fill: var(--muted); font-size: 11.5px; }
+.lab.acc { fill: var(--accent); }
+.lab.fx { fill: var(--fix); font-weight: 600; }
+.lab.pz { fill: var(--pause); font-weight: 600; }
+.lane-l { fill: var(--muted); font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; }
+.e { fill: none; stroke: var(--muted); stroke-width: 1.5; marker-end: url(#ah); }
+.e.acc { stroke: var(--accent); marker-end: url(#ah-acc); }
+.e.fx { stroke: var(--fix); marker-end: url(#ah-fix); }
+.e.fl { stroke: var(--fail); marker-end: url(#ah-fail); }
+.e.dash { stroke-dasharray: 5 4; }
+.ah { fill: var(--muted); } .ah-acc { fill: var(--accent); } .ah-fix { fill: var(--fix); } .ah-fail { fill: var(--fail); }
+.dot { fill: var(--accent); stroke: var(--surface); stroke-width: 3; }
+.trunk { stroke: var(--accent); stroke-width: 3; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+    <marker id="ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-acc" d="M0 0 L10 5 L0 10 z"/></marker>
+    <marker id="ah-fix" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-fix" d="M0 0 L10 5 L0 10 z"/></marker>
+    <marker id="ah-fail" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-fail" d="M0 0 L10 5 L0 10 z"/></marker>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">BuildApp · develop @ 910aa808 · onboarding</div>
+    <h1>How a chat message becomes a running app</h1>
+    <p class="lede">A visual tour of the backend and the browser IDE, for engineers joining the team. Every box here matches a section of <code>docs/architecture.md</code>, which holds the line-by-line references.</p>
+    <nav aria-label="Sections">
+      <ol>
+        <li><a href="#system"><span>§1</span>System map</a></li>
+        <li><a href="#turn"><span>§2</span>Lifecycle of a chat turn</a></li>
+        <li><a href="#agents"><span>§3</span>Agents</a></li>
+        <li><a href="#sandbox"><span>§5</span>Sandbox</a></li>
+        <li><a href="#versioning"><span>§6</span>Versioning</a></li>
+        <li><a href="#publish"><span>§7</span>Publish</a></li>
+      </ol>
+    </nav>
+  </header>
+
+  <!-- §1 -->
+  <section id="system">
+    <div class="head">
+      <div class="num">§1</div>
+      <h2>System map</h2>
+      <p>One FastAPI process serves the IDE, runs the agents and owns every project's sandbox. Durable state lives in Postgres, the workspace disk and S3.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 480" role="img" aria-label="The browser IDE talks to one backend process over HTTP and WebSockets. The backend keeps live event channels and running sandboxes in memory, and uses Postgres, S3, the LLM, FLAPI and the directory service.">
+          <rect class="box" x="20" y="30" width="200" height="330" rx="10"/>
+          <text class="t" x="38" y="58">Browser IDE</text>
+          <text class="s" x="38" y="76">React 19 · Zustand · React Query</text>
+          <rect class="chip" x="38" y="94" width="164" height="44" rx="7"/><text class="t2" x="52" y="121">Chat</text>
+          <rect class="chip" x="38" y="150" width="164" height="44" rx="7"/><text class="t2" x="52" y="177">Editor · Monaco</text>
+          <rect class="chip" x="38" y="206" width="164" height="44" rx="7"/><text class="t2" x="52" y="233">Terminal · xterm</text>
+          <rect class="chip" x="38" y="262" width="164" height="44" rx="7"/><text class="t2" x="52" y="289">Preview iframe</text>
+          <text class="s" x="38" y="340">stores/ · services/websocket/</text>
+
+          <rect class="box" x="20" y="392" width="200" height="60" rx="10"/>
+          <text class="t" x="38" y="418">Visitor</text>
+          <text class="s" x="38" y="437">of a published app</text>
+
+          <rect class="box proc" x="300" y="30" width="360" height="430" rx="12"/>
+          <text class="t" x="318" y="58">Backend · one FastAPI process</text>
+          <text class="s" x="318" y="76">main.py</text>
+          <rect class="box" x="320" y="92" width="320" height="48" rx="8"/>
+          <text class="t2" x="336" y="121">/api REST · /ws sockets · /shared</text>
+          <rect class="box hl" x="320" y="154" width="320" height="56" rx="8"/>
+          <text class="t2" x="336" y="178">Agents · one turn per project</text>
+          <text class="s" x="336" y="197">ai/agents/ · api/chat.py</text>
+          <rect class="box mem" x="320" y="226" width="320" height="216" rx="10"/>
+          <text class="s" x="336" y="248">IN THIS PROCESS'S MEMORY</text>
+          <rect class="box" x="334" y="262" width="140" height="54" rx="8"/>
+          <text class="t2" x="348" y="286">Event channels</text>
+          <text class="s" x="348" y="304">db/events.py</text>
+          <rect class="box" x="488" y="262" width="138" height="54" rx="8"/>
+          <text class="t2" x="502" y="286">SandboxManager</text>
+          <text class="s" x="502" y="304">sandbox/manager.py</text>
+          <rect class="box" x="334" y="350" width="88" height="70" rx="8"/>
+          <text class="t2" x="346" y="374">Sandbox</text><text class="s" x="346" y="392">dev server</text><text class="s" x="346" y="408">:3501</text>
+          <rect class="box" x="436" y="350" width="88" height="70" rx="8"/>
+          <text class="t2" x="448" y="374">Sandbox</text><text class="s" x="448" y="392">dev server</text><text class="s" x="448" y="408">:3502</text>
+          <rect class="box" x="538" y="350" width="88" height="70" rx="8"/>
+          <text class="t2" x="550" y="374">…</text><text class="s" x="550" y="392">one per</text><text class="s" x="550" y="408">project</text>
+          <path class="e" d="M557 316 V348"/>
+
+          <rect class="box" x="780" y="30" width="200" height="86" rx="10"/>
+          <text class="t" x="798" y="56">Postgres</text>
+          <text class="s" x="798" y="75">events · turns · heartbeats</text>
+          <text class="s" x="798" y="92">advisory locks · NOTIFY</text>
+          <rect class="box" x="780" y="136" width="200" height="62" rx="10"/>
+          <text class="t" x="798" y="162">S3 / MinIO</text>
+          <text class="s" x="798" y="181">published/{project_id}/</text>
+          <rect class="box" x="780" y="218" width="200" height="62" rx="10"/>
+          <text class="t" x="798" y="244">LLM</text>
+          <text class="s" x="798" y="263">via ai/core/provider.py</text>
+          <rect class="box" x="780" y="300" width="200" height="62" rx="10"/>
+          <text class="t" x="798" y="326">FLAPI</text>
+          <text class="s" x="798" y="345">data sources</text>
+          <rect class="box" x="780" y="382" width="200" height="62" rx="10"/>
+          <text class="t" x="798" y="408">Directory</text>
+          <text class="s" x="798" y="427">users &amp; groups</text>
+
+          <path class="e acc" d="M202 116 H318"/>
+          <text class="lab acc" x="260" y="108" text-anchor="middle">HTTP + WS</text>
+          <path class="e" d="M202 284 C262 284 262 385 332 385"/>
+          <text class="lab" x="268" y="342" text-anchor="middle">preview proxy</text>
+          <path class="e" d="M220 422 H298"/>
+          <text class="lab" x="260" y="414" text-anchor="middle">/shared</text>
+          <path class="e" d="M660 73 H778"/><text class="lab" x="720" y="65" text-anchor="middle">state + locks</text>
+          <path class="e" d="M660 167 H778"/><text class="lab" x="720" y="159" text-anchor="middle">publish · serve</text>
+          <path class="e" d="M660 249 H778"/><text class="lab" x="720" y="241" text-anchor="middle">complete · stream</text>
+          <path class="e" d="M660 331 H778"/><text class="lab" x="720" y="323" text-anchor="middle">fetch · run</text>
+          <path class="e" d="M660 413 H778"/><text class="lab" x="720" y="405" text-anchor="middle">group lookup</text>
+        </svg>
+      </div>
+      <figcaption>The dashed region is what a restart loses: live event subscriptions and running dev servers. Workspaces on disk survive, and startup reconciles them against the projects table.</figcaption>
+    </figure>
+    <div class="notes">
+      <p><strong>One pod today</strong>Prod runs one backend process, so it can keep live events and sandboxes in memory. Locks, run claims and Stop go through Postgres.<span class="ref">db/events.py:17 · sandbox/manager.py:21</span></p>
+      <p><strong>Every LLM call is wrapped</strong>Agents never call LiteLLM directly. <code>complete_chat</code>, <code>complete_chat_with_tools</code> and <code>stream_chat</code> are the only entry points.<span class="ref">ai/core/provider.py:52 · :82 · :111</span></p>
+      <p><strong>Startup and shutdown</strong>Startup kills orphan dev servers, deletes workspaces of deleted projects, then starts the idle reaper, heartbeat reaper and abort listener. Shutdown suspends every sandbox.<span class="ref">main.py:53</span></p>
+    </div>
+  </section>
+
+  <!-- §2 -->
+  <section id="turn">
+    <div class="head">
+      <div class="num">§2</div>
+      <h2>Lifecycle of a chat turn</h2>
+      <p>A turn is one agent run. At most one runs per project: the claim is a heartbeat row in Postgres, and the turn ends in a git commit or a rollback.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 540" role="img" aria-label="Swimlane of one turn: the browser sends a message, the chat WebSocket claims the run through versioning and a Postgres heartbeat, saves the message, starts the agent, beats every 15 seconds while events stream to the browser, then commits or rolls back and clears the heartbeat.">
+          <rect class="lane" x="0" y="20" width="1000" height="100"/>
+          <rect class="lane" x="0" y="220" width="1000" height="100"/>
+          <rect class="lane" x="0" y="420" width="1000" height="100"/>
+          <text class="lane-l" x="16" y="74">Browser</text>
+          <text class="lane-l" x="16" y="174">Chat WS</text>
+          <text class="lane-l" x="16" y="274">Versioning</text>
+          <text class="lane-l" x="16" y="374">Agent run</text>
+          <text class="lane-l" x="16" y="474">Postgres</text>
+
+          <rect class="box" x="135" y="45" width="130" height="50" rx="8"/><text class="t2" x="150" y="67">send message</text><text class="s" x="150" y="84">type: message</text>
+          <rect class="box" x="135" y="145" width="130" height="50" rx="8"/><text class="t2" x="150" y="167">dispatch</text><text class="s" x="150" y="184">api/chat.py:280</text>
+          <rect class="box hl" x="295" y="245" width="130" height="50" rx="8"/><text class="t2" x="310" y="267">begin_turn</text><text class="s" x="310" y="284">lock + 3 checks</text>
+          <rect class="box" x="295" y="445" width="130" height="50" rx="8"/><text class="t2" x="310" y="467">claim heartbeat</text><text class="s" x="310" y="484">upsert if stale</text>
+          <rect class="box" x="455" y="145" width="130" height="50" rx="8"/><text class="t2" x="470" y="167">prepare</text><text class="s" x="470" y="184">save user message</text>
+          <rect class="box" x="455" y="45" width="130" height="50" rx="8" stroke-dasharray="5 4"/><text class="t2" x="470" y="67">Stop</text><text class="s" x="470" y="84">type: abort</text>
+          <rect class="box hl" x="605" y="345" width="170" height="50" rx="8"/><text class="t2" x="620" y="367">agent runs</text><text class="s" x="620" y="384">Plan · Execute · FollowUp…</text>
+          <rect class="box" x="575" y="45" width="0" height="0"/>
+          <rect class="box" x="600" y="45" width="0" height="0"/>
+          <rect class="box" x="725" y="145" width="130" height="50" rx="8"/><text class="t2" x="740" y="167">heartbeat</text><text class="s" x="740" y="184">15 s · 1800 s budget</text>
+          <rect class="box" x="605" y="445" width="255" height="50" rx="8"/><text class="t2" x="620" y="467">agent_events + beat_at</text><text class="s" x="620" y="484">stored events · run token</text>
+          <rect class="box" x="605" y="45" width="0" height="0"/>
+          <rect class="box" x="835" y="45" width="150" height="50" rx="8"/><text class="t2" x="850" y="67">turn ends</text><text class="s" x="850" y="84">run_released|aborted</text>
+          <rect class="box ok" x="825" y="228" width="150" height="34" rx="7"/><text class="t2" x="840" y="250">commit_turn</text>
+          <rect class="box fail" x="825" y="278" width="150" height="34" rx="7"/><text class="t2" x="840" y="300">rollback (Stop)</text>
+          <rect class="box" x="835" y="445" width="0" height="0"/>
+          <rect class="box" x="880" y="445" width="105" height="50" rx="8"/><text class="t2" x="892" y="467">clear</text><text class="s" x="892" y="484">heartbeat</text>
+
+          <path class="e" d="M200 95 V143"/>
+          <path class="e acc" d="M265 170 H360 V243"/><text class="lab acc" x="312" y="162" text-anchor="middle">claim</text>
+          <path class="e acc" d="M360 295 V443"/><text class="lab acc" x="368" y="375">try_claim_run</text>
+          <path class="e acc" d="M425 470 H440 Q450 470 450 460 V210 Q450 200 460 196"/><text class="lab acc" x="442" y="430" text-anchor="end">claimed</text>
+          <path class="e acc" d="M585 170 H595 V370 H603"/><text class="lab acc" x="590" y="300" text-anchor="end">start</text>
+          <path class="e" d="M650 395 V443"/><text class="lab" x="658" y="425">emit_event</text>
+          <path class="e dash" d="M640 345 V97"/><text class="lab" x="648" y="270">pushed live</text>
+          <rect class="box" x="575" y="45" width="130" height="50" rx="8"/><text class="t2" x="590" y="67">live events</text><text class="s" x="590" y="84">phase · task_update</text>
+          <path class="e" d="M790 195 V443"/><text class="lab" x="798" y="420">touch</text>
+          <path class="e dash" d="M520 95 V106 H700 Q710 106 710 116 V170 H723"/><text class="lab" x="600" y="116" text-anchor="middle">pg_notify run_abort</text>
+          <path class="e" d="M775 370 H812 V245 H823"/><path class="e" d="M812 300 H823"/>
+          <text class="lab" x="804" y="388" text-anchor="end">run ends</text>
+          <path class="e" d="M932 312 V443"/>
+          <path class="e dash" d="M900 228 V97"/><text class="lab" x="906" y="160">transient</text>
+        </svg>
+      </div>
+      <figcaption>Claim first, then save the message: a refused turn ("Can't edit while the AI is working") leaves nothing behind. The workspace lock is held only for the claim; for the rest of the run, the fresh heartbeat row marks the project busy.</figcaption>
+    </figure>
+    <div class="legend"><span><i class="lg-ok"></i>finished or failed: whatever the agent wrote is committed</span><span><i class="lg-fail"></i>Stop: workspace reset, the turn's events and messages deleted</span></div>
+    <div class="notes">
+      <p><strong>begin_turn refuses when</strong>a run is already active, the workspace is previewing an old version, or there are unsaved user edits.<span class="ref">services/versioning/service.py:152 · db/heartbeat.py:49</span></p>
+      <p><strong>Stop works through Postgres</strong><code>pg_notify('run_abort')</code> wakes the watcher in the heartbeat loop, which cancels the run. Stopping Execute or a resumed interview re-pauses the plan or questions.<span class="ref">services/run_abort.py:41 · api/chat.py:347, :378</span></p>
+      <p><strong>Crashed runs heal</strong>The heartbeat reaper deletes heartbeats older than 60 s and tells the browser "Agent run was interrupted".<span class="ref">db/heartbeat.py:83 · config.py:35</span></p>
+      <p><strong>Events drive the UI (§4)</strong>Stored events are replayed on reload through the same handler used live. Transient ones, like streamed file contents, are never stored.<span class="ref">db/events.py:68, :81 · stores/chat.ts:401</span></p>
+    </div>
+  </section>
+
+  <!-- §3 -->
+  <section id="agents">
+    <div class="head">
+      <div class="num">§3</div>
+      <h2>Agents</h2>
+      <p>Plan, Execute and FixError are step machines (<code>Flow</code>). FollowUp is a ReAct tool loop. Interview and Plan end their run by pausing, and the user's reply starts the next turn.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1100 610" role="img" aria-label="AgentRouter sends new projects to Interview (interview mode) or Plan, and existing projects to FollowUp. Interview pauses for answers, Plan pauses for approval, and accepting runs Execute with a fix loop of up to 10 attempts. FixError, started from an error toast, has its own retry loop of up to 3.">
+          <text class="lab" x="85" y="132" text-anchor="middle">message</text>
+          <path class="e acc" d="M85 138 V156"/>
+          <rect class="box hl" x="20" y="158" width="130" height="84" rx="10"/>
+          <text class="t" x="36" y="190">AgentRouter</text>
+          <text class="s" x="36" y="209">routing.py</text>
+          <text class="s" x="36" y="226">new = no action_complete</text>
+
+          <path class="e" d="M150 172 H180 V70 H258"/><text class="lab" x="188" y="62">new · interview</text>
+          <path class="e" d="M150 200 H258"/><text class="lab" x="188" y="192">new</text>
+          <path class="e" d="M150 228 H180 V435 H258"/><text class="lab" x="188" y="427">existing</text>
+
+          <rect class="box" x="260" y="40" width="200" height="60" rx="10"/>
+          <text class="t" x="276" y="66">Interview</text>
+          <text class="s" x="276" y="86">clarifying questions</text>
+          <path class="e" d="M460 70 H498"/><text class="lab" x="479" y="62" text-anchor="middle">questions</text>
+          <rect class="box pause" x="500" y="52" width="200" height="36" rx="18"/>
+          <text class="lab pz" x="600" y="75" text-anchor="middle">⏸ awaiting_interview</text>
+          <path class="e" d="M600 88 V158"/><text class="lab" x="608" y="128">interview_response</text>
+          <path class="e" d="M360 100 V158"/><text class="lab" x="368" y="132">no questions</text>
+
+          <rect class="box group" x="260" y="160" width="600" height="80" rx="10"/>
+          <text class="t" x="276" y="184">Plan</text>
+          <text class="s" x="318" y="184">Flow</text>
+          <rect class="chip" x="276" y="196" width="150" height="32" rx="6"/><text class="t2" x="288" y="217">fetch_data_sources</text>
+          <path class="e" d="M426 212 H438"/>
+          <rect class="chip" x="440" y="196" width="140" height="32" rx="6"/><text class="t2" x="452" y="217">design · arch ∥ ux</text>
+          <path class="e" d="M580 212 H592"/>
+          <rect class="chip" x="594" y="196" width="122" height="32" rx="6"/><text class="t2" x="606" y="217">build_overview</text>
+          <path class="e" d="M716 212 H726"/>
+          <rect class="chip" x="728" y="196" width="116" height="32" rx="6"/><text class="t2" x="740" y="217">persist</text>
+          <path class="e" d="M860 200 H888"/>
+          <rect class="box pause" x="890" y="182" width="190" height="36" rx="18"/>
+          <text class="lab pz" x="985" y="205" text-anchor="middle">⏸ awaiting_approval</text>
+          <path class="e dash" d="M960 182 C960 140 655 140 655 194"/><text class="lab" x="808" y="136" text-anchor="middle">modify → rebuild_with_feedback</text>
+          <path class="e acc" d="M985 218 V278"/><text class="lab acc" x="993" y="252">accept</text>
+
+          <rect class="box group" x="260" y="280" width="820" height="112" rx="10"/>
+          <text class="t" x="276" y="304">Execute</text>
+          <text class="s" x="340" y="304">Flow · builds the approved plan</text>
+          <rect class="chip" x="276" y="326" width="100" height="32" rx="6"/><text class="t2" x="288" y="347">build_plan</text>
+          <path class="e" d="M376 342 H388"/>
+          <rect class="chip" x="390" y="326" width="170" height="32" rx="6"/><text class="t2" x="402" y="347">execute_tasks · layers ∥</text>
+          <path class="e" d="M560 342 H572"/>
+          <rect class="chip" x="574" y="326" width="170" height="32" rx="6"/><text class="t2" x="586" y="347">validate · tsc ∥ build</text>
+          <path class="e fx" d="M744 336 H770"/><text class="lab fx" x="757" y="328" text-anchor="middle">errors</text>
+          <rect class="chip" x="772" y="326" width="100" height="32" rx="6" style="stroke:var(--fix)"/><text class="t2" x="784" y="347">fix_errors</text>
+          <path class="e fx" d="M822 358 C822 382 659 382 659 360"/><text class="lab fx" x="740" y="386" text-anchor="middle">loop ×10 max</text>
+          <path class="e" d="M700 326 C700 312 950 312 950 324"/><text class="lab" x="900" y="314" text-anchor="middle">clean, or 10 tries</text>
+          <rect class="chip" x="900" y="326" width="110" height="32" rx="6"/><text class="t2" x="912" y="347">summarize</text>
+
+          <rect class="box group" x="260" y="405" width="520" height="62" rx="10"/>
+          <text class="t" x="276" y="430">FollowUp</text>
+          <text class="s" x="276" y="450">ReAct · ≤15 iterations</text>
+          <rect class="chip" x="420" y="420" width="60" height="32" rx="6"/><text class="t2" x="438" y="441">LLM</text>
+          <path class="e" d="M480 430 H518"/><path class="e" d="M518 443 H482"/>
+          <rect class="chip" x="520" y="420" width="244" height="32" rx="6"/><text class="t2" x="532" y="441">grep · glob · read · write · edit</text>
+          <text class="lab" x="790" y="434">edits files directly,</text>
+          <text class="lab" x="790" y="450">answers in plain text</text>
+
+          <text class="t2" x="20" y="532">fix_error</text>
+          <text class="s" x="20" y="550">Fix on an error toast</text>
+          <path class="e" d="M150 536 H258"/>
+          <rect class="box group" x="260" y="490" width="820" height="110" rx="10"/>
+          <text class="t" x="276" y="514">FixError</text>
+          <text class="s" x="344" y="514">Flow · user-reported errors</text>
+          <rect class="chip" x="276" y="536" width="92" height="32" rx="6"/><text class="t2" x="288" y="557">discover</text>
+          <path class="e" d="M368 552 H380"/>
+          <rect class="chip" x="382" y="536" width="96" height="32" rx="6"/><text class="t2" x="394" y="557">generate</text>
+          <path class="e" d="M478 552 H490"/>
+          <rect class="chip" x="492" y="536" width="72" height="32" rx="6"/><text class="t2" x="504" y="557">write</text>
+          <path class="e" d="M564 552 H576"/>
+          <rect class="chip" x="578" y="536" width="170" height="32" rx="6"/><text class="t2" x="590" y="557">validate · pnpm build</text>
+          <path class="e fx" d="M748 546 H774"/><text class="lab fx" x="761" y="538" text-anchor="middle">errors</text>
+          <rect class="chip" x="776" y="536" width="80" height="32" rx="6" style="stroke:var(--fix)"/><text class="t2" x="788" y="557">retry</text>
+          <path class="e fx" d="M816 568 C816 592 663 592 663 570"/><text class="lab fx" x="740" y="595" text-anchor="middle">loop ×3 max</text>
+          <path class="e" d="M704 536 C704 522 960 522 960 534"/><text class="lab" x="900" y="524" text-anchor="middle">clean, or 3 tries</text>
+          <rect class="chip" x="910" y="536" width="100" height="32" rx="6"/><text class="t2" x="922" y="557">complete</text>
+        </svg>
+      </div>
+      <figcaption>Execute and FixError each have their own fix loop. Execute's ×10 loop rewrites whole files right after generation. FixError's ×3 loop runs only when the user clicks Fix on an error.</figcaption>
+    </figure>
+    <div class="legend"><span><i class="lg-pause"></i>paused: state saved in <code>paused_turns</code>, the run ends</span><span><i class="lg-fix"></i>a fix loop</span></div>
+    <div class="notes">
+      <p><strong>New until something completes</strong>A project is new until an <code>action_complete</code> event exists. A first plan that was never approved still counts as new.<span class="ref">ai/agents/routing.py:9</span></p>
+      <p><strong>Layers run in parallel</strong>Tasks whose dependencies are done form a layer and run together. Files outside a task's declared list are rejected.<span class="ref">ai/agents/execute/models.py:33 · execute/agent.py:162</span></p>
+      <p><strong>Build errors are text-matched</strong>Validation reports an error when the output contains "error" or "failed"; exit codes aren't read.<span class="ref">sandbox/pnpm_mixin.py:83</span></p>
+      <p><strong>The resume point</strong>Plan pauses with the whole <code>BuildState</code>. Accepting loads it into Execute; modify regenerates only the overview.<span class="ref">plan/agent.py:166, :175 · ai/state.py:12</span></p>
+    </div>
+  </section>
+
+  <!-- §5 -->
+  <section id="sandbox">
+    <div class="head">
+      <div class="num">§5</div>
+      <h2>Sandbox</h2>
+      <p>Each project is a workspace directory plus a Vite dev server on its own port. Sandboxes start when needed and suspend when idle; the files stay on disk.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 340" role="img" aria-label="Sandbox lifecycle: create copies the template and installs, running serves the dev server on a pooled port, idle for 300 seconds suspends it, any use wakes it, and deleting the project destroys it. The preview iframe reaches the dev server through the backend proxy, with HMR relayed under the workspace lock.">
+          <rect class="box" x="20" y="30" width="220" height="96" rx="10"/>
+          <text class="t" x="38" y="56">Create</text>
+          <text class="s" x="38" y="76">copy pnpm-project-template</text>
+          <text class="s" x="38" y="93">stamp vite.config.ts</text>
+          <text class="s" x="38" y="110">pnpm install · Version 0</text>
+          <rect class="box hl" x="300" y="30" width="220" height="96" rx="10"/>
+          <text class="t" x="318" y="56">Running</text>
+          <text class="s" x="318" y="76">pnpm dev --port N</text>
+          <text class="s" x="318" y="93">N from 3501–4501</text>
+          <text class="s" x="318" y="110">every use resets idle timer</text>
+          <rect class="box" x="590" y="30" width="200" height="96" rx="10"/>
+          <text class="t" x="608" y="56">Suspended</text>
+          <text class="s" x="608" y="76">processes killed</text>
+          <text class="s" x="608" y="93">port back in the pool</text>
+          <text class="s" x="608" y="110">workspace kept on disk</text>
+          <rect class="box fail" x="850" y="30" width="130" height="96" rx="10"/>
+          <text class="t" x="866" y="56">Destroyed</text>
+          <text class="s" x="866" y="76">workspace</text>
+          <text class="s" x="866" y="93">deleted</text>
+
+          <path class="e" d="M240 78 H298"/><text class="lab" x="269" y="70" text-anchor="middle">start</text>
+          <path class="e" d="M520 60 H588"/><text class="lab" x="554" y="52" text-anchor="middle">idle 300 s</text>
+          <path class="e acc" d="M588 98 H522"/><text class="lab acc" x="554" y="116" text-anchor="middle">wake</text>
+          <path class="e fl" d="M790 78 H848"/><text class="lab" x="819" y="70" text-anchor="middle">delete</text>
+
+          <line class="lane-sep" x1="20" y1="160" x2="980" y2="160"/>
+          <text class="lane-l" x="20" y="184">Preview path</text>
+          <rect class="box" x="20" y="204" width="180" height="60" rx="10"/>
+          <text class="t" x="38" y="230">Preview iframe</text>
+          <text class="s" x="38" y="249">browser</text>
+          <rect class="box hl" x="290" y="196" width="300" height="76" rx="10"/>
+          <text class="t2" x="306" y="220">/api/preview/{id}/proxy/…</text>
+          <text class="s" x="306" y="240">wakes the sandbox · loading page</text>
+          <text class="s" x="306" y="257">adds toolbar for write access</text>
+          <rect class="box" x="690" y="204" width="200" height="60" rx="10"/>
+          <text class="t" x="708" y="230">Dev server</text>
+          <text class="s" x="708" y="249">127.0.0.1:N</text>
+          <path class="e acc" d="M200 234 H288"/><text class="lab acc" x="244" y="226" text-anchor="middle">HTTP</text>
+          <path class="e acc" d="M590 234 H688"/><text class="lab acc" x="639" y="226" text-anchor="middle">proxied</text>
+          <path class="e dash" d="M110 264 V300 H790 V266"/>
+          <text class="lab" x="450" y="322" text-anchor="middle">Vite HMR WebSocket · each message relayed under the workspace lock</text>
+        </svg>
+      </div>
+      <figcaption>Prod uses <code>SANDBOX_MODE=local</code> on Linux (<code>PnpmSandboxUnix</code>), overriding the <code>namespaced</code> set in <code>backend/Dockerfile</code>. <code>namespaced</code> runs each sandbox under nsjail, and Windows dev gets <code>PnpmSandboxWindows</code>.</figcaption>
+    </figure>
+    <div class="notes">
+      <p><strong>Who wakes it</strong>Opening the chat socket, the preview proxy, and every sandbox lookup all go through <code>get_sandbox</code>, which also resets the idle timer.<span class="ref">sandbox/manager.py:57, :72</span></p>
+      <p><strong>Other project sockets</strong>Terminal (admins only in local mode), server log, and errors, which watches <code>.dev-server.log</code> and feeds the error toast.<span class="ref">api/errors.py:21 · api/deps.py:213</span></p>
+    </div>
+  </section>
+
+  <!-- §6 -->
+  <section id="versioning">
+    <div class="head">
+      <div class="num">§6</div>
+      <h2>Versioning</h2>
+      <p>Every workspace is its own git repo on <code>main</code>. Each AI turn is a commit, and every operation runs under a per-project Postgres advisory lock.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 290" role="img" aria-label="Commits on main: Version 0, AI turns and the user's saved edits. Previewing checks out an old commit detached. Restoring moves main back and trims later history. Unsaved edits are either saved as a commit or discarded.">
+          <line class="trunk" x1="60" y1="130" x2="880" y2="130"/>
+          <text class="lane-l" x="896" y="134">main</text>
+          <circle class="dot" cx="100" cy="130" r="9"/><text class="t2" x="100" y="104" text-anchor="middle">Version 0</text><text class="s" x="100" y="160" text-anchor="middle">blank scaffold</text>
+          <circle class="dot" cx="300" cy="130" r="9"/><text class="t2" x="300" y="104" text-anchor="middle">Version</text><text class="s" x="300" y="160" text-anchor="middle">AI turn</text>
+          <circle class="dot" cx="500" cy="130" r="9"/><text class="t2" x="500" y="104" text-anchor="middle">Your edits</text><text class="s" x="500" y="160" text-anchor="middle">save_version</text>
+          <circle class="dot" cx="700" cy="130" r="9"/><text class="t2" x="700" y="104" text-anchor="middle">Version</text><text class="s" x="700" y="160" text-anchor="middle">AI turn · tip</text>
+
+          <path class="e dash" d="M692 116 C640 30 360 30 308 116"/>
+          <text class="lab" x="500" y="40" text-anchor="middle">restore_version · main moves back, later events and messages trimmed</text>
+
+          <rect class="box pause" x="210" y="200" width="180" height="56" rx="10"/>
+          <text class="t2" x="226" y="224">preview (detached)</text>
+          <text class="s" x="226" y="243">turns and edits refused</text>
+          <path class="e" d="M300 200 V143"/><text class="lab" x="308" y="186">preview_version</text>
+
+          <rect class="box" x="740" y="196" width="240" height="72" rx="10"/>
+          <text class="t2" x="756" y="220">unsaved edits</text>
+          <text class="s" x="756" y="239">save_version → new commit</text>
+          <text class="s" x="756" y="256">discard_edits → reset + clean</text>
+          <path class="e dash" d="M708 140 L760 194"/><text class="lab" x="742" y="160">user edits files</text>
+        </svg>
+      </div>
+      <figcaption>Only shas recorded in <code>version_committed</code> events are accepted, so raw client input never reaches git. Unsaved edits block the next turn until they're saved or discarded.</figcaption>
+    </figure>
+    <div class="notes">
+      <p><strong>Self-healing lock</strong>Under the advisory lock, a leftover <code>index.lock</code> can only come from a git that was killed mid-command, so it's deleted.<span class="ref">services/versioning/service.py:89, :93</span></p>
+      <p><strong>Rollback reuses git</strong>Stopping a turn is <code>reset --hard</code> + <code>clean -fd</code> to the last commit, plus trimming that turn's events and messages.<span class="ref">services/versioning/service.py:212</span></p>
+    </div>
+  </section>
+
+  <!-- §7 -->
+  <section id="publish">
+    <div class="head">
+      <div class="num">§7</div>
+      <h2>Publish</h2>
+      <p>Publishing builds the sandbox once and copies <code>dist/</code> to S3. After that, visitors are served from S3 with no sandbox involved.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 300" role="img" aria-label="Publish: the request builds dist in the sandbox, uploads it to S3 under the project prefix and saves the handle. Serving: a visitor requests /shared/handle, the backend maps the handle to the project and reads the file from S3, falling back to index.html for client-side routes.">
+          <text class="lane-l" x="20" y="22">Publish · POST /api/export/{id}/publish</text>
+          <rect class="box" x="20" y="40" width="170" height="70" rx="10"/>
+          <text class="t2" x="36" y="66">Publish</text><text class="s" x="36" y="85">needs publish</text><text class="s" x="36" y="100">optional slug</text>
+          <rect class="box" x="260" y="40" width="180" height="70" rx="10"/>
+          <text class="t2" x="276" y="66">pnpm build</text><text class="s" x="276" y="85">base ./ in sandbox</text><text class="s" x="276" y="100">collect dist/</text>
+          <rect class="box hl" x="510" y="40" width="220" height="70" rx="10"/>
+          <text class="t2" x="526" y="66">S3 upload</text><text class="s" x="526" y="85">published/{project_id}/</text><text class="s" x="526" y="100">public-read</text>
+          <rect class="box" x="800" y="40" width="180" height="70" rx="10"/>
+          <text class="t2" x="816" y="66">handle saved</text><text class="s" x="816" y="85">slug or project id</text>
+          <path class="e" d="M190 75 H258"/><text class="lab" x="224" y="67" text-anchor="middle">build_dist</text>
+          <path class="e" d="M440 75 H508"/><text class="lab" x="474" y="67" text-anchor="middle">deploy_dist</text>
+          <path class="e" d="M730 75 H798"/><text class="lab" x="764" y="67" text-anchor="middle">store</text>
+          <text class="s" x="520" y="132">files gone from this build → tagged → expired by S3</text>
+
+          <line class="lane-sep" x1="20" y1="160" x2="980" y2="160"/>
+          <text class="lane-l" x="20" y="184">Serve · no sign-in</text>
+          <rect class="box" x="20" y="200" width="150" height="64" rx="10"/>
+          <text class="t2" x="36" y="226">Visitor</text><text class="s" x="36" y="245">browser</text>
+          <rect class="box" x="240" y="200" width="200" height="64" rx="10"/>
+          <text class="t2" x="256" y="226">/shared/{handle}/…</text><text class="s" x="256" y="245">api/shared.py:50</text>
+          <rect class="box" x="510" y="200" width="160" height="64" rx="10"/>
+          <text class="t2" x="526" y="226">handle → project</text><text class="s" x="526" y="245">must be published</text>
+          <rect class="box hl" x="740" y="200" width="240" height="64" rx="10"/>
+          <text class="t2" x="756" y="226">S3 read</text><text class="s" x="756" y="245">no extension? → index.html</text>
+          <path class="e" d="M170 232 H238"/><text class="lab" x="204" y="224" text-anchor="middle">GET</text>
+          <path class="e" d="M440 232 H508"/><text class="lab" x="474" y="224" text-anchor="middle">lookup</text>
+          <path class="e" d="M670 232 H738"/><text class="lab" x="704" y="224" text-anchor="middle">read</text>
+          <path class="e dash" d="M860 200 V176 H620 V112"/><text class="lab" x="740" y="170" text-anchor="middle">same prefix</text>
+        </svg>
+      </div>
+      <figcaption>Hashed <code>assets/</code> are cached for a year and HTML is <code>no-cache</code>, so a republish shows up on the next page load. Page loads are counted as page views.</figcaption>
+    </figure>
+  </section>
+
+  <footer>
+    <div>The text source of truth is <code>docs/architecture.md</code>: every claim there cites the code on <code>develop</code>. This page shows the same sections as diagrams.</div>
+    <div class="mono">Snapshot: develop @ 910aa808 · paths relative to backend/src/flow44/ and frontend/src/</div>
+  </footer>
+</div>
+</body>
+</html>
