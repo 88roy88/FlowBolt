@@ -8,6 +8,7 @@ from flow44.integrations.directory.client import directory_client
 
 class FeatureFlag(StrEnum):
     model_selector = "model_selector"
+    unsandboxed_preview = "unsandboxed_preview"
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,10 @@ class FlagSpec:
 FLAGS: dict[FeatureFlag, FlagSpec] = {
     FeatureFlag.model_selector: FlagSpec(
         "Show the model dropdown in the chat input. When off, chats use the project's model.",
+    ),
+    FeatureFlag.unsandboxed_preview: FlagSpec(
+        "Remove the sandbox from the builder's preview iframe. PDF embeds render, "
+        "but the previewed app can also navigate the whole builder page (top-level navigation).",
     ),
 }
 

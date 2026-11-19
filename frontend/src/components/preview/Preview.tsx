@@ -10,6 +10,9 @@ import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
 import { logger } from '../../services/logger';
+import { useFeatureFlag } from '../../hooks/useClientConfig';
+
+const PREVIEW_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads';
 
 type PreviewLoadTrigger = 'manual_refresh' | 'auto_on_code_change';
 
@@ -18,7 +21,10 @@ export function Preview() {
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const saveVersion = useFilesStore((s) => s.saveVersion);
-  
+  // Chromium's PDF viewer can't load in a sandboxed frame, so PDF embeds are blank with the sandbox on.
+  // Turning it off lets them render, but the previewed app can then navigate the whole builder page.
+  const unsandboxed = useFeatureFlag('unsandboxed_preview');
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -140,10 +146,12 @@ export function Preview() {
       {previewUrl ? (
         <div className="relative flex-1">
           <iframe
+            // A sandbox change only applies on navigation, so remount when the flag resolves.
+            key={unsandboxed ? 'unsandboxed' : 'sandboxed'}
             ref={iframeRef}
             src={previewUrl}
             onLoad={handleFrameLoad}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
+            sandbox={unsandboxed ? undefined : PREVIEW_SANDBOX}
             className="absolute inset-0 w-full h-full border-none"
             style={{ background: 'var(--preview-bg)' }}
             title={t('preview.title')}
