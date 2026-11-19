@@ -92,6 +92,7 @@ async def test_commit_diffs_lists_binary_files_and_both_sides_of_a_rename(repo: 
     diffs = {d.path: d for d in await repo.commit_diffs(sha, max_chars=10_000)}
 
     assert {path: d.is_new for path, d in diffs.items()} == {"a.txt": False, "b.txt": True, "pixel.png": True}
+    assert {path: d.is_deleted for path, d in diffs.items()} == {"a.txt": True, "b.txt": False, "pixel.png": False}
     assert diffs["pixel.png"].diff == ""
     assert "+zero" in diffs["b.txt"].diff
 

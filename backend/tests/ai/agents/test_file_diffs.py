@@ -56,5 +56,27 @@ class TestDiffTracker:
         assert diffs["src/A.tsx"].is_new is False
         assert diffs["src/B.tsx"].is_new is True
 
+    def test_deleting_an_empty_file_still_yields_an_entry(self) -> None:
+        tracker = DiffTracker()
+        tracker.record_deletion("src/Empty.tsx", "")
+
+        assert [(d.path, d.is_deleted) for d in tracker.combined_diffs()] == [("src/Empty.tsx", True)]
+
+    def test_file_created_then_deleted_yields_nothing(self) -> None:
+        tracker = DiffTracker()
+        tracker.record("src/Tmp.tsx", "", "v1\n", is_new=True)
+        tracker.record_deletion("src/Tmp.tsx", "v1\n")
+
+        assert tracker.combined_diffs() == []
+
+    def test_file_rewritten_after_deletion_is_not_deleted(self) -> None:
+        tracker = DiffTracker()
+        tracker.record_deletion("src/App.tsx", "v1\n")
+        tracker.record("src/App.tsx", "", "v2\n", is_new=True)
+
+        [diff] = tracker.combined_diffs()
+        assert diff.is_deleted is False
+        assert diff.is_new is False
+
     def test_empty_tracker_yields_no_diffs(self) -> None:
         assert DiffTracker().combined_diffs() == []
