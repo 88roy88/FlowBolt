@@ -10,6 +10,9 @@ import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
 import { logger } from '../../services/logger';
+import { useFeatureFlagState } from '../../hooks/useClientConfig';
+
+const PREVIEW_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads';
 
 type PreviewLoadTrigger = 'manual_refresh' | 'auto_on_code_change';
 
@@ -18,7 +21,8 @@ export function Preview() {
   const projectId = useSessionStore((s) => s.projectId);
   const currentProject = useSessionStore((s) => s.currentProject);
   const saveVersion = useFilesStore((s) => s.saveVersion);
-  
+  const unsandboxed = useFeatureFlagState('unsandboxed_preview');
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -139,16 +143,18 @@ export function Preview() {
       {/* iframe */}
       {previewUrl ? (
         <div className="relative flex-1">
-          <iframe
-            ref={iframeRef}
-            src={previewUrl}
-            onLoad={handleFrameLoad}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
-            className="absolute inset-0 w-full h-full border-none"
-            style={{ background: 'var(--preview-bg)' }}
-            title={t('preview.title')}
-            data-testid="preview-iframe"
-          />
+          {unsandboxed !== 'loading' && (
+            <iframe
+              ref={iframeRef}
+              src={previewUrl}
+              onLoad={handleFrameLoad}
+              sandbox={unsandboxed ? undefined : PREVIEW_SANDBOX}
+              className="absolute inset-0 w-full h-full border-none"
+              style={{ background: 'var(--preview-bg)' }}
+              title={t('preview.title')}
+              data-testid="preview-iframe"
+            />
+          )}
           <div
             className={`pointer-events-none absolute inset-0 flex items-center justify-center gap-2 text-muted-foreground text-sm bg-[var(--preview-bg)]/85 transition-opacity duration-200 ${loading ? 'opacity-100' : 'opacity-0'}`}
           >
