@@ -135,6 +135,7 @@ class S3Settings(BuildAppSettings):
 
 class LoggerSettings(BuildAppSettings):
     LOG_FILE_PATH: str | None = None
+    ENVIRONMENT: str | None = None
 
 
 class OpikSettings(BuildAppSettings):
