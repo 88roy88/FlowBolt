@@ -2,7 +2,7 @@ import logging
 from pathlib import PurePosixPath
 from typing import Any
 
-from opik import track
+from opik import opik_context, track
 
 from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.fix_error.file_edits import EditApplyError
@@ -403,6 +403,8 @@ class FixErrorAgent(ChatAgent):
 
         return str(PurePosixPath("src", *parts))
 
+    @track(name="build")  # type: ignore[untyped-decorator]
     async def _build(self) -> str:
         result = await self.sandbox.run_build_command("pnpm build")
+        opik_context.update_current_span(metadata={"success": result.success})
         return result.errors
