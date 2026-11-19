@@ -15,8 +15,9 @@ export function useFeatureFlag(key: string): boolean {
   return useClientConfig()?.features.includes(key) ?? false;
 }
 
-// For flags that must be known before first render. `ready` is also true when the fetch failed (flag off).
-export function useFeatureFlagState(key: string): { enabled: boolean; ready: boolean } {
+// For flags that must be known before first render. A failed fetch settles as false.
+export function useFeatureFlagState(key: string): boolean | 'loading' {
   const { data, isPending } = useClientConfigQuery();
-  return { enabled: data?.features.includes(key) ?? false, ready: !isPending };
+  if (isPending) return 'loading';
+  return data?.features.includes(key) ?? false;
 }

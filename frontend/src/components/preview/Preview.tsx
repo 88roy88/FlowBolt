@@ -24,7 +24,7 @@ export function Preview() {
   // Chromium's PDF viewer can't load in a sandboxed frame, so PDF embeds are blank with the sandbox on.
   // Turning it off lets them render, but the previewed app can then navigate the whole builder page.
   // The iframe waits for the flag, since a sandbox change only applies on navigation (it would load twice).
-  const { enabled: unsandboxed, ready: flagReady } = useFeatureFlagState('unsandboxed_preview');
+  const unsandboxed = useFeatureFlagState('unsandboxed_preview');
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -146,7 +146,7 @@ export function Preview() {
       {/* iframe */}
       {previewUrl ? (
         <div className="relative flex-1">
-          {flagReady && (
+          {unsandboxed !== 'loading' && (
             <iframe
               ref={iframeRef}
               src={previewUrl}
