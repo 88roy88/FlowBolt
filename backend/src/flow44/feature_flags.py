@@ -24,7 +24,7 @@ FLAGS: dict[FeatureFlag, FlagSpec] = {
     ),
     FeatureFlag.unsandboxed_preview: FlagSpec(
         "Remove the sandbox attribute from the builder's preview iframe. "
-        "Allows rendering of <embed> for the PDF viewer, "
+        "Allows the PDF viewer to render inside <embed>, "
         "but also lets the previewed app navigate the whole builder page (top-level navigation).",
     ),
 }
