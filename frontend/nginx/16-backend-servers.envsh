@@ -14,17 +14,19 @@ if [ -n "${BACKEND_STATEFULSET:-}${BACKEND_REPLICAS:-}" ]; then
     [ -n "${BACKEND_INTERNAL_URL:-}" ] && _fail "set BACKEND_INTERNAL_URL or BACKEND_STATEFULSET/REPLICAS, not both"
     [ -n "${BACKEND_STATEFULSET:-}" ] && [ -n "${BACKEND_REPLICAS:-}" ] \
         || _fail "set both BACKEND_STATEFULSET and BACKEND_REPLICAS"
+    _nl='
+    '
     BACKEND_SERVERS=""
     _i=0
     while [ "$_i" -lt "$BACKEND_REPLICAS" ]; do
         _host="${BACKEND_STATEFULSET}-${_i}${BACKEND_SERVICE:+.$BACKEND_SERVICE}"
-        BACKEND_SERVERS="${BACKEND_SERVERS}server ${_host}:${BACKEND_PORT:-8000} resolve; "
+        BACKEND_SERVERS="${BACKEND_SERVERS:+$BACKEND_SERVERS$_nl}server ${_host}:${BACKEND_PORT:-8000} resolve;"
         _i=$((_i + 1))
     done
 elif [ -n "${BACKEND_INTERNAL_URL:-}" ]; then
     # http://host:port/path -> host:port
     _host="${BACKEND_INTERNAL_URL#*://}"
-    BACKEND_SERVERS="server ${_host%%/*}; "
+    BACKEND_SERVERS="server ${_host%%/*};"
 else
     _fail "set BACKEND_INTERNAL_URL (one backend pod) or BACKEND_STATEFULSET, BACKEND_SERVICE and BACKEND_REPLICAS"
 fi
@@ -32,4 +34,4 @@ export BACKEND_SERVERS
 
 echo "16-backend-servers: $BACKEND_SERVERS"
 unset -f _fail
-unset _i _host
+unset _i _host _nl
