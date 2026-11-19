@@ -44,7 +44,7 @@ if os.name == "posix":
     # (022) strips write permission from files this process creates so other pods can't write to them.
     os.umask(0)
 
-setup_logging(settings.LOG_FILE_PATH)
+setup_logging(settings.LOG_FILE_PATH, settings.ENVIRONMENT)
 
 logger = logging.getLogger(__name__)
 
