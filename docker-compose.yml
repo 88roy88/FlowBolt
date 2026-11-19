@@ -80,11 +80,11 @@ services:
     working_dir: /app
     volumes:
       - ./mocks/flapi-mock:/app
-    command: sh -c "npm install && npm start"
-    expose:
-      - "6001"
+      - /app/node_modules
+    command: sh -c "corepack enable && corepack install -g pnpm@12 && pnpm install --frozen-lockfile && pnpm start"
     environment:
       MOCK_PORT: "6001"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
     ports:
       - "6001:6001"
     networks:
@@ -96,9 +96,11 @@ services:
     working_dir: /app
     volumes:
       - ./mocks/directory-mock:/app
-    command: sh -c "npm install && npm start"
+      - /app/node_modules
+    command: sh -c "corepack enable && corepack install -g pnpm@12 && pnpm install --frozen-lockfile && pnpm start"
     environment:
       MOCK_PORT: "6002"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
     ports:
       - "6002:6002"
     networks:

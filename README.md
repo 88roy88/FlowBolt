@@ -97,7 +97,6 @@ uv run --no-sync alembic revision --autogenerate -m "describe change"
 cd backend
 uv run --no-sync task tests      # pytest
 uv run --no-sync task lint       # mypy + ruff
-uv run --no-sync task benchmark  # AI benchmarks
 ```
 
 ```bash
