@@ -147,7 +147,7 @@ export function Preview() {
         <div className="relative flex-1">
           <iframe
             // A sandbox change only applies on navigation, so remount when the flag resolves.
-            key={unsandboxed ? 'unsandboxed' : 'sandboxed'}
+            key={String(unsandboxed)}
             ref={iframeRef}
             src={previewUrl}
             onLoad={handleFrameLoad}
