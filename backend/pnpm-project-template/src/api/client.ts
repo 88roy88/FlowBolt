@@ -1,4 +1,4 @@
-import { API_BASE } from '../config';
+import { API_BASE, APP_MODE, PROJECT_ID } from '../config';
 import { authSession } from '../auth';
 
 export async function fetchWithAuth(path: string, options: RequestInit = {}, allowRetry = true): Promise<Response> {
@@ -23,7 +23,7 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}, all
 export async function fetchDataSource(path: string, body?: Record<string, unknown>): Promise<Response> {
   const options: RequestInit = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-App-Project-Id': PROJECT_ID, 'X-App-Mode': APP_MODE },
     body: body ? JSON.stringify(body) : undefined,
   };
   const res = await fetchWithAuth(path, options);
