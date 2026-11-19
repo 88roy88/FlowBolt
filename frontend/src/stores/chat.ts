@@ -33,6 +33,8 @@ export interface ChatState {
   executionTasks: ExecutionTask[];
   fixSteps: FixStep[];
   followUpSteps: FollowUpStep[];
+  /** Followup hit its turn limit and could not summarize what is left. */
+  followUpStepLimitReached: boolean;
   fileDiffs: FileDiff[];
   designProgress: { architecture: string | null; ux: string | null };
   projectSummary: ProjectSummary | null;
@@ -126,6 +128,7 @@ const RESET_STATE = {
   actions: [] as Action[],
   fixSteps: [] as FixStep[],
   followUpSteps: [] as FollowUpStep[],
+  followUpStepLimitReached: false,
   fileDiffs: [] as FileDiff[],
   error: null,
   agentPhase: AGENT_PHASE.idle,
@@ -207,6 +210,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   executionTasks: [],
   fixSteps: [],
   followUpSteps: [],
+  followUpStepLimitReached: false,
   fileDiffs: [],
   designProgress: { architecture: null, ux: null },
   projectSummary: null,

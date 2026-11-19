@@ -6,7 +6,11 @@ from typing import Any
 import pytest
 
 from flow44.ai.core import react_flow
-from flow44.ai.core.react_flow import MALFORMED_TOOL_CALL_CORRECTION, ReActFlow
+from flow44.ai.core.react_flow import (
+    MALFORMED_TOOL_CALL_CORRECTION,
+    MAX_ITERATIONS_WRAP_UP,
+    ReActFlow,
+)
 from flow44.ai.core.tools import ToolExecutor
 
 LEAK = '<invoke name="read_file"><parameter name="path">a</parameter></invoke>'
@@ -43,7 +47,64 @@ async def test_leaked_tool_call_is_corrected_then_answered(monkeypatch: pytest.M
     ]
 
 
-async def test_persistent_leaks_return_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_llm(monkeypatch, LEAK, LEAK, LEAK)
+async def test_persistent_leaks_end_with_failed_wrap_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_llm(monkeypatch, LEAK, LEAK, LEAK, LEAK)
+    flow: ReActFlow[Any] = ReActFlow(max_iterations=3)
 
-    assert await _loop() == ""
+    assert await flow.react_loop([{"role": "user", "content": "go"}], "sys", ToolExecutor([])) == ""
+    assert flow.wrap_up_failed
+
+
+def _tool_call_response() -> SimpleNamespace:
+    call = {"id": "call-1", "type": "function", "function": {"name": "noop", "arguments": "{}"}}
+    message = SimpleNamespace(
+        content="",
+        tool_calls=[SimpleNamespace(id="call-1", function=SimpleNamespace(name="noop", arguments="{}"))],
+        model_dump=lambda: {"role": "assistant", "content": "", "tool_calls": [call]},
+    )
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+def _patch_tool_loop(monkeypatch: pytest.MonkeyPatch, wrap_up: str | Exception) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+
+    async def fake(messages: list[dict[str, Any]], **kwargs: Any) -> SimpleNamespace:
+        calls.append({"messages": list(messages), **kwargs})
+        if kwargs.get("tool_choice") != "none":
+            return _tool_call_response()
+        if isinstance(wrap_up, Exception):
+            raise wrap_up
+        return _response(wrap_up)
+
+    monkeypatch.setattr(react_flow, "complete_chat_with_tools", fake)
+    return calls
+
+
+async def test_max_iterations_ends_with_tool_less_wrap_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _patch_tool_loop(monkeypatch, "Did A, B is left.")
+    flow: ReActFlow[Any] = ReActFlow(max_iterations=2)
+
+    answer = await flow.react_loop([{"role": "user", "content": "go"}], "sys", ToolExecutor([]))
+
+    assert answer == "Did A, B is left."
+    assert flow.hit_max_iterations
+    assert not flow.wrap_up_failed
+    assert [c.get("tool_choice") for c in calls] == [None, None, "none"]
+    assert calls[-1]["messages"][-1] == {"role": "user", "content": MAX_ITERATIONS_WRAP_UP}
+
+
+@pytest.mark.parametrize("wrap_up", ["", LEAK, RuntimeError("boom")])
+async def test_max_iterations_flags_unusable_wrap_up(monkeypatch: pytest.MonkeyPatch, wrap_up: str | Exception) -> None:
+    _patch_tool_loop(monkeypatch, wrap_up)
+    flow: ReActFlow[Any] = ReActFlow(max_iterations=1)
+
+    assert await flow.react_loop([{"role": "user", "content": "go"}], "sys", ToolExecutor([])) == ""
+    assert flow.wrap_up_failed
+
+
+async def test_finishing_in_time_does_not_flag_max_iterations(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_llm(monkeypatch, "done")
+    flow: ReActFlow[Any] = ReActFlow(max_iterations=2)
+
+    assert await flow.react_loop([{"role": "user", "content": "go"}], "sys", ToolExecutor([])) == "done"
+    assert not flow.hit_max_iterations

@@ -310,6 +310,10 @@ export function createSendMessageHandler(
         handleFollowUpStep(msg, set);
         break;
 
+      case 'step_limit_reached':
+        set({ followUpStepLimitReached: true });
+        break;
+
       case 'fix_step':
         handleFixStep(msg, set);
         break;
@@ -499,6 +503,7 @@ function handleActionComplete(set: SetState, get: GetState, cleanup: () => void)
         answer: state.currentAssistantMessage || undefined,
         filesChanged: filesChanged.length > 0 ? filesChanged : undefined,
         diffs: [...state.fileDiffs],
+        stepLimitReached: state.followUpStepLimitReached || undefined,
       },
     });
   } else if (state.currentAssistantMessage) {

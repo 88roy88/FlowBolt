@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -26,13 +27,15 @@ function summarizeSteps(steps: FollowUpStep[]) {
   return summary.charAt(0).toUpperCase() + summary.slice(1);
 }
 
-export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }: {
+export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive, stepLimitReached }: {
   steps: FollowUpStep[];
   answer?: string;
   filesChanged?: string[];
   diffs?: FileDiff[];
   isLive?: boolean;
+  stepLimitReached?: boolean;
 }) {
+  const { t } = useTranslation();
   const inProgress = isLive || steps.some((s) => s.status === 'running');
   const [userExpanded, setUserExpanded] = useState(false);
   const expanded = inProgress || userExpanded;
@@ -94,6 +97,10 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
         <div className="markdown-content mt-2.5 border-t border-border pt-2.5 text-[13px] leading-relaxed break-words">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
         </div>
+      )}
+
+      {stepLimitReached && !answer && (
+        <p className="mt-2.5 border-t border-border pt-2.5 text-[13px] text-muted-foreground">{t('chat.stepLimitReached')}</p>
       )}
     </CardWrapper>
   );
