@@ -2,13 +2,14 @@
 
 How BuildApp works, end to end, as merged on `develop`. Every behavior cites the code that implements it. Backend paths are relative to `backend/src/flow44/`, frontend paths to `frontend/src/`.
 
-Visual walkthrough: [`architecture.html`](architecture.html), which shows §1–3 and §5–7 as diagrams. Open it in a browser. A hosted copy is at [BuildApp Architecture](https://claude.ai/artifact/UF8J7hSu14NGk4rdGnCJBB).
+Visual walkthrough: [`architecture.html`](architecture.html), which shows sections 1–3 and 5–7 as diagrams. Open it in a browser. A hosted copy is at [BuildApp Architecture](https://claude.ai/artifact/UF8J7hSu14NGk4rdGnCJBB).
 
 ## 1. System map
 
 | Part | What it is | Entry point |
 | --- | --- | --- |
 | Browser IDE | React 19 + Zustand stores (client state) + React Query (new data fetching), Monaco editor, xterm terminal, preview iframe | `App.tsx`, `stores/`, `services/websocket/` |
+| Nginx | Serves the built React IDE and forwards API, WebSocket, preview and published-app requests to FastAPI | `frontend/nginx/nginx.conf` (repo root) |
 | Backend | One FastAPI process: REST under `/api`, WebSockets under `/ws`, published apps under `/shared` | `main.py` |
 | Postgres | Projects, members, chat messages, agent events, paused turns, run heartbeats; also advisory locks and `LISTEN/NOTIFY` | `db/` |
 | Sandbox | One workspace dir + one Vite dev server per project, run by the backend process | `sandbox/` |
@@ -22,7 +23,7 @@ Visual walkthrough: [`architecture.html`](architecture.html), which shows §1–
 
 **Routes** (`main.py:115-143`): `auth_routes` require a valid token; `public_routes` (models, `/shared`) don't; `ws_auth_routes` (chat, terminal, server log, errors) validate the token on the handshake.
 
-**One process.** Prod runs a single backend pod. Two kinds of state live only in that process's memory: live event subscriptions (`_channels`, `db/events.py:17`) and running sandboxes with their ports (`SandboxManager._sandboxes`, `sandbox/manager.py:21`). Everything else is in Postgres, the workspace disk or S3.
+**One process.** Prod runs a single backend pod. The process holds active agent tasks (`_RUNNING`, `api/chat.py:44`), live event subscriptions (`db/events.py:17`) and sandbox instances with their ports (`sandbox/manager.py:21`). A restart interrupts active tasks. The heartbeat reaper reports the interruption (section 2), and Interview or Plan turns already paused in Postgres can resume on the user's reply (section 3).
 
 ## 2. Lifecycle of a chat turn
 
@@ -33,20 +34,20 @@ A turn is one agent run started by a chat WebSocket message. At most one turn ru
 
    | WS message | Starts |
    | --- | --- |
-   | `message` | `AgentRouter.handle_message` (see §3) |
+   | `message` | `AgentRouter.handle_message` (see section 3) |
    | `plan_response` `accept` | `ExecuteAgent.run` |
    | `plan_response` `modify` | `PlanAgent.rebuild_with_feedback` |
    | `interview_response` `submit`/`skip` | `AgentRouter.resume_interview` |
    | `fix_error` | `FixErrorAgent.run` |
    | `abort` | `run_abort.request_abort` (no new run) |
-   | anything else | `versioning.handle_action` (see §6) |
+   | anything else | `versioning.handle_action` (see section 6) |
 
 3. **Claim.** `_start_turn` (`api/chat.py:192`) → `_claim_run` → `versioning.begin_turn` (`services/versioning/service.py:152`). Under the project's workspace lock it refuses when a run is active, the workspace is previewing an old version, or there are unsaved user edits. Then `try_claim_run` (`db/heartbeat.py:49`) upserts the `agent_run_heartbeat` row only if the existing one is stale. The lock is released after the claim; for the rest of the run, the fresh heartbeat row is what marks the project busy (`is_run_active`, `db/heartbeat.py:78`). A refused check sends a `version_error`, such as "Can't edit while the AI is working" (`services/versioning/service.py:26`). Losing the claim race to a concurrent turn sends "An agent is already running for this project" (`api/chat.py:46`).
 4. **Prepare.** Only after a successful claim: save the user message, or clear the paused turn being resumed (`api/chat.py:308`).
 5. **Run.** `_run_agent_safe` (`api/chat.py:139`) runs the agent as a background task, held in `_RUNNING` so it isn't garbage-collected (`api/chat.py:44`). `_heartbeat_until_done` (`api/chat.py:87`) touches the heartbeat every `AGENT_RUN_STALE_TIMEOUT / 4` (15 s by default) and enforces `AGENT_RUN_TIMEOUT` (1800 s) (`config.py:34-35`).
 6. **End.** Exactly one of:
-   - **Finished or failed:** `commit_turn` (`services/versioning/service.py:238`) commits whatever the agent wrote. A failure (timeout, context window exceeded, exception) first emits `phase: idle` plus an `error` event.
-   - **Aborted:** rollback. `discard_agent_response` (`services/versioning/service.py:212`) resets the workspace to the last commit and deletes the turn's events and messages. For Execute and resumed interviews, `on_abort` re-pauses the plan or interview so the user can try again (`api/chat.py:347`, `:378`).
+   - **Finished or failed:** `commit_turn` (`services/versioning/service.py:238`) attempts to commit workspace changes. A clean workspace produces no commit or `version_committed` event (`services/versioning/git.py:101`). A failure (timeout, context window exceeded, exception) first emits `phase: idle` plus an `error` event.
+   - **Aborted:** rollback. `discard_agent_response` (`services/versioning/service.py:212`) resets the workspace to the last commit and trims events and messages after the rollback boundary. `_start_turn` records that boundary after saving the initiating prompt or fix request, so the request stays in history (`api/chat.py:200-204`). For Execute and resumed interviews, `on_abort` re-pauses the plan or interview so the user can try again (`api/chat.py:347`, `:378`).
 
    Then the heartbeat row is cleared and a transient `run_released` or `turn_aborted` event is sent.
 
@@ -93,7 +94,7 @@ Flow (`:54`): `build_plan` → `execute_tasks` → `validate` → (`fix_errors` 
 Not a step `Flow`. It's a ReAct tool loop: `ReActFlow.react_loop` (`ai/core/react_flow.py:46`, called at `:202`) calls the LLM with tools, runs the tool calls, and repeats until the model answers in plain text or `MAX_ITERATIONS = 15` is reached (`:25`). Its tools (`_build_tool_executor`, `:63`) are `grep`, `glob`, `read_file`, `write_file` and `edit_file`. It gets the chat history, project summary and file tree as context. A tool call leaked into plain text gets a correction message and another iteration (`ai/core/react_flow.py:94`).
 
 ### FixError (`ai/agents/fix_error/agent.py`)
-Runs only on a `fix_error` WS message: the user clicks fix on an error toast (`components/errors/ErrorToast.tsx:32`). The error comes from the dev-server log (errors WS, §5) or from runtime and console errors in the preview (`hooks/useErrorCapture.ts`). Flow (`:49`): `discover` (files related to the error) → `generate` (whole files or search/replace edits) → `write` → `validate` (`pnpm build`) → `retry` → `validate` … → `complete`. It retries at most `MAX_RETRY_ATTEMPTS = 3` times (`:28`).
+Runs only on a `fix_error` WS message: the user clicks fix on an error toast (`components/errors/ErrorToast.tsx:32`). The error comes from the dev-server log (errors WS, section 5) or from runtime and console errors in the preview (`hooks/useErrorCapture.ts`). Flow (`:49`): `discover` (files related to the error) → `generate` (whole files or search/replace edits) → `write` → `validate` (`pnpm build`) → `retry` → `validate` … → `complete`. It retries at most `MAX_RETRY_ATTEMPTS = 3` times (`:28`).
 
 **There are two fix loops:** Execute's internal ×10 rewrite loop after generation, and FixErrorAgent's ×3 loop for errors the user reports.
 
@@ -101,7 +102,7 @@ Runs only on a `fix_error` WS message: the user clicks fix on an error toast (`c
 
 Agents talk to the browser only through events.
 
-- `emit_event` (`db/events.py:68`) stores the event in `agent_events`, then pushes it to live subscribers.
+- `emit_event` (`db/events.py:68`) stores the event in `agent_events`, and broadcasts it by default. `_save_user_turn` passes `notify=False` for prompts and fix requests (`api/chat.py:219`, `:318`, `:416`). Another tab sees those requests when it reloads project history.
 - `emit_transient` (`db/events.py:81`) only pushes it live and never stores it: streamed file contents, `run_released`, version previews.
 - **Reload and replay.** On opening a project the frontend fetches `GET /api/chat/{id}/events` (`api/chat.py:228`) and replays every stored event through the same handler it uses live (`stores/chat.ts:401-437`). Stored events are therefore the source of truth for chat history; the chat messages table is the LLM's conversation memory.
 - **Frontend handlers.** `createSendMessageHandler` (`stores/chatHandlers.ts:220`) handles build and follow-up turns; `createFixErrorHandler` (`stores/chatHandlers.ts:160`) handles fix turns.
@@ -127,15 +128,15 @@ Agents talk to the browser only through events.
 
 ## 5. Sandbox
 
-**Class.** `PnpmSandbox` (`sandbox/main.py:20`) combines file system, search and pnpm behavior with a platform base. `_get_sandbox_class` (`sandbox/manager.py:47`) picks `PnpmSandboxNamespace` (nsjail) when `SANDBOX_MODE=namespaced`, `PnpmSandboxWindows` on Windows, otherwise `PnpmSandboxUnix`. Prod runs `SANDBOX_MODE=local` on Linux, so it uses `PnpmSandboxUnix`. `local` is the default (`config.py:33`); the repo's `backend/Dockerfile:77` sets `namespaced`, but prod overrides it.
+**Class.** `PnpmSandbox` (`sandbox/main.py:20`) combines file system, search and pnpm behavior with a platform base. `_get_sandbox_class` (`sandbox/manager.py:47`) picks `PnpmSandboxNamespace` (nsjail) when `AIB_SANDBOX_MODE=namespaced`, `PnpmSandboxWindows` on Windows, otherwise `PnpmSandboxUnix`. Prod runs `AIB_SANDBOX_MODE=local` on Linux, so it uses `PnpmSandboxUnix`. `local` is the default (`config.py:33`); the repo's `backend/Dockerfile:77` sets `namespaced`, but prod overrides it.
 
 **Lifecycle** (`sandbox/manager.py`):
 - **Create** (`:81`): on project creation (`api/projects.py:142`) the template `backend/pnpm-project-template` is copied in, `vite.config.ts` is stamped with the project id and auth settings, `pnpm install` runs (`sandbox/pnpm_mixin.py:35`), and the dev server starts. Then `versioning.ensure_repo` makes the "Version 0" commit (`api/projects.py:151`).
-- **Get / wake** (`:57`): first use takes a free port from `SANDBOX_PORT_RANGE_START`–`END` (3501–4501, `config.py:22`) and creates the sandbox object. Wake also starts `pnpm dev --port <port> --strictPort` (`sandbox/pnpm_mixin.py:108`). Every get resets the idle timer (`:72`).
+- **Get / wake** (`:57`): first use takes a free port from `SANDBOX_PORT_RANGE_START`–`END` (3501–4501, `config.py:22`) and creates the sandbox object. Wake also ensures the dev server is running, starting it with `pnpm dev --port <port> --strictPort` (`sandbox/pnpm_mixin.py:108`). Every get resets the idle timer (`:72`).
 - **Suspend** (`:88`): kills its processes and frees the port, keeping the workspace on disk. The idle reaper suspends sandboxes untouched for `SANDBOX_IDLE_TTL_SECONDS` (300 s) (`sandbox/idle_reaper.py:35`).
 - **Destroy**: on project delete, the workspace is deleted after the published files and DB rows (`api/projects.py:184`).
 
-**Preview** (`api/preview.py`). `/api/preview/{id}/proxy/{path}` (`:71`) wakes the sandbox and proxies to `127.0.0.1:<port>`. It serves a self-reloading "Preparing…" or "Waking up…" page while the dev server comes up. HTML responses get the preview toolbar script for users with `write` (`:139`). Vite HMR goes through the WebSocket proxy (`:156`), which holds the workspace lock per message so a version checkout can't send half-written files (`:185`).
+**Preview** (`api/preview.py`). `/api/preview/{id}/proxy/{path}` (`:71`) wakes the sandbox and proxies to `127.0.0.1:<port>`. It serves a self-reloading "Preparing…" or "Waking up…" page while the dev server comes up. HTML responses get the preview toolbar script for users with `write` (`:139`). Vite HMR goes through the WebSocket proxy (`:156`), which takes the workspace lock when forwarding a Vite update to the browser so the browser sees the completed checkout. Browser-to-Vite messages are forwarded directly (`:185`).
 
 **Other per-project sockets**: `/ws/terminal` (PTY; in `local` mode it's limited to system admins, `api/deps.py:213-218`), `/ws/server-log`, and `/ws/errors` (`api/errors.py:21`), which watches `.dev-server.log` for build errors.
 
@@ -145,7 +146,7 @@ Each workspace is its own git repo on branch `main` (`services/versioning/`). Ev
 
 | Action | What happens | Refused when |
 | --- | --- | --- |
-| end of turn | `commit_turn` commits everything → `version_committed` (`:238`) | previewing |
+| finished or failed turn | `commit_turn` attempts to commit changes and emits `version_committed` only for a new commit (`:238`) | previewing |
 | `save_version` | commits the user's own edits as "Your edits" and adds a chat note (`:161`) | run active, previewing |
 | `discard_edits` | `reset --hard` + `clean -fd` (`:173`) | run active, previewing |
 | `preview_version` | detached checkout of an old commit; the newest one returns to `main` (`:180`) | run active, unsaved edits |
@@ -166,16 +167,16 @@ Serving: `/shared/{handle}/{path}` (`api/shared.py:50`) needs no sign-in. It map
 ## 8. Data sources
 
 Picking a data source in chat sends its ids with the message.
-1. `fetch_and_analyze_data_source` (`ai/agents/analyze_data_source.py:30`) gets the name, usage (sample, queries, params) and summary from FLAPI, then asks the LLM which fields matter. A failed analysis degrades to a basic description and doesn't fail the run.
+1. `fetch_and_analyze_data_source` (`ai/agents/analyze_data_source.py:30`) fetches the name and usage (sample, queries, params) from FLAPI. The summary comes from the optional `AIB_DATA_SOURCE_ENRICHMENT_URL` endpoint and defaults to an empty string when unconfigured (`integrations/enrichment.py:18`). The LLM uses this context to identify relevant fields. A failed analysis degrades to a basic description and doesn't fail the run.
 2. `generate_data_source_files` (`:110`) writes a deterministic, typed TS module `src/dataSources/<Name>.ts` (`ai/codegen/data_source_module.py:40`) plus a `.docs.md`, with no LLM involved. The generated app calls the module; the LLM is told how to use it.
 3. The contexts are saved on the project, so FollowUp knows which sources already exist.
 
 ## 9. Auth and access
 
-- **Tokens.** An RS256 JWT, verified with `AUTH_JWT_PUBLIC_KEY` (`api/deps.py:85`); the user id is its `…/UniqueID` claim, casefolded. The token is read from the `Authorization` header or the auth cookie (`api/deps.py:72`). WebSockets resolve the user from the cookie (`api/deps.py:299`) and reject the handshake when it's invalid.
+- **Tokens.** The backend verifies JWTs using `AUTH_JWT_PUBLIC_KEY` and `AUTH_JWT_ALGORITHM`, which defaults to RS256 (`api/deps.py:85`, `config.py:93`). The user id is the token's `…/UniqueID` claim, casefolded. The token is read from the `Authorization` header or the auth cookie (`api/deps.py:72`). WebSockets resolve the user from the cookie (`api/deps.py:299`) and reject the handshake when it's invalid.
 - **Project access.** `ProjectDep` (`get_project`, `api/deps.py:221`) loads the project and returns 404 when the user has no permission on it, so private projects don't leak their existence. `WsProjectDep` (`api/deps.py:312`) rejects the handshake with code 1008 instead.
 - **Roles** (`auth/permissions.py:40`): viewer `read`; editor `read, write`; publisher `read, publish`; maintainer `read, write, publish, manage_members`. Owners also get `delete`. Roles can be granted to users or directory groups.
-- **Admins** are ids in `SYSTEM_ADMIN_IDS` (`api/deps.py:140`). They get the `*_all` permissions, which satisfy the plain ones (`has_permission`, `auth/permissions.py:82`).
+- **Admins** are ids in `SYSTEM_ADMIN_IDS` (`api/deps.py:140`). They can read, write, publish, manage members and delete projects across the system. `read_all`, `write_all` and `publish_all` satisfy the corresponding project permissions (`auth/permissions.py:56`, `:82`).
 - **Platform access** (needed to create projects): admin, an explicit platform user, or a member of a platform group (`api/deps.py:273`).
 
 ## 10. Where to start
@@ -188,7 +189,7 @@ Reading order:
 5. `services/versioning/service.py` and `sandbox/manager.py`.
 
 Glossary:
-- **Turn**: one agent run, claimed by a heartbeat row and committed or rolled back at the end.
+- **Turn**: one agent run claimed by a heartbeat row. Workspace changes can produce a version. Stop rolls back agent output and preserves the initiating request.
 - **Paused turn**: Interview or Plan state saved while waiting for the user.
 - **Layer**: a set of Execute tasks whose dependencies are all done; they run in parallel.
 - **Transient event**: pushed live, never stored, never replayed.

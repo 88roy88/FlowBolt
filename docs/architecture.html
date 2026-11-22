@@ -49,7 +49,7 @@ body {
   background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.wrap { max-width: 1080px; margin: 0 auto; padding-block: 48px 72px; display: grid; gap: 72px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 48px 72px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; }
 header { display: grid; gap: 16px; }
 .eyebrow { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
@@ -66,7 +66,19 @@ nav a {
 }
 nav a span { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
 nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
-section { display: grid; gap: 20px; scroll-margin-top: 24px; }
+section { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--line); padding-top: 28px; gap: 20px; scroll-margin-top: 24px; }
+.steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.steps li { border-inline-start: 3px solid var(--accent); padding-inline-start: 14px; }
+.steps strong { display: block; margin-bottom: 4px; }
+details { min-width: 0; }
+summary { cursor: pointer; color: var(--accent); font-weight: 600; padding-block: 8px; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+details[open] > :not(summary) { margin-top: 16px; }
+footer a { color: var(--accent); }
+@media (max-width: 720px) {
+  .steps { grid-template-columns: 1fr; gap: 16px; }
+  .wrap { gap: 32px; padding-top: 28px; }
+}
 .head { display: grid; gap: 8px; }
 .num { font-family: var(--font-mono); font-size: 13px; color: var(--accent); letter-spacing: .04em; }
 .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 32px; }
@@ -130,31 +142,38 @@ svg text { font-family: var(--font-body); }
 
 <div class="wrap">
   <header>
-    <div class="eyebrow">BuildApp · develop @ 910aa808 · onboarding</div>
+    <div class="eyebrow">BuildApp architecture</div>
     <h1>How a chat message becomes a running app</h1>
-    <p class="lede">A visual tour of the backend and the browser IDE, for engineers joining the team. Every box here matches a section of <code>docs/architecture.md</code>, which holds the line-by-line references.</p>
+    <p class="lede">Follow a reading-list app from its first chat message to its public share link. Open any diagram for implementation details.</p>
     <nav aria-label="Sections">
       <ol>
-        <li><a href="#system"><span>§1</span>System map</a></li>
-        <li><a href="#turn"><span>§2</span>Lifecycle of a chat turn</a></li>
-        <li><a href="#agents"><span>§3</span>Agents</a></li>
-        <li><a href="#sandbox"><span>§5</span>Sandbox</a></li>
-        <li><a href="#versioning"><span>§6</span>Versioning</a></li>
-        <li><a href="#publish"><span>§7</span>Publish</a></li>
+        <li><a href="#system">System map</a></li>
+        <li><a href="#turn">Chat turns</a></li>
+        <li><a href="#agents">Agents</a></li>
+        <li><a href="#sandbox">Live preview</a></li>
+        <li><a href="#versioning">Versions</a></li>
+        <li><a href="#publish">Publishing</a></li>
       </ol>
     </nav>
   </header>
 
-  <!-- §1 -->
+  <!-- Section 1 -->
   <section id="system">
     <div class="head">
-      <div class="num">§1</div>
-      <h2>System map</h2>
-      <p>One FastAPI process serves the IDE, runs the agents and owns every project's sandbox. Durable state lives in Postgres, the workspace disk and S3.</p>
+      <div class="num">System map</div>
+      <h2>Where does my request go?</h2>
+      <p>Suppose you ask BuildApp to build a reading list. Three parts of the system work together before you see the first preview.</p>
     </div>
+    <ol class="steps">
+      <li><strong>Browser IDE</strong>You type the request into chat. Nginx serves the IDE and forwards its chat connection to FastAPI.</li>
+      <li><strong>Backend</strong>FastAPI receives the message. The agent calls the model and sends progress events back to chat. Postgres stores chat history and run state.</li>
+      <li><strong>Workspace</strong>When the agent writes code, it writes files into the project’s workspace. Vite serves those files to the preview iframe.</li>
+    </ol>
+    <details>
+      <summary>System map and service connections</summary>
     <figure>
       <div class="scroll">
-        <svg viewBox="0 0 1000 480" role="img" aria-label="The browser IDE talks to one backend process over HTTP and WebSockets. The backend keeps live event channels and running sandboxes in memory, and uses Postgres, S3, the LLM, FLAPI and the directory service.">
+        <svg viewBox="0 0 1000 480" role="img" aria-label="Nginx serves the IDE and forwards HTTP and WebSocket requests to one backend process. The backend holds active agents, live event channels and sandbox instances in memory, and uses Postgres, S3, the LLM, FLAPI and the directory service.">
           <rect class="box" x="20" y="30" width="200" height="330" rx="10"/>
           <text class="t" x="38" y="58">Browser IDE</text>
           <text class="s" x="38" y="76">React 19 · Zustand · React Query</text>
@@ -210,7 +229,7 @@ svg text { font-family: var(--font-body); }
           <text class="s" x="798" y="427">users &amp; groups</text>
 
           <path class="e acc" d="M202 116 H318"/>
-          <text class="lab acc" x="260" y="108" text-anchor="middle">HTTP + WS</text>
+          <text class="lab acc" x="260" y="108" text-anchor="middle">via Nginx</text>
           <path class="e" d="M202 284 C262 284 262 385 332 385"/>
           <text class="lab" x="268" y="342" text-anchor="middle">preview proxy</text>
           <path class="e" d="M220 422 H298"/>
@@ -222,25 +241,33 @@ svg text { font-family: var(--font-body); }
           <path class="e" d="M660 413 H778"/><text class="lab" x="720" y="405" text-anchor="middle">group lookup</text>
         </svg>
       </div>
-      <figcaption>The dashed region is what a restart loses: live event subscriptions and running dev servers. Workspaces on disk survive, and startup reconciles them against the projects table.</figcaption>
+      <figcaption>A backend restart interrupts active agents and clears live subscriptions and sandbox registrations. Workspaces on disk survive, and startup reconciles them against the projects table.</figcaption>
     </figure>
     <div class="notes">
-      <p><strong>One pod today</strong>Prod runs one backend process, so it can keep live events and sandboxes in memory. Locks, run claims and Stop go through Postgres.<span class="ref">db/events.py:17 · sandbox/manager.py:21</span></p>
+      <p><strong>One pod today</strong>Production runs one backend pod. Agent tasks, event subscriptions and sandbox registrations live in its process. Locks, run claims and Stop go through Postgres.<span class="ref">api/chat.py:44 · db/events.py:17 · sandbox/manager.py:21</span></p>
       <p><strong>Every LLM call is wrapped</strong>Agents never call LiteLLM directly. <code>complete_chat</code>, <code>complete_chat_with_tools</code> and <code>stream_chat</code> are the only entry points.<span class="ref">ai/core/provider.py:52 · :82 · :111</span></p>
       <p><strong>Startup and shutdown</strong>Startup kills orphan dev servers, deletes workspaces of deleted projects, then starts the idle reaper, heartbeat reaper and abort listener. Shutdown suspends every sandbox.<span class="ref">main.py:53</span></p>
     </div>
+    </details>
   </section>
 
-  <!-- §2 -->
+  <!-- Section 2 -->
   <section id="turn">
     <div class="head">
-      <div class="num">§2</div>
-      <h2>Lifecycle of a chat turn</h2>
-      <p>A turn is one agent run. At most one runs per project: the claim is a heartbeat row in Postgres, and the turn ends in a git commit or a rollback.</p>
+      <div class="num">Chat turns</div>
+      <h2>What happens after I press Send?</h2>
+      <p>A turn is one agent run. Asking for the reading list starts a turn. Approving its plan later starts another.</p>
     </div>
+    <ol class="steps">
+      <li><strong>Claim the project</strong>Before saving the request, the backend checks for an active run, unsaved edits or a version preview. If the checks pass, it claims the run in Postgres.</li>
+      <li><strong>Run and stream</strong>The backend saves the prompt and starts the agent. Events update chat. A heartbeat tells other requests that the project is busy.</li>
+      <li><strong>Finish or stop</strong>On success or failure, the backend attempts to commit changed files. Stop resets the workspace and trims agent output while keeping the request. The backend then releases the claim.</li>
+    </ol>
+    <details>
+      <summary>Turn sequence, heartbeat and rollback</summary>
     <figure>
       <div class="scroll">
-        <svg viewBox="0 0 1000 540" role="img" aria-label="Swimlane of one turn: the browser sends a message, the chat WebSocket claims the run through versioning and a Postgres heartbeat, saves the message, starts the agent, beats every 15 seconds while events stream to the browser, then commits or rolls back and clears the heartbeat.">
+        <svg viewBox="0 0 1000 540" role="img" aria-label="Swimlane of one turn: the browser sends a message, the chat WebSocket claims the run through versioning and a Postgres heartbeat, saves the message, starts the agent, beats every 15 seconds while events stream to the browser, then attempts to commit changes or rolls back agent output on Stop before clearing the heartbeat.">
           <rect class="lane" x="0" y="20" width="1000" height="100"/>
           <rect class="lane" x="0" y="220" width="1000" height="100"/>
           <rect class="lane" x="0" y="420" width="1000" height="100"/>
@@ -286,22 +313,30 @@ svg text { font-family: var(--font-body); }
       </div>
       <figcaption>Claim first, then save the message: a refused turn ("Can't edit while the AI is working") leaves nothing behind. The workspace lock is held only for the claim; for the rest of the run, the fresh heartbeat row marks the project busy.</figcaption>
     </figure>
-    <div class="legend"><span><i class="lg-ok"></i>finished or failed: whatever the agent wrote is committed</span><span><i class="lg-fail"></i>Stop: workspace reset, the turn's events and messages deleted</span></div>
+    <div class="legend"><span><i class="lg-ok"></i>Finished or failed · commit workspace changes if present</span><span><i class="lg-fail"></i>Stop · reset files and trim agent output, keeping the initiating request</span></div>
     <div class="notes">
       <p><strong>begin_turn refuses when</strong>a run is already active, the workspace is previewing an old version, or there are unsaved user edits.<span class="ref">services/versioning/service.py:152 · db/heartbeat.py:49</span></p>
       <p><strong>Stop works through Postgres</strong><code>pg_notify('run_abort')</code> wakes the watcher in the heartbeat loop, which cancels the run. Stopping Execute or a resumed interview re-pauses the plan or questions.<span class="ref">services/run_abort.py:41 · api/chat.py:347, :378</span></p>
-      <p><strong>Crashed runs heal</strong>The heartbeat reaper deletes heartbeats older than 60 s and tells the browser "Agent run was interrupted".<span class="ref">db/heartbeat.py:83 · config.py:35</span></p>
-      <p><strong>Events drive the UI (§4)</strong>Stored events are replayed on reload through the same handler used live. Transient ones, like streamed file contents, are never stored.<span class="ref">db/events.py:68, :81 · stores/chat.ts:401</span></p>
+      <p><strong>Interrupted runs</strong>After a crash, the reaper removes stale heartbeats and reports the interruption. Interview and Plan turns already paused in Postgres can resume on the user's reply.<span class="ref">db/heartbeat.py:83 · config.py:35</span></p>
+      <p><strong>Events drive the UI (section 4)</strong>Stored events are broadcast by default. Prompts and fix requests are saved silently and appear in another tab on history reload. Transient events reach live subscribers only.<span class="ref">db/events.py:68, :81 · api/chat.py:219 · stores/chat.ts:401</span></p>
     </div>
+    </details>
   </section>
 
-  <!-- §3 -->
+  <!-- Section 3 -->
   <section id="agents">
     <div class="head">
-      <div class="num">§3</div>
-      <h2>Agents</h2>
-      <p>Plan, Execute and FixError are step machines (<code>Flow</code>). FollowUp is a ReAct tool loop. Interview and Plan end their run by pausing, and the user's reply starts the next turn.</p>
+      <div class="num">Agents</div>
+      <h2>Which agent handles the request?</h2>
+      <p>The router looks for a stored <code>action_complete</code> event. Until the first one exists, the router treats the project as new.</p>
     </div>
+    <ol class="steps">
+      <li><strong>First build</strong>Interview mode can ask clarifying questions. Plan drafts the overview and waits for approval. Accepting starts Execute, which writes files and checks the build.</li>
+      <li><strong>Later edits</strong>Once the first build completes, “Add a rating to each book” goes to FollowUp. It can inspect the workspace, edit files and reply directly.</li>
+      <li><strong>Reported errors</strong>Clicking Fix on an error starts FixError. Execute also has its own repair loop during the initial build.</li>
+    </ol>
+    <details>
+      <summary>Agent routing, task dependencies and retry limits</summary>
     <figure>
       <div class="scroll">
         <svg viewBox="0 0 1100 610" role="img" aria-label="AgentRouter sends new projects to Interview (interview mode) or Plan, and existing projects to FollowUp. Interview pauses for answers, Plan pauses for approval, and accepting runs Execute with a fix loop of up to 10 attempts. FixError, started from an error toast, has its own retry loop of up to 3.">
@@ -393,18 +428,26 @@ svg text { font-family: var(--font-body); }
       <p><strong>Build errors are text-matched</strong>Validation reports an error when the output contains "error" or "failed"; exit codes aren't read.<span class="ref">sandbox/pnpm_mixin.py:83</span></p>
       <p><strong>The resume point</strong>Plan pauses with the whole <code>BuildState</code>. Accepting loads it into Execute; modify regenerates only the overview.<span class="ref">plan/agent.py:166, :175 · ai/state.py:12</span></p>
     </div>
+    </details>
   </section>
 
-  <!-- §5 -->
+  <!-- Section 5 -->
   <section id="sandbox">
     <div class="head">
-      <div class="num">§5</div>
-      <h2>Sandbox</h2>
-      <p>Each project is a workspace directory plus a Vite dev server on its own port. Sandboxes start when needed and suspend when idle; the files stay on disk.</p>
+      <div class="num">Live preview</div>
+      <h2>How does the preview stay current?</h2>
+      <p>The preview is the running development copy of the app. Each active sandbox has its own directory and Vite server port.</p>
     </div>
+    <ol class="steps">
+      <li><strong>Start Vite</strong>Opening chat or the preview wakes the sandbox. A wake starts Vite if needed. An ordinary lookup refreshes the idle timer.</li>
+      <li><strong>Show an edit</strong>The iframe loads the app through the backend proxy. When Vite sends a hot update, the proxy takes the workspace lock before forwarding it to the browser.</li>
+      <li><strong>Return later</strong>The idle reaper can suspend the sandbox and release its port. The files stay on disk, ready for the next wake.</li>
+    </ol>
+    <details>
+      <summary>Sandbox lifecycle and preview connections</summary>
     <figure>
       <div class="scroll">
-        <svg viewBox="0 0 1000 340" role="img" aria-label="Sandbox lifecycle: create copies the template and installs, running serves the dev server on a pooled port, idle for 300 seconds suspends it, any use wakes it, and deleting the project destroys it. The preview iframe reaches the dev server through the backend proxy, with HMR relayed under the workspace lock.">
+        <svg viewBox="0 0 1000 340" role="img" aria-label="Sandbox lifecycle: create copies the template and installs, running serves the dev server on a pooled port, idle for 300 seconds suspends it, a wake request ensures Vite is running, and deleting the project destroys it. The preview iframe reaches the dev server through the backend proxy, with Vite-to-browser HMR updates forwarded under the workspace lock.">
           <rect class="box" x="20" y="30" width="220" height="96" rx="10"/>
           <text class="t" x="38" y="56">Create</text>
           <text class="s" x="38" y="76">copy pnpm-project-template</text>
@@ -414,7 +457,7 @@ svg text { font-family: var(--font-body); }
           <text class="t" x="318" y="56">Running</text>
           <text class="s" x="318" y="76">pnpm dev --port N</text>
           <text class="s" x="318" y="93">N from 3501–4501</text>
-          <text class="s" x="318" y="110">every use resets idle timer</text>
+          <text class="s" x="318" y="110">lookup resets idle timer</text>
           <rect class="box" x="590" y="30" width="200" height="96" rx="10"/>
           <text class="t" x="608" y="56">Suspended</text>
           <text class="s" x="608" y="76">processes killed</text>
@@ -444,28 +487,36 @@ svg text { font-family: var(--font-body); }
           <text class="s" x="708" y="249">127.0.0.1:N</text>
           <path class="e acc" d="M200 234 H288"/><text class="lab acc" x="244" y="226" text-anchor="middle">HTTP</text>
           <path class="e acc" d="M590 234 H688"/><text class="lab acc" x="639" y="226" text-anchor="middle">proxied</text>
-          <path class="e dash" d="M110 264 V300 H790 V266"/>
-          <text class="lab" x="450" y="322" text-anchor="middle">Vite HMR WebSocket · each message relayed under the workspace lock</text>
+          <path class="e dash" d="M790 264 V300 H110 V266"/>
+          <text class="lab" x="450" y="322" text-anchor="middle">Vite → browser · HMR updates hold the workspace lock</text>
         </svg>
       </div>
-      <figcaption>Prod uses <code>SANDBOX_MODE=local</code> on Linux (<code>PnpmSandboxUnix</code>), overriding the <code>namespaced</code> set in <code>backend/Dockerfile</code>. <code>namespaced</code> runs each sandbox under nsjail, and Windows dev gets <code>PnpmSandboxWindows</code>.</figcaption>
+      <figcaption>Prod uses <code>AIB_SANDBOX_MODE=local</code> on Linux (<code>PnpmSandboxUnix</code>), overriding the <code>namespaced</code> set in <code>backend/Dockerfile</code>. <code>namespaced</code> runs each sandbox under nsjail, and Windows dev gets <code>PnpmSandboxWindows</code>.</figcaption>
     </figure>
     <div class="notes">
-      <p><strong>Who wakes it</strong>Opening the chat socket, the preview proxy, and every sandbox lookup all go through <code>get_sandbox</code>, which also resets the idle timer.<span class="ref">sandbox/manager.py:57, :72</span></p>
+      <p><strong>Who wakes it</strong>A lookup gets the sandbox and resets its idle timer. The chat socket and preview proxy also wake the sandbox, starting Vite if needed.<span class="ref">sandbox/manager.py:57, :75</span></p>
       <p><strong>Other project sockets</strong>Terminal (admins only in local mode), server log, and errors, which watches <code>.dev-server.log</code> and feeds the error toast.<span class="ref">api/errors.py:21 · api/deps.py:213</span></p>
     </div>
+    </details>
   </section>
 
-  <!-- §6 -->
+  <!-- Section 6 -->
   <section id="versioning">
     <div class="head">
-      <div class="num">§6</div>
-      <h2>Versioning</h2>
-      <p>Every workspace is its own git repo on <code>main</code>. Each AI turn is a commit, and every operation runs under a per-project Postgres advisory lock.</p>
+      <div class="num">Versions</div>
+      <h2>When does a change become a version?</h2>
+      <p>The reading list has its own Git history. A read-only follow-up can answer a question without adding a version.</p>
     </div>
+    <ol class="steps">
+      <li><strong>Save changes</strong>An agent turn that changes files can add a commit. If you edit files yourself, save or discard those edits before starting another turn.</li>
+      <li><strong>Preview a version</strong>Choose an older commit to inspect it. Editing is blocked during preview. Exit preview to return to the latest version.</li>
+      <li><strong>Restore a version</strong>Restore moves the project’s main branch back to the chosen commit and removes later chat events and messages.</li>
+    </ol>
+    <details>
+      <summary>Git history, preview and restore operations</summary>
     <figure>
       <div class="scroll">
-        <svg viewBox="0 0 1000 290" role="img" aria-label="Commits on main: Version 0, AI turns and the user's saved edits. Previewing checks out an old commit detached. Restoring moves main back and trims later history. Unsaved edits are either saved as a commit or discarded.">
+        <svg viewBox="0 0 1000 290" role="img" aria-label="Version 0 starts the history on main. AI turns that change files and user saves can add commits. Previewing checks out an old commit detached. Restoring moves main back and trims later history. Unsaved edits are either saved as a commit or discarded.">
           <line class="trunk" x1="60" y1="130" x2="880" y2="130"/>
           <text class="lane-l" x="896" y="134">main</text>
           <circle class="dot" cx="100" cy="130" r="9"/><text class="t2" x="100" y="104" text-anchor="middle">Version 0</text><text class="s" x="100" y="160" text-anchor="middle">blank scaffold</text>
@@ -492,17 +543,25 @@ svg text { font-family: var(--font-body); }
     </figure>
     <div class="notes">
       <p><strong>Self-healing lock</strong>Under the advisory lock, a leftover <code>index.lock</code> can only come from a git that was killed mid-command, so it's deleted.<span class="ref">services/versioning/service.py:89, :93</span></p>
-      <p><strong>Rollback reuses git</strong>Stopping a turn is <code>reset --hard</code> + <code>clean -fd</code> to the last commit, plus trimming that turn's events and messages.<span class="ref">services/versioning/service.py:212</span></p>
+      <p><strong>Rollback reuses git</strong>Stopping a turn is <code>reset --hard</code> + <code>clean -fd</code> to the last commit, plus trimming events and messages after the rollback boundary. The prompt or fix request that started the turn stays in history.<span class="ref">services/versioning/service.py:212</span></p>
     </div>
+    </details>
   </section>
 
-  <!-- §7 -->
+  <!-- Section 7 -->
   <section id="publish">
     <div class="head">
-      <div class="num">§7</div>
-      <h2>Publish</h2>
-      <p>Publishing builds the sandbox once and copies <code>dist/</code> to S3. After that, visitors are served from S3 with no sandbox involved.</p>
+      <div class="num">Publishing</div>
+      <h2>What do visitors get when I publish?</h2>
+      <p>Publishing makes a build of the reading list available at a share link. Later workspace edits reach visitors when you publish again.</p>
     </div>
+    <ol class="steps">
+      <li><strong>Build</strong>A user with publish permission starts a production build in the sandbox. The backend collects the output from <code>dist/</code>.</li>
+      <li><strong>Upload</strong>The backend uploads the build to S3 under the project ID and saves the share handle, using the chosen slug or the project ID.</li>
+      <li><strong>Serve</strong>A visitor opens <code>/shared/{handle}/</code>. FastAPI resolves the handle and serves the published files from S3. The sandbox can be asleep.</li>
+    </ol>
+    <details>
+      <summary>Publish request, storage and public serving path</summary>
     <figure>
       <div class="scroll">
         <svg viewBox="0 0 1000 300" role="img" aria-label="Publish: the request builds dist in the sandbox, uploads it to S3 under the project prefix and saves the handle. Serving: a visitor requests /shared/handle, the backend maps the handle to the project and reads the file from S3, falling back to index.html for client-side routes.">
@@ -538,10 +597,11 @@ svg text { font-family: var(--font-body); }
       </div>
       <figcaption>Hashed <code>assets/</code> are cached for a year and HTML is <code>no-cache</code>, so a republish shows up on the next page load. Page loads are counted as page views.</figcaption>
     </figure>
+    </details>
   </section>
 
   <footer>
-    <div>The text source of truth is <code>docs/architecture.md</code>: every claim there cites the code on <code>develop</code>. This page shows the same sections as diagrams.</div>
+    <div>For source references and the sections on event delivery, data sources and access, read the <a href="architecture.md">architecture guide</a>.</div>
     <div class="mono">Snapshot: develop @ 910aa808 · paths relative to backend/src/flow44/ and frontend/src/</div>
   </footer>
 </div>
