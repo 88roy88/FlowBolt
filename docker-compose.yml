@@ -81,7 +81,7 @@ services:
     volumes:
       - ./mocks/flapi-mock:/app
       - /app/node_modules
-    command: sh -c "corepack enable && corepack install -g pnpm@12 && pnpm install --frozen-lockfile && pnpm start"
+    command: sh -c "corepack enable && corepack install -g pnpm@11 && pnpm install --frozen-lockfile && pnpm start"
     environment:
       MOCK_PORT: "6001"
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
@@ -97,7 +97,7 @@ services:
     volumes:
       - ./mocks/directory-mock:/app
       - /app/node_modules
-    command: sh -c "corepack enable && corepack install -g pnpm@12 && pnpm install --frozen-lockfile && pnpm start"
+    command: sh -c "corepack enable && corepack install -g pnpm@11 && pnpm install --frozen-lockfile && pnpm start"
     environment:
       MOCK_PORT: "6002"
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"

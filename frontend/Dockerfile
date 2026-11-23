@@ -8,7 +8,7 @@ ARG NPM_STRICT_SSL=true
 RUN npm set registry ${NPM_REGISTRY}
 RUN npm config set strict-ssl ${NPM_STRICT_SSL}
 
-RUN npm install -g pnpm@12
+RUN npm install -g pnpm
 
 WORKDIR /app
 

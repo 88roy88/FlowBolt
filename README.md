@@ -10,7 +10,7 @@ AI-powered web app builder. The backend is a FastAPI service; the frontend is a 
 | ------------------------------------------- | -------------------------------------------- |
 | [uv](https://docs.astral.sh/uv/)            | Python package/environment manager (backend) |
 | [Node.js](https://nodejs.org/) 24           | Frontend & mocks                             |
-| [pnpm](https://pnpm.io/) 12                 | Node package manager (frontend & mocks)      |
+| [pnpm](https://pnpm.io/) 11                 | Node package manager (frontend & mocks)      |
 | [Docker](https://www.docker.com/) + Compose | Postgres / MinIO, full-stack mode            |
 
 ---
