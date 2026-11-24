@@ -28,7 +28,7 @@ cd frontend && pnpm install && cd ..
 cp backend/.env.example backend/.env
 ```
 
-Set `AIB_AI_API_KEY` to your [OpenRouter](https://openrouter.ai/keys) key; the default model is DeepSeek V4.1 Flash. The DB and S3 values already match Compose. `backend/.env.example` also shows other providers (vLLM, Ollama, Anthropic, Bedrock) and Opik tracing; every setting, with its default, is in `backend/src/flow44/config.py`.
+Set `AIB_AI_MODEL`, `AIB_AI_BASE_URL` and `AIB_AI_API_KEY` for your provider; `backend/.env.example` has examples for OpenRouter, Ollama, Anthropic and Bedrock, plus Opik tracing. The DB and S3 values already match Compose. Every setting, with its default, is in `backend/src/flow44/config.py`.
 
 ---
 
