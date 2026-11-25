@@ -1,7 +1,7 @@
 x-db-shared: &db-shared
   POSTGRES_USER: &db-user postgres
   POSTGRES_PASSWORD: &db-pass postgres
-  POSTGRES_DB: &db-name buildapp
+  POSTGRES_DB: &db-name flow44
   DB_HOST: &db-host postgres
   DB_PORT: &db-port 5432
 
@@ -11,7 +11,7 @@ x-minio-shared: &minio-shared
   AIB_S3_ACCESS_KEY: *s3-user
   AIB_S3_SECRET_KEY: *s3-pass
   AIB_S3_ENDPOINT_URL: http://minio:9000
-  AIB_S3_BUCKET_NAME: buildapp
+  AIB_S3_BUCKET_NAME: flow44
 
 services:
   migrate:
@@ -127,7 +127,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: buildapp-postgres
+    container_name: flow44-postgres
     environment: *db-shared
     ports:
       - "5432:5432"

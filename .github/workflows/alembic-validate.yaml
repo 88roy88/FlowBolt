@@ -24,7 +24,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: buildapp
+          POSTGRES_DB: flow44
         ports:
           - 5432:5432
         options: >-
@@ -37,7 +37,7 @@ jobs:
       AIB_DB_PASSWORD: postgres
       AIB_DB_HOST: localhost
       AIB_DB_PORT: 5432
-      AIB_DB_NAME: buildapp
+      AIB_DB_NAME: flow44
       # Dummy values to satisfy required-field validation; unrelated to migrations.
       AIB_AUTH_JWT_PUBLIC_KEY: alembic-ci-not-used
       AIB_S3_ENDPOINT_URL: http://localhost:9000
