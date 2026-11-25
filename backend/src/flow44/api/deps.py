@@ -4,7 +4,8 @@ from contextvars import ContextVar
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Cookie, Depends, Header, HTTPException, WebSocketException, status
+from fastapi import Cookie, Depends, HTTPException, WebSocketException, status
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from flow44.auth.permissions import (
@@ -69,8 +70,11 @@ class TokenPayload(BaseModel):
         }
 
 
+authorization_scheme = APIKeyHeader(name="Authorization", auto_error=False)
+
+
 def get_authorization_header(
-    authorization: str | None = Header(None, alias="Authorization"),
+    authorization: str | None = Depends(authorization_scheme),
     flow44_token: str | None = Cookie(None, alias=settings.AUTH_COOKIE_NAME),
 ) -> str | None:
     raw = (authorization or flow44_token or "").strip()
