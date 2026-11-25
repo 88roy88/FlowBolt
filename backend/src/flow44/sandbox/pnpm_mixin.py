@@ -18,7 +18,12 @@ class BuildCommandResult(BaseModel):
 
 
 class PnpmMixin(BaseSandbox, ABC):
-    def configure_npmrc(self) -> None:
+    def configure_npmrc(self) -> bool:
+        """Write the project's .npmrc from current settings. Returns True if the file changed.
+
+        Idempotent: also called when waking an existing workspace so that changes to the
+        store dir / registry settings reach projects scaffolded before the change.
+        """
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
         store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
 
@@ -29,8 +34,16 @@ class PnpmMixin(BaseSandbox, ABC):
             f"store-dir={store_path}\n"
         )
 
+        try:
+            with open(npmrc, encoding="utf-8") as f:
+                if f.read() == content:
+                    return False
+        except FileNotFoundError:
+            pass
+
         with open(npmrc, "w", encoding="utf-8") as f:
             f.write(content)
+        return True
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)
