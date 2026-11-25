@@ -18,7 +18,7 @@ class BuildCommandResult(BaseModel):
 
 
 class PnpmMixin(BaseSandbox, ABC):
-    def configure_npmrc(self) -> bool:
+    def configure_npmrc(self) -> None:
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
         store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
 
@@ -32,13 +32,12 @@ class PnpmMixin(BaseSandbox, ABC):
         try:
             with open(npmrc, encoding="utf-8") as f:
                 if f.read() == content:
-                    return False
+                    return
         except FileNotFoundError:
             pass
 
         with open(npmrc, "w", encoding="utf-8") as f:
             f.write(content)
-        return True
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)
