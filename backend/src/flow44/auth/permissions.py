@@ -1,6 +1,8 @@
 from collections.abc import Iterable
 from enum import StrEnum
 
+from flow44.config import settings
+
 
 class Permission(StrEnum):
     read = "read"
@@ -77,6 +79,10 @@ def get_owner_permissions() -> set[Permission]:
 
 def get_admin_permissions() -> set[Permission]:
     return set(_ADMIN_PERMISSIONS)
+
+
+def is_admin(user_id: str) -> bool:
+    return user_id in settings.SYSTEM_ADMIN_IDS
 
 
 def has_permission(user_permissions: set[Permission], required: Permission) -> bool:
