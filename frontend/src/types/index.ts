@@ -41,7 +41,7 @@ export type AgentCard =
   | { type: 'fix_progress'; steps: FixStep[]; diffs?: FileDiff[] }
   | { type: 'data_sources_fetched'; dataSources: { dataSourceId: string; dataSourceName: string; dataSchema: string; relevantFields?: string }[] }
 
-  | { type: 'followup_progress'; steps: FollowUpStep[]; answer?: string; filesChanged?: string[]; diffs?: FileDiff[] }
+  | { type: 'followup_progress'; steps: FollowUpStep[]; answer?: string; filesChanged?: string[]; diffs?: FileDiff[]; stepLimitReached?: boolean }
   | { type: 'interview_answered'; questions: InterviewQuestion[]; answers: InterviewAnswer[] };
 
 export interface Action {
@@ -272,6 +272,7 @@ export type WSMessage = { _ts?: string } & (
   | { type: 'data_sources_fetched'; data_sources: { data_source_id: string; data_source_name: string; data_schema: string; relevant_fields?: string }[] }
   | { type: 'data_source_error'; message: string }
 
+  | { type: 'step_limit_reached' }
   | { type: 'followup_step'; tool: string; args: Record<string, string>; status: string; result_preview?: string; iteration: number }
   | { type: 'file_diffs'; diffs: FileDiff[] }
   | { type: 'user_message'; content: string; data_sources?: { id: number; name: string }[]; selected_elements?: Omit<SelectedElement, 'id'>[]; error_fix_request?: { errorMessage: string; errorFile?: string; errorLine?: number; errorStack?: string } }
