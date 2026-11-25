@@ -27,8 +27,14 @@ _client_app_version: ContextVar[str | None] = ContextVar("client_app_version", d
 class RequestContextFilter(logging.Filter):
     _hostname = socket.gethostname()
 
+    def __init__(self, environment: str | None = None) -> None:
+        super().__init__()
+        self._environment = environment
+
     def filter(self, record: logging.LogRecord) -> bool:
         record.hostname = self._hostname
+        if self._environment:
+            record.environment = self._environment
         if user_id := _user_id.get():
             record.user_id = user_id
         if project_id := _project_id.get():
@@ -41,8 +47,8 @@ class RequestContextFilter(logging.Filter):
         return True
 
 
-def setup_logging(log_file_path: str | None = None) -> None:
-    context_filter = RequestContextFilter()
+def setup_logging(log_file_path: str | None = None, environment: str | None = None) -> None:
+    context_filter = RequestContextFilter(environment)
 
     console = logging.StreamHandler()
     console.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
@@ -53,7 +59,7 @@ def setup_logging(log_file_path: str | None = None) -> None:
     if log_file_path:
         file = logging.handlers.RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=5)
         format_str = (
-            "%(asctime)s %(hostname)s %(name)s %(levelname)s %(user_id)s "
+            "%(asctime)s %(hostname)s %(environment)s %(name)s %(levelname)s %(user_id)s "
             "%(project_id)s %(project_name)s %(source)s %(client_app_version)s %(message)s"
         )
         file.setFormatter(
