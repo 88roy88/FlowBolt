@@ -201,6 +201,12 @@ async def sync_protected_files(user_id: AdminDep) -> list[ProjectMaintenanceResu
     return await run_over_projects(sync_files)
 
 
+@router.post("/maintenance/configure-npmrc", tags=["maintenance"])
+async def configure_projects_npmrc(user_id: AdminDep) -> list[ProjectMaintenanceResult]:
+    """Rewrite each project's .npmrc from the current npm/pnpm settings."""
+    return await run_over_projects(lambda project: configure_project_npmrc(project.id))
+
+
 @router.post("/maintenance/reinstall-dependencies", tags=["maintenance"])
 async def reinstall_project_dependencies(user_id: AdminDep) -> list[ProjectMaintenanceResult]:
     """Refresh .npmrc, delete node_modules and reinstall so dependencies are hard-linked from the shared pnpm store."""
@@ -209,9 +215,3 @@ async def reinstall_project_dependencies(user_id: AdminDep) -> list[ProjectMaint
         return await reinstall_dependencies(project.id)
 
     return await run_over_projects(reinstall)
-
-
-@router.post("/maintenance/configure-npmrc", tags=["maintenance"])
-async def configure_projects_npmrc(user_id: AdminDep) -> list[ProjectMaintenanceResult]:
-    """Rewrite each project's .npmrc from the current npm/pnpm settings."""
-    return await run_over_projects(lambda project: configure_project_npmrc(project.id))
