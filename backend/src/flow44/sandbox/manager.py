@@ -66,8 +66,6 @@ class SandboxManager:
 
             sandbox = self._create_sandbox_instance(info)
             await sandbox.start()
-            if await sandbox.is_scaffolded():
-                sandbox.configure_npmrc()
 
             self._sandboxes[project_id] = sandbox
 

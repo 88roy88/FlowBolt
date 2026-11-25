@@ -12,8 +12,9 @@ async def reinstall_dependencies(project_id: str) -> str:
         return "workspace not present on this pod or not scaffolded, skipped"
 
     await sandbox_manager.suspend_sandbox(project_id)
-    sandbox = await sandbox_manager.get_sandbox(project_id)  # also refreshes .npmrc
+    sandbox = await sandbox_manager.get_sandbox(project_id)
     try:
+        sandbox.configure_npmrc()
         await asyncio.to_thread(shutil.rmtree, os.path.join(workspace_dir, "node_modules"), True)
         async for _ in sandbox.exec("pnpm install 2>&1"):
             pass
