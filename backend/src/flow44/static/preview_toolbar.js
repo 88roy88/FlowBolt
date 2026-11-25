@@ -699,6 +699,39 @@
     ui.appendChild(bar);
   }
 
+  // Tells the builder which in-app route is showing, relative to the proxy base.
+  var routeBase = match[0].slice(0, -1);
+  var lastRoute = null;
+
+  function reportRoute() {
+    var path = location.pathname;
+    if (path.indexOf(routeBase) === 0) path = path.slice(routeBase.length) || '/';
+    var route = path + location.search + location.hash;
+    if (route === lastRoute) return;
+    lastRoute = route;
+    send({ type: 'route-changed', route: route });
+  }
+
+  ['pushState', 'replaceState'].forEach(function (method) {
+    var original = history[method];
+    history[method] = function () {
+      var result = original.apply(this, arguments);
+      reportRoute();
+      return result;
+    };
+  });
+  window.addEventListener('popstate', reportRoute);
+  window.addEventListener('hashchange', reportRoute);
+
+  // Tells the builder the page's title, which apps can also change at runtime.
+  var lastTitle = null;
+
+  function reportTitle() {
+    if (document.title === lastTitle) return;
+    lastTitle = document.title;
+    send({ type: 'title-changed', title: lastTitle });
+  }
+
   function mount() {
     document.body.appendChild(hostEl);
     // Re-attach if the app replaces body content.
@@ -706,6 +739,9 @@
       if (!hostEl.isConnected) document.body.appendChild(hostEl);
     }).observe(document.body, { childList: true });
     hello();
+    reportRoute();
+    reportTitle();
+    new MutationObserver(reportTitle).observe(document.head, { childList: true, subtree: true, characterData: true });
   }
 
   if (document.body) mount();

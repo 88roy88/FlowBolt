@@ -7,7 +7,7 @@ import { WRITE_ROLES } from '../types';
 import { parseSelectedElement } from '../utils/selectedElement';
 
 /** Matches backend `static/preview_toolbar.js`. */
-const TOOLBAR_SOURCE = 'buildapp-toolbar';
+export const TOOLBAR_SOURCE = 'buildapp-toolbar';
 const BUILDER_SOURCE = 'buildapp-builder';
 
 /** Adds elements picked in the preview (iframe or opened tab) to the chat input, and sends prompts written there. */

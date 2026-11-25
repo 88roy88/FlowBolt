@@ -375,6 +375,15 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     return route.fulfill({ json: { model: 'mock/test-model' } });
   });
 
+  // --- Unmocked, these reach the dev proxy, whose 401 signs the app out mid-test ---
+  await page.route('**/api/projects/*/model', async (route) => {
+    return route.fulfill({ json: { model: 'mock/test-model' } });
+  });
+
+  await page.route('**/api/bi/events', async (route) => {
+    return route.fulfill({ status: 204 });
+  });
+
   // --- Preview ---
   await page.route(`**/api/preview/*/port`, async (route) => {
     return route.fulfill({ json: { port: 3001 } });
