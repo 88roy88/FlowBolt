@@ -2,7 +2,7 @@ import contextlib
 import functools
 import os
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import psycopg
 import pytest
@@ -43,6 +43,11 @@ flow44.db.database.get_engine = get_engine
 @pytest.fixture
 def tmp_dir(tmp_path: Path) -> Path:
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def no_opik_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("flow44.ai.core.opik_utils.get_global_client", MagicMock())
 
 
 @pytest.fixture(autouse=True)
