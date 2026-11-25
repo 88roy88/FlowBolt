@@ -19,11 +19,6 @@ class BuildCommandResult(BaseModel):
 
 class PnpmMixin(BaseSandbox, ABC):
     def configure_npmrc(self) -> bool:
-        """Write the project's .npmrc from current settings. Returns True if the file changed.
-
-        Idempotent: also called when waking an existing workspace so that changes to the
-        store dir / registry settings reach projects scaffolded before the change.
-        """
         npmrc = os.path.join(self.workspace_dir, ".npmrc")
         store_path = "/.pnpm-store" if settings.SANDBOX_MODE == "namespaced" else settings.PNPM_STORE_DIR
 

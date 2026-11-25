@@ -66,8 +66,11 @@ class SandboxManager:
 
             sandbox = self._create_sandbox_instance(info)
             await sandbox.start()
-            if await sandbox.is_scaffolded() and sandbox.configure_npmrc():
-                logger.info("Refreshed .npmrc for %s", project_id)
+            if await sandbox.is_scaffolded():
+                try:
+                    sandbox.configure_npmrc()
+                except OSError:
+                    logger.exception("Failed to refresh .npmrc for %s", project_id)
 
             self._sandboxes[project_id] = sandbox
 
