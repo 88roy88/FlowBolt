@@ -38,7 +38,6 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
     ws.binaryType = 'arraybuffer';
     socket = ws;
     history = '';
-    // Streaming decode keeps characters split across messages intact; one decoder per connection.
     const decoder = new TextDecoder();
 
     ws.addEventListener('open', () => {

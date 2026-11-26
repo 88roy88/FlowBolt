@@ -78,9 +78,6 @@ USER appuser
 # Use namespaced sandbox mode in container (nsjail isolation)
 ENV AIB_SANDBOX_MODE=namespaced
 
-# UTF-8 locale so terminal apps (vim, lazygit) handle non-ASCII text
-ENV LANG=C.UTF-8
-
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
