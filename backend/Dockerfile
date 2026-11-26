@@ -35,6 +35,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     vim \
     lazygit \
+    less \
+    tree \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy nsjail binary from builder stage
