@@ -78,10 +78,10 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
         </div>
         <div>
           <DialogTitle className="text-lg font-semibold tracking-tight">
-            {isEditMode ? t('publish.republishTitle') : t('publish.chooseSlugTitle')}
+            {isEditMode ? t('publish.republishTitle') : t('publish.publishTitle')}
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            {isEditMode ? t('publish.republishSubtitle') : t('publish.chooseSlugSubtitle')}
+            {isEditMode ? t('publish.republishSubtitle') : t('publish.publishSubtitle')}
           </p>
         </div>
       </div>

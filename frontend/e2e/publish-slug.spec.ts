@@ -41,7 +41,7 @@ test.describe('Publish modal — create mode', () => {
     await page.getByTitle('Publish').click();
 
     // Modal title for create mode
-    await expect(page.getByText('Choose a custom URL')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Publish your app')).toBeVisible({ timeout: 5_000 });
 
     // Slug input is visible
     await expect(page.getByPlaceholder('my-awesome-app')).toBeVisible();
@@ -56,7 +56,7 @@ test.describe('Publish modal — create mode', () => {
   test('can publish without a slug (default link)', async ({ page }) => {
     await goToPreview(page);
     await page.getByTitle('Publish').click();
-    await expect(page.getByText('Choose a custom URL')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Publish your app')).toBeVisible({ timeout: 5_000 });
 
     const defaultLinkBtn = page.getByRole('button', { name: 'Use default link' });
     await expect(defaultLinkBtn).toBeDisabled();
@@ -140,7 +140,7 @@ test.describe('Publish modal — edit mode', () => {
     await page.getByTitle('Republish').click();
 
     // Modal title for edit mode
-    await expect(page.getByText('Republish project')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Republish your app')).toBeVisible({ timeout: 5_000 });
 
     // Current URL label and the slug displayed
     await expect(page.getByText('Current URL')).toBeVisible();
@@ -160,7 +160,7 @@ test.describe('Publish modal — edit mode', () => {
     await goToPreview(page);
     await page.getByTitle('Republish').click();
 
-    await expect(page.getByText('Republish project')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Republish your app')).toBeVisible({ timeout: 5_000 });
 
     // Click the modal's Republish button (last "Republish" on page, after toolbar)
     const modalRepublish = page.getByRole('button', { name: 'Republish', exact: true }).last();
@@ -176,7 +176,7 @@ test.describe('Publish modal — edit mode', () => {
   test('Change URL unlocks editing and shows slug input', async ({ page }) => {
     await goToPreview(page);
     await page.getByTitle('Republish').click();
-    await expect(page.getByText('Republish project')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Republish your app')).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole('button', { name: 'Change URL' }).click();
 
@@ -192,7 +192,7 @@ test.describe('Publish modal — edit mode', () => {
   test('Cancel change reverts to read-only state', async ({ page }) => {
     await goToPreview(page);
     await page.getByTitle('Republish').click();
-    await expect(page.getByText('Republish project')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Republish your app')).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole('button', { name: 'Change URL' }).click();
     await expect(page.getByPlaceholder('my-awesome-app')).toBeVisible();
@@ -207,7 +207,7 @@ test.describe('Publish modal — edit mode', () => {
   test('taken slug shows "Already taken" hint', async ({ page }) => {
     await goToPreview(page);
     await page.getByTitle('Republish').click();
-    await expect(page.getByText('Republish project')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Republish your app')).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole('button', { name: 'Change URL' }).click();
     const slugInput = page.getByPlaceholder('my-awesome-app');
@@ -221,7 +221,7 @@ test.describe('Publish modal — edit mode', () => {
   test('available new slug enables republish with new URL', async ({ page }) => {
     await goToPreview(page);
     await page.getByTitle('Republish').click();
-    await expect(page.getByText('Republish project')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Republish your app')).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole('button', { name: 'Change URL' }).click();
     const slugInput = page.getByPlaceholder('my-awesome-app');
