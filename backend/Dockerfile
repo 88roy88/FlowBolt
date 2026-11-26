@@ -41,7 +41,7 @@ COPY --from=nsjail-builder /usr/bin/nsjail /usr/bin/nsjail
 # Install Node.js 20 + pnpm
 # NOTE: pnpm is pinned to v10 on purpose. Project settings (e.g. store-dir) are written to each project's .npmrc
 # by configure_npmrc(); pnpm 11+ no longer reads those from .npmrc, so upgrading means moving them to
-# pnpm-workspace.yaml / the global config.
+# pnpm-workspace.yaml or the global config.
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g pnpm@10.33.0 \
