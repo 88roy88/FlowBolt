@@ -7,10 +7,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
 from flow44.api.deps import validate_token
+from flow44.db.project import PublishDetails
 from flow44.integrations.s3 import S3Object
 from flow44.main import app
 
 client = TestClient(app)
+
+DETAILS = PublishDetails(app_type="game")
 
 
 class TestSlugCheck:
@@ -51,29 +54,29 @@ class TestPublish:
             patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=False)),
             patch("flow44.api.publish.publish_project", AsyncMock(return_value="my-cool-app")) as mock_publish,
         ):
-            response = client.post("/api/export/proj-1/publish", json={"slug": "my-cool-app"})
+            response = client.post("/api/export/proj-1/publish", json={"slug": "my-cool-app", "app_type": "game"})
             assert response.status_code == 200
             assert response.json() == {"url": "/shared/my-cool-app", "handle": "my-cool-app"}
-            mock_publish.assert_awaited_once_with("proj-1", "my-cool-app")
+            mock_publish.assert_awaited_once_with("proj-1", "my-cool-app", DETAILS)
 
     @pytest.mark.asyncio
     async def test_publish_without_slug(self):
         with patch("flow44.api.publish.publish_project", AsyncMock(return_value="proj-1")) as mock_publish:
-            response = client.post("/api/export/proj-1/publish", json={"slug": None})
+            response = client.post("/api/export/proj-1/publish", json={"slug": None, "app_type": "game"})
             assert response.status_code == 200
             assert response.json() == {"url": "/shared/proj-1", "handle": "proj-1"}
-            mock_publish.assert_awaited_once_with("proj-1", None)
+            mock_publish.assert_awaited_once_with("proj-1", None, DETAILS)
 
     @pytest.mark.asyncio
     async def test_publish_with_taken_slug_returns_409(self):
         with patch("flow44.logic.publish.is_handle_taken", AsyncMock(return_value=True)):
-            response = client.post("/api/export/proj-1/publish", json={"slug": "taken-slug"})
+            response = client.post("/api/export/proj-1/publish", json={"slug": "taken-slug", "app_type": "game"})
             assert response.status_code == 409
             assert "already taken" in response.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_publish_with_invalid_slug_returns_400(self):
-        response = client.post("/api/export/proj-1/publish", json={"slug": "X!"})
+        response = client.post("/api/export/proj-1/publish", json={"slug": "X!", "app_type": "game"})
         assert response.status_code == 400
         assert "Invalid slug" in response.json()["detail"]
 
@@ -86,9 +89,38 @@ class TestPublish:
                 AsyncMock(side_effect=IntegrityError(None, None, Exception("collision"))),
             ),
         ):
-            response = client.post("/api/export/proj-1/publish", json={"slug": "collision-slug"})
+            response = client.post("/api/export/proj-1/publish", json={"slug": "collision-slug", "app_type": "game"})
             assert response.status_code == 409
             assert "just claimed" in response.json()["detail"]
+
+    @pytest.mark.parametrize(
+        ("description", "saved_description"),
+        [("  A quiz  ", "A quiz"), ("   ", None)],
+    )
+    def test_publish_passes_trimmed_details(self, description: str, saved_description: str | None):
+        body = {"app_type": "game", "app_description": description, "publish_reason": "Other"}
+        with patch("flow44.api.publish.publish_project", AsyncMock(return_value="proj-1")) as mock_publish:
+            response = client.post("/api/export/proj-1/publish", json=body)
+
+        assert response.status_code == 200
+        expected = PublishDetails(app_type="game", app_description=saved_description, publish_reason="Other")
+        mock_publish.assert_awaited_once_with("proj-1", None, expected)
+
+    @pytest.mark.parametrize(
+        ("body", "status_code"),
+        [
+            ({}, 422),
+            ({"app_type": "spaceship"}, 400),
+            ({"app_type": "game", "publish_reason": "Because"}, 400),
+            ({"app_type": "game", "app_description": "a" * 501}, 422),
+        ],
+    )
+    def test_publish_with_bad_details_does_not_publish(self, body: dict[str, str | None], status_code: int):
+        with patch("flow44.api.publish.publish_project", AsyncMock()) as mock_publish:
+            response = client.post("/api/export/proj-1/publish", json=body)
+
+        assert response.status_code == status_code
+        mock_publish.assert_not_awaited()
 
 
 class TestShareBySlug:

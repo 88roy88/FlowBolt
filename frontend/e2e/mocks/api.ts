@@ -10,6 +10,7 @@ import {
   MOCK_PROJECT_WITH_SLUG,
   MOCK_FILE_TREE,
   MOCK_MODELS,
+  MOCK_CLIENT_CONFIG,
   CHAT_SEED_EVENTS,
   MOCK_FILE_CONTENTS,
 } from './data';
@@ -387,6 +388,11 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     });
   });
 
+  // --- Client config ---
+  await page.route('**/api/config', async (route) => {
+    return route.fulfill({ json: MOCK_CLIENT_CONFIG });
+  });
+
   // --- Publish & slug check ---
   await page.route('**/api/export/*/slug/check**', async (route) => {
     const url = new URL(route.request().url());
@@ -404,14 +410,15 @@ export async function setupMockAPI(page: Page, options: MockAPIOptions = {}) {
     }
     const url = route.request().url();
     const projectId = url.split('/api/export/')[1]?.split('/publish')[0] ?? '';
-    let body: { slug?: string | null } = {};
+    let body: { slug?: string | null } & Record<string, unknown> = {};
     try { body = route.request().postDataJSON(); } catch { /* ignore */ }
     const slug = body.slug ?? undefined;
 
     const handle = slug || projectId;
     const proj = projects.find((p) => p.id === projectId);
     if (proj) {
-      proj.published_url = handle;
+      const { slug: _slug, ...details } = body;
+      Object.assign(proj, details, { published_url: handle });
     }
 
     const publicPath = `/shared/${handle}`;

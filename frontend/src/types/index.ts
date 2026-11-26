@@ -91,7 +91,24 @@ export interface Project {
   summary?: string;
   selected_model?: string;
   published_url?: string;
+  app_type?: string | null;
+  app_description?: string | null;
+  publish_reason?: string | null;
   role?: ProjectRole;
+}
+
+export type PublishDetails = Pick<Project, 'app_type' | 'app_description' | 'publish_reason'>;
+
+export interface AppType {
+  id: string;
+  name: string;
+  examples: string[];
+  icon: string;
+}
+
+export interface PublishFormConfig {
+  app_types: AppType[];
+  publish_reasons: string[];
 }
 
 export interface ProjectMember {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, UserStatus } from '../types';
+import type { Project, PublishDetails, UserStatus } from '../types';
 import * as api from '../services/api';
 import { closeChatSocket } from '../services/websocket';
 import { useChatStore } from './chat';
@@ -27,7 +27,7 @@ interface SessionState {
   deleteProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
   updateProjectSummary: (projectId: string, summary: string) => void;
-  setProjectPublishedUrl: (projectId: string, handle: string) => void;
+  setProjectPublished: (projectId: string, handle: string, details: PublishDetails) => void;
 }
 
 let latestSearchQuery = '';
@@ -170,7 +170,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((state) => patchProject(state, projectId, { summary }));
   },
 
-  setProjectPublishedUrl(projectId: string, handle: string) {
-    set((state) => patchProject(state, projectId, { published_url: handle }));
+  setProjectPublished(projectId: string, handle: string, details: PublishDetails) {
+    set((state) => patchProject(state, projectId, { ...details, published_url: handle }));
   },
 }));

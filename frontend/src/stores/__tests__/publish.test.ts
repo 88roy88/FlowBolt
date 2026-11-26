@@ -9,6 +9,9 @@ describe('publishStore', () => {
       isOpen: false,
       slug: '',
       initialSlug: '',
+      appType: '',
+      appDescription: '',
+      publishReason: '',
     });
   });
 
@@ -38,6 +41,22 @@ describe('publishStore', () => {
     store.close();
     store.open('proj-1');
     expect(usePublishStore.getState().slug).toBe('draft-slug');
+  });
+
+  it('open() prefills the saved publish details, and keeps a draft for the same project', () => {
+    const store = usePublishStore.getState();
+    const saved = { app_type: 'game', app_description: 'A quiz', publish_reason: null };
+
+    store.open('proj-1', 'proj-1', saved);
+    expect(usePublishStore.getState()).toMatchObject({ appType: 'game', appDescription: 'A quiz', publishReason: '' });
+
+    store.setAppType('portal');
+    store.close();
+    store.open('proj-1', 'proj-1', saved);
+    expect(usePublishStore.getState().appType).toBe('portal');
+
+    store.open('proj-2');
+    expect(usePublishStore.getState()).toMatchObject({ appType: '', appDescription: '', publishReason: '' });
   });
 
   it('setSlug() formats free text into a candidate slug', () => {

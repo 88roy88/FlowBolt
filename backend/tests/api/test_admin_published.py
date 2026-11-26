@@ -13,7 +13,7 @@ from flow44.main import app
 client = TestClient(app)
 
 
-def _published_project(project_id: str, handle: str, published_at: str) -> Project:
+def _published_project(project_id: str, handle: str, published_at: str, app_type: str | None = None) -> Project:
     return Project(
         id=project_id,
         user_id="owner-1",
@@ -21,6 +21,7 @@ def _published_project(project_id: str, handle: str, published_at: str) -> Proje
         created_at="2025-12-01T00:00:00+00:00",
         published_url=handle,
         published_at=published_at,
+        app_type=app_type,
     )
 
 
@@ -34,7 +35,7 @@ class TestListPublishedApps:
 
     async def test_maps_project_rows_to_response(self):
         projects = [
-            _published_project("proj-1", "my-app", "2026-01-02T00:00:00+00:00"),
+            _published_project("proj-1", "my-app", "2026-01-02T00:00:00+00:00", "game"),
             _published_project("proj-2", "proj-2", "2026-01-01T00:00:00+00:00"),
         ]
         view_counts = {"proj-1": ProjectViewCount(project_id="proj-1", production_views=7, preview_views=3)}
@@ -55,6 +56,7 @@ class TestListPublishedApps:
                 "public_path": "/shared/my-app",
                 "created_at": "2025-12-01T00:00:00+00:00",
                 "published_at": "2026-01-02T00:00:00+00:00",
+                "app_type": "game",
                 "production_views": 7,
                 "preview_views": 3,
             },
@@ -66,6 +68,7 @@ class TestListPublishedApps:
                 "public_path": "/shared/proj-2",
                 "created_at": "2025-12-01T00:00:00+00:00",
                 "published_at": "2026-01-01T00:00:00+00:00",
+                "app_type": None,
                 "production_views": 0,
                 "preview_views": 0,
             },

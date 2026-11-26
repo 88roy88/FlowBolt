@@ -76,6 +76,21 @@ export const MOCK_FILE_CONTENTS: Record<string, string> = {
   'index.html': '<!DOCTYPE html><html><body><div id="root"></div></body></html>',
 };
 
+const MOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/></svg>';
+
+export const MOCK_CLIENT_CONFIG = {
+  chat_message_max_chars: 100_000,
+  app_description_max_chars: 500,
+  publish_form: {
+    app_types: [
+      { id: 'game', name: 'Game', examples: ['Trivia quiz'], icon: MOCK_ICON },
+      { id: 'portal', name: 'Portal', examples: ['Team home page'], icon: MOCK_ICON },
+      { id: 'dashboard', name: 'Dashboard', examples: ['KPI overview'], icon: MOCK_ICON },
+    ],
+    publish_reasons: ['To prototype an idea', 'Other'],
+  },
+};
+
 export const MOCK_MODELS = [{ id: 'mock/test-model', name: 'Test Model' }];
 
 /** A scripted build sequence — the events the chat WebSocket sends during a build. */

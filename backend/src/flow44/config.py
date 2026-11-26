@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 _DEFAULT_WORKSPACE = str(_BACKEND_ROOT / "data" / "workspaces")
 _DEFAULT_TEMPLATE = str(_BACKEND_ROOT / "pnpm-project-template")
+_DEFAULT_PUBLISH_FORM_CONFIG = str(_BACKEND_ROOT / "config" / "publish_form_defaults.toml")
 
 
 class BuildAppSettings(BaseSettings):
@@ -133,6 +134,11 @@ class S3Settings(BuildAppSettings):
     S3_PENDING_DELETION_DAYS: int = 7
 
 
+class PublishSettings(BuildAppSettings):
+    PUBLISH_FORM_CONFIG_PATH: str = _DEFAULT_PUBLISH_FORM_CONFIG
+    APP_DESCRIPTION_MAX_CHARS: int = 500
+
+
 class LoggerSettings(BuildAppSettings):
     LOG_FILE_PATH: str | None = None
     ENVIRONMENT: str | None = None
@@ -166,6 +172,7 @@ class Settings(
     DirectorySettings,
     DataSourceEnrichmentSettings,
     S3Settings,
+    PublishSettings,
     OpikSettings,
     LoggerSettings,
     BuildAppSettings,

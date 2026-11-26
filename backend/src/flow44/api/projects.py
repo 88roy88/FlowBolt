@@ -67,6 +67,9 @@ class ProjectResponse(BaseModel):
     selected_model: str
     published_url: str | None = None
     published_at: str | None = None
+    app_type: str | None = None
+    app_description: str | None = None
+    publish_reason: str | None = None
     role: DisplayRole
 
 
