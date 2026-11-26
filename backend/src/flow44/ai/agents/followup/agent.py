@@ -60,7 +60,7 @@ class FollowUpAgent(ChatAgent):
         self._data_source_authorization = data_source_authorization
         self._executor = self._build_tool_executor()
 
-    def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901
+    def _build_tool_executor(self) -> ToolExecutor:  # noqa: C901, PLR0915
         sandbox = self.sandbox
 
         # Inline tool implementations - thin wrappers around sandbox
@@ -158,7 +158,22 @@ class FollowUpAgent(ChatAgent):
                 )
             return f"OK — edited {path}"
 
-        return ToolExecutor([grep, glob, read_file, write_file, edit_file])
+        @tool
+        async def delete_file(path: str) -> str:
+            """Delete a single file that is no longer needed. Directories cannot be deleted."""
+            try:
+                path = normalized_path_or_reject(path)
+            except FileSafetyError as exc:
+                return _format_file_safety_error(exc)
+            try:
+                await self._delete_file_and_record_diff(self._diffs, path)
+            except FileNotFoundError:
+                return f"Error: File not found: {path}"
+            except (IsADirectoryError, PermissionError, UnicodeDecodeError):
+                return f"Error: {path} is not a deletable source file. Only single text files can be deleted."
+            return f"OK — deleted {path}"
+
+        return ToolExecutor([grep, glob, read_file, write_file, edit_file, delete_file])
 
     @track(name="followup-agent-run")  # type: ignore[untyped-decorator]
     async def run(self, content: str, data_source_ids: list[str] | None = None) -> None:

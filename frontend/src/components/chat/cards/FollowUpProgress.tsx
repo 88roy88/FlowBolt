@@ -17,10 +17,12 @@ function summarizeSteps(steps: FollowUpStep[]) {
   const reads = uniqueFiles(['read_file']);
   const searches = ofTools(['grep', 'glob']).length;
   const edits = uniqueFiles(['write_file', 'edit_file']);
+  const deletes = uniqueFiles(['delete_file']);
   const parts = [
     reads > 0 && `read ${plural(reads, 'file')}`,
     searches > 0 && `searched ${plural(searches, 'time')}`,
     edits > 0 && `edited ${plural(edits, 'file')}`,
+    deletes > 0 && `deleted ${plural(deletes, 'file')}`,
   ].filter(Boolean);
   const summary = parts.length ? parts.join(' · ') : plural(steps.length, 'step');
   return summary.charAt(0).toUpperCase() + summary.slice(1);
@@ -76,7 +78,7 @@ export function FollowUpProgress({ steps, answer, filesChanged, diffs, isLive }:
               )}
               <div className="flex-1 min-w-0">
                 <span>{getFollowUpToolLabel(step.tool, step.args, step.status === 'running')}</span>
-                {step.status === 'completed' && step.resultPreview && step.tool !== 'write_file' && step.tool !== 'edit_file' && (
+                {step.status === 'completed' && step.resultPreview && !['write_file', 'edit_file', 'delete_file'].includes(step.tool) && (
                   <div className="mt-1 px-1.5 py-1 bg-background rounded text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all max-h-[60px] overflow-hidden">
                     {step.resultPreview}
                   </div>

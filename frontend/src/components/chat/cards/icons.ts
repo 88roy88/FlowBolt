@@ -1,4 +1,4 @@
-import { Search, Wrench, Save, TestTube, RefreshCw, FolderSearch, FileText, Pencil, BotIcon } from 'lucide-react';
+import { Search, Wrench, Save, TestTube, RefreshCw, FolderSearch, FileText, Pencil, Trash2, BotIcon } from 'lucide-react';
 import type { FixStep, FollowUpStep } from '../../../types';
 
 export function getStepIcon(step: FixStep['step']) {
@@ -28,6 +28,8 @@ export function getFollowUpToolIcon(tool: FollowUpStep['tool']) {
       return Save;
     case 'edit_file':
       return Pencil;
+    case 'delete_file':
+      return Trash2;
     default:
       return BotIcon;
   }
@@ -47,5 +49,7 @@ export function getFollowUpToolLabel(tool: FollowUpStep['tool'], args: Record<st
       return isRunning ? `Writing ${args.path || ''}` : `Wrote ${args.path || ''}`;
     case 'edit_file':
       return isRunning ? `Editing ${args.path || ''}` : `Edited ${args.path || ''}`;
+    case 'delete_file':
+      return isRunning ? `Deleting ${args.path || ''}` : `Deleted ${args.path || ''}`;
   }
 }

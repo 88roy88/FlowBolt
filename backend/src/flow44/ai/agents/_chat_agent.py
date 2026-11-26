@@ -75,6 +75,12 @@ class ChatAgent(BaseAgent):
         tracker.record(path, old_content, new_content, is_new=False)
         await emit_transient(self.project_id, {"type": "file", "path": path, "content": new_content})
 
+    async def _delete_file_and_record_diff(self, tracker: DiffTracker, path: str) -> None:
+        """Raises FileNotFoundError, or IsADirectoryError/PermissionError when the path is not a regular file."""
+        old_content = await self.sandbox.read_file(path)
+        await self.sandbox.delete_file(path)
+        tracker.record_deletion(path, old_content)
+
     async def _apply_edits_and_emit_diff(self, tracker: DiffTracker, path: str, edits: list[tuple[str, str]]) -> str:
         """Raises FileNotFoundError, or EditApplyError when a search is missing or ambiguous."""
         old_content = await self.sandbox.read_file(path)
@@ -91,7 +97,9 @@ class ChatAgent(BaseAgent):
         await self.emit(
             {
                 "type": "file_diffs",
-                "diffs": [{"path": d.path, "diff": d.diff, "is_new": d.is_new} for d in diffs],
+                "diffs": [
+                    {"path": d.path, "diff": d.diff, "is_new": d.is_new, "is_deleted": d.is_deleted} for d in diffs
+                ],
             }
         )
         bi_logger.file_diffs(diffs)
