@@ -28,7 +28,7 @@ from flow44.db.project import (
     list_published_projects,
     rename_project,
     update_project_model,
-    update_project_publication,
+    update_project_publish_info,
     update_project_summary,
 )
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
@@ -117,11 +117,11 @@ class TestProjectCRUD:
         fetched = await get_project(project.id)
         assert fetched is None
 
-    async def test_update_project_publication(self, test_db):
+    async def test_update_project_publish_info(self, test_db):
         project = await create_project("App", user_id="test-user")
         handle = "my-custom-slug"
         details = PublishDetails(app_type="game", app_description="A quiz", publish_reason="Other")
-        await update_project_publication(project.id, handle, details)
+        await update_project_publish_info(project.id, handle, details)
 
         fetched = await get_project(project.id)
         assert fetched is not None
@@ -130,7 +130,7 @@ class TestProjectCRUD:
         assert fetched.updated_at > project.updated_at
         assert PublishDetails.model_validate(fetched, from_attributes=True) == details
 
-        await update_project_publication(project.id, handle, PublishDetails(app_type="portal"))
+        await update_project_publish_info(project.id, handle, PublishDetails(app_type="portal"))
         republished = await get_project(project.id)
         assert republished is not None
         assert (republished.app_type, republished.app_description, republished.publish_reason) == ("portal", None, None)
@@ -138,7 +138,7 @@ class TestProjectCRUD:
     async def test_list_published_projects_excludes_unpublished(self, test_db):
         published = await create_project("Published", user_id="test-user")
         await create_project("Draft", user_id="test-user")
-        await update_project_publication(published.id, "published-slug", PublishDetails(app_type="game"))
+        await update_project_publish_info(published.id, "published-slug", PublishDetails(app_type="game"))
 
         projects = await list_published_projects()
         assert [p.id for p in projects] == [published.id]
@@ -146,8 +146,8 @@ class TestProjectCRUD:
     async def test_list_published_projects_ordered_newest_first(self, test_db):
         first = await create_project("First", user_id="test-user")
         second = await create_project("Second", user_id="test-user")
-        await update_project_publication(first.id, "first-slug", PublishDetails(app_type="game"))
-        await update_project_publication(second.id, "second-slug", PublishDetails(app_type="game"))
+        await update_project_publish_info(first.id, "first-slug", PublishDetails(app_type="game"))
+        await update_project_publish_info(second.id, "second-slug", PublishDetails(app_type="game"))
 
         projects = await list_published_projects()
         assert [p.id for p in projects] == [second.id, first.id]

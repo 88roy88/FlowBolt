@@ -1,7 +1,7 @@
 import re
 from enum import StrEnum
 
-from flow44.db.project import PublishDetails, is_handle_taken, update_project_publication
+from flow44.db.project import PublishDetails, is_handle_taken, update_project_publish_info
 from flow44.integrations.s3 import s3_storage
 from flow44.sandbox.operations import build_dist
 
@@ -26,5 +26,5 @@ async def publish_project(project_id: str, slug: str | None, details: PublishDet
     files = await build_dist(project_id)
     await s3_storage.deploy_dist(project_id, files)
     handle = slug or project_id
-    await update_project_publication(project_id, handle, details)
+    await update_project_publish_info(project_id, handle, details)
     return handle

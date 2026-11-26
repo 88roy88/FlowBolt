@@ -32,7 +32,7 @@ async def test_publish_project_deploys_and_sets_handle():
     with (
         patch("flow44.logic.publish.build_dist", AsyncMock(return_value=files)) as p_build,
         patch("flow44.logic.publish.s3_storage.deploy_dist", AsyncMock()) as p_deploy,
-        patch("flow44.logic.publish.update_project_publication", AsyncMock()) as p_update,
+        patch("flow44.logic.publish.update_project_publish_info", AsyncMock()) as p_update,
     ):
         handle = await publish_project("proj-1", "my-slug", DETAILS)
 
@@ -47,7 +47,7 @@ async def test_publish_project_defaults_handle_to_project_id():
     with (
         patch("flow44.logic.publish.build_dist", AsyncMock(return_value=[])),
         patch("flow44.logic.publish.s3_storage.deploy_dist", AsyncMock()),
-        patch("flow44.logic.publish.update_project_publication", AsyncMock()) as p_update,
+        patch("flow44.logic.publish.update_project_publish_info", AsyncMock()) as p_update,
     ):
         handle = await publish_project("proj-1", None, DETAILS)
 

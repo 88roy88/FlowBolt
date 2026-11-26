@@ -110,7 +110,7 @@ async def is_handle_taken(handle: str, exclude_project_id: str) -> bool:
         return result.scalar_one_or_none() is not None
 
 
-async def update_project_publication(project_id: str, handle: str, details: PublishDetails) -> None:
+async def update_project_publish_info(project_id: str, handle: str, details: PublishDetails) -> None:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if not project:
