@@ -33,6 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
     ripgrep \
+    vim \
+    lazygit \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy nsjail binary from builder stage
@@ -75,6 +77,9 @@ USER appuser
 
 # Use namespaced sandbox mode in container (nsjail isolation)
 ENV AIB_SANDBOX_MODE=namespaced
+
+# UTF-8 locale so terminal apps (vim, lazygit) handle non-ASCII text
+ENV LANG=C.UTF-8
 
 EXPOSE 8000
 

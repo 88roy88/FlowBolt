@@ -21,7 +21,6 @@ export function Terminal() {
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Menlo, monospace",
       cursorBlink: true,
       cursorStyle: 'bar',
-      convertEol: true,
       lineHeight: 1.2,
     });
 

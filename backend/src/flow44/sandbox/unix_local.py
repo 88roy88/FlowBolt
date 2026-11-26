@@ -20,6 +20,7 @@ _BASHRC_CONTENT = (
     "export LSCOLORS=GxFxCxDxBxegedabagaced\n"
     "alias ls='ls --color=auto'\n"
     "alias grep='grep --color=auto'\n"
+    "alias lg='lazygit'\n"
 )
 
 

@@ -75,6 +75,8 @@ def _build_nsjail_args(
         "--env",
         "TERM=xterm-256color",
         "--env",
+        "LANG=C.UTF-8",
+        "--env",
         "FORCE_COLOR=1",
         "--time_limit",
         str(time_limit),

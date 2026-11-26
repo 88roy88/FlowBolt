@@ -11,7 +11,6 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
 
   const handlers: Array<(data: string, replay: boolean) => void> = [];
   let history = '';
-  const decoder = new TextDecoder();
   const encoder = new TextEncoder();
 
   let socket: WebSocket | null = null;
@@ -39,6 +38,8 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
     ws.binaryType = 'arraybuffer';
     socket = ws;
     history = '';
+    // Streaming decode keeps characters split across messages intact; one decoder per connection.
+    const decoder = new TextDecoder();
 
     ws.addEventListener('open', () => {
       retryDelay = 1000;
@@ -50,7 +51,7 @@ export function getTerminalSocket(projectId: string): TerminalSocket {
       let text: string;
       let replay = false;
       if (event.data instanceof ArrayBuffer) {
-        text = decoder.decode(event.data);
+        text = decoder.decode(event.data, { stream: true });
       } else {
         const scrollback = parseScrollback(event.data as string);
         replay = scrollback !== null;
