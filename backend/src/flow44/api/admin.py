@@ -21,6 +21,8 @@ from flow44.db.platform_user_group import (
 )
 from flow44.db.project import Project, list_published_projects
 from flow44.sandbox.base import workspace_path
+from flow44.services.maintenance.configure_npmrc import configure_project_npmrc
+from flow44.services.maintenance.reinstall_dependencies import reinstall_dependencies
 from flow44.services.maintenance.runner import ProjectMaintenanceResult, run_over_projects
 from flow44.services.maintenance.sandbox_file_permissions import fix_file_permissions
 from flow44.services.maintenance.template_sync import sync_protected_template_files
@@ -197,3 +199,19 @@ async def sync_protected_files(user_id: AdminDep) -> list[ProjectMaintenanceResu
         return summary
 
     return await run_over_projects(sync_files)
+
+
+@router.post("/maintenance/configure-npmrc", tags=["maintenance"])
+async def configure_projects_npmrc(user_id: AdminDep) -> list[ProjectMaintenanceResult]:
+    """Rewrite each project's .npmrc from the current npm/pnpm settings."""
+    return await run_over_projects(lambda project: configure_project_npmrc(project.id))
+
+
+@router.post("/maintenance/reinstall-dependencies", tags=["maintenance"])
+async def reinstall_project_dependencies(user_id: AdminDep) -> list[ProjectMaintenanceResult]:
+    """Refresh .npmrc, delete node_modules and reinstall so dependencies are hard-linked from the shared pnpm store."""
+
+    async def reinstall(project: Project) -> str:
+        return await reinstall_dependencies(project.id)
+
+    return await run_over_projects(reinstall)

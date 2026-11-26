@@ -29,8 +29,14 @@ class PnpmMixin(BaseSandbox, ABC):
             f"store-dir={store_path}\n"
         )
 
+        if os.path.exists(npmrc):
+            with open(npmrc, encoding="utf-8") as f:
+                if f.read() == content:
+                    return
+
         with open(npmrc, "w", encoding="utf-8") as f:
             f.write(content)
+        logger.info("Configured .npmrc for %s", self.project_id)
 
     async def scaffold(self, template_dir: str) -> None:
         logger.info("Bootstrapping sandbox workspace for %s", self.project_id)
