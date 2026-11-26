@@ -10,6 +10,7 @@ import { DirectorySearch } from './DirectorySearch';
 import { cn } from '@/lib/utils';
 import type { PlatformGroup, PlatformUser } from '../../types';
 import * as api from '../../services/api';
+import { useClientConfig } from '../../hooks/useClientConfig';
 import { isPlainClick, projectHref } from '../../utils/links';
 
 // Rows whose id is in `hits` sort first; ties preserve order under a stable sort.
@@ -22,20 +23,21 @@ function rankHit(hits: Set<string>, a: string, b: string): number {
 type Tab = 'users' | 'published';
 
 type ViewsSortKey = 'production_views' | 'preview_views';
-type SortKey = 'name' | 'owner_id' | 'project_url' | 'created_at' | 'published_at' | ViewsSortKey;
+type SortKey = 'name' | 'owner_id' | 'project_url' | 'app_type' | 'created_at' | 'published_at' | ViewsSortKey;
 type SortDir = 'asc' | 'desc';
 
 const INITIAL_SORT_DIR: Record<SortKey, SortDir> = {
   name: 'asc',
   owner_id: 'asc',
   project_url: 'asc',
+  app_type: 'asc',
   created_at: 'desc',
   published_at: 'desc',
   production_views: 'desc',
   preview_views: 'desc',
 };
 
-const APPS_GRID ='grid grid-cols-[1fr_130px_150px_80px_80px_80px_130px] gap-2';
+const APPS_GRID ='grid grid-cols-[1fr_130px_150px_90px_80px_80px_80px_130px] gap-2';
 
 function isViewsSortKey(key: SortKey): key is ViewsSortKey {
   return key === 'production_views' || key === 'preview_views';
@@ -98,6 +100,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   });
   const appsData = appsQuery.data;
   const apps = useMemo(() => appsData ?? [], [appsData]);
+  const appTypes = useClientConfig()?.publish_form.app_types;
+  const appTypeNames = useMemo(() => new Map(appTypes?.map((type) => [type.id, type.name])), [appTypes]);
   const [appsSearch, setAppsSearch] = useState('');
   const [appsSort, setAppsSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'published_at', dir: 'desc' });
 
@@ -107,13 +111,17 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       [app.name, app.owner_id, app.project_url].some((field) => field.toLowerCase().includes(query)));
 
     const { key } = appsSort;
-    return matchingApps.sort((a, b) => {
+    const typedApps = matchingApps.map((app) => ({
+      ...app,
+      app_type: app.app_type && (appTypeNames.get(app.app_type) ?? app.app_type),
+    }));
+    return typedApps.sort((a, b) => {
       const order = isViewsSortKey(key)
         ? a[key] - b[key]
-        : a[key].localeCompare(b[key], undefined, { sensitivity: 'base' });
+        : (a[key] ?? '').localeCompare(b[key] ?? '', undefined, { sensitivity: 'base' });
       return appsSort.dir === 'asc' ? order : -order;
     });
-  }, [apps, appsSearch, appsSort]);
+  }, [apps, appsSearch, appsSort, appTypeNames]);
 
   const toggleSort = (key: SortKey) => setAppsSort((prev) => (prev.key === key
     ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
@@ -195,7 +203,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       <DialogContent
         className={cn(
           'max-h-[85vh] flex flex-col overflow-hidden',
-          tab === 'published' ? 'w-[900px] max-w-[900px]' : 'w-[440px]',
+          tab === 'published' ? 'w-[1000px] max-w-[min(1000px,calc(100vw-2rem))]' : 'w-[440px]',
         )}
       >
         <DialogClose onClose={onClose} />
@@ -237,6 +245,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
               {sortHeader('name', t('admin.colName', 'Project'))}
               {sortHeader('owner_id', t('admin.colOwner', 'Owner'))}
               {sortHeader('project_url', t('admin.colUrl', 'URL'))}
+              {sortHeader('app_type', t('admin.colType', 'Type'))}
               {sortHeader('created_at', t('admin.colCreated', 'Created'))}
               {sortHeader('published_at', t('admin.colPublished', 'Published'))}
               {sortHeader('production_views', t('admin.colLiveViews', 'Live views'), 'justify-center')}
@@ -360,6 +369,9 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   <span className="truncate">{a.project_url}</span>
                   <ExternalLink size={11} className="shrink-0" />
                 </a>
+                <span className="text-muted-foreground text-xs truncate" title={a.app_type ?? undefined}>
+                  {a.app_type ?? '—'}
+                </span>
                 <Timestamp iso={a.created_at} />
                 <Timestamp iso={a.published_at} />
                 <span className="text-muted-foreground text-xs tabular-nums text-center">{a.production_views}</span>

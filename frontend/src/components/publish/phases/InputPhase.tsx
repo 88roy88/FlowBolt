@@ -5,13 +5,16 @@ import { DialogTitle } from '../../../components/ui/dialog';
 import { SlugInput } from '../components/SlugInput';
 import { SlugPreview } from '../components/SlugPreview';
 import { PublishButton } from '../components/PublishButton';
+import { PublishDetailsFields } from '../components/PublishDetailsFields';
 import { BTN_SECONDARY } from '../styles';
 import { usePublishStore } from '../../../stores/publish';
 import { useSlugAvailability, SlugStatus } from '../../../hooks/useSlugAvailability';
+import { useClientConfigQuery } from '../../../hooks/useClientConfig';
+import type { PublishDetails } from '../../../types';
 
 interface InputPhaseProps {
   isPublishing: boolean;
-  onPublish: (useSlug: boolean) => void;
+  onPublish: (useSlug: boolean, details: PublishDetails) => void;
 }
 
 export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
@@ -23,12 +26,26 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
   const onCancelEditing = usePublishStore(s => s.resetSlug);
   const isChanged = usePublishStore(s => s.isChanged());
   const { status: slugStatus, canPublish } = useSlugAvailability();
+  const appType = usePublishStore(s => s.appType);
+  const appDescription = usePublishStore(s => s.appDescription);
+  const publishReason = usePublishStore(s => s.publishReason);
+  const clientConfig = useClientConfigQuery();
+  const publishForm = clientConfig.data?.publish_form;
 
   const { t } = useTranslation();
   const [isEditingSlug, setIsEditingSlug] = useState(mode === 'create');
   
   const isEditMode = mode === 'edit';
+  const hasAppType = !!publishForm?.app_types.some((type) => type.id === appType);
+  const submitDisabled = isPublishing || !hasAppType;
+
+  const publish = (useSlug: boolean) => onPublish(useSlug, {
+    app_type: appType,
+    app_description: appDescription.trim() || null,
+    publish_reason: publishForm?.publish_reasons.includes(publishReason) ? publishReason : null,
+  });
   const showHint = isEditMode ? (!!slug && slug !== initialSlug) : !!slug;
+  const isUrlConfirmed = showHint ? slugStatus === 'available' : isEditMode && !!slug;
 
   const slugHintMap: Partial<Record<SlugStatus, ReactNode>> = {
     invalid: <span className="text-destructive">{t('publish.slugInvalid')}</span>,
@@ -49,6 +66,7 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
       <div className="h-4 text-xs">
         {showHint ? (slugHintMap[slugStatus] ?? null) : null}
       </div>
+      <SlugPreview slugValue={slug || t('publish.slugPlaceholder')} dimmed={!isUrlConfirmed} />
     </div>
   );
 
@@ -76,6 +94,8 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
             <SlugPreview slugValue={initialSlug || projectId || ''} />
           </div>
 
+          <PublishDetailsFields clientConfig={clientConfig} disabled={isPublishing} />
+
           <p className="text-xs text-amber-500/90">{t('publish.overwriteWarning')}</p>
 
           <div className="flex gap-2 pt-1">
@@ -89,8 +109,8 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
             </button>
             <PublishButton
               publishing={isPublishing}
-              disabled={isPublishing}
-              onClick={() => onPublish(true)}
+              disabled={submitDisabled}
+              onClick={() => publish(true)}
               label={isPublishing ? t('publish.publishing') : t('publish.republish')}
             />
           </div>
@@ -102,12 +122,10 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
         <>
           {renderSlugField()}
 
-          {showHint && slugStatus === 'available' && (
-            <SlugPreview slugValue={slug} />
-          )}
+          <PublishDetailsFields clientConfig={clientConfig} disabled={isPublishing} />
 
-          {isEditMode && isChanged && (
-            <p className="text-xs text-amber-500/90">{t('publish.slugChangeWarning')}</p>
+          {isEditMode && (
+            <p className={`text-xs text-amber-500/90 ${isChanged ? '' : 'invisible'}`}>{t('publish.slugChangeWarning')}</p>
           )}
 
           <div className="flex gap-2 pt-1">
@@ -124,8 +142,8 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
               </button>
             ) : (
               <button
-                onClick={() => onPublish(false)}
-                disabled={isPublishing}
+                onClick={() => publish(false)}
+                disabled={submitDisabled}
                 className={`flex-1 ${BTN_SECONDARY}`}
               >
                 {t('publish.skipSlug')}
@@ -134,8 +152,8 @@ export function InputPhase({ isPublishing, onPublish }: InputPhaseProps) {
             
             <PublishButton
               publishing={isPublishing}
-              disabled={isPublishing || !canPublish}
-              onClick={() => onPublish(true)}
+              disabled={submitDisabled || !canPublish}
+              onClick={() => publish(true)}
               label={
                 isPublishing 
                   ? t('publish.publishing') 

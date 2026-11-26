@@ -245,6 +245,7 @@
     "colName": "פרויקט",
     "colOwner": "בעלים",
     "colUrl": "כתובת",
+    "colType": "סוג",
     "colCreated": "נוצר",
     "colPublished": "פורסם",
     "colLiveViews": "צפיות באתר",
@@ -311,6 +312,13 @@
     "republish": "פרסם מחדש",
     "republishWithNewSlug": "פרסם עם כתובת URL חדשה",
     "overwriteWarning": "פעולה זו תחליף את הגרסה המפורסמת הנוכחית.",
-    "slugChangeWarning": "שינוי הכתובת ישבית לצמיתות את הקישור הישן."
+    "slugChangeWarning": "שינוי הכתובת ישבית לצמיתות את הקישור הישן.",
+    "optional": "לא חובה",
+    "appTypeLabel": "סוג האפליקציה",
+    "descriptionLabel": "תיאור האפליקציה",
+    "descriptionPlaceholder": "מה האפליקציה שלך עושה?",
+    "reasonLabel": "למה בנית את האפליקציה הזו ב-BuildApp?",
+    "reasonPlaceholder": "בחר סיבה",
+    "formLoadFailed": "טעינת טופס הפרסום נכשלה."
   }
 }

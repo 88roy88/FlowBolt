@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup, PublishDetails, PublishFormConfig } from '../types';
 import type { LogEvent } from './logger';
 
 const BASE = '/api';
@@ -203,6 +203,8 @@ export async function fetchDefaultModel(): Promise<string> {
 
 export interface ClientConfig {
   chat_message_max_chars: number;
+  app_description_max_chars: number;
+  publish_form: PublishFormConfig;
 }
 
 export async function fetchClientConfig(): Promise<ClientConfig> {
@@ -224,10 +226,14 @@ export function downloadSingleHtml(projectId: string): void {
   window.open(`${BASE}/export/${projectId}/html`, '_blank');
 }
 
-export async function publishToS3(projectId: string, slug?: string): Promise<{ url: string; handle: string }> {
+export async function publishToS3(
+  projectId: string,
+  details: PublishDetails,
+  slug?: string,
+): Promise<{ url: string; handle: string }> {
   return request<{ url: string; handle: string }>(`/export/${projectId}/publish`, {
     method: 'POST',
-    body: JSON.stringify({ slug: slug ?? null }),
+    body: JSON.stringify({ ...details, slug: slug ?? null }),
   });
 }
 
@@ -345,6 +351,7 @@ export async function fetchPublishedApps(): Promise<{
   public_path: string;
   created_at: string;
   published_at: string;
+  app_type: string | null;
   production_views: number;
   preview_views: number;
 }[]> {

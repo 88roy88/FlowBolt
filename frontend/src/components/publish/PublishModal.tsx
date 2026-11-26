@@ -20,7 +20,7 @@ export function PublishModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="w-[448px] p-0 pb-10 border-border/60 bg-surface/95 backdrop-blur-xl min-h-[260px] flex flex-col transition-all duration-300 ease-in-out">
+      <DialogContent className="w-[520px] max-w-[min(520px,calc(100vw-2rem))] max-h-[90vh] p-0 pb-10 border-border/60 bg-surface/95 backdrop-blur-xl min-h-[260px] flex flex-col transition-all duration-300 ease-in-out">
         <DialogClose onClose={handleClose} />
 
         <div className="flex-1 flex flex-col pt-10 pb-0 px-6">
@@ -31,7 +31,7 @@ export function PublishModal() {
           ) : (
             <InputPhase
               isPublishing={publish.isPending}
-              onPublish={(useSlug) => publish.mutate({ useSlug })}
+              onPublish={(useSlug, details) => publish.mutate({ useSlug, details })}
             />
           )}
         </div>

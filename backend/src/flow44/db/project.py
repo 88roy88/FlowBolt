@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
+from pydantic import BaseModel
 from sqlmodel import Field, SQLModel, col, select
 
 from flow44.db import database
@@ -18,6 +19,15 @@ class Project(SQLModel, table=True):
     selected_model: str = Field(default="")
     published_url: str | None = Field(default=None, sa_column_kwargs={"unique": True})
     published_at: str | None = Field(default=None)
+    app_type: str | None = Field(default=None)
+    app_description: str | None = Field(default=None)
+    publish_reason: str | None = Field(default=None)
+
+
+class PublishDetails(BaseModel):
+    app_type: str
+    app_description: str | None = None
+    publish_reason: str | None = None
 
 
 async def create_project(name: str, user_id: str) -> Project:
@@ -100,8 +110,7 @@ async def is_handle_taken(handle: str, exclude_project_id: str) -> bool:
         return result.scalar_one_or_none() is not None
 
 
-async def update_project_published_url(project_id: str, handle: str) -> None:
-    """Set the project's handle. Caller must ensure the project exists."""
+async def update_project_publication(project_id: str, handle: str, details: PublishDetails) -> None:
     async with database.async_session() as session:
         project = await session.get(Project, project_id)
         if not project:
@@ -109,6 +118,9 @@ async def update_project_published_url(project_id: str, handle: str) -> None:
         now = datetime.now(UTC).isoformat()
         project.published_url = handle
         project.published_at = now
+        project.app_type = details.app_type
+        project.app_description = details.app_description
+        project.publish_reason = details.publish_reason
         project.updated_at = now
         session.add(project)
         await session.commit()

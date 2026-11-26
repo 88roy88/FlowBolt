@@ -73,6 +73,7 @@ class PublishedAppResponse(BaseModel):
     public_path: str
     created_at: str
     published_at: str
+    app_type: str | None
     production_views: int
     preview_views: int
 
@@ -114,6 +115,7 @@ async def list_published_apps(user_id: AdminDep) -> list[PublishedAppResponse]:
             public_path=f"/shared/{handle}",
             created_at=p.created_at,
             published_at=published_at,
+            app_type=p.app_type,
             production_views=view_counts.get(p.id, no_views).production_views,
             preview_views=view_counts.get(p.id, no_views).preview_views,
         )

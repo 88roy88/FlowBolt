@@ -78,7 +78,7 @@ export function Preview() {
 
   const handlePublish = useCallback(() => {
     if (projectId) {
-      usePublishStore.getState().open(projectId, currentProject?.published_url);
+      usePublishStore.getState().open(projectId, currentProject?.published_url, currentProject ?? undefined);
     }
   }, [projectId, currentProject]);
 

@@ -7,6 +7,10 @@
 import { test, expect } from './fixtures';
 import { MOCK_PROJECT, MOCK_PROJECT_WITH_SLUG, PROJECT_ID } from './mocks/data';
 
+async function pickAppType(page: import('@playwright/test').Page, name = 'Game') {
+  await page.getByText(name, { exact: true }).click();
+}
+
 /** Navigate directly to the given project so the Preview toolbar appears. */
 async function goToPreview(page: import('@playwright/test').Page, projectId = PROJECT_ID) {
   await page.goto(`/#/project/${projectId}`);
@@ -54,10 +58,51 @@ test.describe('Publish modal — create mode', () => {
     await page.getByTitle('Publish').click();
     await expect(page.getByText('Choose a custom URL')).toBeVisible({ timeout: 5_000 });
 
-    await page.getByRole('button', { name: 'Use default link' }).click();
+    const defaultLinkBtn = page.getByRole('button', { name: 'Use default link' });
+    await expect(defaultLinkBtn).toBeDisabled();
+
+    await pickAppType(page);
+    const publishRequest = page.waitForRequest('**/api/export/*/publish');
+    await defaultLinkBtn.click();
+
+    expect((await publishRequest).postDataJSON()).toEqual({
+      slug: null,
+      app_type: 'game',
+      app_description: null,
+      publish_reason: null,
+    });
 
     // Success phase
     await expect(page.getByText('Successfully Published!')).toBeVisible({ timeout: 10_000 });
+  });
+});
+
+test.describe('Publish modal — saved answers', () => {
+  test.use({
+    mockOptions: {
+      projects: [{
+        ...MOCK_PROJECT,
+        published_url: 'my-existing-app',
+        app_type: 'portal',
+        app_description: 'Links for the team',
+        publish_reason: 'Other',
+      }],
+      seedChatHistory: true,
+    },
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('language', 'en'));
+  });
+
+  test('prefills the form on republish', async ({ page }) => {
+    await goToPreview(page);
+    await page.getByTitle('Republish').click();
+
+    await expect(page.getByRole('radio', { name: /Portal/ })).toBeChecked();
+    await expect(page.getByLabel(/App description/)).toHaveValue('Links for the team');
+    await expect(page.getByLabel(/Why did you build/)).toHaveValue('Other');
+    await expect(page.getByRole('button', { name: 'Republish', exact: true }).last()).toBeEnabled();
   });
 });
 
@@ -119,6 +164,8 @@ test.describe('Publish modal — edit mode', () => {
 
     // Click the modal's Republish button (last "Republish" on page, after toolbar)
     const modalRepublish = page.getByRole('button', { name: 'Republish', exact: true }).last();
+    await expect(modalRepublish).toBeDisabled();
+    await pickAppType(page);
     await modalRepublish.click();
 
     // Success phase with the slug URL
@@ -186,6 +233,8 @@ test.describe('Publish modal — edit mode', () => {
 
     // Warning about old URL being disabled
     await expect(page.getByText(/permanently disable the old link/)).toBeVisible();
+
+    await pickAppType(page);
 
     // Button should say "Republish with new URL"
     const newUrlBtn = page.getByRole('button', { name: 'Republish with new URL' });

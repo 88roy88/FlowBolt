@@ -245,6 +245,7 @@
     "colName": "Project",
     "colOwner": "Owner",
     "colUrl": "URL",
+    "colType": "Type",
     "colCreated": "Created",
     "colPublished": "Published",
     "colLiveViews": "Live views",
@@ -310,6 +311,13 @@
     "republish": "Republish",
     "republishWithNewSlug": "Republish with new URL",
     "overwriteWarning": "This will replace the currently published version.",
-    "slugChangeWarning": "Changing the URL will permanently disable the old link."
+    "slugChangeWarning": "Changing the URL will permanently disable the old link.",
+    "optional": "optional",
+    "appTypeLabel": "App type",
+    "descriptionLabel": "App description",
+    "descriptionPlaceholder": "What does your app do?",
+    "reasonLabel": "Why did you build this app in BuildApp?",
+    "reasonPlaceholder": "Choose a reason",
+    "formLoadFailed": "Couldn't load the publish form."
   }
 }
