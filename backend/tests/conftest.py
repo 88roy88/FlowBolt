@@ -27,7 +27,6 @@ from flow44.auth.permissions import get_owner_permissions  # noqa: E402
 from flow44.db.database import build_db_url, init_db, reset  # noqa: E402
 from flow44.integrations.directory.client import directory_client  # noqa: E402
 from flow44.main import app  # noqa: E402
-from flow44.workspace_gate import clear_workspace_gate_cache  # noqa: E402
 
 
 @functools.lru_cache
@@ -71,7 +70,7 @@ def no_directory_groups(monkeypatch):
 @pytest.fixture(autouse=True)
 def workspaces_enabled(monkeypatch):
     monkeypatch.setattr("flow44.workspace_gate.is_feature_enabled", AsyncMock(return_value=False))
-    clear_workspace_gate_cache()
+    monkeypatch.setattr("flow44.workspace_gate._cache", {})
 
 
 @pytest.fixture(scope="session")

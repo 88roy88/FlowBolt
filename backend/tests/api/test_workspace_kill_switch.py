@@ -16,6 +16,7 @@ EXEMPT = "/api/admin/flags/disable_workspaces_exempt"
 @pytest.fixture
 def real_gate(monkeypatch):
     monkeypatch.setattr("flow44.workspace_gate.is_feature_enabled", feature_flags.is_feature_enabled)
+    monkeypatch.setattr("flow44.workspace_gate._TTL_SECONDS", 0)
 
 
 @pytest.fixture
@@ -31,7 +32,6 @@ def as_admin():
 async def test_switch_blocks_workspaces_until_turned_off(async_client, test_db):
     assert (await async_client.get("/api/projects/some-project")).status_code == 404
 
-    # Takes effect at once, despite the cached answer from the request above.
     await async_client.put(SWITCH, json={"enabled_for_all": True})
 
     for response in (

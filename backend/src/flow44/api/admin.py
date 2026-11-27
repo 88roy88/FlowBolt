@@ -35,7 +35,6 @@ from flow44.services.maintenance.sandbox_file_permissions import fix_file_permis
 from flow44.services.maintenance.template_sync import sync_protected_template_files
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git
-from flow44.workspace_gate import clear_workspace_gate_cache
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -259,7 +258,6 @@ async def update_flag_switches(user_id: AdminDep, key: str, body: UpdateFlagRequ
         enabled_for_all=body.enabled_for_all,
         enabled_for_admins=body.enabled_for_admins,
     )
-    clear_workspace_gate_cache()
 
 
 @router.post("/flags/{key}/targets", status_code=201)
@@ -277,7 +275,6 @@ async def add_target(user_id: AdminDep, key: str, body: AddFlagTargetRequest) ->
         )
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="Already on this flag") from exc
-    clear_workspace_gate_cache()
     return _target_response(target)
 
 
@@ -286,7 +283,6 @@ async def remove_target(user_id: AdminDep, key: str, target_type: FlagTargetType
     _require_flag_spec(key)
     if not await remove_flag_target(key, target_type, _normalize_target_id(target_type, target_id)):
         raise HTTPException(status_code=404, detail="Target not found")
-    clear_workspace_gate_cache()
 
 
 @router.post("/maintenance/fix-file-permissions", tags=["maintenance"])

@@ -25,7 +25,3 @@ async def are_workspaces_disabled(user_id: str) -> bool:
 async def require_workspaces_enabled(user_id: str) -> None:
     if await are_workspaces_disabled(user_id):
         raise HTTPException(status_code=503, detail=_DISABLED_DETAIL)
-
-
-def clear_workspace_gate_cache() -> None:
-    _cache.clear()
