@@ -217,7 +217,6 @@ def can_use_terminal(user_id: str) -> bool:
 
 
 async def get_project(project_id: str, user_id: UserDep) -> Project:
-    # First, so a blocked request costs as little as possible. Covers every project route, sandbox and WebSocket.
     await require_workspaces_enabled(user_id)
 
     project = await db_get_project(project_id)
