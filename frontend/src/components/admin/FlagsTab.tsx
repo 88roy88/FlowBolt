@@ -47,17 +47,13 @@ export function FlagsTab() {
     return <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noFlags', 'No feature flags are defined')}</p>;
   }
 
-  const workspaceTitles: Record<string, string> = {
-    [BLACKLIST_KEY]: t('admin.workspaceBlacklist', 'Blacklist'),
-    [WHITELIST_KEY]: t('admin.workspaceWhitelist', 'Whitelist (overrides blacklist)'),
-  };
-  const workspaceFlags = flags.filter((flag) => flag.key in workspaceTitles);
+  const isWorkspaceFlag = (flag: FeatureFlag) => flag.key === BLACKLIST_KEY || flag.key === WHITELIST_KEY;
+  const workspaceFlags = flags.filter(isWorkspaceFlag);
 
   const renderRow = (flag: FeatureFlag) => (
     <FlagRow
       key={flag.key}
       flag={flag}
-      title={workspaceTitles[flag.key]}
       confirmTurningOn={flag.key === BLACKLIST_KEY}
       adding={addingTo === flag.key}
       onToggleAdding={() => setAddingTo((prev) => (prev === flag.key ? null : flag.key))}
@@ -70,7 +66,7 @@ export function FlagsTab() {
   return (
     <div className="space-y-2">
       {error && <p className="text-destructive text-xs">{error}</p>}
-      {flags.filter((flag) => !(flag.key in workspaceTitles)).map(renderRow)}
+      {flags.filter((flag) => !isWorkspaceFlag(flag)).map(renderRow)}
       {workspaceFlags.length > 0 && (
         <section className="space-y-2 rounded-lg border border-destructive/60 bg-destructive/5 p-2 !mt-6">
           <h3 className="text-xs font-semibold text-destructive px-1">{t('admin.workspaceAccess', 'Workspace access')}</h3>
@@ -83,7 +79,6 @@ export function FlagsTab() {
 
 interface FlagRowProps {
   flag: FeatureFlag;
-  title?: string;
   confirmTurningOn: boolean;
   adding: boolean;
   onToggleAdding: () => void;
@@ -92,7 +87,7 @@ interface FlagRowProps {
   onRemoveTarget: (type: FlagTargetType, id: string) => Promise<void>;
 }
 
-function FlagRow({ flag, title, confirmTurningOn, adding, onToggleAdding, onUpdate, onAddTarget, onRemoveTarget }: FlagRowProps) {
+function FlagRow({ flag, confirmTurningOn, adding, onToggleAdding, onUpdate, onAddTarget, onRemoveTarget }: FlagRowProps) {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
 
@@ -138,11 +133,7 @@ function FlagRow({ flag, title, confirmTurningOn, adding, onToggleAdding, onUpda
     <div className="rounded-md border border-border bg-surface px-3 py-2.5">
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          {title ? (
-            <span className="text-[13px] font-semibold" title={flag.key}>{title}</span>
-          ) : (
-            <code className="text-[13px] font-semibold break-all">{flag.key}</code>
-          )}
+          <code className="text-[13px] font-semibold break-all">{flag.key}</code>
           {flag.description && <p className="text-xs text-muted-foreground mt-0.5">{flag.description}</p>}
         </div>
         <div className="flex items-center gap-3 shrink-0 pt-0.5">

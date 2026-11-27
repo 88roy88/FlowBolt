@@ -249,8 +249,6 @@
     "noMatches": "אין אפליקציות תואמות",
     "flagsTab": "דגלים",
     "workspaceAccess": "גישה לסביבות עבודה",
-    "workspaceBlacklist": "רשימה שחורה",
-    "workspaceWhitelist": "רשימה לבנה (גוברת על הרשימה השחורה)",
     "workspaceBlacklistConfirm": "לחסום מסביבות העבודה: {{audience}}?",
     "flagEveryone": "כולם",
     "flagAdmins": "מנהלים",
