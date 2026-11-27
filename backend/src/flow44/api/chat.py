@@ -231,7 +231,6 @@ async def chat_ws(  # noqa: C901, PLR0915
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
             raw = await websocket.receive_text()
-            # A socket opened before the kill switch was flipped must not start new work.
             if await are_workspaces_disabled(user_id):
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Workspaces are disabled")
                 return
