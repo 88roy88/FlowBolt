@@ -16,6 +16,8 @@
     "sendMessage": "Send message"
   },
   "app": {
+    "workspacesDisabled": "Workspaces are temporarily unavailable",
+    "workspacesDisabledDetail": "Working on projects is paused for now. Published apps still work, and this page will come back on its own.",
     "selectProjectFirst": "Select a project first",
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
@@ -246,6 +248,7 @@
     "searchApps": "Search by project, owner or URL",
     "noMatches": "No matching apps",
     "flagsTab": "Flags",
+    "flagDangerConfirm": "Turn on {{flag}} for: {{audience}}?",
     "flagEveryone": "Everyone",
     "flagAdmins": "Admins",
     "flagAddTarget": "Add user or group",

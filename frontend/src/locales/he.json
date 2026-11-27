@@ -16,6 +16,8 @@
     "sendMessage": "שלח הודעה"
   },
   "app": {
+    "workspacesDisabled": "סביבות העבודה אינן זמינות כרגע",
+    "workspacesDisabledDetail": "העבודה על פרויקטים מושהית כרגע. אפליקציות שפורסמו ממשיכות לעבוד, והעמוד הזה יחזור מעצמו.",
     "selectProjectFirst": "בחר פרויקט תחילה",
     "backendUnavailable": "השרת לא זמין",
     "cannotConnect": "לא ניתן להתחבר לשרת. אנא ודא שהשרת פועל ונסה לרענן את הדף.",
@@ -246,6 +248,7 @@
     "searchApps": "חיפוש לפי פרויקט, בעלים או כתובת",
     "noMatches": "אין אפליקציות תואמות",
     "flagsTab": "דגלים",
+    "flagDangerConfirm": "להפעיל את {{flag}} עבור: {{audience}}?",
     "flagEveryone": "כולם",
     "flagAdmins": "מנהלים",
     "flagAddTarget": "הוסף משתמש או קבוצה",

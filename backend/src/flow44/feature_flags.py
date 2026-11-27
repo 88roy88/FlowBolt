@@ -7,6 +7,7 @@ from flow44.integrations.directory.client import directory_client
 
 
 class FeatureFlag(StrEnum):
+    disable_workspaces = "disable_workspaces"
     model_selector = "model_selector"
 
 
@@ -15,9 +16,15 @@ class FlagSpec:
     description: str
     default_for_all: bool = False
     default_for_admins: bool = False
+    danger: bool = False  # the admin UI shows it in red and asks before turning it on
 
 
 FLAGS: dict[FeatureFlag, FlagSpec] = {
+    FeatureFlag.disable_workspaces: FlagSpec(
+        "Kill switch for when the backend is overloaded: blocks opening, editing and creating projects. "
+        "Published apps and this admin panel keep working.",
+        danger=True,
+    ),
     FeatureFlag.model_selector: FlagSpec(
         "Show the model dropdown in the chat input. When off, chats use the project's model.",
     ),

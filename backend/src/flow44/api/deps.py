@@ -33,6 +33,7 @@ from flow44.services.logging import _project_id as _log_project_id
 from flow44.services.logging import _project_name as _log_project_name
 from flow44.services.logging import _user_id as _log_user_id
 from flow44.services.versioning import service as versioning
+from flow44.workspace_gate import require_workspaces_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,9 @@ def can_use_terminal(user_id: str) -> bool:
 
 
 async def get_project(project_id: str, user_id: UserDep) -> Project:
+    # First, so a blocked request costs as little as possible. Covers every project route, sandbox and WebSocket.
+    await require_workspaces_enabled(user_id)
+
     project = await db_get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")

@@ -52,9 +52,9 @@ function Timestamp({ iso }: { iso: string }) {
   );
 }
 
-export function AdminPanel({ onClose }: { onClose: () => void }) {
+export function AdminPanel({ onClose, initialTab = 'published' }: { onClose: () => void; initialTab?: Tab }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>('published');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [groups, setGroups] = useState<PlatformGroup[]>([]);
   const [loading, setLoading] = useState(true);

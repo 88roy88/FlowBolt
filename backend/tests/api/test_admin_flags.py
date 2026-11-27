@@ -52,6 +52,7 @@ class TestAdminFlags:
             {
                 "key": "beta",
                 "description": "Beta feature",
+                "danger": False,
                 "enabled_for_all": False,
                 "enabled_for_admins": False,
                 "targets": [],

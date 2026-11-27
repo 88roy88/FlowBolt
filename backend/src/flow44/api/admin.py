@@ -35,6 +35,7 @@ from flow44.services.maintenance.sandbox_file_permissions import fix_file_permis
 from flow44.services.maintenance.template_sync import sync_protected_template_files
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git
+from flow44.workspace_gate import clear_workspace_gate_cache
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -191,6 +192,7 @@ class FlagTargetResponse(BaseModel):
 class FeatureFlagResponse(BaseModel):
     key: str
     description: str
+    danger: bool
     enabled_for_all: bool
     enabled_for_admins: bool
     targets: list[FlagTargetResponse]
@@ -241,6 +243,7 @@ async def list_flags(user_id: AdminDep) -> list[FeatureFlagResponse]:
             FeatureFlagResponse(
                 key=key,
                 description=spec.description,
+                danger=spec.danger,
                 enabled_for_all=state.enabled_for_all,
                 enabled_for_admins=state.enabled_for_admins,
                 targets=[_target_response(t) for t in state.targets],
@@ -258,6 +261,7 @@ async def update_flag_switches(user_id: AdminDep, key: str, body: UpdateFlagRequ
         enabled_for_all=body.enabled_for_all,
         enabled_for_admins=body.enabled_for_admins,
     )
+    clear_workspace_gate_cache()
 
 
 @router.post("/flags/{key}/targets", status_code=201)
@@ -275,6 +279,7 @@ async def add_target(user_id: AdminDep, key: str, body: AddFlagTargetRequest) ->
         )
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="Already on this flag") from exc
+    clear_workspace_gate_cache()
     return _target_response(target)
 
 
@@ -283,6 +288,7 @@ async def remove_target(user_id: AdminDep, key: str, target_type: FlagTargetType
     _require_flag_spec(key)
     if not await remove_flag_target(key, target_type, _normalize_target_id(target_type, target_id)):
         raise HTTPException(status_code=404, detail="Target not found")
+    clear_workspace_gate_cache()
 
 
 @router.post("/maintenance/fix-file-permissions", tags=["maintenance"])

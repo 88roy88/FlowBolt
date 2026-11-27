@@ -95,24 +95,30 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
     [flag.targets],
   );
 
+  const confirmTurnOn = (label: string) =>
+    window.confirm(t('admin.flagDangerConfirm', 'Turn on {{flag}} for: {{audience}}?', { flag: flag.key, audience: label }));
+
   const switchBox = (checked: boolean, label: string, changes: { enabled_for_all?: boolean; enabled_for_admins?: boolean }) => (
     <label className={cn('flex items-center gap-1.5 text-xs cursor-pointer select-none', pending && 'opacity-60')}>
       <input
         type="checkbox"
         checked={checked}
         disabled={pending}
-        onChange={() => withPending(() => onUpdate(changes))}
-        className="cursor-pointer accent-primary"
+        onChange={() => {
+          if (flag.danger && !checked && !confirmTurnOn(label)) return;
+          void withPending(() => onUpdate(changes));
+        }}
+        className={cn('cursor-pointer', flag.danger ? 'accent-destructive' : 'accent-primary')}
       />
       {label}
     </label>
   );
 
   return (
-    <div className="rounded-md border border-border px-3 py-2.5">
+    <div className={cn('rounded-md border px-3 py-2.5', flag.danger ? 'border-destructive/60 bg-destructive/5' : 'border-border')}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <code className="text-[13px] font-semibold break-all">{flag.key}</code>
+          <code className={cn('text-[13px] font-semibold break-all', flag.danger && 'text-destructive')}>{flag.key}</code>
           {flag.description && <p className="text-xs text-muted-foreground mt-0.5">{flag.description}</p>}
         </div>
         <div className="flex items-center gap-3 shrink-0 pt-0.5">
@@ -146,8 +152,14 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
         <div className="mt-2">
           <DirectorySearch
             actionLabel={t('admin.flagAdd', 'Add')}
-            onInviteUser={(u) => withPending(() => onAddTarget({ target_type: 'user', target_id: u.uniqueId, display_name: u.displayName, email: u.mail }))}
-            onInviteGroup={(g) => withPending(() => onAddTarget({ target_type: 'group', target_id: g.distinguishedName, display_name: g.displayName, email: g.mail }))}
+            onInviteUser={(u) => {
+              if (flag.danger && !confirmTurnOn(u.displayName)) return Promise.resolve();
+              return withPending(() => onAddTarget({ target_type: 'user', target_id: u.uniqueId, display_name: u.displayName, email: u.mail }));
+            }}
+            onInviteGroup={(g) => {
+              if (flag.danger && !confirmTurnOn(g.displayName)) return Promise.resolve();
+              return withPending(() => onAddTarget({ target_type: 'group', target_id: g.distinguishedName, display_name: g.displayName, email: g.mail }));
+            }}
             existingUserIds={userIds}
             existingGroupIds={groupIds}
           />

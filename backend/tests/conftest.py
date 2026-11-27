@@ -27,6 +27,7 @@ from flow44.auth.permissions import get_owner_permissions  # noqa: E402
 from flow44.db.database import build_db_url, init_db, reset  # noqa: E402
 from flow44.integrations.directory.client import directory_client  # noqa: E402
 from flow44.main import app  # noqa: E402
+from flow44.workspace_gate import clear_workspace_gate_cache  # noqa: E402
 
 
 @functools.lru_cache
@@ -65,6 +66,13 @@ def authenticated_user():
 def no_directory_groups(monkeypatch):
     # No directory service runs in tests, and a refused connection takes ~3s to fail on Windows.
     monkeypatch.setattr(directory_client, "get_user_group_ids", AsyncMock(return_value=set()))
+
+
+@pytest.fixture(autouse=True)
+def workspaces_enabled(monkeypatch):
+    # The kill switch guards every project route; keep tests without a database from reading the flags table.
+    monkeypatch.setattr("flow44.workspace_gate.is_feature_enabled", AsyncMock(return_value=False))
+    clear_workspace_gate_cache()
 
 
 @pytest.fixture(scope="session")
