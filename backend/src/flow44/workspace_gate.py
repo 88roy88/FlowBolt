@@ -15,8 +15,8 @@ async def are_workspaces_disabled(user_id: str) -> bool:
     cached = _cache.get(user_id)
     if cached is not None and cached[0] > now:
         return cached[1]
-    disabled = await is_feature_enabled(user_id, FeatureFlag.disable_workspaces) and not await is_feature_enabled(
-        user_id, FeatureFlag.disable_workspaces_exempt
+    disabled = await is_feature_enabled(user_id, FeatureFlag.workspace_blacklist) and not await is_feature_enabled(
+        user_id, FeatureFlag.workspace_whitelist
     )
     _cache[user_id] = (now + _TTL_SECONDS, disabled)
     return disabled

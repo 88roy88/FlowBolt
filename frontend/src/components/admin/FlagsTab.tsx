@@ -11,8 +11,8 @@ import * as api from '../../services/api';
 import { CLIENT_CONFIG_QUERY_KEY } from '../../hooks/useClientConfig';
 
 const FLAGS_QUERY_KEY = ['admin', 'flags'];
-const BLACKLIST_KEY = 'disable_workspaces';
-const WHITELIST_KEY = 'disable_workspaces_exempt';
+const BLACKLIST_KEY = 'workspace_blacklist';
+const WHITELIST_KEY = 'workspace_whitelist';
 
 export function FlagsTab() {
   const { t } = useTranslation();

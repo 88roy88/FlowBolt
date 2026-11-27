@@ -9,8 +9,8 @@ from flow44.api.admin import require_admin
 from flow44.api.deps import require_platform_user
 from flow44.main import app
 
-SWITCH = "/api/admin/flags/disable_workspaces"
-EXEMPT = "/api/admin/flags/disable_workspaces_exempt"
+BLACKLIST = "/api/admin/flags/workspace_blacklist"
+WHITELIST = "/api/admin/flags/workspace_whitelist"
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def as_admin():
 async def test_switch_blocks_workspaces_until_turned_off(async_client, test_db):
     assert (await async_client.get("/api/projects/some-project")).status_code == 404
 
-    await async_client.put(SWITCH, json={"enabled_for_all": True})
+    await async_client.put(BLACKLIST, json={"enabled_for_all": True})
 
     for response in (
         await async_client.get("/api/projects/some-project"),
@@ -42,34 +42,34 @@ async def test_switch_blocks_workspaces_until_turned_off(async_client, test_db):
         assert response.status_code == 503
         assert response.json()["detail"]["code"] == "workspaces_disabled"
     # What the blocked screen needs, and the way back, stay open.
-    assert "disable_workspaces" in (await async_client.get("/api/config")).json()["features"]
+    assert "workspace_blacklist" in (await async_client.get("/api/config")).json()["features"]
     assert (await async_client.get("/api/projects")).status_code == 200
 
-    await async_client.put(SWITCH, json={"enabled_for_all": False})
+    await async_client.put(BLACKLIST, json={"enabled_for_all": False})
 
     assert (await async_client.get("/api/projects/some-project")).status_code == 404
 
 
 @pytest.mark.usefixtures("real_gate", "as_admin")
 async def test_switch_only_blocks_targeted_users(async_client, test_db):
-    await async_client.post(f"{SWITCH}/targets", json={"target_type": "user", "target_id": "someone-else"})
+    await async_client.post(f"{BLACKLIST}/targets", json={"target_type": "user", "target_id": "someone-else"})
     assert (await async_client.get("/api/projects/some-project")).status_code == 404
 
-    await async_client.post(f"{SWITCH}/targets", json={"target_type": "user", "target_id": "test-user"})
+    await async_client.post(f"{BLACKLIST}/targets", json={"target_type": "user", "target_id": "test-user"})
     assert (await async_client.get("/api/projects/some-project")).status_code == 503
 
 
 @pytest.mark.usefixtures("real_gate", "as_admin")
-async def test_exempt_user_keeps_working_while_switched_on(async_client, test_db):
-    await async_client.put(SWITCH, json={"enabled_for_all": True})
-    await async_client.post(f"{EXEMPT}/targets", json={"target_type": "user", "target_id": "test-user"})
+async def test_whitelisted_user_keeps_working_while_switched_on(async_client, test_db):
+    await async_client.put(BLACKLIST, json={"enabled_for_all": True})
+    await async_client.post(f"{WHITELIST}/targets", json={"target_type": "user", "target_id": "test-user"})
 
     assert (await async_client.get("/api/projects/some-project")).status_code == 404
     # The frontend works out the same answer from these two.
     features = (await async_client.get("/api/config")).json()["features"]
-    assert {"disable_workspaces", "disable_workspaces_exempt"} <= set(features)
+    assert {"workspace_blacklist", "workspace_whitelist"} <= set(features)
 
-    await async_client.delete(f"{EXEMPT}/targets/user/test-user")
+    await async_client.delete(f"{WHITELIST}/targets/user/test-user")
 
     assert (await async_client.get("/api/projects/some-project")).status_code == 503
 

@@ -31,7 +31,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   const { data, isFetched } = useClientConfigQuery();
   const [lastAnswer] = useState(readLastAnswer);
   const answer =
-    data && data.features.includes('disable_workspaces') && !data.features.includes('disable_workspaces_exempt');
+    data && data.features.includes('workspace_blacklist') && !data.features.includes('workspace_whitelist');
   const disabled = answer ?? lastAnswer ?? false;
   const waiting = !isFetched && lastAnswer === null;
   const [appStarted, setAppStarted] = useState(false);
