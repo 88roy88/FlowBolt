@@ -12,7 +12,7 @@ import * as api from '../../services/api';
 export function WorkspaceGate({ children }: { children: ReactNode }) {
   // isFetched, not isPending: a poll after a failed first load goes back to pending and would remount the app.
   const { data, isFetched } = useClientConfigQuery();
-  const disabled = data?.features.includes('disable_workspaces') ?? false;
+  const disabled = data?.workspaces_disabled ?? false;
   const [appStarted, setAppStarted] = useState(false);
 
   useEffect(() => {
@@ -43,12 +43,12 @@ function WorkspacesDisabled() {
       <FlowBrand size="lg" />
       <div role="alert" className="w-full max-w-md px-5 py-4 bg-surface rounded-xl border-2 border-destructive/50 text-center">
         <p className="text-destructive font-semibold mb-1.5">
-          {t('app.workspacesDisabled', 'Workspaces are temporarily unavailable')}
+          {t('app.workspacesDisabled', 'Your workspaces are temporarily unavailable')}
         </p>
         <p className="text-sm text-muted-foreground leading-relaxed">
           {t(
             'app.workspacesDisabledDetail',
-            'Working on projects is paused for now. Published apps still work, and this page will come back on its own.',
+            "You can't work on projects right now. Published apps still work, and this page will come back on its own.",
           )}
         </p>
       </div>

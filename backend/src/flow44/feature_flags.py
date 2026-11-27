@@ -8,6 +8,7 @@ from flow44.integrations.directory.client import directory_client
 
 class FeatureFlag(StrEnum):
     disable_workspaces = "disable_workspaces"
+    disable_workspaces_exempt = "disable_workspaces_exempt"
     model_selector = "model_selector"
 
 
@@ -21,9 +22,12 @@ class FlagSpec:
 
 FLAGS: dict[FeatureFlag, FlagSpec] = {
     FeatureFlag.disable_workspaces: FlagSpec(
-        "Kill switch for when the backend is overloaded: blocks opening, editing and creating projects. "
-        "Published apps and this admin panel keep working.",
+        "Kill switch for when the backend is overloaded. Users it's turned on for can't open, edit or create "
+        "projects, unless disable_workspaces_exempt is on for them. Published apps and the admin panel keep working.",
         danger=True,
+    ),
+    FeatureFlag.disable_workspaces_exempt: FlagSpec(
+        "Whitelist for disable_workspaces: users it's turned on for keep working while the kill switch is on.",
     ),
     FeatureFlag.model_selector: FlagSpec(
         "Show the model dropdown in the chat input. When off, chats use the project's model.",

@@ -1,4 +1,4 @@
-"""Enforces the disable_workspaces kill switch."""
+"""Enforces the disable_workspaces kill switch and its disable_workspaces_exempt whitelist."""
 
 import time
 
@@ -18,7 +18,10 @@ async def are_workspaces_disabled(user_id: str) -> bool:
     cached = _cache.get(user_id)
     if cached is not None and cached[0] > now:
         return cached[1]
-    disabled = await is_feature_enabled(user_id, FeatureFlag.disable_workspaces)
+    # The whitelist is only looked up once the switch applies, so it costs nothing the rest of the time.
+    disabled = await is_feature_enabled(user_id, FeatureFlag.disable_workspaces) and not await is_feature_enabled(
+        user_id, FeatureFlag.disable_workspaces_exempt
+    )
     _cache[user_id] = (now + _TTL_SECONDS, disabled)
     return disabled
 

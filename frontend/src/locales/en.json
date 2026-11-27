@@ -16,8 +16,8 @@
     "sendMessage": "Send message"
   },
   "app": {
-    "workspacesDisabled": "Workspaces are temporarily unavailable",
-    "workspacesDisabledDetail": "Working on projects is paused for now. Published apps still work, and this page will come back on its own.",
+    "workspacesDisabled": "Your workspaces are temporarily unavailable",
+    "workspacesDisabledDetail": "You can't work on projects right now. Published apps still work, and this page will come back on its own.",
     "selectProjectFirst": "Select a project first",
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
