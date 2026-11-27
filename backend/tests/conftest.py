@@ -70,7 +70,6 @@ def no_directory_groups(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def workspaces_enabled(monkeypatch):
-    # The kill switch guards every project route; keep tests without a database from reading the flags table.
     monkeypatch.setattr("flow44.workspace_gate.is_feature_enabled", AsyncMock(return_value=False))
     clear_workspace_gate_cache()
 
