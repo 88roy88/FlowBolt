@@ -22,6 +22,7 @@ from flow44.api import (
     members,
     models,
     preview,
+    project_data_sources_api,
     projects,
     publish,
     server_log,
@@ -119,6 +120,7 @@ auth_routes.include_router(preview.router)
 auth_routes.include_router(export.router)
 auth_routes.include_router(publish.router)
 auth_routes.include_router(data_source_api.router)
+auth_routes.include_router(project_data_sources_api.router)
 auth_routes.include_router(chat.http_router)
 auth_routes.include_router(client_config.router)
 auth_routes.include_router(iaagent.router)

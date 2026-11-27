@@ -9,6 +9,7 @@
   var match = location.pathname.match(/^\/api\/preview\/([^/]+)\/proxy\//);
   if (!match) return;
   var projectId = decodeURIComponent(match[1]);
+  var host = window.parent !== window ? window.parent : window.opener;
 
   var SOURCE = 'buildapp-toolbar';
   var BUILDER_SOURCE = 'buildapp-builder';
@@ -18,6 +19,8 @@
   var HELLO_THROTTLE_MS = 1000;
   var PROMPT_TIMEOUT_MS = 3000;
   var MAX_COMPONENTS = 4;
+  var MAX_PARAMS_CHARS = 4000;
+  var RUN_PATH = /\/api\/data-source\/([^/]+)\/run$/;
   var IGNORED_COMPONENTS =
     /^(BrowserRouter|HashRouter|MemoryRouter|Router|Routes|Route|RenderedRoute|Outlet|Suspense|StrictMode|Fragment|ErrorBoundary)$|(Provider|Consumer|Context|Boundary)$/;
 
@@ -65,7 +68,6 @@
     '.label{position:fixed;z-index:2147483646;pointer-events:none;padding:2px 6px;border-radius:3px;background:#0090A3;color:#fff;font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;display:none;max-width:60vw;overflow:hidden;text-overflow:ellipsis}',
   ].join('\n');
 
-  var host = window.parent !== window ? window.parent : window.opener;
   var state = {
     status: 'pending', // 'pending' | 'connected' | 'unbuilt' | 'readonly' | 'disconnected'
     count: 0,
@@ -83,6 +85,58 @@
   var hovered = null;
   var lastPicked = null;
   var promptTimer = null;
+
+  // Before anything else, so the app's first data source call is already tracked.
+  trackDataSourceCalls();
+
+  function runTarget(input) {
+    try {
+      var url = typeof input === 'string' ? input : input.url || String(input);
+      var found = new URL(url, location.href).pathname.match(RUN_PATH);
+      return found ? decodeURIComponent(found[1]) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Reports the app's data source calls, with their params but not their responses, to the builder.
+  // Only from the iframe: the builder's panel is about the preview it shows.
+  function trackDataSourceCalls() {
+    if (window.parent === window || typeof window.fetch !== 'function') return;
+    var originalFetch = window.fetch;
+    var documentId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    var calls = 0;
+    send({ type: 'data-source-reset' });
+
+    window.fetch = function (input, init) {
+      var request = originalFetch.apply(this, arguments);
+      var dataSourceId = runTarget(input);
+      if (dataSourceId === null) return request;
+
+      var callId = documentId + '-' + ++calls;
+      var body = init && init.body;
+      send({
+        type: 'data-source-call',
+        phase: 'start',
+        callId: callId,
+        dataSourceId: dataSourceId,
+        params: typeof body === 'string' ? clip(body, MAX_PARAMS_CHARS) : null,
+      });
+      function end(result) {
+        send({ type: 'data-source-call', phase: 'end', callId: callId, dataSourceId: dataSourceId, result: result });
+      }
+      return request.then(
+        function (response) {
+          end(response.ok ? 'ok' : 'error');
+          return response;
+        },
+        function (error) {
+          end(error && error.name === 'AbortError' ? 'aborted' : 'error');
+          throw error;
+        },
+      );
+    };
+  }
 
   function readCollapsed() {
     try {

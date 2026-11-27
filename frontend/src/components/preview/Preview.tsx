@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { credentialsStore } from '../../auth';
 import { useDebouncedCallback } from '../../hooks/useDebounce';
 import { logger } from '../../services/logger';
+import { useDataSourceActivityStore } from '../../stores/dataSourceActivity';
 
 type PreviewLoadTrigger = 'manual_refresh' | 'auto_on_code_change';
 
@@ -38,6 +39,9 @@ export function Preview() {
     credentialsStore.ensureCookie();
     setPreviewUrl(`/api/preview/${projectId}/proxy/`);
   }, [projectId]);
+
+  // Calls still in flight can't report back once the iframe is gone.
+  useEffect(() => () => useDataSourceActivityStore.getState().clearRunning(), []);
 
   const clearConsole = useConsoleStore((s) => s.clear);
 

@@ -112,3 +112,4 @@ class DataSourceUsage(BaseModel):
     params: DataSourceParamsInfo
     can_run: bool = False
     sample: dict[QueryDisplayName, Any] | None = None
+    updated_date: str | None = None

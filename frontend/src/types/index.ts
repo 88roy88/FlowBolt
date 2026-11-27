@@ -140,6 +140,26 @@ export interface AIModel {
   provider: string;
 }
 
+/** A data source the project's code can use. */
+export interface ProjectDataSource {
+  data_source_id: string;
+  name: string;
+  module_path: string;
+  /** The package date the module was generated from, if it records one. */
+  package_updated_date: string | null;
+}
+
+/** A data source whose package is newer than its module. */
+export interface DataSourceUpdate {
+  data_source_id: string;
+  updated_date: string;
+}
+
+export interface DataSourceUsage {
+  file: string;
+  line: number;
+}
+
 export interface DataSourceSearchResult {
   id: number;
   name: string;

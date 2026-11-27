@@ -34,6 +34,14 @@ Based on the user's request, you may also need to build new UI around them (new 
 {% if ds.integration_notes %}- **Integration Notes:** {{ ds.integration_notes }}{% endif %}
 - Usage: `import { dataSource{{ ds.sanitized_name }} } from './dataSources/{{ ds.sanitized_name }}';`
 - Docs: `src/dataSources/{{ ds.sanitized_name }}.docs.md`
+{% if module_changes.get(ds.data_source_id) %}
+- **What changed in the module** when it was regenerated. Check the code that uses it against these changes:
+```diff
+{{ module_changes[ds.data_source_id] }}
+```
+{% elif ds.data_source_id in module_changes %}
+- **What changed in the module:** nothing. Its code is the same as before it was regenerated.
+{% endif %}
 {% endfor %}
 {% endif %}
 

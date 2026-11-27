@@ -102,6 +102,8 @@
   },
   "terminal": {
     "terminal": "Terminal",
+    "expandPanel": "Open panel",
+    "collapsePanel": "Close panel",
     "adminOnly": "Visible to admins only",
     "console": "Console",
     "server": "Server",
@@ -111,6 +113,65 @@
     "entry": "entry",
     "entries": "entries",
     "noConsoleOutput": "No console output"
+  },
+  "dataSources": {
+    "title": "Data Sources",
+    "empty": "No data sources in this project yet",
+    "addHint": "To add one, click <plus/> in the chat box, pick a data source, then send a message saying how the app should use it.",
+    "loadFailed": "Couldn't load the data sources",
+    "running": "Running",
+    "notRun": "Not run yet",
+    "ran": "Ran {{count}}×",
+    "showCalls": "Show recent calls",
+    "noCalls": "No calls since the preview loaded",
+    "noParams": "No parameters",
+    "result": {
+      "running": "Running",
+      "ok": "Succeeded",
+      "error": "Failed",
+      "aborted": "Cancelled"
+    },
+    "resyncNoUpdate": "Re-sync with the package (no update detected)",
+    "resyncUnknown": "Re-sync with the package (there's no recorded date to check for updates)",
+    "sync": "Sync",
+    "packageUpdated": "Package updated",
+    "updateTooltip": "The package was updated on {{date}}. Sync to update your app.",
+    "adjust": "Adjust",
+    "adjustTooltip": "Ask the AI about this data source",
+    "issues": {
+      "notRunning": "This isn't running when it should",
+      "runningTooMuch": "This is running too much",
+      "wrongParams": "The parameters this gets are wrong"
+    },
+    "prompts": {
+      "notRunning": "The \"{{name}}\" data source ({{path}}) isn't running when it should.",
+      "runningTooMuch": "The \"{{name}}\" data source ({{path}}) is running too much.",
+      "wrongParams": "The \"{{name}}\" data source ({{path}}) is getting the wrong parameters.",
+      "sync": "Sync the \"{{name}}\" data source ({{path}}) with the latest version of its package, and adjust the app if anything changed.",
+      "removeUsages": "Remove every use of the \"{{name}}\" data source ({{path}}) from the app. It's used in: {{places}}. Don't edit or delete the files in src/dataSources/; I'll remove the data source afterwards."
+    },
+    "remove": "Remove data source",
+    "dialog": {
+      "title": "Remove \"{{name}}\"?",
+      "checking": "Checking where it's used…",
+      "confirm": "The app's code doesn't use this data source. Its generated files will be deleted and saved as a new version.",
+      "inUse": "The app's code still uses this data source, so it can't be removed yet:",
+      "askAi": "Ask AI to remove usages",
+      "remove": "Remove"
+    },
+    "disabled": {
+      "readOnly": "You have read-only access",
+      "notBuilt": "Available after the app is built"
+    },
+    "errors": {
+      "check": "Couldn't check where it's used",
+      "remove": "Couldn't remove the data source",
+      "dirty_workspace": "Save or discard your unsaved edits first",
+      "run_active": "Wait for the AI to finish",
+      "previewing": "Go back to the latest version first",
+      "busy": "Another change is in progress, try again",
+      "not_built": "Available after the app is built"
+    }
   },
   "preview": {
     "title": "Preview",

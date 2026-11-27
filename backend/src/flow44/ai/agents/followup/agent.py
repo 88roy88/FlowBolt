@@ -1,4 +1,5 @@
 import asyncio
+import difflib
 import json
 import uuid
 from itertools import accumulate
@@ -11,6 +12,7 @@ from flow44.ai.agents._chat_agent import ChatAgent
 from flow44.ai.agents.analyze_data_source import fetch_and_analyze_data_source, generate_data_source_files
 from flow44.ai.agents.file_diffs import DiffTracker
 from flow44.ai.agents.followup.prompts import render_followup
+from flow44.ai.codegen.data_source_module import PACKAGE_UPDATED_HEADER
 from flow44.ai.core.messages import Message
 from flow44.ai.core.react_flow import ReActFlow, looks_like_leaked_tool_call
 from flow44.ai.core.tools import ToolExecutor, ToolResult, tool
@@ -18,12 +20,14 @@ from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
 from flow44.config import settings
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
-from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
+from flow44.db.project_data_source import DataSourceContext, update_project_data_sources
+from flow44.logic.project_data_sources import list_active, module_path
 from flow44.sandbox.main import PnpmSandbox
 from flow44.services.logging.helpers import bi_logger
 
 MAX_ITERATIONS = 15
 MAX_READ_LINES = 1000
+MAX_MODULE_CHANGE_CHARS = 20_000
 
 
 def _trim_start(history: list[ChatMessage]) -> int:
@@ -36,6 +40,18 @@ def _trim_start(history: list[ChatMessage]) -> int:
     if suffix_sizes[0] <= budget:
         return 0
     return next((i for i in run_starts if suffix_sizes[i] <= budget), run_starts[-1])
+
+
+def module_change(old: str, new: str) -> str:
+    """How regenerating changed a data source module, ignoring its package date. "" when the code is the same."""
+
+    def code(content: str) -> list[str]:
+        return [line for line in content.splitlines() if not line.startswith(PACKAGE_UPDATED_HEADER)]
+
+    diff = "\n".join(difflib.unified_diff(code(old), code(new), "before", "after", lineterm=""))
+    if len(diff) > MAX_MODULE_CHANGE_CHARS:
+        return diff[:MAX_MODULE_CHANGE_CHARS] + "\n... (cut short)"
+    return diff
 
 
 def _format_file_safety_error(exc: FileSafetyError) -> str:
@@ -166,20 +182,27 @@ class FollowUpAgent(ChatAgent):
 
         new_data_source_contexts: list[DataSourceContext] = []
         existing_data_source_contexts: list[DataSourceContext] = []
+        # By data source id, for those the app already had: the AI can't read the overwritten module.
+        module_changes: dict[str, str] = {}
 
         if data_source_ids:
-            stored_contexts = await get_project_data_sources(self.project_id)
-            stored_ids = {ds.data_source_id for ds in stored_contexts}
+            stored_contexts = await list_active(self.project_id, self.sandbox)
+            stored_by_id = {ds.data_source_id: ds for ds in stored_contexts}
             await self.emit({"type": "phase", "phase": "fetching_data_sources"})
             try:
                 updated_contexts: list[DataSourceContext] = list(
-                    await asyncio.gather(*[self._fetch_analyze_and_write(sid, content) for sid in data_source_ids])
+                    await asyncio.gather(
+                        *[
+                            self._fetch_analyze_and_write(sid, content, stored_by_id.get(sid), module_changes)
+                            for sid in data_source_ids
+                        ]
+                    )
                 )
             except Exception:
                 await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
                 raise
-            new_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id not in stored_ids]
-            existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_ids]
+            new_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id not in stored_by_id]
+            existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_by_id]
             if updated_contexts:
                 await self._persist_data_sources(updated_contexts, stored_contexts)
                 bi_logger.data_sources_added(new_data_source_contexts)
@@ -196,6 +219,7 @@ class FollowUpAgent(ChatAgent):
             file_tree=context["file_tree"],
             new_data_source_contexts=new_data_source_contexts or None,
             existing_data_source_contexts=existing_data_source_contexts or None,
+            module_changes=module_changes,
         )
 
         react_flow: ReActFlow[BaseModel] = ReActFlow(name="followup", max_iterations=MAX_ITERATIONS)
@@ -221,7 +245,9 @@ class FollowUpAgent(ChatAgent):
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
-    async def _fetch_analyze_and_write(self, sid: str, user_content: str) -> DataSourceContext:
+    async def _fetch_analyze_and_write(
+        self, sid: str, user_content: str, stored: DataSourceContext | None, module_changes: dict[str, str]
+    ) -> DataSourceContext:
         ctx = await fetch_and_analyze_data_source(
             sid,
             user_content,
@@ -229,7 +255,15 @@ class FollowUpAgent(ChatAgent):
             self.model,
             self._llm_metadata,
         )
+        if stored is None:
+            await self._write_data_source_module(ctx)
+            return ctx
+        # The app imports the module by this name, so it stays even if the package was renamed.
+        ctx.sanitized_name = stored.sanitized_name
+        path = module_path(stored)
+        old = await self.sandbox.read_file(path)
         await self._write_data_source_module(ctx)
+        module_changes[sid] = module_change(old, await self.sandbox.read_file(path))
         return ctx
 
     async def _write_data_source_module(self, ctx: DataSourceContext) -> None:

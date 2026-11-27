@@ -236,3 +236,28 @@ describe('message queue', () => {
     expect(useChatStore.getState().messages.map((m) => m.content)).toEqual(['next']);
   });
 });
+
+describe('appendToDraft', () => {
+  it('adds to the chat input without sending or overwriting it', () => {
+    socketSend.mockClear();
+    useChatStore.setState({ draft: '' });
+    const { draftFocusRequest } = useChatStore.getState();
+
+    useChatStore.getState().appendToDraft('first');
+    useChatStore.getState().appendToDraft('second');
+
+    expect(useChatStore.getState().draft).toBe('first\nsecond');
+    expect(useChatStore.getState().draftFocusRequest).toBe(draftFocusRequest + 2);
+    expect(socketSend).not.toHaveBeenCalled();
+  });
+
+  it('only asks for focus when the text is already there', () => {
+    useChatStore.setState({ draft: 'first' });
+    const { draftFocusRequest } = useChatStore.getState();
+
+    useChatStore.getState().appendToDraft('first');
+
+    expect(useChatStore.getState().draft).toBe('first');
+    expect(useChatStore.getState().draftFocusRequest).toBe(draftFocusRequest + 1);
+  });
+});

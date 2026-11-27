@@ -44,6 +44,8 @@ class DataSourceContext(DataSourceBase):
     sample_data: dict[str, Any] | None = None
     module_path: str = ""
     generated_files: dict[str, str] = Field(default_factory=dict)
+    # Not stored in the DB: the generated module records it, so versions restore it along with the code.
+    package_updated_date: str = ""
 
     def to_prompt_context(self) -> dict[str, Any]:
         return {
@@ -76,7 +78,7 @@ async def update_project_data_sources(project_id: str, data_sources: Sequence[Da
         )
         by_id = {(row.type, row.data_source_id): row for row in existing.scalars().all()}
 
-        _transient = {"id", "project_id", "sample_data", "module_path", "generated_files"}
+        _transient = {"id", "project_id", "sample_data", "module_path", "generated_files", "package_updated_date"}
         for ctx in data_sources:
             persistent = ctx.model_dump(exclude=_transient)
             row = by_id.get((ctx.type, ctx.data_source_id))

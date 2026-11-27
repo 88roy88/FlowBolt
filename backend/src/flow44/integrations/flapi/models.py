@@ -210,3 +210,5 @@ class PackageMetadata(PascalCaseBaseModel):
     description: str | None = None
     # output_queries_id: list[Any]
     queries: list[Query]
+    # Kept as text, so an unexpected format can't stop a data source from being added.
+    updated_date: str | None = None
