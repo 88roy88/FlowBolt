@@ -8,21 +8,50 @@ import { FlowBrand } from '../ui/flow-logo';
 import { useClientConfigQuery } from '../../hooks/useClientConfig';
 import * as api from '../../services/api';
 
+const LAST_ANSWER_KEY = 'workspaces-disabled';
+
+function readLastAnswer(): boolean | null {
+  try {
+    const stored = localStorage.getItem(LAST_ANSWER_KEY);
+    return stored === null ? null : stored === 'true';
+  } catch {
+    return null;
+  }
+}
+
+function saveLastAnswer(disabled: boolean) {
+  try {
+    localStorage.setItem(LAST_ANSWER_KEY, String(disabled));
+  } catch {
+    // A stale "not blocked" that can't be overwritten would reload the page forever.
+    try { localStorage.removeItem(LAST_ANSWER_KEY); } catch {}
+  }
+}
+
 /** Keeps the app from mounting while the disable_workspaces kill switch is on for this user. */
 export function WorkspaceGate({ children }: { children: ReactNode }) {
-  // isFetched, not isPending: a poll after a failed first load goes back to pending and would remount the app.
+  // isFetched, not isPending: a refetch after a failed first load goes back to pending and would remount the app.
   const { data, isFetched } = useClientConfigQuery();
-  const disabled = data?.workspaces_disabled ?? false;
+  // The last answer stands in until the server replies, so a slow backend doesn't hold returning users on the spinner.
+  const [lastAnswer] = useState(readLastAnswer);
+  const answer = data?.workspaces_disabled;
+  const disabled = answer ?? lastAnswer ?? false;
+  const waiting = !isFetched && lastAnswer === null;
   const [appStarted, setAppStarted] = useState(false);
 
+  // Declared before the reload below, which needs the new answer to be saved already.
   useEffect(() => {
-    if (!isFetched) return;
+    if (answer !== undefined) saveLastAnswer(answer);
+  }, [answer]);
+
+  useEffect(() => {
+    if (waiting) return;
     if (!disabled) setAppStarted(true);
     // The app's sockets, pollers and preview iframe outlive an unmount; only a reload drops them all.
     else if (appStarted) window.location.reload();
-  }, [isFetched, disabled, appStarted]);
+  }, [waiting, disabled, appStarted]);
 
-  if (!isFetched) {
+  if (waiting) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
         <FlowBrand size="lg" />
@@ -48,7 +77,7 @@ function WorkspacesDisabled() {
         <p className="text-sm text-muted-foreground leading-relaxed">
           {t(
             'app.workspacesDisabledDetail',
-            "You can't work on projects right now. Published apps still work, and this page will come back on its own.",
+            "You can't work on projects right now. Published apps still work. Refresh the page later to check again.",
           )}
         </p>
       </div>

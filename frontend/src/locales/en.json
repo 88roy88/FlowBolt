@@ -17,7 +17,7 @@
   },
   "app": {
     "workspacesDisabled": "Your workspaces are temporarily unavailable",
-    "workspacesDisabledDetail": "You can't work on projects right now. Published apps still work, and this page will come back on its own.",
+    "workspacesDisabledDetail": "You can't work on projects right now. Published apps still work. Refresh the page later to check again.",
     "selectProjectFirst": "Select a project first",
     "backendUnavailable": "Backend Server Unavailable",
     "cannotConnect": "Cannot connect to the backend server. Please ensure the server is running and try refreshing the page.",
