@@ -34,7 +34,9 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   const { data, isFetched } = useClientConfigQuery();
   // The last answer stands in until the server replies, so a slow backend doesn't hold returning users on the spinner.
   const [lastAnswer] = useState(readLastAnswer);
-  const answer = data?.workspaces_disabled;
+  // The same rule as the backend's workspace_gate.
+  const answer =
+    data && data.features.includes('disable_workspaces') && !data.features.includes('disable_workspaces_exempt');
   const disabled = answer ?? lastAnswer ?? false;
   const waiting = !isFetched && lastAnswer === null;
   const [appStarted, setAppStarted] = useState(false);

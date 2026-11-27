@@ -42,7 +42,7 @@ async def test_switch_blocks_workspaces_until_turned_off(async_client, test_db):
         assert response.status_code == 503
         assert response.json()["detail"]["code"] == "workspaces_disabled"
     # What the blocked screen needs, and the way back, stay open.
-    assert (await async_client.get("/api/config")).json()["workspaces_disabled"] is True
+    assert "disable_workspaces" in (await async_client.get("/api/config")).json()["features"]
     assert (await async_client.get("/api/projects")).status_code == 200
 
     await async_client.put(SWITCH, json={"enabled_for_all": False})
@@ -65,10 +65,9 @@ async def test_exempt_user_keeps_working_while_switched_on(async_client, test_db
     await async_client.post(f"{EXEMPT}/targets", json={"target_type": "user", "target_id": "test-user"})
 
     assert (await async_client.get("/api/projects/some-project")).status_code == 404
-    # The frontend goes by this rather than by the raw flags, which both stay on.
-    config = (await async_client.get("/api/config")).json()
-    assert config["workspaces_disabled"] is False
-    assert {"disable_workspaces", "disable_workspaces_exempt"} <= set(config["features"])
+    # The frontend works out the same answer from these two.
+    features = (await async_client.get("/api/config")).json()["features"]
+    assert {"disable_workspaces", "disable_workspaces_exempt"} <= set(features)
 
     await async_client.delete(f"{EXEMPT}/targets/user/test-user")
 

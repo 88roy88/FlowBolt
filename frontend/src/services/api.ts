@@ -203,7 +203,6 @@ export async function fetchDefaultModel(): Promise<string> {
 
 export interface ClientConfig {
   chat_message_max_chars: number;
-  workspaces_disabled: boolean;
   features: string[];
 }
 
