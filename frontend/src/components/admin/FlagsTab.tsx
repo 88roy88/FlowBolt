@@ -11,6 +11,8 @@ import * as api from '../../services/api';
 import { CLIENT_CONFIG_QUERY_KEY } from '../../hooks/useClientConfig';
 
 const FLAGS_QUERY_KEY = ['admin', 'flags'];
+const BLACKLIST_KEY = 'disable_workspaces';
+const WHITELIST_KEY = 'disable_workspaces_exempt';
 
 export function FlagsTab() {
   const { t } = useTranslation();
@@ -45,26 +47,44 @@ export function FlagsTab() {
     return <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noFlags', 'No feature flags are defined')}</p>;
   }
 
+  const workspaceTitles: Record<string, string> = {
+    [BLACKLIST_KEY]: t('admin.workspaceBlacklist', 'Blacklist'),
+    [WHITELIST_KEY]: t('admin.workspaceWhitelist', 'Whitelist (overrides blacklist)'),
+  };
+  const workspaceFlags = flags.filter((flag) => flag.key in workspaceTitles);
+
+  const renderRow = (flag: FeatureFlag) => (
+    <FlagRow
+      key={flag.key}
+      flag={flag}
+      title={workspaceTitles[flag.key]}
+      confirmTurningOn={flag.key === BLACKLIST_KEY}
+      adding={addingTo === flag.key}
+      onToggleAdding={() => setAddingTo((prev) => (prev === flag.key ? null : flag.key))}
+      onUpdate={(changes) => run(() => api.updateFeatureFlag(flag.key, changes), 'Failed to update flag')}
+      onAddTarget={(target) => run(() => api.addFlagTarget(flag.key, target), 'Failed to add to flag')}
+      onRemoveTarget={(type, id) => run(() => api.removeFlagTarget(flag.key, type, id), 'Failed to remove from flag')}
+    />
+  );
+
   return (
     <div className="space-y-2">
       {error && <p className="text-destructive text-xs">{error}</p>}
-      {flags.map((flag) => (
-        <FlagRow
-          key={flag.key}
-          flag={flag}
-          adding={addingTo === flag.key}
-          onToggleAdding={() => setAddingTo((prev) => (prev === flag.key ? null : flag.key))}
-          onUpdate={(changes) => run(() => api.updateFeatureFlag(flag.key, changes), 'Failed to update flag')}
-          onAddTarget={(target) => run(() => api.addFlagTarget(flag.key, target), 'Failed to add to flag')}
-          onRemoveTarget={(type, id) => run(() => api.removeFlagTarget(flag.key, type, id), 'Failed to remove from flag')}
-        />
-      ))}
+      {flags.filter((flag) => !(flag.key in workspaceTitles)).map(renderRow)}
+      {workspaceFlags.length > 0 && (
+        <section className="space-y-2 rounded-lg border border-destructive/60 bg-destructive/5 p-2 !mt-6">
+          <h3 className="text-xs font-semibold text-destructive px-1">{t('admin.workspaceAccess', 'Workspace access')}</h3>
+          {workspaceFlags.map(renderRow)}
+        </section>
+      )}
     </div>
   );
 }
 
 interface FlagRowProps {
   flag: FeatureFlag;
+  title?: string;
+  confirmTurningOn: boolean;
   adding: boolean;
   onToggleAdding: () => void;
   onUpdate: (changes: { enabled_for_all?: boolean; enabled_for_admins?: boolean }) => Promise<void>;
@@ -72,7 +92,7 @@ interface FlagRowProps {
   onRemoveTarget: (type: FlagTargetType, id: string) => Promise<void>;
 }
 
-function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemoveTarget }: FlagRowProps) {
+function FlagRow({ flag, title, confirmTurningOn, adding, onToggleAdding, onUpdate, onAddTarget, onRemoveTarget }: FlagRowProps) {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
 
@@ -96,7 +116,7 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
   );
 
   const confirmTurnOn = (label: string) =>
-    window.confirm(t('admin.flagDangerConfirm', 'Turn on {{flag}} for: {{audience}}?', { flag: flag.key, audience: label }));
+    window.confirm(t('admin.workspaceBlacklistConfirm', 'Blacklist from workspaces: {{audience}}?', { audience: label }));
 
   const switchBox = (checked: boolean, label: string, changes: { enabled_for_all?: boolean; enabled_for_admins?: boolean }) => (
     <label className={cn('flex items-center gap-1.5 text-xs cursor-pointer select-none', pending && 'opacity-60')}>
@@ -105,20 +125,24 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
         checked={checked}
         disabled={pending}
         onChange={() => {
-          if (flag.danger && !checked && !confirmTurnOn(label)) return;
+          if (confirmTurningOn && !checked && !confirmTurnOn(label)) return;
           void withPending(() => onUpdate(changes));
         }}
-        className={cn('cursor-pointer', flag.danger ? 'accent-destructive' : 'accent-primary')}
+        className="cursor-pointer accent-primary"
       />
       {label}
     </label>
   );
 
   return (
-    <div className={cn('rounded-md border px-3 py-2.5', flag.danger ? 'border-destructive/60 bg-destructive/5' : 'border-border')}>
+    <div className="rounded-md border border-border bg-surface px-3 py-2.5">
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <code className={cn('text-[13px] font-semibold break-all', flag.danger && 'text-destructive')}>{flag.key}</code>
+          {title ? (
+            <span className="text-[13px] font-semibold" title={flag.key}>{title}</span>
+          ) : (
+            <code className="text-[13px] font-semibold break-all">{flag.key}</code>
+          )}
           {flag.description && <p className="text-xs text-muted-foreground mt-0.5">{flag.description}</p>}
         </div>
         <div className="flex items-center gap-3 shrink-0 pt-0.5">
@@ -153,11 +177,11 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
           <DirectorySearch
             actionLabel={t('admin.flagAdd', 'Add')}
             onInviteUser={(u) => {
-              if (flag.danger && !confirmTurnOn(u.displayName)) return Promise.resolve();
+              if (confirmTurningOn && !confirmTurnOn(u.displayName)) return Promise.resolve();
               return withPending(() => onAddTarget({ target_type: 'user', target_id: u.uniqueId, display_name: u.displayName, email: u.mail }));
             }}
             onInviteGroup={(g) => {
-              if (flag.danger && !confirmTurnOn(g.displayName)) return Promise.resolve();
+              if (confirmTurningOn && !confirmTurnOn(g.displayName)) return Promise.resolve();
               return withPending(() => onAddTarget({ target_type: 'group', target_id: g.distinguishedName, display_name: g.displayName, email: g.mail }));
             }}
             existingUserIds={userIds}

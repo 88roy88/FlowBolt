@@ -17,17 +17,15 @@ class FlagSpec:
     description: str
     default_for_all: bool = False
     default_for_admins: bool = False
-    danger: bool = False  # the admin UI shows it in red and asks before turning it on
 
 
 FLAGS: dict[FeatureFlag, FlagSpec] = {
     FeatureFlag.disable_workspaces: FlagSpec(
-        "Kill switch for when the backend is overloaded. Users it's turned on for can't open, edit or create "
-        "projects, unless disable_workspaces_exempt is on for them. Published apps and the admin panel keep working.",
-        danger=True,
+        "Users it's turned on for can't open, edit or create projects, for when the backend is overloaded. "
+        "Published apps and the admin panel keep working.",
     ),
     FeatureFlag.disable_workspaces_exempt: FlagSpec(
-        "Whitelist for disable_workspaces: users it's turned on for keep working while the kill switch is on.",
+        "Users it's turned on for keep working, even if they're also on the blacklist.",
     ),
     FeatureFlag.model_selector: FlagSpec(
         "Show the model dropdown in the chat input. When off, chats use the project's model.",

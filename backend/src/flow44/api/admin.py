@@ -192,7 +192,6 @@ class FlagTargetResponse(BaseModel):
 class FeatureFlagResponse(BaseModel):
     key: str
     description: str
-    danger: bool
     enabled_for_all: bool
     enabled_for_admins: bool
     targets: list[FlagTargetResponse]
@@ -243,7 +242,6 @@ async def list_flags(user_id: AdminDep) -> list[FeatureFlagResponse]:
             FeatureFlagResponse(
                 key=key,
                 description=spec.description,
-                danger=spec.danger,
                 enabled_for_all=state.enabled_for_all,
                 enabled_for_admins=state.enabled_for_admins,
                 targets=[_target_response(t) for t in state.targets],

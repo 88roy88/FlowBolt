@@ -140,7 +140,6 @@ export interface FlagTarget {
 export interface FeatureFlag {
   key: string;
   description: string;
-  danger: boolean;
   enabled_for_all: boolean;
   enabled_for_admins: boolean;
   targets: FlagTarget[];
