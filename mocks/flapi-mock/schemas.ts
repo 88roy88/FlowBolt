@@ -80,6 +80,7 @@ export const PackageMetadataSchema = Type.Object({
   Name: Type.String(),
   OutputQueriesId: Type.Array(Type.Unknown()),
   Queries: Type.Array(QuerySchema),
+  UpdatedDate: Type.String(),
 });
 
 export type PackageMetadata = Static<typeof PackageMetadataSchema>;
