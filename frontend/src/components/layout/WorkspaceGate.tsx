@@ -23,25 +23,19 @@ function saveLastAnswer(disabled: boolean) {
   try {
     localStorage.setItem(LAST_ANSWER_KEY, String(disabled));
   } catch {
-    // A stale "not blocked" that can't be overwritten would reload the page forever.
     try { localStorage.removeItem(LAST_ANSWER_KEY); } catch {}
   }
 }
 
-/** Keeps the app from mounting while the disable_workspaces kill switch is on for this user. */
 export function WorkspaceGate({ children }: { children: ReactNode }) {
-  // isFetched, not isPending: a refetch after a failed first load goes back to pending and would remount the app.
   const { data, isFetched } = useClientConfigQuery();
-  // The last answer stands in until the server replies, so a slow backend doesn't hold returning users on the spinner.
   const [lastAnswer] = useState(readLastAnswer);
-  // The same rule as the backend's workspace_gate.
   const answer =
     data && data.features.includes('disable_workspaces') && !data.features.includes('disable_workspaces_exempt');
   const disabled = answer ?? lastAnswer ?? false;
   const waiting = !isFetched && lastAnswer === null;
   const [appStarted, setAppStarted] = useState(false);
 
-  // Declared before the reload below, which needs the new answer to be saved already.
   useEffect(() => {
     if (answer !== undefined) saveLastAnswer(answer);
   }, [answer]);
@@ -49,7 +43,6 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (waiting) return;
     if (!disabled) setAppStarted(true);
-    // The app's sockets, pollers and preview iframe outlive an unmount; only a reload drops them all.
     else if (appStarted) window.location.reload();
   }, [waiting, disabled, appStarted]);
 
