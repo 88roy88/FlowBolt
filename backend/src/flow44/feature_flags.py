@@ -7,6 +7,8 @@ from flow44.integrations.directory.client import directory_client
 
 
 class FeatureFlag(StrEnum):
+    workspace_blacklist = "workspace_blacklist"
+    workspace_whitelist = "workspace_whitelist"
     model_selector = "model_selector"
 
 
@@ -18,6 +20,13 @@ class FlagSpec:
 
 
 FLAGS: dict[FeatureFlag, FlagSpec] = {
+    FeatureFlag.workspace_blacklist: FlagSpec(
+        "Users it's turned on for can't open, edit or create projects, for when the backend is overloaded. "
+        "Published apps and the admin panel keep working.",
+    ),
+    FeatureFlag.workspace_whitelist: FlagSpec(
+        "Users it's turned on for keep working, even if they're also on the blacklist.",
+    ),
     FeatureFlag.model_selector: FlagSpec(
         "Show the model dropdown in the chat input. When off, chats use the project's model.",
     ),

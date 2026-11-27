@@ -39,6 +39,7 @@ from flow44.sandbox.idle_reaper import idle_reaper
 from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
 from flow44.services.versioning import service as versioning
+from flow44.workspace_gate import require_workspaces_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,7 @@ async def get_single_project(project: ProjectDep, user_id: UserDep) -> ProjectRe
 
 @router.post("", status_code=201)
 async def create_new_project(body: CreateProjectRequest, user_id: PlatformUserDep) -> ProjectResponse:
+    await require_workspaces_enabled(user_id)
     project = await create_project(body.name, user_id)
     log_bi_event("project_created", project_id=project.id, project_name=body.name)
 

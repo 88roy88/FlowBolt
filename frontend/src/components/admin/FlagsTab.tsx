@@ -11,6 +11,8 @@ import * as api from '../../services/api';
 import { CLIENT_CONFIG_QUERY_KEY } from '../../hooks/useClientConfig';
 
 const FLAGS_QUERY_KEY = ['admin', 'flags'];
+const BLACKLIST_KEY = 'workspace_blacklist';
+const WHITELIST_KEY = 'workspace_whitelist';
 
 export function FlagsTab() {
   const { t } = useTranslation();
@@ -45,26 +47,39 @@ export function FlagsTab() {
     return <p className="text-muted-foreground text-xs text-center py-4">{t('admin.noFlags', 'No feature flags are defined')}</p>;
   }
 
+  const isWorkspaceFlag = (flag: FeatureFlag) => flag.key === BLACKLIST_KEY || flag.key === WHITELIST_KEY;
+  const workspaceFlags = flags.filter(isWorkspaceFlag);
+
+  const renderRow = (flag: FeatureFlag) => (
+    <FlagRow
+      key={flag.key}
+      flag={flag}
+      confirmTurningOn={flag.key === BLACKLIST_KEY}
+      adding={addingTo === flag.key}
+      onToggleAdding={() => setAddingTo((prev) => (prev === flag.key ? null : flag.key))}
+      onUpdate={(changes) => run(() => api.updateFeatureFlag(flag.key, changes), 'Failed to update flag')}
+      onAddTarget={(target) => run(() => api.addFlagTarget(flag.key, target), 'Failed to add to flag')}
+      onRemoveTarget={(type, id) => run(() => api.removeFlagTarget(flag.key, type, id), 'Failed to remove from flag')}
+    />
+  );
+
   return (
     <div className="space-y-2">
       {error && <p className="text-destructive text-xs">{error}</p>}
-      {flags.map((flag) => (
-        <FlagRow
-          key={flag.key}
-          flag={flag}
-          adding={addingTo === flag.key}
-          onToggleAdding={() => setAddingTo((prev) => (prev === flag.key ? null : flag.key))}
-          onUpdate={(changes) => run(() => api.updateFeatureFlag(flag.key, changes), 'Failed to update flag')}
-          onAddTarget={(target) => run(() => api.addFlagTarget(flag.key, target), 'Failed to add to flag')}
-          onRemoveTarget={(type, id) => run(() => api.removeFlagTarget(flag.key, type, id), 'Failed to remove from flag')}
-        />
-      ))}
+      {flags.filter((flag) => !isWorkspaceFlag(flag)).map(renderRow)}
+      {workspaceFlags.length > 0 && (
+        <section className="space-y-2 rounded-lg border border-destructive/60 bg-destructive/5 p-2 !mt-6">
+          <h3 className="text-xs font-semibold text-destructive px-1">{t('admin.workspaceAccess', 'Workspace access')}</h3>
+          {workspaceFlags.map(renderRow)}
+        </section>
+      )}
     </div>
   );
 }
 
 interface FlagRowProps {
   flag: FeatureFlag;
+  confirmTurningOn: boolean;
   adding: boolean;
   onToggleAdding: () => void;
   onUpdate: (changes: { enabled_for_all?: boolean; enabled_for_admins?: boolean }) => Promise<void>;
@@ -72,7 +87,7 @@ interface FlagRowProps {
   onRemoveTarget: (type: FlagTargetType, id: string) => Promise<void>;
 }
 
-function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemoveTarget }: FlagRowProps) {
+function FlagRow({ flag, confirmTurningOn, adding, onToggleAdding, onUpdate, onAddTarget, onRemoveTarget }: FlagRowProps) {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
 
@@ -95,13 +110,19 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
     [flag.targets],
   );
 
+  const confirmTurnOn = (label: string) =>
+    window.confirm(t('admin.workspaceBlacklistConfirm', 'Blacklist from workspaces: {{audience}}?', { audience: label }));
+
   const switchBox = (checked: boolean, label: string, changes: { enabled_for_all?: boolean; enabled_for_admins?: boolean }) => (
     <label className={cn('flex items-center gap-1.5 text-xs cursor-pointer select-none', pending && 'opacity-60')}>
       <input
         type="checkbox"
         checked={checked}
         disabled={pending}
-        onChange={() => withPending(() => onUpdate(changes))}
+        onChange={() => {
+          if (confirmTurningOn && !checked && !confirmTurnOn(label)) return;
+          void withPending(() => onUpdate(changes));
+        }}
         className="cursor-pointer accent-primary"
       />
       {label}
@@ -109,7 +130,7 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
   );
 
   return (
-    <div className="rounded-md border border-border px-3 py-2.5">
+    <div className="rounded-md border border-border bg-surface px-3 py-2.5">
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <code className="text-[13px] font-semibold break-all">{flag.key}</code>
@@ -146,8 +167,14 @@ function FlagRow({ flag, adding, onToggleAdding, onUpdate, onAddTarget, onRemove
         <div className="mt-2">
           <DirectorySearch
             actionLabel={t('admin.flagAdd', 'Add')}
-            onInviteUser={(u) => withPending(() => onAddTarget({ target_type: 'user', target_id: u.uniqueId, display_name: u.displayName, email: u.mail }))}
-            onInviteGroup={(g) => withPending(() => onAddTarget({ target_type: 'group', target_id: g.distinguishedName, display_name: g.displayName, email: g.mail }))}
+            onInviteUser={(u) => {
+              if (confirmTurningOn && !confirmTurnOn(u.displayName)) return Promise.resolve();
+              return withPending(() => onAddTarget({ target_type: 'user', target_id: u.uniqueId, display_name: u.displayName, email: u.mail }));
+            }}
+            onInviteGroup={(g) => {
+              if (confirmTurningOn && !confirmTurnOn(g.displayName)) return Promise.resolve();
+              return withPending(() => onAddTarget({ target_type: 'group', target_id: g.distinguishedName, display_name: g.displayName, email: g.mail }));
+            }}
             existingUserIds={userIds}
             existingGroupIds={groupIds}
           />

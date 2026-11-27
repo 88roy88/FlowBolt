@@ -67,6 +67,12 @@ def no_directory_groups(monkeypatch):
     monkeypatch.setattr(directory_client, "get_user_group_ids", AsyncMock(return_value=set()))
 
 
+@pytest.fixture(autouse=True)
+def workspaces_enabled(monkeypatch):
+    monkeypatch.setattr("flow44.workspace_gate.is_feature_enabled", AsyncMock(return_value=False))
+    monkeypatch.setattr("flow44.workspace_gate._cache", {})
+
+
 @pytest.fixture(scope="session")
 async def setup_test_db():
     """Session-scoped: create an isolated database on the running Postgres and build tables once."""

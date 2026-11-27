@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import partial
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from flow44.ai.agents.execute.agent import ExecuteAgent
 from flow44.ai.agents.fix_error.agent import FixErrorAgent
@@ -32,6 +32,7 @@ from flow44.sandbox.manager import sandbox_manager
 from flow44.services.logging import log_bi_event
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import GitError
+from flow44.workspace_gate import are_workspaces_disabled
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +231,9 @@ async def chat_ws(  # noqa: C901, PLR0915
     async def _receive_actions() -> None:  # noqa: C901, PLR0912, PLR0915
         while True:
             raw = await websocket.receive_text()
+            if await are_workspaces_disabled(user_id):
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Workspaces are disabled")
+                return
             data = json.loads(raw)
             msg_type = data.get("type")
 
