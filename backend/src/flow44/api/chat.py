@@ -215,6 +215,7 @@ async def _save_user_turn(project_id: str, turn: _UserTurn) -> None:
         prompt_length=len(turn.prompt),
         prompt_sequence_number=await count_user_messages(project_id),
         selected_element_count=len(turn.event.get("selected_elements", [])),
+        data_source_count=len(turn.event.get("data_sources", [])),
     )
     await emit_event(project_id, turn.event, notify=False)
 

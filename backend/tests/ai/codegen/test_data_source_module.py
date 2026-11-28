@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from flow44.ai.codegen.data_source_module import generate_data_source_module
 from flow44.logic.models import (
     DataSourceFieldSchema,
@@ -745,3 +747,18 @@ class TestDatetimeFieldConversion:
             queries=_queries("plain"),
         )
         assert "convertDateFields" not in result
+
+
+class TestPackageUpdatedHeader:
+    @pytest.mark.parametrize(
+        ("date", "first_line"),
+        [
+            ("2024-02-11T00:00:00.000", "// Package updated: 2024-02-11T00:00:00.000"),
+            ("2024\nalert(1)\u2028x", "// Package updated: 2024 alert(1) x"),
+        ],
+    )
+    def test_first_line_records_the_date(self, date: str, first_line: str) -> None:
+        result = generate_data_source_module(
+            data_source_id="1", sanitized_name="X", params_info=_empty_params(), package_updated_date=date
+        )
+        assert result.splitlines()[:2] == [first_line, "import { fetchDataSource } from '../api/client';"]

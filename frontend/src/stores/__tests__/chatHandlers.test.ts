@@ -85,6 +85,8 @@ const INITIAL_STATE: ChatState = {
   queuedMessages: [],
   queueHeld: false,
   draft: '',
+  draftFocusRequest: 0,
+  appendToDraft: vi.fn() as unknown as ChatState['appendToDraft'],
   fixSteps: [],
   followUpSteps: [],
   fileDiffs: [],

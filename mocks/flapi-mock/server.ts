@@ -24,6 +24,7 @@ import {
   getRunResults,
   getQuickParamsInfo,
   getPackageFullMetadata,
+  touchPackage,
 } from './packages';
 
 const PORT = Number(process.env.MOCK_PORT) || 6001;
@@ -133,7 +134,7 @@ await server.register(swaggerUI, {
 // Paths that don't require the Authorization header. The SSO login page
 // sits behind no auth for obvious reasons — it's what callers hit to *get*
 // a token in the first place.
-const PUBLIC_PATH_PREFIXES = ['/api-docs', '/documentation', '/public/', '/sso'];
+const PUBLIC_PATH_PREFIXES = ['/api-docs', '/documentation', '/public/', '/sso', '/mock/'];
 const PUBLIC_PATHS = new Set(['/health']);
 
 server.addHook('preHandler', async (request, reply) => {
@@ -295,6 +296,16 @@ server.get(
   }
 );
 
+// ——— Mock-only controls (not part of FLAPI) ———
+
+server.post<{ Params: { packageId: string } }>('/mock/packages/:packageId/touch', async (request, reply) => {
+  const updatedDate = touchPackage(request.params.packageId);
+  if (!updatedDate) {
+    return reply.status(404).send(errorBody('not_found', `No package found for id: ${request.params.packageId}`));
+  }
+  return { Id: Number(request.params.packageId), UpdatedDate: updatedDate };
+});
+
 // ——— FLAPI Run ———
 
 const runPackageSchema = {
@@ -321,7 +332,7 @@ const runPackageHandler = async (request: any, reply: any) => {
     return reply.status(400).send(errorBody('invalid_data_source_id', 'dataSourceId is required'));
   }
 
-  const result = getRunResults(dataSourceId, request.body);
+  const result = await getRunResults(dataSourceId, request.body);
   if (!result) {
     return reply.status(404).send(errorBody('not_found', `No package found for id: ${dataSourceId}`));
   }

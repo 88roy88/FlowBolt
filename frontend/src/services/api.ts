@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectDataSource, DataSourceUpdate, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
 import type { LogEvent } from './logger';
 
 const BASE = '/api';
@@ -212,6 +212,14 @@ export async function fetchClientConfig(): Promise<ClientConfig> {
 export async function searchDataSources(queryOrId: string): Promise<DataSourceSearchResult[]> {
   // Backend strips the Bearer prefix before forwarding to FLAPI, so the shared helper is safe here.
   return request<DataSourceSearchResult[]>(`/data-source/search/${encodeURIComponent(queryOrId)}`);
+}
+
+export async function fetchProjectDataSources(projectId: string): Promise<ProjectDataSource[]> {
+  return request<ProjectDataSource[]>(`/projects/${projectId}/data-sources`);
+}
+
+export async function fetchDataSourceUpdates(projectId: string): Promise<DataSourceUpdate[]> {
+  return request<DataSourceUpdate[]>(`/projects/${projectId}/data-sources/updates`);
 }
 
 export function downloadZip(projectId: string): void {

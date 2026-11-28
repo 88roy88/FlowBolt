@@ -49,6 +49,9 @@ export interface ChatState {
   queueHeld: boolean;
   draft: string;
   setDraft: (draft: string) => void;
+  /** Bumped to ask the chat input to take focus. */
+  draftFocusRequest: number;
+  appendToDraft: (text: string) => void;
   sendMessage: (content: string, opts?: { keepDraft?: boolean }) => void;
   queueMessage: (content: string) => void;
   removeQueued: (id: string) => void;
@@ -219,9 +222,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
   queuedMessages: [],
   queueHeld: false,
   draft: '',
+  draftFocusRequest: 0,
 
   setDraft(draft: string) {
     set({ draft });
+  },
+
+  appendToDraft(text: string) {
+    set((state) => ({
+      draft: state.draft.includes(text) ? state.draft : state.draft.trim() ? `${state.draft.trimEnd()}\n${text}` : text,
+      draftFocusRequest: state.draftFocusRequest + 1,
+    }));
   },
 
   sendFixError(errorMessage: string, errorFile?: string, errorLine?: number, errorStack?: string) {

@@ -140,6 +140,25 @@ export interface AIModel {
   provider: string;
 }
 
+export interface ProjectDataSource {
+  data_source_id: string;
+  name: string;
+  module_path: string;
+  package_updated_date: string | null;
+  params: ParamLabel[];
+}
+
+export interface ParamLabel {
+  cube_id: string;
+  name: string;
+  label: string;
+}
+
+export interface DataSourceUpdate {
+  data_source_id: string;
+  updated_date: string;
+}
+
 export interface DataSourceSearchResult {
   id: number;
   name: string;

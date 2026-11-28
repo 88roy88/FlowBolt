@@ -25,6 +25,14 @@ export function searchPackages(query: string): SearchResult[] {
     .map(pkgToSearchResult);
 }
 
+export function touchPackage(packageId: string): string | null {
+  const pkg = packageById.get(packageId);
+  if (!pkg) return null;
+
+  pkg.metadata.UpdatedDate = new Date().toISOString().replace('Z', '');
+  return pkg.metadata.UpdatedDate;
+}
+
 export function getPackageFullMetadata(packageId: string): PackageMetadata | null {
   const numeric = Number(packageId);
   if (!Number.isFinite(numeric)) return null;

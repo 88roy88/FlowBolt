@@ -77,6 +77,7 @@ async def fetch_and_analyze_data_source(
         params_info=usage.params.model_dump(),
         sample_data=usage.sample,
         can_run_without_input=usage.can_run,
+        package_updated_date=usage.updated_date or "",
         data_schema=analysis.get("data_schema", ""),
         relevant_fields=analysis.get("relevant_fields", ""),
         data_characteristics=analysis.get("data_characteristics", ""),
@@ -118,6 +119,7 @@ def generate_data_source_files(ctx: DataSourceContext) -> dict[str, str]:
         sanitized_name=ctx.sanitized_name,
         params_info=params_info,
         queries=queries,
+        package_updated_date=ctx.package_updated_date,
     )
     docs = _generate_data_source_docs(ctx, params_info, queries)
     return {module_path: content, docs_path: docs}

@@ -18,6 +18,8 @@
   var HELLO_THROTTLE_MS = 1000;
   var PROMPT_TIMEOUT_MS = 3000;
   var MAX_COMPONENTS = 4;
+  var MAX_PARAMS_CHARS = 100000;
+  var RUN_PATH = /\/api\/data-source\/([^/]+)\/run$/;
   var IGNORED_COMPONENTS =
     /^(BrowserRouter|HashRouter|MemoryRouter|Router|Routes|Route|RenderedRoute|Outlet|Suspense|StrictMode|Fragment|ErrorBoundary)$|(Provider|Consumer|Context|Boundary)$/;
 
@@ -83,6 +85,56 @@
   var hovered = null;
   var lastPicked = null;
   var promptTimer = null;
+
+  trackDataSourceCalls();
+
+  function runTarget(input) {
+    try {
+      var url = typeof input === 'string' ? input : input.url || String(input);
+      var found = new URL(url, location.href).pathname.match(RUN_PATH);
+      return found ? decodeURIComponent(found[1]) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function trackDataSourceCalls() {
+    if (window.parent === window || typeof window.fetch !== 'function') return;
+    var originalFetch = window.fetch;
+    var documentId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    var calls = 0;
+    send({ type: 'data-source-reset' });
+
+    window.fetch = function (input, init) {
+      var request = originalFetch.apply(this, arguments);
+      var dataSourceId = runTarget(input);
+      if (dataSourceId === null) return request;
+
+      var callId = documentId + '-' + ++calls;
+      var body = init && init.body;
+      send({
+        type: 'data-source-call',
+        phase: 'start',
+        callId: callId,
+        dataSourceId: dataSourceId,
+        params: typeof body === 'string' ? clip(body, MAX_PARAMS_CHARS) : null,
+        paramsCut: typeof body === 'string' && body.length > MAX_PARAMS_CHARS,
+      });
+      function end(result) {
+        send({ type: 'data-source-call', phase: 'end', callId: callId, dataSourceId: dataSourceId, result: result });
+      }
+      return request.then(
+        function (response) {
+          end(response.ok ? 'ok' : 'error');
+          return response;
+        },
+        function (error) {
+          end(error && error.name === 'AbortError' ? 'aborted' : 'error');
+          throw error;
+        },
+      );
+    };
+  }
 
   function readCollapsed() {
     try {

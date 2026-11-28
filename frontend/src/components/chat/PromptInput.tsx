@@ -37,6 +37,8 @@ export function PromptInput() {
   const aborting = useChatStore((s) => s.aborting);
   const value = useChatStore((s) => s.draft);
   const setValue = useChatStore((s) => s.setDraft);
+  const focusRequest = useChatStore((s) => s.draftFocusRequest);
+  const handledFocusRequest = useRef(focusRequest);
   const agentPhase = useChatStore((s) => s.agentPhase);
   const awaitingPlan = useChatStore(isAwaitingPlanApproval);
   const awaitingInterview = useChatStore(isAwaitingInterview);
@@ -61,6 +63,14 @@ export function PromptInput() {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }, [value]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || focusRequest === handledFocusRequest.current) return;
+    handledFocusRequest.current = focusRequest;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [focusRequest]);
 
   const handleSubmit = () => {
     const trimmed = value.trim();
@@ -154,7 +164,7 @@ export function PromptInput() {
               </Badge>
             ))}
             {!dsOpen && selectedDataSources.map((c) => (
-              <Badge key={c.id} variant="accent" className="gap-1">
+              <Badge key={c.id} variant="accent" className="gap-1" data-testid="data-source-chip">
                 <span className="font-medium">{c.name}</span>
                 <button
                   onClick={() => removeDataSource(c.id)}

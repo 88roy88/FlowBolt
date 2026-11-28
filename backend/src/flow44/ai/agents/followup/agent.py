@@ -18,7 +18,8 @@ from flow44.ai.file_safety import FileSafetyError, normalized_path_or_reject
 from flow44.config import settings
 from flow44.db.chat import ChatMessage, ChatRole, get_messages
 from flow44.db.project import get_project
-from flow44.db.project_data_source import DataSourceContext, get_project_data_sources, update_project_data_sources
+from flow44.db.project_data_source import DataSourceContext, update_project_data_sources
+from flow44.logic.project_data_sources import list_active
 from flow44.sandbox.main import PnpmSandbox
 from flow44.services.logging.helpers import bi_logger
 
@@ -168,18 +169,20 @@ class FollowUpAgent(ChatAgent):
         existing_data_source_contexts: list[DataSourceContext] = []
 
         if data_source_ids:
-            stored_contexts = await get_project_data_sources(self.project_id)
-            stored_ids = {ds.data_source_id for ds in stored_contexts}
+            stored_contexts = await list_active(self.project_id, self.sandbox)
+            stored_by_id = {ds.data_source_id: ds for ds in stored_contexts}
             await self.emit({"type": "phase", "phase": "fetching_data_sources"})
             try:
                 updated_contexts: list[DataSourceContext] = list(
-                    await asyncio.gather(*[self._fetch_analyze_and_write(sid, content) for sid in data_source_ids])
+                    await asyncio.gather(
+                        *[self._fetch_analyze_and_write(sid, content, stored_by_id.get(sid)) for sid in data_source_ids]
+                    )
                 )
             except Exception:
                 await self.emit({"type": "error", "message": "Failed to fetch required data source data."})
                 raise
-            new_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id not in stored_ids]
-            existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_ids]
+            new_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id not in stored_by_id]
+            existing_data_source_contexts = [ctx for ctx in updated_contexts if ctx.data_source_id in stored_by_id]
             if updated_contexts:
                 await self._persist_data_sources(updated_contexts, stored_contexts)
                 bi_logger.data_sources_added(new_data_source_contexts)
@@ -221,7 +224,9 @@ class FollowUpAgent(ChatAgent):
         await self.emit({"type": "phase", "phase": "complete"})
         await self.emit({"type": "action_complete"})
 
-    async def _fetch_analyze_and_write(self, sid: str, user_content: str) -> DataSourceContext:
+    async def _fetch_analyze_and_write(
+        self, sid: str, user_content: str, stored: DataSourceContext | None
+    ) -> DataSourceContext:
         ctx = await fetch_and_analyze_data_source(
             sid,
             user_content,
@@ -229,6 +234,9 @@ class FollowUpAgent(ChatAgent):
             self.model,
             self._llm_metadata,
         )
+        if stored is not None:
+            # The app imports the module by this name, so it stays even if the package was renamed.
+            ctx.sanitized_name = stored.sanitized_name
         await self._write_data_source_module(ctx)
         return ctx
 

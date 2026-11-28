@@ -18,10 +18,10 @@ function extractQuickParams(body: unknown): QuickParams {
   return extracted;
 }
 
-export function getRunResults(
+export async function getRunResults(
   dataSourceId: string,
   body: unknown
-): { results: Record<string, unknown> } | { error: string; status?: number; code?: string } | null {
+): Promise<{ results: Record<string, unknown> } | { error: string; status?: number; code?: string } | null> {
   const id = String(dataSourceId).trim();
   const pkg = packageById.get(id);
   if (!pkg) return null;
@@ -34,7 +34,7 @@ export function getRunResults(
   }
 
   try {
-    return { results: pkg.getResults(validationResult.params) };
+    return { results: await pkg.getResults(validationResult.params) };
   } catch (err) {
     if (err instanceof MockPackageError) {
       return { error: err.message, status: err.status, code: err.code };

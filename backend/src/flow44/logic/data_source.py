@@ -35,6 +35,7 @@ __all__ = [
     "FlapiUpstreamError",
     "can_run_without_params",
     "get_display_name",
+    "get_package_updated_date",
     "get_params_info",
     "get_usage",
     "run_data_source",
@@ -255,6 +256,15 @@ async def can_run_without_params(
     return minimal is not None, minimal
 
 
+async def get_package_updated_date(
+    data_source_id: str | int,
+    *,
+    authorization: str | None = None,
+) -> str | None:
+    metadata = await data_source_client.get_metadata(data_source_id, authorization=authorization)
+    return metadata.updated_date
+
+
 async def get_usage(
     data_source_id: str | int,
     *,
@@ -313,4 +323,5 @@ async def get_usage(
         params=params_info,
         can_run=can_run,
         sample=sample,
+        updated_date=metadata.updated_date,
     )

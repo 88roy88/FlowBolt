@@ -5,22 +5,24 @@ import { isAwaitingUserInput } from '../stores/chatAgentState';
 import { workspaceLocked } from '../stores/workspaceLock';
 import { WRITE_ROLES } from '../types';
 import { parseSelectedElement } from '../utils/selectedElement';
+import { handleDataSourceMessage, useDataSourceActivityStore } from '../stores/dataSourceActivity';
 
 /** Matches backend `static/preview_toolbar.js`. */
 const TOOLBAR_SOURCE = 'buildapp-toolbar';
 const BUILDER_SOURCE = 'buildapp-builder';
 
-/** Adds elements picked in the preview (iframe or opened tab) to the chat input, and sends prompts written there. */
 export function usePreviewToolbarBridge() {
   const projectId = useSessionStore((s) => s.projectId);
 
   useEffect(() => {
+    useDataSourceActivityStore.getState().reset();
     if (!projectId) return;
 
     function onMessage(event: MessageEvent) {
       const data = event.data;
       if (event.origin !== window.location.origin) return;
       if (!data || data.source !== TOOLBAR_SOURCE || data.projectId !== projectId) return;
+      if (handleDataSourceMessage(data)) return;
       const reply = event.source as Window | null;
       if (!reply) return;
       const send = (msg: Record<string, unknown>) =>

@@ -382,6 +382,15 @@
   }
 }
 
+@keyframes dataSourceFlash {
+  from { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+  to { background: transparent; }
+}
+
+.data-source-flash {
+  animation: dataSourceFlash 1.2s ease-out both;
+}
+
 /* Progress bar shimmer */
 @keyframes shimmer {
   0% { background-position: -200% 0; }

@@ -102,6 +102,8 @@
   },
   "terminal": {
     "terminal": "Terminal",
+    "expandPanel": "Open panel",
+    "collapsePanel": "Close panel",
     "adminOnly": "Visible to admins only",
     "console": "Console",
     "server": "Server",
@@ -111,6 +113,50 @@
     "entry": "entry",
     "entries": "entries",
     "noConsoleOutput": "No console output"
+  },
+  "dataSources": {
+    "title": "Data Sources",
+    "empty": "No data sources in this project yet",
+    "addHint": "To add one, click <plus/> in the chat box, pick a data source, then send a message saying how the app should use it.",
+    "loadFailed": "Couldn't load the data sources",
+    "running": "Running",
+    "notRun": "Not run yet",
+    "ran": "Ran {{count}}×",
+    "showCalls": "Show its recent runs",
+    "noCalls": "No runs since the preview loaded",
+    "selectForRuns": "Select a data source to see its recent runs",
+    "recentRuns": "Recent runs",
+    "copy": "Copy parameters",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy",
+    "copyCut": "These params are too large to copy: they arrived cut short",
+    "noParams": "No parameters",
+    "result": {
+      "running": "Running",
+      "ok": "Succeeded",
+      "error": "Failed",
+      "aborted": "Cancelled"
+    },
+    "resyncNoUpdate": "Re-sync with the package (no update detected)",
+    "resyncUnknown": "Re-sync with the package (there's no recorded date to check for updates)",
+    "sync": "Sync",
+    "updateTooltip": "The package was updated on {{date}}. Sync to update your app.",
+    "adjust": "Adjust",
+    "adjustTooltip": "Ask the AI about this data source",
+    "issues": {
+      "notRunning": "This isn't running when it should",
+      "runningWhenItShouldNot": "This is running when it shouldn't",
+      "wrongParams": "The parameters this gets are wrong"
+    },
+    "prompts": {
+      "notRunning": "The \"{{name}}\" data source ({{path}}) isn't running when it should.",
+      "runningWhenItShouldNot": "The \"{{name}}\" data source ({{path}}) is running when it shouldn't.",
+      "wrongParams": "The \"{{name}}\" data source ({{path}}) is getting the wrong parameters.",
+      "sync": "Sync the \"{{name}}\" data source ({{path}}) with the latest version of its package, and adjust the app if anything changed."
+    },
+    "disabled": {
+      "notBuilt": "Available after the app is built"
+    }
   },
   "preview": {
     "title": "Preview",

@@ -43,6 +43,7 @@ def _send_message(payload: dict[str, Any]) -> dict[str, Any]:
         patch("flow44.api.chat.emit_event", emit_event),
         patch("flow44.api.chat.count_user_messages", new_callable=AsyncMock, return_value=1),
         patch("flow44.api.chat.log_bi_event") as log_bi_event,
+        patch("flow44.api.chat.ds_logic.get_display_name", new_callable=AsyncMock, return_value="Sales"),
     ):
         mgr.wake_sandbox = AsyncMock(return_value=MagicMock())
         with client.websocket_connect(f"/ws/chat/{PROJECT_ID}", headers={"cookie": "flow44_token=t"}) as ws:
@@ -55,6 +56,7 @@ def _send_message(payload: dict[str, Any]) -> dict[str, Any]:
     captured["event"] = emit_event.await_args.args[1]
     captured["prompt_length"] = log_bi_event.call_args.kwargs["prompt_length"]
     captured["element_count"] = log_bi_event.call_args.kwargs["selected_element_count"]
+    captured["data_source_count"] = log_bi_event.call_args.kwargs["data_source_count"]
     return captured
 
 
@@ -78,3 +80,10 @@ def test_message_without_elements_is_unchanged() -> None:
     assert result["saved_content"] == "make it red"
     assert "selected_elements" not in result["event"]
     assert result["element_count"] == 0
+
+
+def test_prompt_submitted_counts_attached_data_sources() -> None:
+    with_sources = _send_message({"type": "message", "content": "sync", "dataSourceIds": [12, 7]})
+    without = _send_message({"type": "message", "content": "hi"})
+
+    assert (with_sources["data_source_count"], without["data_source_count"]) == (2, 0)

@@ -10,16 +10,18 @@ export class MockPackageError extends Error {
   }
 }
 
+export type MockResults = Record<string, unknown> | Promise<Record<string, unknown>>;
+
 export interface MockPackageConfig {
   metadata: PackageMetadata;
   quickParams?: Record<string, QuickParamDefinition[]>;
-  getResults: (quickParams: Record<string, unknown>) => Record<string, unknown>;
+  getResults: (quickParams: Record<string, unknown>) => MockResults;
 }
 
 export class MockPackage {
   metadata: PackageMetadata;
   quickParams: Record<string, QuickParamDefinition[]>;
-  private _getResults: (quickParams: Record<string, unknown>) => Record<string, unknown>;
+  private _getResults: (quickParams: Record<string, unknown>) => MockResults;
 
   constructor(config: MockPackageConfig) {
     this.metadata = config.metadata;
@@ -91,7 +93,7 @@ export class MockPackage {
     return { params: finalParams };
   }
 
-  getResults(quickParams: Record<string, unknown>): Record<string, unknown> {
+  getResults(quickParams: Record<string, unknown>): MockResults {
     return this._getResults(quickParams);
   }
 }
@@ -209,6 +211,8 @@ export function buildQueriesFromData(
   return queries;
 }
 
+export const DEFAULT_UPDATED_DATE = '2026-11-01T00:00:00.000';
+
 export function buildMetadata(
   id: number,
   name: string,
@@ -221,5 +225,6 @@ export function buildMetadata(
     Description: options?.description || '',
     OutputQueriesId: [],
     Queries: buildQueriesFromData(data, id, name),
+    UpdatedDate: DEFAULT_UPDATED_DATE,
   };
 }
