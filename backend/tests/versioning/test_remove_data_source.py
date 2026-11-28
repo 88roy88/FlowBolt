@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from flow44.api import project_data_sources_api
 from flow44.api.deps import get_project, get_sandbox
 from flow44.config import settings
 from flow44.db.chat import get_messages
@@ -45,7 +46,6 @@ async def client(overrides: None) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture
 async def url(project_id: str, workspace: Path) -> str:
-    """A built project with one data source whose files are committed."""
     (workspace / "src/dataSources").mkdir(parents=True)
     (workspace / MODULE).write_text("export {}")
     (workspace / "src/dataSources/Sales.docs.md").write_text("docs")
@@ -58,14 +58,19 @@ async def url(project_id: str, workspace: Path) -> str:
 
 
 async def test_delete_commits_the_removal_as_a_user_version(
-    client: AsyncClient, url: str, project_id: str, workspace: Path
+    client: AsyncClient, url: str, project_id: str, workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    log = MagicMock()
+    monkeypatch.setattr(project_data_sources_api, "log_bi_event", log)
     listed = (await client.get(url)).json()
 
     response = await client.delete(f"{url}/12")
 
-    assert listed == [{"data_source_id": "12", "name": "Sales", "module_path": MODULE, "package_updated_date": None}]
+    assert listed == [
+        {"data_source_id": "12", "name": "Sales", "module_path": MODULE, "package_updated_date": None, "params": []}
+    ]
     assert response.status_code == 204
+    log.assert_called_once_with("data_source_removed", data_source_type="flow_package", data_source_id="12")
     assert (await client.get(url)).json() == []
     assert not await Git(project_id).is_dirty()
     payload = (await get_versions(project_id))[-1].payload

@@ -14,7 +14,6 @@ from typing import assert_never
 from flow44.ai.codegen.ts_types import _redundant_display_name, generate_ts_interfaces
 from flow44.logic.models import DataSourceParamsInfo, DataSourceQuerySchema, ParamDefinition
 
-# First line of a module: the package's UpdatedDate when the module was generated.
 PACKAGE_UPDATED_HEADER = "// Package updated: "
 
 _TYPE_DEFS: dict[str, str] = {
@@ -69,8 +68,7 @@ def generate_data_source_module(
         parts.append(type_defs)
     parts.append(types_block)
     parts.append(f"{signature} {{\n{body}}}")
-    # The date comes from outside the app, so it must not be able to end the comment line.
-    date = " ".join(package_updated_date.split())
+    date = " ".join(package_updated_date.split())  # Sanitize the string
     header = f"{PACKAGE_UPDATED_HEADER}{date}\n" if date else ""
     return header + "\n\n".join(parts) + "\n"
 

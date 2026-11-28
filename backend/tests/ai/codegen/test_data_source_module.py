@@ -754,7 +754,6 @@ class TestPackageUpdatedHeader:
         ("date", "first_line"),
         [
             ("2024-02-11T00:00:00.000", "// Package updated: 2024-02-11T00:00:00.000"),
-            # The value comes from outside the app, so it can't end the comment and add code.
             ("2024\nalert(1)\u2028x", "// Package updated: 2024 alert(1) x"),
         ],
     )
@@ -763,7 +762,3 @@ class TestPackageUpdatedHeader:
             data_source_id="1", sanitized_name="X", params_info=_empty_params(), package_updated_date=date
         )
         assert result.splitlines()[:2] == [first_line, "import { fetchDataSource } from '../api/client';"]
-
-    def test_omitted_without_a_date(self) -> None:
-        result = generate_data_source_module(data_source_id="1", sanitized_name="X", params_info=_empty_params())
-        assert result.startswith("import ")

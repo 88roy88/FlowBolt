@@ -49,7 +49,9 @@ export function BottomDrawer() {
     return bottomTab === 'terminal' && showTerminal ? <Terminal /> : <ServerLog />;
   };
 
-  const tabIcon = (tab: BottomTab, size: number) => tab === 'dataSources' && <FlowLogo size={size} />;
+  // Nudged down: centred on the line box, the triangle looks high next to mostly lowercase text.
+  const tabIcon = (tab: BottomTab, size: number) =>
+    tab === 'dataSources' && <FlowLogo size={size} className="relative top-px" />;
 
   const adminBadge = (tab: BottomTab, size: number, className?: string) =>
     tab === 'terminal' && terminalAdminOnly && (
@@ -60,13 +62,11 @@ export function BottomDrawer() {
 
   return (
     <div className="relative border-t border-border bg-surface shrink-0">
-      {/* Straddles the drawer's top edge, so the line it highlights is that border. */}
       {bottomOpen && (
         <div className="absolute inset-x-0 -top-1">
           <Resizer direction="vertical" onDrag={handleBottomResize} />
         </div>
       )}
-      {/* One bar whether open or closed. Clicking anywhere on it that isn't a tab opens or closes the drawer. */}
       <div
         data-testid="bottom-drawer-bar"
         onClick={() => setBottomOpen((v) => !v)}
@@ -85,7 +85,6 @@ export function BottomDrawer() {
           <button
             key={tab}
             onClick={(e) => { e.stopPropagation(); setBottomTab(tab); setBottomOpen(true); }}
-            // The underline stops short of the tab's edges, which keeps it clear of the arrow.
             className={`relative inline-flex items-center gap-1.5 px-4 pt-1.5 pb-2 text-[13px] font-medium transition-colors duration-150 after:absolute after:inset-x-2.5 after:bottom-0 after:h-0.5 ${
               bottomOpen && bottomTab === tab
                 ? 'text-primary after:bg-primary'

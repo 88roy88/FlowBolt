@@ -5,12 +5,11 @@ export type CallResult = 'ok' | 'error' | 'aborted';
 export interface DataSourceCall {
   id: string;
   startedAt: number;
-  /** The request body as sent, possibly shortened. Null when the call had none. */
   params: string | null;
+  paramsCut: boolean;
   result: CallResult | 'running';
 }
 
-/** What one data source has done since the preview loaded. Kept in memory only. */
 export interface DataSourceActivity {
   count: number;
   running: string[];
@@ -21,24 +20,23 @@ export interface DataSourceActivity {
 
 interface DataSourceActivityState {
   byId: Record<string, DataSourceActivity>;
-  startCall: (dataSourceId: string, callId: string, params: string | null) => void;
+  startCall: (dataSourceId: string, callId: string, params: string | null, paramsCut?: boolean) => void;
   endCall: (dataSourceId: string, callId: string, result: CallResult) => void;
-  /** The preview is gone, so calls in flight will never report back. */
   clearRunning: () => void;
   reset: () => void;
 }
 
-export const MAX_RECENT_CALLS = 5;
+export const MAX_RECENT_CALLS = 20;
 
 const IDLE: DataSourceActivity = { count: 0, running: [], lastResult: null, recent: [] };
 
 export const useDataSourceActivityStore = create<DataSourceActivityState>((set) => ({
   byId: {},
 
-  startCall(dataSourceId, callId, params) {
+  startCall(dataSourceId, callId, params, paramsCut = false) {
     set((state) => {
       const activity = state.byId[dataSourceId] ?? IDLE;
-      const call: DataSourceCall = { id: callId, startedAt: Date.now(), params, result: 'running' };
+      const call: DataSourceCall = { id: callId, startedAt: Date.now(), params, paramsCut, result: 'running' };
       return {
         byId: {
           ...state.byId,
@@ -96,7 +94,6 @@ export const useDataSourceActivityStore = create<DataSourceActivityState>((set) 
 
 const RESULTS: ReadonlySet<unknown> = new Set<CallResult>(['ok', 'error', 'aborted']);
 
-/** Applies a data source message from `static/preview_toolbar.js`. Returns whether it was one. */
 export function handleDataSourceMessage(data: Record<string, unknown>): boolean {
   const store = useDataSourceActivityStore.getState();
   if (data.type === 'data-source-reset') {
@@ -104,10 +101,10 @@ export function handleDataSourceMessage(data: Record<string, unknown>): boolean 
     return true;
   }
   if (data.type !== 'data-source-call') return false;
-  const { dataSourceId, callId, phase, params, result } = data;
+  const { dataSourceId, callId, phase, params, paramsCut, result } = data;
   if (typeof dataSourceId !== 'string' || typeof callId !== 'string') return true;
   if (phase === 'start') {
-    store.startCall(dataSourceId, callId, typeof params === 'string' ? params : null);
+    store.startCall(dataSourceId, callId, typeof params === 'string' ? params : null, paramsCut === true);
   } else if (phase === 'end' && RESULTS.has(result)) {
     store.endCall(dataSourceId, callId, result as CallResult);
   }

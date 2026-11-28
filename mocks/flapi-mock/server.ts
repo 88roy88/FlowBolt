@@ -298,7 +298,6 @@ server.get(
 
 // ——— Mock-only controls (not part of FLAPI) ———
 
-// Try the "update available" state:  curl -X POST http://localhost:6001/mock/packages/27/touch
 server.post<{ Params: { packageId: string } }>('/mock/packages/:packageId/touch', async (request, reply) => {
   const updatedDate = touchPackage(request.params.packageId);
   if (!updatedDate) {

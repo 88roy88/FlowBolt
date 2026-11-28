@@ -30,6 +30,15 @@ describe('data source activity', () => {
     expect(activity().recent[0].id).toBe(`call-${MAX_RECENT_CALLS}`);
   });
 
+  it('remembers that a body arrived cut short', () => {
+    handleDataSourceMessage({
+      type: 'data-source-call', phase: 'start', dataSourceId: '12', callId: 'a', params: '{…', paramsCut: true,
+    });
+    start('b', '{}');
+
+    expect(activity().recent.map((c) => c.paramsCut)).toEqual([false, true]);
+  });
+
   it('keeps the previous result when a call is cancelled', () => {
     start('a');
     end('a', 'ok');

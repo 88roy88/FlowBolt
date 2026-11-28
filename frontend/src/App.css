@@ -382,7 +382,6 @@
   }
 }
 
-/* Briefly tints a data source row when the preview calls it */
 @keyframes dataSourceFlash {
   from { background: color-mix(in srgb, var(--primary) 22%, transparent); }
   to { background: transparent; }

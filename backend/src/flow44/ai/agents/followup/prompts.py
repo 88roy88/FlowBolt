@@ -28,7 +28,6 @@ def render(
     file_safety: ProtectedFileRules,
     new_data_source_contexts: list[DataSourceContext] | None = None,
     existing_data_source_contexts: list[DataSourceContext] | None = None,
-    module_changes: dict[str, str] | None = None,
 ) -> str:
     return _env.get_template(template_name).render(
         project_summary=project_summary,
@@ -36,7 +35,6 @@ def render(
         file_safety=file_safety,
         new_data_source_contexts=new_data_source_contexts,
         existing_data_source_contexts=existing_data_source_contexts,
-        module_changes=module_changes or {},
     )
 
 
@@ -46,7 +44,6 @@ def render_followup(
     file_tree: str,
     new_data_source_contexts: list[DataSourceContext] | None = None,
     existing_data_source_contexts: list[DataSourceContext] | None = None,
-    module_changes: dict[str, str] | None = None,
 ) -> str:
     return render(
         "followup.jinja2",
@@ -55,5 +52,4 @@ def render_followup(
         file_safety=protected_file_rules(),
         new_data_source_contexts=new_data_source_contexts,
         existing_data_source_contexts=existing_data_source_contexts,
-        module_changes=module_changes,
     )

@@ -1,51 +1,14 @@
-import { useState, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, Loader2, RefreshCw, Trash2, WandSparkles } from 'lucide-react';
-import { useDataSourceActivityStore, type DataSourceCall } from '../../stores/dataSourceActivity';
+import { Loader2, RefreshCw, Trash2, WandSparkles } from 'lucide-react';
+import { useDataSourceActivityStore } from '../../stores/dataSourceActivity';
 import type { ProjectDataSource } from '../../types';
-import { paramLines } from '../../utils/dataSourceParams';
-import { aiMenuAnchorName } from '../../utils/dataSourceMenu';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { FlowLogo } from '../ui/flow-logo';
 
-const RESULT_TEXT: Record<DataSourceCall['result'], string> = {
-  running: 'text-primary',
-  ok: 'text-success',
-  error: 'text-destructive',
-  aborted: 'text-muted-foreground',
-};
-
-function RecentCalls({ calls }: { calls: DataSourceCall[] }) {
-  const { t } = useTranslation();
-  if (calls.length === 0) {
-    return <div className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">{t('dataSources.noCalls')}</div>;
-  }
-  return (
-    <ul className="space-y-1.5 border-t border-border px-3 py-2">
-      {calls.map((call) => {
-        const lines = paramLines(call.params);
-        return (
-          <li key={call.id} className="text-[11px]">
-            <div className="flex gap-2">
-              <span className="text-muted-foreground">
-                {new Date(call.startedAt).toLocaleTimeString([], { hour12: false })}
-              </span>
-              <span className={RESULT_TEXT[call.result]}>{t(`dataSources.result.${call.result}`)}</span>
-            </div>
-            {lines.length === 0 ? (
-              <div className="text-muted-foreground">{t('dataSources.noParams')}</div>
-            ) : (
-              <div dir="ltr" className="font-mono text-start break-all">
-                {lines.map((line, i) => <div key={i}>{line}</div>)}
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
+// eslint-disable-next-line react-refresh/only-export-components
+export const aiMenuAnchorName = (id: string) => `--data-source-ai-${id.replace(/[^\w-]/g, '_')}`;
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -55,12 +18,12 @@ function formatDate(value: string) {
 interface DataSourceRowProps {
   dataSource: ProjectDataSource;
   canWrite: boolean;
+  selected: boolean;
+  onSelect: () => void;
   /** The package's date when it's newer than the data source's module, otherwise null. */
   updatedDate: string | null;
-  /** Why syncing is unavailable right now, or null when it is available. */
   syncBlockedReason: string | null;
   onSync: () => void;
-  /** Why removing is unavailable right now, or null when it is available. */
   removeBlockedReason: string | null;
   aiMenuId: string;
   onOpenAiMenu: (event: React.MouseEvent) => void;
@@ -68,10 +31,9 @@ interface DataSourceRowProps {
 }
 
 export function DataSourceRow({
-  dataSource, canWrite, updatedDate, syncBlockedReason, onSync, removeBlockedReason, aiMenuId, onOpenAiMenu, onRemove,
+  dataSource, canWrite, selected, onSelect, updatedDate, syncBlockedReason, onSync, removeBlockedReason, aiMenuId, onOpenAiMenu, onRemove,
 }: DataSourceRowProps) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
   const activity = useDataSourceActivityStore((s) => s.byId[dataSource.data_source_id]);
   const count = activity?.count ?? 0;
   const running = !!activity?.running.length;
@@ -83,22 +45,25 @@ export function DataSourceRow({
   };
 
   return (
+    // Clicking anywhere on the card selects it; the button inside is what the keyboard reaches.
     <li
       data-testid="data-source-row"
-      className="relative shrink-0 overflow-hidden rounded-lg border border-border bg-surface transition-colors hover:border-primary/40"
+      onClick={onSelect}
+      className={cn(
+        'relative shrink-0 cursor-pointer overflow-hidden rounded-lg border transition-colors',
+        selected ? 'border-primary/60 bg-primary/5' : 'border-border bg-surface hover:border-primary/40',
+      )}
     >
       {/* Re-keyed on each call, so even one too quick to show as running is noticed. */}
       {count > 0 && <div key={count} aria-hidden className="data-source-flash pointer-events-none absolute inset-0" />}
       <div className="relative flex items-center gap-2 px-2.5 py-2">
         <button
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
+          aria-pressed={selected}
           title={t('dataSources.showCalls')}
           className="flex flex-1 min-w-0 items-center gap-2.5 text-start"
         >
           <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
             <FlowLogo size={15} />
-            {/* The status sits on the corner of the icon. */}
             <span className="absolute -bottom-0.5 -end-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-surface">
               {running ? (
                 <Loader2 size={11} className="animate-spin text-primary" />
@@ -117,17 +82,11 @@ export function DataSourceRow({
               <span className="truncate text-[13px] font-medium text-foreground" dir="auto" title={dataSource.module_path}>
                 {dataSource.name}
               </span>
-              {/* Outside the truncated name, so a long one never hides the ID. */}
               <span className="shrink-0 text-[11px] text-muted-foreground" dir="ltr">
                 ({dataSource.data_source_id})
               </span>
-              <ChevronRight
-                size={12}
-                className={cn('shrink-0 text-muted-foreground transition-transform', expanded ? 'rotate-90' : 'rtl:rotate-180')}
-              />
             </span>
             <span className={cn('truncate text-[11px]', failed && !running ? 'text-destructive' : 'text-muted-foreground')}>
-              {updatedDate && <span className="text-primary">{`${t('dataSources.packageUpdated')} · `}</span>}
               {count === 0 ? t('dataSources.notRun') : (
                 <>
                   {running && `${t('dataSources.running')} · `}
@@ -153,7 +112,6 @@ export function DataSourceRow({
               <RefreshCw size={12} />
               {t('dataSources.sync')}
               {updatedDate && (
-                // A notification dot.
                 <span
                   data-testid="data-source-update-dot"
                   aria-hidden
@@ -191,7 +149,6 @@ export function DataSourceRow({
           </Button>
         </span>
       </div>
-      {expanded && <RecentCalls calls={activity?.recent ?? []} />}
     </li>
   );
 }

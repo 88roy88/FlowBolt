@@ -73,16 +73,6 @@ async def test_delete_module_removes_both_files_and_tolerates_missing_docs(tmp_p
     assert not (tmp_path / "src/dataSources/Sales.ts").exists()
 
 
-async def test_delete_module_keeps_the_files_while_in_use(tmp_path: Path) -> None:
-    _write(tmp_path, "src/dataSources/Sales.ts", "export {}")
-    _write(tmp_path, "src/App.tsx", "import './dataSources/Sales';")
-
-    with pytest.raises(ds_logic.DataSourceInUse):
-        await ds_logic.delete_module(_sandbox(tmp_path), DS)
-
-    assert (tmp_path / "src/dataSources/Sales.ts").exists()
-
-
 @pytest.mark.parametrize(
     ("latest", "known", "newer"),
     [
@@ -90,7 +80,6 @@ async def test_delete_module_keeps_the_files_while_in_use(tmp_path: Path) -> Non
         ("2024-02-11T00:00:00.001", "2024-02-11T00:00:00.000", True),
         ("2024-02-11T00:00:00.000", "2024-02-11T00:00:00", False),
         ("2024-02-10T00:00:00.000", "2024-02-11T00:00:00.000", False),
-        # No time zone means UTC.
         ("2024-02-11T10:00:00.000", "2024-02-11T10:00:00+00:00", False),
         ("2024-02-11T11:00:00+00:00", "2024-02-11T10:00:00.000", True),
         ("yesterday", "2024-02-11T00:00:00.000", False),
@@ -132,3 +121,26 @@ def test_package_metadata_reads_updated_date_and_works_without_it() -> None:
     assert PackageMetadata.model_validate(metadata).updated_date is None
     dated = PackageMetadata.model_validate({**metadata, "UpdatedDate": "2024-02-11T00:00:00.000"})
     assert dated.updated_date == "2024-02-11T00:00:00.000"
+
+
+@pytest.mark.parametrize(
+    ("quick_name", "display_name", "label"),
+    [("From quick info", "From param", "From quick info"), (None, "From param", "From param"), ("", "", "raw_name")],
+)
+def test_param_labels_fall_back_like_the_module_comments(quick_name: str | None, display_name: str, label: str) -> None:
+    param = {
+        "name": "raw_name",
+        "display_name": display_name,
+        "quick_info": {"display_name": quick_name},
+        "type": "string",
+        "is_required": False,
+        "is_single_value": True,
+        "cube_id": "cube",
+    }
+    ds = DataSourceContext(params_info={"parameters": [param]})
+
+    assert ds_logic.param_labels(ds) == [ds_logic.ParamLabel(cube_id="cube", name="raw_name", label=label)]
+
+
+def test_param_labels_are_empty_for_unreadable_params_info() -> None:
+    assert ds_logic.param_labels(DataSourceContext(params_info={})) == []

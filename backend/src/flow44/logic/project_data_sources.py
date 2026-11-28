@@ -1,8 +1,5 @@
-"""The data sources a project's code can use, and removing them.
-
-A data source exists while its generated module is in the workspace. The DB rows are kept after a removal,
-so restoring or rolling back a version brings the data source back along with its files.
-"""
+"""A data source exists while its generated module is in the workspace. Its DB row is kept after removal,
+so restoring a version brings it back."""
 
 import asyncio
 import logging
@@ -19,6 +16,7 @@ from pydantic import BaseModel, ValidationError
 from flow44.ai.codegen.data_source_module import PACKAGE_UPDATED_HEADER
 from flow44.db.project_data_source import DataSourceContext, get_project_data_sources
 from flow44.logic import data_source as ds_source
+from flow44.logic.models import DataSourceParamsInfo
 from flow44.sandbox.constants import SKIP_DIRS
 from flow44.sandbox.main import PnpmSandbox
 
@@ -29,13 +27,19 @@ _SOURCE_SUFFIXES = (".ts", ".tsx", ".js", ".jsx")
 
 
 class Usage(BaseModel):
-    file: str  # workspace-relative path
+    file: str
     line: int
 
 
 class PackageUpdate(BaseModel):
     data_source_id: str
-    updated_date: str  # the package's current one, newer than the module's
+    updated_date: str
+
+
+class ParamLabel(BaseModel):
+    cube_id: str
+    name: str
+    label: str
 
 
 class DataSourceInUse(RuntimeError):
@@ -46,6 +50,21 @@ class DataSourceInUse(RuntimeError):
 
 def module_path(ds: DataSourceContext) -> str:
     return f"{_DIR}/{ds.sanitized_name}.ts"
+
+
+def param_labels(ds: DataSourceContext) -> list[ParamLabel]:
+    try:
+        params = DataSourceParamsInfo.model_validate(ds.params_info).parameters
+    except ValidationError:
+        return []
+    return [
+        ParamLabel(
+            cube_id=p.cube_id,
+            name=p.name,
+            label=(p.quick_info and p.quick_info.display_name) or p.display_name or p.name,
+        )
+        for p in params
+    ]
 
 
 def _exists(sandbox: PnpmSandbox, path: str) -> bool:
@@ -90,16 +109,11 @@ def _scan(workspace: Path, ds: DataSourceContext) -> list[Usage]:
 
 
 async def find_usages(sandbox: PnpmSandbox, ds: DataSourceContext) -> list[Usage]:
-    """Where the app's code imports the data source's module or calls its run URL directly.
-
-    Reads the files itself rather than using `sandbox.grep`: a failed search command returns no output there,
-    which would look like "unused" and let the removal through.
-    """
+    """Reads the files rather than using `sandbox.grep`, where a failed search returns nothing and would look unused."""
     return await asyncio.to_thread(_scan, Path(sandbox.workspace_dir), ds)
 
 
 async def delete_module(sandbox: PnpmSandbox, ds: DataSourceContext) -> None:
-    """Delete the generated files, refusing while the app still uses them."""
     if usages := await find_usages(sandbox, ds):
         raise DataSourceInUse(usages)
     for path in (module_path(ds), f"{_DIR}/{ds.sanitized_name}.docs.md"):
@@ -108,7 +122,6 @@ async def delete_module(sandbox: PnpmSandbox, ds: DataSourceContext) -> None:
 
 
 async def read_package_updated_date(sandbox: PnpmSandbox, ds: DataSourceContext) -> str:
-    """The package date the module was generated from, or "" if it doesn't record one."""
     try:
         content = await sandbox.read_file(module_path(ds))
     except (OSError, UnicodeDecodeError):
@@ -128,7 +141,6 @@ def _parse_date(value: str) -> datetime | None:
 
 
 def is_newer(latest: str, known: str) -> bool:
-    """Whether `latest` is a later date than `known`. False if either can't be read."""
     latest_date, known_date = _parse_date(latest), _parse_date(known)
     return latest_date is not None and known_date is not None and latest_date > known_date
 
@@ -150,6 +162,5 @@ async def _find_update(sandbox: PnpmSandbox, ds: DataSourceContext, authorizatio
 async def find_updates(
     sandbox: PnpmSandbox, sources: list[DataSourceContext], authorization: str | None
 ) -> list[PackageUpdate]:
-    """The data sources whose package is newer than their module. One that can't be checked is left out."""
     found = await asyncio.gather(*[_find_update(sandbox, ds, authorization) for ds in sources])
     return [update for update in found if update]

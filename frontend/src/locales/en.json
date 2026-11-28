@@ -122,8 +122,14 @@
     "running": "Running",
     "notRun": "Not run yet",
     "ran": "Ran {{count}}×",
-    "showCalls": "Show recent calls",
-    "noCalls": "No calls since the preview loaded",
+    "showCalls": "Show its recent runs",
+    "noCalls": "No runs since the preview loaded",
+    "selectForRuns": "Select a data source to see its recent runs",
+    "recentRuns": "Recent runs",
+    "copy": "Copy parameters",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy",
+    "copyCut": "These params are too large to copy: they arrived cut short",
     "noParams": "No parameters",
     "result": {
       "running": "Running",
@@ -134,18 +140,17 @@
     "resyncNoUpdate": "Re-sync with the package (no update detected)",
     "resyncUnknown": "Re-sync with the package (there's no recorded date to check for updates)",
     "sync": "Sync",
-    "packageUpdated": "Package updated",
     "updateTooltip": "The package was updated on {{date}}. Sync to update your app.",
     "adjust": "Adjust",
     "adjustTooltip": "Ask the AI about this data source",
     "issues": {
       "notRunning": "This isn't running when it should",
-      "runningTooMuch": "This is running too much",
+      "runningWhenItShouldNot": "This is running when it shouldn't",
       "wrongParams": "The parameters this gets are wrong"
     },
     "prompts": {
       "notRunning": "The \"{{name}}\" data source ({{path}}) isn't running when it should.",
-      "runningTooMuch": "The \"{{name}}\" data source ({{path}}) is running too much.",
+      "runningWhenItShouldNot": "The \"{{name}}\" data source ({{path}}) is running when it shouldn't.",
       "wrongParams": "The \"{{name}}\" data source ({{path}}) is getting the wrong parameters.",
       "sync": "Sync the \"{{name}}\" data source ({{path}}) with the latest version of its package, and adjust the app if anything changed.",
       "removeUsages": "Remove every use of the \"{{name}}\" data source ({{path}}) from the app. It's used in: {{places}}. Don't edit or delete the files in src/dataSources/; I'll remove the data source afterwards."

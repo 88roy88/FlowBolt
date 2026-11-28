@@ -18,7 +18,7 @@ Every log entry, for every event, must carry these fields. Event-specific fields
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `event` | string | Yes | Fixed name of the event, for example `prompt_submitted`. |
-| `event_version` | integer | Yes | Version of this event's field structure. Starts at 1 and goes up when fields change. |
+| `event_version` | integer | Yes | Version of this event's field structure. Starts at 1 and goes up only if specified. |
 | `timestamp` | string (ISO 8601, UTC) | Yes | Time the action happened, set by the component that saw it. |
 | `user_id` | string | Yes | Enterprise ID of the user who caused the event. |
 | `session_id` | string | No | ID of the session in progress at event time. See Section 3. (Not yet implemented.) |
@@ -86,6 +86,7 @@ Trigger: the user sends an instruction to the model.
 | `prompt_sequence_number` | integer | Yes | Position of this prompt within its project, starting at 1. If a part of another branch, the position in that tree. |
 | `version_id` | string | Yes | The version ID the prompt was sent in. |
 | `selected_element_count` | integer | Yes | Number of preview elements the user attached to the prompt, 0 when none. |
+| `data_source_count` | integer | Yes | Number of data sources attached to the prompt, 0 when none. Includes sources attached by **Sync**. |
 
 #### `response_aborted`
 Trigger: the user presses Stop while the model is working, logged by the client once the outcome is known.
@@ -189,13 +190,44 @@ Trigger: the user adds a data source to the project.
 | `data_source_type` | string | Yes | Type of data source, for now it is only `package`. |
 | `data_source_id` | string | Yes | ID of the underlying data source. |
 
-#### `data_source_removed` || Not yet implemented (no way to manually remove a data source)
-Trigger: the user removes a data source from the project.
+#### `data_source_removed`
+Trigger: a data source is removed from the project, after the user confirms. The backend logs it only when the removal succeeds. Removing is blocked while the app's code uses the data source.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `data_source_id` | string | Yes | ID of the data source. |
-| `data_source_type` | string | Yes | Type of data source, for now it is only `package`. |
+| `data_source_type` | string | Yes | Type of data source. |
+
+#### `data_source_sync_clicked`
+Trigger: the user clicks **Sync** on a data source. This puts a message in the chat input and attaches the data source. It sends nothing, so this event does not mean that a sync happened. Each click counts.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `data_source_id` | string | Yes | ID of the data source. |
+| `update_available` | boolean | Yes | True if **Sync** showed that the package has an update. False also when the app could not check, for example when the data source has no recorded package date. |
+
+#### `data_source_adjust_selected`
+Trigger: the user picks an option in the **Adjust** menu of a data source. This puts a message in the chat input. It sends nothing.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `data_source_id` | string | Yes | ID of the data source. |
+| `issue` | enum: `not_running`, `running_when_it_should_not`, `wrong_params` | Yes | The problem the user picked. |
+
+#### `data_source_usage_removal_requested`
+Trigger: removing a data source is blocked because the app's code uses it, and the user clicks **Ask AI to remove usages**. This puts a message in the chat input. It sends nothing.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `data_source_id` | string | Yes | ID of the data source. |
+| `usage_count` | integer | Yes | Number of places in the code that use the data source, as listed to the user. |
+
+#### `data_source_params_copied`
+Trigger: the user copies the parameters of a preview run, and the copy succeeds. The event never carries the parameters.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `data_source_id` | string | Yes | ID of the data source. |
 
 #### `flapi_call_made`
 Trigger: the running app calls flapi.

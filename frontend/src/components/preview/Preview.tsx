@@ -40,7 +40,6 @@ export function Preview() {
     setPreviewUrl(`/api/preview/${projectId}/proxy/`);
   }, [projectId]);
 
-  // Calls still in flight can't report back once the iframe is gone.
   useEffect(() => () => useDataSourceActivityStore.getState().clearRunning(), []);
 
   const clearConsole = useConsoleStore((s) => s.clear);

@@ -161,7 +161,6 @@ def _edit_note(files: list[str]) -> str:
 async def _commit_changes(
     project_id: str, git: Git, message: str, *, author: str, note: Callable[[list[str]], str] | None
 ) -> tuple[str, list[FileDiff]] | None:
-    """Commit everything in the workspace as a new version. `note` tells the AI what changed, given the paths."""
     sha = await git.commit_all(message)
     if not sha:
         return None
@@ -185,10 +184,7 @@ async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, a
 async def commit_user_change(
     project_id: str, *, message: str, note: str, change: Callable[[], Awaitable[None]]
 ) -> None:
-    """Apply a change the user asked for and commit it as its own version, all under the workspace lock.
-
-    Requires a clean workspace, so that the version holds only this change and none of the user's unsaved edits.
-    """
+    """Applies and commits one change. Needs a clean workspace, so no unsaved edits end up in the version."""
     async with _locked_workspace(project_id, [_not_busy, _not_detached, _not_dirty]) as git:
         await change()
         await _commit_changes(project_id, git, message, author="user", note=lambda _: note)

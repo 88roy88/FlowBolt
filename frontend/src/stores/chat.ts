@@ -51,7 +51,6 @@ export interface ChatState {
   setDraft: (draft: string) => void;
   /** Bumped to ask the chat input to take focus. */
   draftFocusRequest: number;
-  /** Adds text to the chat input without sending it, keeping what is already there. */
   appendToDraft: (text: string) => void;
   sendMessage: (content: string, opts?: { keepDraft?: boolean }) => void;
   queueMessage: (content: string) => void;
@@ -231,7 +230,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   appendToDraft(text: string) {
     set((state) => ({
-      // Asking for the same thing twice only focuses the input.
       draft: state.draft.includes(text) ? state.draft : state.draft.trim() ? `${state.draft.trimEnd()}\n${text}` : text,
       draftFocusRequest: state.draftFocusRequest + 1,
     }));

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Sparkles } from 'lucide-react';
 import * as api from '../../services/api';
+import { logger } from '../../services/logger';
 import { useChatStore } from '../../stores/chat';
 import { useFilesStore } from '../../stores/files';
 import type { DataSourceUsage, ProjectDataSource } from '../../types';
@@ -17,7 +18,6 @@ interface RemoveDataSourceDialogProps {
   onRemoved: () => void;
 }
 
-/** Checks where the data source is used, then offers to remove it, or to have the AI remove the usages first. */
 export function RemoveDataSourceDialog({ projectId, dataSource, onClose, onRemoved }: RemoveDataSourceDialogProps) {
   const { t } = useTranslation();
   const appendToDraft = useChatStore((s) => s.appendToDraft);
@@ -49,7 +49,6 @@ export function RemoveDataSourceDialog({ projectId, dataSource, onClose, onRemov
       const detail = err instanceof api.ApiError
         ? (err.detail as { code?: string; usages?: DataSourceUsage[] } | undefined)
         : undefined;
-      // The code may have changed since the check.
       if (detail?.code === 'in_use' && detail.usages) setUsages(detail.usages);
       else if (detail?.code && KNOWN_REFUSALS.has(detail.code)) setErrorKey(`dataSources.errors.${detail.code}`);
       else setErrorKey('dataSources.errors.remove');
@@ -58,6 +57,7 @@ export function RemoveDataSourceDialog({ projectId, dataSource, onClose, onRemov
   };
 
   const askAi = () => {
+    logger.info('data_source_usage_removal_requested', { data_source_id: id, usage_count: usages?.length ?? 0 });
     const places = (usages ?? []).map((u) => `${u.file}:${u.line}`).join(', ');
     onClose();
     appendToDraft(t('dataSources.prompts.removeUsages', { name, path, places, interpolation: { escapeValue: false } }));

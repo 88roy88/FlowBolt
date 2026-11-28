@@ -25,12 +25,10 @@ export function searchPackages(query: string): SearchResult[] {
     .map(pkgToSearchResult);
 }
 
-/** Marks a package as updated just now, until the mock restarts. */
 export function touchPackage(packageId: string): string | null {
   const pkg = packageById.get(packageId);
   if (!pkg) return null;
 
-  // FLAPI dates carry no time zone; this one is UTC.
   pkg.metadata.UpdatedDate = new Date().toISOString().replace('Z', '');
   return pkg.metadata.UpdatedDate;
 }

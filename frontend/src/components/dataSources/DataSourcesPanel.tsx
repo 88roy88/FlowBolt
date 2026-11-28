@@ -3,19 +3,26 @@ import { Trans, useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { CirclePlus, Loader2 } from 'lucide-react';
 import * as api from '../../services/api';
+import { logger } from '../../services/logger';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { useVersionStore } from '../../stores/version';
 import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
 import type { ProjectDataSource } from '../../types';
-import { aiMenuAnchorName } from '../../utils/dataSourceMenu';
 import { Button } from '../ui/button';
-import { DataSourceRow } from './DataSourceRow';
+import { aiMenuAnchorName, DataSourceRow } from './DataSourceRow';
 import { RemoveDataSourceDialog } from './RemoveDataSourceDialog';
+import { RunHistory } from './RunHistory';
 
 const UPDATES_STALE_MS = 5 * 60 * 1000;
 const AI_MENU_ID = 'data-source-ai-menu';
-const AI_ISSUES = ['notRunning', 'runningTooMuch', 'wrongParams'] as const;
+const AI_ISSUES = ['notRunning', 'runningWhenItShouldNot', 'wrongParams'] as const;
+/** The `issue` of `data_source_adjust_selected`, as in the log spec. */
+const ISSUE_LOG_VALUES: Record<(typeof AI_ISSUES)[number], string> = {
+  notRunning: 'not_running',
+  runningWhenItShouldNot: 'running_when_it_should_not',
+  wrongParams: 'wrong_params',
+};
 
 interface Listing {
   projectId: string;
@@ -43,11 +50,9 @@ function useProjectDataSources(projectId: string | null) {
     return () => { stale = true; };
   }, [projectId, reloads, isStreaming, agentPhase, versionCount, previewingVersion]);
 
-  // Never show the previous project's list while the new one loads.
   return { listing: listing?.projectId === projectId ? listing : null, reload };
 }
 
-/** When each outdated data source's package last changed, by id. Checked only while the panel is open. */
 function useDataSourceUpdates(projectId: string | null, items: ProjectDataSource[] | null | undefined) {
   // Part of the key, so a sync or a restored version checks again; otherwise a result is reused for a while.
   const knownDates = (items ?? [])
@@ -74,6 +79,7 @@ export function DataSourcesPanel() {
   const [removing, setRemoving] = useState<ProjectDataSource | null>(null);
   const [menuTarget, setMenuTarget] = useState<ProjectDataSource | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const removeBlockedReason = () => {
     if (!canWrite) return t('dataSources.disabled.readOnly');
@@ -84,6 +90,10 @@ export function DataSourcesPanel() {
   const syncBlockedReason = buildCompleted ? null : t('dataSources.disabled.notBuilt');
 
   const sync = (dataSource: ProjectDataSource) => {
+    logger.info('data_source_sync_clicked', {
+      data_source_id: dataSource.data_source_id,
+      update_available: updates.has(dataSource.data_source_id),
+    });
     appendToDraft(t('dataSources.prompts.sync', {
       name: dataSource.name,
       path: dataSource.module_path,
@@ -102,6 +112,10 @@ export function DataSourcesPanel() {
   const askAi = (issue: (typeof AI_ISSUES)[number]) => {
     if (!menuTarget) return;
     menuRef.current?.hidePopover();
+    logger.info('data_source_adjust_selected', {
+      data_source_id: menuTarget.data_source_id,
+      issue: ISSUE_LOG_VALUES[issue],
+    });
     appendToDraft(t(`dataSources.prompts.${issue}`, {
       name: menuTarget.name,
       path: menuTarget.module_path,
@@ -130,8 +144,7 @@ export function DataSourcesPanel() {
         <div className="flex h-full flex-col items-center justify-center gap-1 px-3 text-center text-[12px] text-muted-foreground">
           <p className="font-medium text-foreground">{t('dataSources.empty')}</p>
           {canWrite && (
-            <p data-testid="data-sources-add-hint">
-              {/* The icon is the one on the chat input's button. */}
+            <p>
               <Trans
                 i18nKey="dataSources.addHint"
                 components={{ plus: <CirclePlus size={13} className="inline align-text-bottom text-primary" aria-label="+" /> }}
@@ -141,23 +154,31 @@ export function DataSourcesPanel() {
         </div>
       );
     }
+    const selected = listing.items.find((item) => item.data_source_id === selectedId) ?? null;
     return (
-      <ul className="flex flex-col gap-1.5 p-2">
-        {listing.items.map((dataSource) => (
-          <DataSourceRow
-            key={dataSource.data_source_id}
-            dataSource={dataSource}
-            canWrite={canWrite}
-            updatedDate={updates.get(dataSource.data_source_id) ?? null}
-            syncBlockedReason={syncBlockedReason}
-            onSync={() => sync(dataSource)}
-            removeBlockedReason={removeBlockedReason()}
-            aiMenuId={AI_MENU_ID}
-            onOpenAiMenu={openAiMenu(dataSource)}
-            onRemove={() => setRemoving(dataSource)}
-          />
-        ))}
-      </ul>
+      <div className="flex h-full">
+        <ul className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-auto p-2">
+          {listing.items.map((dataSource) => (
+            <DataSourceRow
+              key={dataSource.data_source_id}
+              dataSource={dataSource}
+              canWrite={canWrite}
+              selected={dataSource === selected}
+              onSelect={() => setSelectedId(dataSource.data_source_id)}
+              updatedDate={updates.get(dataSource.data_source_id) ?? null}
+              syncBlockedReason={syncBlockedReason}
+              onSync={() => sync(dataSource)}
+              removeBlockedReason={removeBlockedReason()}
+              aiMenuId={AI_MENU_ID}
+              onOpenAiMenu={openAiMenu(dataSource)}
+              onRemove={() => setRemoving(dataSource)}
+            />
+          ))}
+        </ul>
+        <div className="min-w-0 flex-1 border-s border-border">
+          <RunHistory dataSource={selected} />
+        </div>
+      </div>
     );
   };
 

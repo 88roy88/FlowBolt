@@ -10,7 +10,6 @@ export class MockPackageError extends Error {
   }
 }
 
-/** A package that takes a while to run returns a promise. */
 export type MockResults = Record<string, unknown> | Promise<Record<string, unknown>>;
 
 export interface MockPackageConfig {
@@ -212,8 +211,7 @@ export function buildQueriesFromData(
   return queries;
 }
 
-/** FLAPI dates carry no time zone. */
-export const DEFAULT_UPDATED_DATE = '2024-02-11T00:00:00.000';
+export const DEFAULT_UPDATED_DATE = '2026-11-01T00:00:00.000';
 
 export function buildMetadata(
   id: number,

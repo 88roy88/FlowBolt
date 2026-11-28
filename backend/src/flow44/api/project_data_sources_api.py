@@ -18,7 +18,8 @@ class ProjectDataSourceItem(BaseModel):
     data_source_id: str
     name: str
     module_path: str
-    package_updated_date: str | None  # the one the module was generated from, if recorded
+    package_updated_date: str | None
+    params: list[ds_logic.ParamLabel]
 
 
 async def _get_active(project_id: str, sandbox: PnpmSandbox, data_source_id: str) -> DataSourceContext:
@@ -36,6 +37,7 @@ async def list_data_sources(project: ProjectDep, sandbox: SandboxDep) -> list[Pr
             name=ds.data_source_name,
             module_path=ds_logic.module_path(ds),
             package_updated_date=await ds_logic.read_package_updated_date(sandbox, ds) or None,
+            params=ds_logic.param_labels(ds),
         )
         for ds in await ds_logic.list_active(project.id, sandbox)
     ]
@@ -79,4 +81,4 @@ async def delete_data_source(project: ProjectDep, sandbox: SandboxDep, data_sour
         ) from None
     except versioning.WorkspaceLocked as exc:
         raise HTTPException(status_code=409, detail=exc.payload) from None
-    log_bi_event("data_source_removed", data_source_id=data_source_id)
+    log_bi_event("data_source_removed", data_source_type=ds.type, data_source_id=data_source_id)

@@ -9,7 +9,6 @@
   var match = location.pathname.match(/^\/api\/preview\/([^/]+)\/proxy\//);
   if (!match) return;
   var projectId = decodeURIComponent(match[1]);
-  var host = window.parent !== window ? window.parent : window.opener;
 
   var SOURCE = 'buildapp-toolbar';
   var BUILDER_SOURCE = 'buildapp-builder';
@@ -19,7 +18,7 @@
   var HELLO_THROTTLE_MS = 1000;
   var PROMPT_TIMEOUT_MS = 3000;
   var MAX_COMPONENTS = 4;
-  var MAX_PARAMS_CHARS = 4000;
+  var MAX_PARAMS_CHARS = 100000;
   var RUN_PATH = /\/api\/data-source\/([^/]+)\/run$/;
   var IGNORED_COMPONENTS =
     /^(BrowserRouter|HashRouter|MemoryRouter|Router|Routes|Route|RenderedRoute|Outlet|Suspense|StrictMode|Fragment|ErrorBoundary)$|(Provider|Consumer|Context|Boundary)$/;
@@ -68,6 +67,7 @@
     '.label{position:fixed;z-index:2147483646;pointer-events:none;padding:2px 6px;border-radius:3px;background:#0090A3;color:#fff;font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;display:none;max-width:60vw;overflow:hidden;text-overflow:ellipsis}',
   ].join('\n');
 
+  var host = window.parent !== window ? window.parent : window.opener;
   var state = {
     status: 'pending', // 'pending' | 'connected' | 'unbuilt' | 'readonly' | 'disconnected'
     count: 0,
@@ -86,7 +86,6 @@
   var lastPicked = null;
   var promptTimer = null;
 
-  // Before anything else, so the app's first data source call is already tracked.
   trackDataSourceCalls();
 
   function runTarget(input) {
@@ -99,8 +98,6 @@
     }
   }
 
-  // Reports the app's data source calls, with their params but not their responses, to the builder.
-  // Only from the iframe: the builder's panel is about the preview it shows.
   function trackDataSourceCalls() {
     if (window.parent === window || typeof window.fetch !== 'function') return;
     var originalFetch = window.fetch;
@@ -121,6 +118,7 @@
         callId: callId,
         dataSourceId: dataSourceId,
         params: typeof body === 'string' ? clip(body, MAX_PARAMS_CHARS) : null,
+        paramsCut: typeof body === 'string' && body.length > MAX_PARAMS_CHARS,
       });
       function end(result) {
         send({ type: 'data-source-call', phase: 'end', callId: callId, dataSourceId: dataSourceId, result: result });

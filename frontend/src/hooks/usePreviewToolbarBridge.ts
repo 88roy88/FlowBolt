@@ -11,10 +11,6 @@ import { handleDataSourceMessage, useDataSourceActivityStore } from '../stores/d
 const TOOLBAR_SOURCE = 'buildapp-toolbar';
 const BUILDER_SOURCE = 'buildapp-builder';
 
-/**
- * Adds elements picked in the preview (iframe or opened tab) to the chat input, sends prompts written there,
- * and records the preview's data source calls.
- */
 export function usePreviewToolbarBridge() {
   const projectId = useSessionStore((s) => s.projectId);
 
@@ -26,7 +22,6 @@ export function usePreviewToolbarBridge() {
       const data = event.data;
       if (event.origin !== window.location.origin) return;
       if (!data || data.source !== TOOLBAR_SOURCE || data.projectId !== projectId) return;
-      // Read-only, so it comes before the checks for what this user may do.
       if (handleDataSourceMessage(data)) return;
       const reply = event.source as Window | null;
       if (!reply) return;
