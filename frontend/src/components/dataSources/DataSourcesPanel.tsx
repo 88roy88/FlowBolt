@@ -7,11 +7,10 @@ import { logger } from '../../services/logger';
 import { useChatStore } from '../../stores/chat';
 import { useSessionStore } from '../../stores/session';
 import { useVersionStore } from '../../stores/version';
-import { LOCK_MESSAGES, useWorkspaceLock } from '../../stores/workspaceLock';
+import { useWorkspaceLock } from '../../stores/workspaceLock';
 import type { ProjectDataSource } from '../../types';
 import { Button } from '../ui/button';
 import { aiMenuAnchorName, DataSourceRow } from './DataSourceRow';
-import { RemoveDataSourceDialog } from './RemoveDataSourceDialog';
 import { RunHistory } from './RunHistory';
 
 const UPDATES_STALE_MS = 5 * 60 * 1000;
@@ -72,20 +71,13 @@ export function DataSourcesPanel() {
   const projectId = useSessionStore((s) => s.projectId);
   const buildCompleted = useChatStore((s) => s.buildCompleted);
   const appendToDraft = useChatStore((s) => s.appendToDraft);
-  const { lock, canWrite } = useWorkspaceLock();
+  const { canWrite } = useWorkspaceLock();
   const { listing, reload } = useProjectDataSources(projectId);
   const updates = useDataSourceUpdates(projectId, listing?.items);
   const addDataSource = useChatStore((s) => s.addDataSource);
-  const [removing, setRemoving] = useState<ProjectDataSource | null>(null);
   const [menuTarget, setMenuTarget] = useState<ProjectDataSource | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const removeBlockedReason = () => {
-    if (!canWrite) return t('dataSources.disabled.readOnly');
-    if (lock) return t(LOCK_MESSAGES[lock]);
-    return buildCompleted ? null : t('dataSources.disabled.notBuilt');
-  };
 
   const syncBlockedReason = buildCompleted ? null : t('dataSources.disabled.notBuilt');
 
@@ -168,10 +160,8 @@ export function DataSourcesPanel() {
               updatedDate={updates.get(dataSource.data_source_id) ?? null}
               syncBlockedReason={syncBlockedReason}
               onSync={() => sync(dataSource)}
-              removeBlockedReason={removeBlockedReason()}
               aiMenuId={AI_MENU_ID}
               onOpenAiMenu={openAiMenu(dataSource)}
-              onRemove={() => setRemoving(dataSource)}
             />
           ))}
         </ul>
@@ -206,15 +196,6 @@ export function DataSourcesPanel() {
           </button>
         ))}
       </div>
-
-      {removing && projectId && (
-        <RemoveDataSourceDialog
-          projectId={projectId}
-          dataSource={removing}
-          onClose={() => setRemoving(null)}
-          onRemoved={() => { setRemoving(null); reload(); }}
-        />
-      )}
     </div>
   );
 }

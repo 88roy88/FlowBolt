@@ -10,8 +10,6 @@ from flow44.sandbox.base import SandboxInfo
 
 from ..api.test_files_api import APITestSandbox
 
-DS = DataSourceContext(data_source_id="12", data_source_name="Sales", sanitized_name="Sales")
-
 
 def _sandbox(root: Path) -> APITestSandbox:
     return APITestSandbox(SandboxInfo(project_id="p", workspace_dir=str(root), port=0))
@@ -21,56 +19,6 @@ def _write(root: Path, path: str, content: str) -> None:
     full = root / path
     full.parent.mkdir(parents=True, exist_ok=True)
     full.write_text(content, encoding="utf-8")
-
-
-@pytest.mark.parametrize(
-    ("file", "content"),
-    [
-        ("src/App.tsx", "import { dataSourceSales } from './dataSources/Sales';"),
-        ("src/components/deep/Chart.tsx", 'import { dataSourceSales } from "../../dataSources/Sales.ts";'),
-        ("src/types.ts", "import type { SalesResults } from './dataSources/Sales';"),
-        ("src/dataSources/index.ts", "export * from './Sales';"),
-        ("src/lazy.ts", "const load = () => import(`./dataSources/Sales`);"),
-        ("src/aliased.ts", "import { dataSourceSales } from '@/dataSources/Sales';"),
-        ("src/raw.ts", "fetch(`${API_BASE}/api/data-source/12/run`);"),
-        ("src/wrapped.ts", "import {\n  dataSourceSales,\n} from './dataSources/Sales';"),
-    ],
-)
-async def test_find_usages_reports_code_that_reaches_the_source(tmp_path: Path, file: str, content: str) -> None:
-    _write(tmp_path, file, content)
-
-    usages = await ds_logic.find_usages(_sandbox(tmp_path), DS)
-
-    assert [u.file for u in usages] == [file]
-    assert usages[0].line == (3 if file == "src/wrapped.ts" else 1)
-
-
-@pytest.mark.parametrize(
-    ("file", "content"),
-    [
-        ("src/App.tsx", "import { Sales } from './components/Sales';"),
-        ("src/components/Page.tsx", "import { Sales } from './Sales';"),
-        ("src/pages/Page.tsx", "import x from '../components/dataSources/Sales';"),
-        ("src/App.tsx", "import { dataSourceSalesByRegion } from './dataSources/SalesByRegion';"),
-        ("src/App.tsx", "const title = 'Sales';"),
-        ("src/raw.ts", "fetch('/api/data-source/123/run');"),
-        ("src/dataSources/Sales.ts", "fetchDataSource('/api/data-source/12/run');"),
-        ("src/dataSources/Sales.docs.md", "import { dataSourceSales } from './dataSources/Sales';"),
-        ("src/node_modules/pkg/index.js", "require('./dataSources/Sales')"),
-    ],
-)
-async def test_find_usages_ignores_everything_else(tmp_path: Path, file: str, content: str) -> None:
-    _write(tmp_path, file, content)
-
-    assert await ds_logic.find_usages(_sandbox(tmp_path), DS) == []
-
-
-async def test_delete_module_removes_both_files_and_tolerates_missing_docs(tmp_path: Path) -> None:
-    _write(tmp_path, "src/dataSources/Sales.ts", "export {}")
-
-    await ds_logic.delete_module(_sandbox(tmp_path), DS)
-
-    assert not (tmp_path / "src/dataSources/Sales.ts").exists()
 
 
 @pytest.mark.parametrize(

@@ -159,11 +159,6 @@ export interface DataSourceUpdate {
   updated_date: string;
 }
 
-export interface DataSourceUsage {
-  file: string;
-  line: number;
-}
-
 export interface DataSourceSearchResult {
   id: number;
   name: string;

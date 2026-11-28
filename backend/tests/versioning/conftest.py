@@ -1,17 +1,29 @@
 import shutil
 import subprocess
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
+from flow44.api.deps import get_project, get_sandbox
 from flow44.config import settings
+from flow44.db.events import emit_event
 from flow44.db.project import create_project
+from flow44.db.project_data_source import DataSourceContext, update_project_data_sources
+from flow44.main import app
+from flow44.sandbox.base import SandboxInfo
 from flow44.services.versioning import service as versioning
 from flow44.services.versioning.git import Git
 
+from ..api.test_files_api import APITestSandbox
+
 git_missing = shutil.which("git") is None
 requires_git = pytest.mark.skipif(git_missing, reason="git not installed")
+
+DS_MODULE = "src/dataSources/Sales.ts"
 
 
 def git_out(root: Path, *args: str) -> str:
@@ -75,3 +87,34 @@ async def dirty_chain(version_chain: VersionChain) -> VersionChain:
     (version_chain.workspace / "a.txt").write_text("MANUAL-EDIT")
     (version_chain.workspace / "scratch.txt").write_text("untracked")
     return version_chain
+
+
+@pytest.fixture
+def overrides(project_id: str, workspace: Path) -> Iterator[None]:
+    project = MagicMock()
+    project.id = project_id
+    sandbox = APITestSandbox(SandboxInfo(project_id=project_id, workspace_dir=str(workspace), port=0))
+    app.dependency_overrides[get_project] = lambda: project
+    app.dependency_overrides[get_sandbox] = lambda: sandbox
+    yield
+    app.dependency_overrides.pop(get_project, None)
+    app.dependency_overrides.pop(get_sandbox, None)
+
+
+@pytest.fixture
+async def data_sources_client(overrides: None) -> AsyncIterator[AsyncClient]:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as http:
+        yield http
+
+
+@pytest.fixture
+async def data_sources_url(project_id: str, workspace: Path) -> str:
+    (workspace / "src/dataSources").mkdir(parents=True)
+    (workspace / DS_MODULE).write_text("export {}")
+    (workspace / "src/dataSources/Sales.docs.md").write_text("docs")
+    await versioning.ensure_repo(project_id)
+    await update_project_data_sources(
+        project_id, [DataSourceContext(data_source_id="12", data_source_name="Sales", sanitized_name="Sales")]
+    )
+    await emit_event(project_id, {"type": "action_complete"})
+    return f"/api/projects/{project_id}/data-sources"

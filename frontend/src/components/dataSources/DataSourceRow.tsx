@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, RefreshCw, Trash2, WandSparkles } from 'lucide-react';
+import { Loader2, RefreshCw, WandSparkles } from 'lucide-react';
 import { useDataSourceActivityStore } from '../../stores/dataSourceActivity';
 import type { ProjectDataSource } from '../../types';
 import { cn } from '@/lib/utils';
@@ -24,14 +24,12 @@ interface DataSourceRowProps {
   updatedDate: string | null;
   syncBlockedReason: string | null;
   onSync: () => void;
-  removeBlockedReason: string | null;
   aiMenuId: string;
   onOpenAiMenu: (event: React.MouseEvent) => void;
-  onRemove: () => void;
 }
 
 export function DataSourceRow({
-  dataSource, canWrite, selected, onSelect, updatedDate, syncBlockedReason, onSync, removeBlockedReason, aiMenuId, onOpenAiMenu, onRemove,
+  dataSource, canWrite, selected, onSelect, updatedDate, syncBlockedReason, onSync, aiMenuId, onOpenAiMenu,
 }: DataSourceRowProps) {
   const { t } = useTranslation();
   const activity = useDataSourceActivityStore((s) => s.byId[dataSource.data_source_id]);
@@ -135,19 +133,6 @@ export function DataSourceRow({
             {t('dataSources.adjust')}
           </Button>
         )}
-        {/* A disabled button shows no tooltip, so the reason goes on the wrapper. */}
-        <span title={removeBlockedReason ?? t('dataSources.remove')} className="inline-flex shrink-0">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onRemove}
-            disabled={removeBlockedReason !== null}
-            aria-label={t('dataSources.remove')}
-            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 size={13} />
-          </Button>
-        </span>
       </div>
     </li>
   );

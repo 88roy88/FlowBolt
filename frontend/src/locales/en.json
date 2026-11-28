@@ -152,30 +152,10 @@
       "notRunning": "The \"{{name}}\" data source ({{path}}) isn't running when it should.",
       "runningWhenItShouldNot": "The \"{{name}}\" data source ({{path}}) is running when it shouldn't.",
       "wrongParams": "The \"{{name}}\" data source ({{path}}) is getting the wrong parameters.",
-      "sync": "Sync the \"{{name}}\" data source ({{path}}) with the latest version of its package, and adjust the app if anything changed.",
-      "removeUsages": "Remove every use of the \"{{name}}\" data source ({{path}}) from the app. It's used in: {{places}}. Don't edit or delete the files in src/dataSources/; I'll remove the data source afterwards."
-    },
-    "remove": "Remove data source",
-    "dialog": {
-      "title": "Remove \"{{name}}\"?",
-      "checking": "Checking where it's used…",
-      "confirm": "The app's code doesn't use this data source. Its generated files will be deleted and saved as a new version.",
-      "inUse": "The app's code still uses this data source, so it can't be removed yet:",
-      "askAi": "Ask AI to remove usages",
-      "remove": "Remove"
+      "sync": "Sync the \"{{name}}\" data source ({{path}}) with the latest version of its package, and adjust the app if anything changed."
     },
     "disabled": {
-      "readOnly": "You have read-only access",
       "notBuilt": "Available after the app is built"
-    },
-    "errors": {
-      "check": "Couldn't check where it's used",
-      "remove": "Couldn't remove the data source",
-      "dirty_workspace": "Save or discard your unsaved edits first",
-      "run_active": "Wait for the AI to finish",
-      "previewing": "Go back to the latest version first",
-      "busy": "Another change is in progress, try again",
-      "not_built": "Available after the app is built"
     }
   },
   "preview": {

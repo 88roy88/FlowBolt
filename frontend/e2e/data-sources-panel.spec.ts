@@ -32,11 +32,7 @@ test.use({
   },
 });
 
-async function openPanel(
-  page: Page,
-  { usages = [] as { file: string; line: number }[], updates = [] as { data_source_id: string; updated_date: string }[] } = {},
-) {
-  let sources = [SALES, USERS];
+async function openPanel(page: Page, { updates = [] as { data_source_id: string; updated_date: string }[] } = {}) {
   await page.route('**/api/preview/*/proxy/**', (route) =>
     route.fulfill({ contentType: 'text/html', body: PREVIEW_HTML }),
   );
@@ -44,14 +40,8 @@ async function openPanel(
     route.fulfill({ contentType: 'text/javascript', path: '../backend/src/flow44/static/preview_toolbar.js' }),
   );
   await page.route('**/api/data-source/12/run', (route) => route.fulfill({ json: { data: 'rows' } }));
-  await page.route('**/api/projects/*/data-sources', (route) => route.fulfill({ json: sources }));
+  await page.route('**/api/projects/*/data-sources', (route) => route.fulfill({ json: [SALES, USERS] }));
   await page.route('**/api/projects/*/data-sources/updates', (route) => route.fulfill({ json: updates }));
-  await page.route('**/api/projects/*/data-sources/*/usages', (route) => route.fulfill({ json: usages }));
-  await page.route('**/api/projects/*/data-sources/12', (route) => {
-    sources = [USERS];
-    return route.fulfill({ status: 204, body: '' });
-  });
-
   await page.goto(`/#/project/${PROJECT_ID}`);
   const preview = page.frameLocator('[data-testid="preview-iframe"]');
   await expect(preview.locator('#out')).toHaveText('rows', { timeout: 15_000 });
@@ -103,30 +93,6 @@ test.describe('Data Sources panel', () => {
     );
     await expect(input).toBeFocused();
     await expect(page.getByRole('button', { name: "This is running when it shouldn't" })).toBeHidden();
-  });
-
-  test('removes an unused data source after confirming', async ({ page }) => {
-    const { rows } = await openPanel(page);
-
-    await rows.first().getByRole('button', { name: 'Remove data source' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Remove', exact: true }).click();
-
-    await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(rows).toHaveCount(1);
-  });
-
-  test('blocks removal while in use and drafts a request to remove the usages', async ({ page }) => {
-    const { rows } = await openPanel(page, { usages: [{ file: 'src/App.tsx', line: 3 }] });
-
-    await rows.first().getByRole('button', { name: 'Remove data source' }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('listitem')).toHaveText('src/App.tsx:3');
-    await expect(dialog.getByRole('button', { name: 'Remove', exact: true })).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Ask AI to remove usages' }).click();
-
-    await expect(dialog).toHaveCount(0);
-    await expect(page.getByTestId('chat-input')).toHaveValue(/It's used in: src\/App\.tsx:3\./);
-    await expect(rows).toHaveCount(2);
   });
 
   test('opens and closes the drawer from its single bar', async ({ page }) => {
@@ -249,7 +215,6 @@ test.describe('Data Sources panel', () => {
       return route.fulfill({ json: { status: 'ok' } });
     });
     const { rows } = await openPanel(page, {
-      usages: [{ file: 'src/App.tsx', line: 3 }],
       updates: [{ data_source_id: '12', updated_date: '2024-03-01T00:00:00.000' }],
     });
     await expect(rows.first().getByTestId('data-source-update-dot')).toBeVisible();
@@ -262,8 +227,6 @@ test.describe('Data Sources panel', () => {
     }
     await rows.first().click();
     await page.getByTestId('data-source-run').first().getByRole('button', { name: 'Copy parameters' }).click();
-    await rows.first().getByRole('button', { name: 'Remove data source' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Ask AI to remove usages' }).click();
 
     const ours = () =>
       logged.filter((entry) => entry.event.startsWith('data_source_')).map((e) => [e.event, e.properties]);
@@ -274,7 +237,6 @@ test.describe('Data Sources panel', () => {
       ['data_source_adjust_selected', { data_source_id: '12', issue: 'running_when_it_should_not' }],
       ['data_source_adjust_selected', { data_source_id: '12', issue: 'wrong_params' }],
       ['data_source_params_copied', { data_source_id: '12' }],
-      ['data_source_usage_removal_requested', { data_source_id: '12', usage_count: 1 }],
     ]);
     expect(JSON.stringify(logged)).not.toContain('north');
   });
