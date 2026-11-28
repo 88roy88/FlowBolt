@@ -158,15 +158,36 @@ def _edit_note(files: list[str]) -> str:
     return f"[I edited these files myself: {', '.join(files)}]" if files else "[I edited the project files myself]"
 
 
+async def _commit_changes(
+    project_id: str, git: Git, message: str, *, author: str, note: Callable[[list[str]], str] | None
+) -> tuple[str, list[FileDiff]] | None:
+    sha = await git.commit_all(message)
+    if not sha:
+        return None
+    diffs = await git.commit_diffs(sha, max_chars=_MAX_DIFF_CHARS)
+    if note:
+        await save_message(project_id, ChatRole.user, note([d.path for d in diffs]))
+    await _emit_committed(project_id, sha, author=author, diffs=diffs)
+    return sha, diffs
+
+
 async def save_version(project_id: str, *, message: str = _USER_EDITS_MESSAGE, author: str = "user") -> None:
     async with _locked_workspace(project_id, [_not_busy, _not_detached]) as git:
-        sha = await git.commit_all(message)
-        if sha:
-            diffs = await git.commit_diffs(sha, max_chars=_MAX_DIFF_CHARS)
-            if author == "user":
-                await save_message(project_id, ChatRole.user, _edit_note([d.path for d in diffs]))
-                log_bi_event("manual_edits_committed", version_id=sha, file_count=len(diffs))
-            await _emit_committed(project_id, sha, author=author, diffs=diffs)
+        note = _edit_note if author == "user" else None
+        committed = await _commit_changes(project_id, git, message, author=author, note=note)
+        if committed and author == "user":
+            sha, diffs = committed
+            log_bi_event("manual_edits_committed", version_id=sha, file_count=len(diffs))
+        await _emit_dirty_files(project_id, git)
+
+
+async def commit_user_change(
+    project_id: str, *, message: str, note: str, change: Callable[[], Awaitable[None]]
+) -> None:
+    """Applies and commits one change. Needs a clean workspace, so no unsaved edits end up in the version."""
+    async with _locked_workspace(project_id, [_not_busy, _not_detached, _not_dirty]) as git:
+        await change()
+        await _commit_changes(project_id, git, message, author="user", note=lambda _: note)
         await _emit_dirty_files(project_id, git)
 
 

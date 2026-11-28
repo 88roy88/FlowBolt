@@ -190,13 +190,13 @@ Trigger: the user adds a data source to the project.
 | `data_source_type` | string | Yes | Type of data source, for now it is only `package`. |
 | `data_source_id` | string | Yes | ID of the underlying data source. |
 
-#### `data_source_removed` || Not yet implemented (no way to manually remove a data source)
-Trigger: the user removes a data source from the project.
+#### `data_source_removed`
+Trigger: a data source is removed from the project, after the user confirms. The backend logs it only when the removal succeeds. Removing is blocked while the app's code uses the data source.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `data_source_id` | string | Yes | ID of the data source. |
-| `data_source_type` | string | Yes | Type of data source, for now it is only `package`. |
+| `data_source_type` | string | Yes | Type of data source. |
 
 #### `data_source_sync_clicked`
 Trigger: the user clicks **Sync** on a data source. This puts a message in the chat input and attaches the data source. It sends nothing, so this event does not mean that a sync happened. Each click counts.
@@ -213,6 +213,14 @@ Trigger: the user picks an option in the **Adjust** menu of a data source. This 
 |---|---|---|---|
 | `data_source_id` | string | Yes | ID of the data source. |
 | `issue` | enum: `not_running`, `running_when_it_should_not`, `wrong_params` | Yes | The problem the user picked. |
+
+#### `data_source_usage_removal_requested`
+Trigger: removing a data source is blocked because the app's code uses it, and the user clicks **Ask AI to remove usages**. This puts a message in the chat input. It sends nothing.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `data_source_id` | string | Yes | ID of the data source. |
+| `usage_count` | integer | Yes | Number of places in the code that use the data source, as listed to the user. |
 
 #### `data_source_params_copied`
 Trigger: the user copies the parameters of a preview run, and the copy succeeds. The event never carries the parameters.

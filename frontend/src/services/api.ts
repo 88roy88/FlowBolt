@@ -1,5 +1,5 @@
 import { authSession, credentialsStore } from '../auth';
-import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectDataSource, DataSourceUpdate, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
+import type { AssignableRole, FileEntry, Project, AIModel, DataSourceSearchResult, ProjectDataSource, DataSourceUpdate, DataSourceUsage, ProjectMember, ProjectGroupGrant, PlatformUser, PlatformGroup, UserStatus, AdUser, AdGroup } from '../types';
 import type { LogEvent } from './logger';
 
 const BASE = '/api';
@@ -220,6 +220,14 @@ export async function fetchProjectDataSources(projectId: string): Promise<Projec
 
 export async function fetchDataSourceUpdates(projectId: string): Promise<DataSourceUpdate[]> {
   return request<DataSourceUpdate[]>(`/projects/${projectId}/data-sources/updates`);
+}
+
+export async function fetchDataSourceUsages(projectId: string, dataSourceId: string): Promise<DataSourceUsage[]> {
+  return request<DataSourceUsage[]>(`/projects/${projectId}/data-sources/${encodeURIComponent(dataSourceId)}/usages`);
+}
+
+export async function deleteProjectDataSource(projectId: string, dataSourceId: string): Promise<void> {
+  await request(`/projects/${projectId}/data-sources/${encodeURIComponent(dataSourceId)}`, { method: 'DELETE' });
 }
 
 export function downloadZip(projectId: string): void {
